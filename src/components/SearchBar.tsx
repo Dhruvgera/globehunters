@@ -11,7 +11,6 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
@@ -231,13 +230,14 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
       {/* Main Search Row */}
       <div className="flex items-center gap-3">
         {/* From */}
-        <div className="flex items-center gap-2 flex-1 border border-[#D3D3D3] rounded-xl px-3 py-2.5">
+        <div className="flex items-center gap-2 flex-1 border border-[#D3D3D3] rounded-xl px-3 py-2.5 bg-white">
           <MapPin className="w-5 h-5 text-[#010D50]" />
-          <Input
+          <input
+            type="text"
             placeholder="Country, city or airport"
             value={from}
             onChange={(e) => setFrom(e.target.value)}
-            className="border-0 text-sm font-medium focus-visible:ring-0 focus-visible:ring-offset-0 p-0 h-auto"
+            className="flex-1 outline-none text-sm font-medium text-[#010D50] placeholder:text-gray-400"
           />
         </div>
 
@@ -256,13 +256,14 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
         </Button>
 
         {/* To */}
-        <div className="flex items-center gap-2 flex-1 border border-[#D3D3D3] rounded-xl px-3 py-2.5">
+        <div className="flex items-center gap-2 flex-1 border border-[#D3D3D3] rounded-xl px-3 py-2.5 bg-white">
           <MapPin className="w-5 h-5 text-[#010D50]" />
-          <Input
+          <input
+            type="text"
             placeholder="Country, city or airport"
             value={to}
             onChange={(e) => setTo(e.target.value)}
-            className="border-0 text-sm font-medium focus-visible:ring-0 focus-visible:ring-offset-0 p-0 h-auto"
+            className="flex-1 outline-none text-sm font-medium text-[#010D50] placeholder:text-gray-400"
           />
         </div>
 
@@ -271,7 +272,7 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
           <PopoverTrigger asChild>
             <Button
               variant="outline"
-              className="flex items-center gap-2 flex-1 border border-[#D3D3D3] rounded-xl px-3 py-2.5 h-auto justify-start hover:bg-transparent"
+              className="flex items-center gap-2 flex-1 border-[#D3D3D3] rounded-xl px-3 py-2.5 h-auto justify-start hover:bg-transparent hover:border-[#D3D3D3]"
             >
               <Calendar className="w-5 h-5 text-[#010D50]" />
               <span className="text-sm font-medium text-[#010D50]">
@@ -281,12 +282,13 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
               </span>
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
+          <PopoverContent className="w-auto p-6 bg-white border shadow-lg" align="start">
             <CalendarComponent
               mode="single"
               selected={departureDate}
               onSelect={setDepartureDate}
               initialFocus
+              className="[--cell-size:3rem]"
             />
           </PopoverContent>
         </Popover>
@@ -297,25 +299,23 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
             <PopoverTrigger asChild>
               <Button
                 variant="outline"
-                className="flex items-center justify-between gap-2 flex-1 border border-[#D3D3D3] rounded-xl px-3 py-2.5 h-auto hover:bg-transparent"
+                className="flex items-center gap-2 flex-1 border-[#D3D3D3] rounded-xl px-3 py-2.5 h-auto justify-start hover:bg-transparent hover:border-[#D3D3D3]"
               >
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-[#010D50]" />
-                  <span className="text-sm font-medium text-[#010D50]">
-                    {returnDate
-                      ? format(returnDate, "EEE, dd MMM yyyy")
-                      : "Return Date"}
-                    </span>
-                </div>
-                <div className="w-4 h-4 rounded-full bg-[#F0F0F0]" />
+                <Calendar className="w-5 h-5 text-[#010D50]" />
+                <span className="text-sm font-medium text-[#010D50]">
+                  {returnDate
+                    ? format(returnDate, "EEE, dd MMM yyyy")
+                    : "Return Date"}
+                </span>
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
+            <PopoverContent className="w-auto p-6 bg-white border shadow-lg" align="start">
               <CalendarComponent
                 mode="single"
                 selected={returnDate}
                 onSelect={setReturnDate}
                 initialFocus
+                className="[--cell-size:3rem]"
                 disabled={(date) => {
                   return departureDate ? date < departureDate : false;
                 }}

@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Flight } from "@/types/flight";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import FlightInfoModal from "@/components/FlightInfoModal";
 
 interface FlightCardProps {
   flight: Flight;
@@ -11,6 +13,7 @@ interface FlightCardProps {
 }
 
 export default function FlightCard({ flight, showReturn = true }: FlightCardProps) {
+  const router = useRouter();
   const [showTicketOptions, setShowTicketOptions] = useState(false);
   const [showFlightInfo, setShowFlightInfo] = useState(false);
 
@@ -50,7 +53,7 @@ export default function FlightCard({ flight, showReturn = true }: FlightCardProp
         </div>
 
         {/* Outbound Flight */}
-        <div className="bg-[#EEF3F7] rounded-xl p-3 flex items-center gap-4">
+        <div className="bg-white rounded-xl p-3 flex items-center gap-4">
           {/* Departure */}
           <div className="flex flex-col gap-1 w-36">
             <span className="text-xs text-[#010D50]">
@@ -98,7 +101,7 @@ export default function FlightCard({ flight, showReturn = true }: FlightCardProp
 
         {/* Return Flight */}
         {showReturn && flight.inbound && (
-          <div className="bg-[#EEF3F7] rounded-xl p-3 flex items-center gap-4">
+          <div className="bg-white rounded-xl p-3 flex items-center gap-4">
             {/* Arrival (Return) */}
             <div className="flex flex-col gap-1 w-36">
               <span className="text-xs text-[#010D50]">
@@ -197,7 +200,10 @@ export default function FlightCard({ flight, showReturn = true }: FlightCardProp
                     {option.price}
                   </span>
                 </div>
-                <Button className="w-full bg-[#3754ED] hover:bg-[#2A3FB8] text-white border border-[#3754ED] rounded-full py-2 h-auto text-xs font-medium">
+                <Button 
+                  onClick={() => router.push("/booking")}
+                  className="w-full bg-[#3754ED] hover:bg-[#2A3FB8] text-white border border-[#3754ED] rounded-full py-2 h-auto text-xs font-medium"
+                >
                   View {option.type.split(" ")[1]}
                 </Button>
               </div>
@@ -213,6 +219,13 @@ export default function FlightCard({ flight, showReturn = true }: FlightCardProp
           </div>
         </div>
       )}
+
+      {/* Flight Info Modal */}
+      <FlightInfoModal
+        flight={flight}
+        open={showFlightInfo}
+        onOpenChange={setShowFlightInfo}
+      />
     </div>
   );
 }
