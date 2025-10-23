@@ -7,6 +7,7 @@ import {
   Dialog,
   DialogContent,
   DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Flight } from "@/types/flight";
@@ -36,6 +37,9 @@ export default function FlightInfoModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-6 gap-8 [&>button]:hidden bg-white rounded-3xl border-0">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Flight information</DialogTitle>
+        </DialogHeader>
         {/* Header with Flight Leg Selector */}
         <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
