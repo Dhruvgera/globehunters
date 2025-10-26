@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Flight } from "@/types/flight";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import FlightInfoModal from "@/components/FlightInfoModal";
+import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
 
 interface FlightCardProps {
   flight: Flight;

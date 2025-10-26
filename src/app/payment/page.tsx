@@ -1,8 +1,8 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import Navbar from "@/components/Navbar";
-import { ChevronLeft, Info, Phone, Check, Plane, Briefcase, Package, ShoppingBag, XCircle, CheckCircle2, Minus, Plus } from "lucide-react";
+import Navbar from "@/components/navigation/Navbar";
+import { ChevronLeft, Phone, Check, Briefcase, Package, ShoppingBag, XCircle, CheckCircle2, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -338,27 +338,51 @@ function PaymentContent() {
                 <div className="flex items-center justify-between p-3">
                   <span className="w-[524px] opacity-0">Select</span>
                   <div className="flex items-center gap-0">
-                    <button
+                    <div
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setProtectionPlan("basic")}
-                      className="w-[109px] flex flex-col items-center justify-center gap-1 py-0.5"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setProtectionPlan("basic");
+                        }
+                      }}
+                      className="w-[109px] flex flex-col items-center justify-center gap-1 py-0.5 cursor-pointer"
                     >
                       <Checkbox checked={protectionPlan === "basic"} />
                       <span className="text-xs font-medium text-[#010D50]">Basic</span>
-                    </button>
-                    <button
+                    </div>
+                    <div
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setProtectionPlan("premium")}
-                      className="w-[109px] flex flex-col items-center justify-center gap-1 py-0.5"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setProtectionPlan("premium");
+                        }
+                      }}
+                      className="w-[109px] flex flex-col items-center justify-center gap-1 py-0.5 cursor-pointer"
                     >
                       <Checkbox checked={protectionPlan === "premium"} />
                       <span className="text-xs font-medium text-[#010D50]">Premium</span>
-                    </button>
-                    <button
+                    </div>
+                    <div
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setProtectionPlan("all")}
-                      className="w-[109px] flex flex-col items-center justify-center gap-1 py-0.5"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setProtectionPlan("all");
+                        }
+                      }}
+                      className="w-[109px] flex flex-col items-center justify-center gap-1 py-0.5 cursor-pointer"
                     >
                       <Checkbox checked={protectionPlan === "all"} />
                       <span className="text-xs font-medium text-[#010D50]">All Included</span>
-                    </button>
+                    </div>
                   </div>
                 </div>
               </div>

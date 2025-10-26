@@ -1,4 +1,4 @@
-import Navbar from "@/components/Navbar";
+import Navbar from "@/components/navigation/Navbar";
 import { Tag, Plane, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -126,7 +126,7 @@ export default function OffersPage() {
 
         <div className="bg-white p-8 rounded-2xl shadow-md border border-[#DFE0E4] text-center">
           <h2 className="text-3xl font-bold text-[#010D50] mb-4">
-            Don't Miss Out!
+            Don&apos;t Miss Out!
           </h2>
           <p className="text-lg text-[#3A478A] mb-6">
             Subscribe to our newsletter and be the first to know about exclusive deals and offers

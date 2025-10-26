@@ -1,5 +1,5 @@
-import Navbar from "@/components/Navbar";
-import SearchBar from "@/components/SearchBar";
+import Navbar from "@/components/navigation/Navbar";
+import SearchBar from "@/components/search/SearchBar";
 import { Plane } from "lucide-react";
 
 export default function Home() {

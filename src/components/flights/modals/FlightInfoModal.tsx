@@ -335,7 +335,7 @@ export default function FlightInfoModal({
                             Non-Refundable
                           </span>
                           <span className="text-sm text-[#3A478A]">
-                            Ticket can't be refunded
+                            Ticket can&apos;t be refunded
                           </span>
                         </div>
                       </div>
@@ -351,7 +351,7 @@ export default function FlightInfoModal({
                             Changes not allowed
                           </span>
                           <span className="text-sm text-[#3A478A]">
-                            Flights can't be changed after booking
+                            Flights can&apos;t be changed after booking
                           </span>
                         </div>
                       </div>

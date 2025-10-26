@@ -5,6 +5,8 @@ import { X, Info, ChevronLeft, ChevronRight, ShoppingBag, Briefcase, Package, XC
 import {
   Dialog,
   DialogContent,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
@@ -136,6 +138,9 @@ export default function UpgradeOptionsModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[1440px] max-h-[90vh] overflow-y-auto p-4 gap-2 [&>button]:hidden bg-white rounded-3xl border-0">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Upgrade options</DialogTitle>
+        </DialogHeader>
         {/* Close Button */}
         <button
           onClick={() => onOpenChange(false)}

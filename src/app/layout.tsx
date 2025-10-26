@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import SmoothScrolling from "@/components/SmoothScrolling";
-import RouteTransitions from "@/components/RouteTransitions";
+import SmoothScrolling from "@/components/animations/SmoothScrolling";
+import RouteTransitions from "@/components/animations/RouteTransitions";
 
 const inter = Inter({
   subsets: ["latin"],

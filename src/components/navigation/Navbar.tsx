@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Phone } from "lucide-react";
 
 export default function Navbar() {
@@ -9,10 +10,8 @@ export default function Navbar() {
           {/* Logo and Navigation */}
           <div className="flex items-center gap-16">
             {/* Logo */}
-            <Link href="/" className="flex items-center">
-              <div className="h-7 w-36 bg-gradient-to-r from-blue-600 to-blue-800 rounded flex items-center justify-center text-white font-bold text-base">
-                GLOBEHUNTERS
-              </div>
+            <Link href="/" className="flex items-center" aria-label="GlobeHunters home">
+              <Image src="/gh-logo.svg" alt="GlobeHunters" width={144} height={28} priority />
             </Link>
 
             {/* Navigation Links */}

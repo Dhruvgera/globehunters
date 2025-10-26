@@ -1,4 +1,4 @@
-import Navbar from "@/components/Navbar";
+import Navbar from "@/components/navigation/Navbar";
 import { Phone, Mail, MapPin } from "lucide-react";
 
 export default function ContactPage() {
@@ -12,7 +12,7 @@ export default function ContactPage() {
             Contact Us
           </h1>
           <p className="text-xl text-[#3A478A]">
-            We're here to help you plan your perfect journey
+            We&apos;re here to help you plan your perfect journey
           </p>
         </div>
 

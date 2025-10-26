@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import Navbar from "@/components/Navbar";
-import SearchBar from "@/components/SearchBar";
-import FlightCard from "@/components/FlightCard";
+import Navbar from "@/components/navigation/Navbar";
+import SearchBar from "@/components/search/SearchBar";
+import FlightCard from "@/components/flights/FlightCard";
 import { mockFlights, mockDatePrices, mockAirlines, mockAirports } from "@/data/mockFlights";
 import { ChevronDown, Phone, Plane } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,7 +11,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 
 function SearchPageContent() {
-  const searchParams = useSearchParams();
   const [selectedStops, setSelectedStops] = useState<number[]>([0]);
   const [selectedAirlines, setSelectedAirlines] = useState<string[]>([
     "Air India",

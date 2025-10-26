@@ -2,13 +2,13 @@
 
 import { Suspense, useState } from "react";
 import { useRouter } from "next/navigation";
-import Navbar from "@/components/Navbar";
-import { ChevronLeft, Info, Phone, Check, Plane, Briefcase, Package, ShoppingBag, Star } from "lucide-react";
+import Navbar from "@/components/navigation/Navbar";
+import { ChevronLeft, Info, Phone, Plane, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import Link from "next/link";
-import UpgradeOptionsModal from "@/components/UpgradeOptionsModal";
+import UpgradeOptionsModal from "@/components/flights/modals/UpgradeOptionsModal";
 
 function BookingContent() {
   const router = useRouter();
@@ -86,7 +86,7 @@ function BookingContent() {
                 <p>
                   We strongly recommend you check the entry requirements for any
                   country you travel through. You can find this info on the
-                  website of the countries' relevant authorities, or via your
+                  website of the countries&apos; relevant authorities, or via your
                   embassy or consulate.
                 </p>
               </div>
@@ -538,7 +538,7 @@ function BookingContent() {
                     <p className="text-sm font-medium text-[#010D50]">
                       The booking process was incredibly fast and easy to
                       navigate. The price breakdown was clear and I appreciate
-                      knowing exactly what I'm paying for.
+                      knowing exactly what I&apos;m paying for.
                     </p>
                   </div>
                 </div>
