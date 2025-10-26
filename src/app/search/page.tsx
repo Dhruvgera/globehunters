@@ -229,10 +229,10 @@ function SearchPageContent() {
                     className="w-full"
                   />
                   <div className="flex items-center justify-between w-full">
-                    <span className="text-xs text-[#010D50]">
+                    <span className="text-xs text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
                       £{priceRange[0]}
                     </span>
-                    <span className="text-xs text-[#010D50]">
+                    <span className="text-xs text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
                       £{priceRange[1]}
                     </span>
                   </div>
@@ -274,11 +274,11 @@ function SearchPageContent() {
                         className="w-full"
                       />
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-[#010D50]">
+                        <span className="text-sm text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
                           {String(outboundTimeRange[0]).padStart(2, "0")}:00
                         </span>
-                        <span className="text-xs text-[#010D50]">
-                          {String(outboundTimeRange[1]).padStart(2, "0")}:00
+                        <span className="text-sm text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
+                          {outboundTimeRange[1] === 24 ? "23:59" : `${String(outboundTimeRange[1]).padStart(2, "0")}:00`}
                         </span>
                       </div>
                     </div>
@@ -300,11 +300,11 @@ function SearchPageContent() {
                         className="w-full"
                       />
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-[#010D50]">
+                        <span className="text-sm text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
                           {String(inboundTimeRange[0]).padStart(2, "0")}:00
                         </span>
-                        <span className="text-xs text-[#010D50]">
-                          {String(inboundTimeRange[1]).padStart(2, "0")}:00
+                        <span className="text-sm text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
+                          {inboundTimeRange[1] === 24 ? "23:59" : `${String(inboundTimeRange[1]).padStart(2, "0")}:00`}
                         </span>
                       </div>
                     </div>
@@ -347,10 +347,10 @@ function SearchPageContent() {
                         className="w-full"
                       />
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-[#010D50]">
+                        <span className="text-xs text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
                           {outboundJourneyTime[0]} Hours
                         </span>
-                        <span className="text-xs text-[#010D50]">
+                        <span className="text-xs text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
                           {outboundJourneyTime[1]} Hours
                         </span>
                       </div>
@@ -373,10 +373,10 @@ function SearchPageContent() {
                         className="w-full"
                       />
                       <div className="flex items-center justify-between">
-                        <span className="text-xs text-[#010D50]">
+                        <span className="text-xs text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
                           {inboundJourneyTime[0]} Hours
                         </span>
-                        <span className="text-xs text-[#010D50]">
+                        <span className="text-xs text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
                           {inboundJourneyTime[1]} Hours
                         </span>
                       </div>

@@ -72,7 +72,7 @@ export default function FlightCard({ flight, showReturn = true }: FlightCardProp
           <div className="flex flex-col items-center justify-center flex-1 gap-1">
             <div className="flex items-center w-full">
               <div className="flex-1 border-t border-dashed border-[#010D50]" />
-              <div className="px-3 py-1 bg-[#F7DFD8] rounded-full">
+              <div className="px-3 py-0">
                 <span className="text-xs font-medium text-[#008234]">
                   {flight.outbound.stopDetails}
                 </span>
@@ -120,7 +120,7 @@ export default function FlightCard({ flight, showReturn = true }: FlightCardProp
             <div className="flex flex-col items-center justify-center flex-1 gap-1">
               <div className="flex items-center w-full">
                 <div className="flex-1 border-t border-dashed border-[#010D50]" />
-                <div className="px-3 py-1 bg-[#F7DFD8] rounded-full">
+                <div className="px-3 py-0">
                   <span className="text-xs font-medium text-[#008234]">
                     {flight.inbound.stopDetails}
                   </span>

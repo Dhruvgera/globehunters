@@ -28,3 +28,4 @@ export default function RouteTransitions({ children }: { children: ReactNode }) 
     </AnimatePresence>
   );
 }
+
