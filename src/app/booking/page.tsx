@@ -124,13 +124,13 @@ function BookingContent() {
             {/* Flight Summary Cards */}
             <div className="flex flex-col gap-3">
               {/* Outbound Flight */}
-              <div className="bg-[#F5F7FF] rounded-xl p-4 flex gap-4">
-                <div className="flex-1 flex flex-col gap-6">
+              <div className="bg-[#F5F7FF] rounded-xl p-4 flex flex-col sm:flex-row gap-4 overflow-hidden">
+                <div className="flex-1 flex flex-col gap-6 min-w-0">
                   <span className="text-sm font-semibold text-[#010D50]">
                     London to Lagos
                   </span>
                   <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <div className="flex items-center gap-3">
                         <span className="text-sm text-[#010D50]">LGW</span>
                         <span className="text-sm font-semibold text-[#010D50]">
@@ -158,7 +158,7 @@ function BookingContent() {
                         <span className="text-sm text-[#010D50]">LOS</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 text-sm text-[#010D50]">
+                    <div className="flex items-center gap-3 text-sm text-[#010D50] flex-wrap">
                       <span>1 Stop</span>
                       <div className="w-1 h-1 rounded-full bg-[#010D50]" />
                       <span>13h 10m</span>
@@ -167,7 +167,7 @@ function BookingContent() {
                     </div>
                   </div>
                 </div>
-                <div className="flex flex-col justify-between items-end gap-2">
+                <div className="flex sm:items-end sm:justify-between items-start gap-2 sm:flex-col">
                   <div className="flex items-center gap-2">
                     <div className="w-10 h-10 bg-[#DA0E29] rounded flex items-center justify-center">
                       <Plane className="w-5 h-5 text-white" />
@@ -188,13 +188,13 @@ function BookingContent() {
               </div>
 
               {/* Return Flight */}
-              <div className="bg-[#F5F7FF] rounded-xl p-4 flex gap-4">
-                <div className="flex-1 flex flex-col gap-6">
+              <div className="bg-[#F5F7FF] rounded-xl p-4 flex flex-col sm:flex-row gap-4 overflow-hidden">
+                <div className="flex-1 flex flex-col gap-6 min-w-0">
                   <span className="text-sm font-semibold text-[#010D50]">
                     Lagos to London
                   </span>
                   <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <div className="flex items-center gap-3">
                         <span className="text-sm text-[#010D50]">LOS</span>
                         <span className="text-sm font-semibold text-[#010D50]">
@@ -222,7 +222,7 @@ function BookingContent() {
                         <span className="text-sm text-[#010D50]">LGW</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 text-sm text-[#010D50]">
+                    <div className="flex items-center gap-3 text-sm text-[#010D50] flex-wrap">
                       <span>1 Stop</span>
                       <div className="w-1 h-1 rounded-full bg-[#010D50]" />
                       <span>13h 10m</span>
@@ -231,7 +231,7 @@ function BookingContent() {
                     </div>
                   </div>
                 </div>
-                <div className="flex flex-col justify-between items-end gap-2">
+                <div className="flex sm:items-end sm:justify-between items-start gap-2 sm:flex-col">
                   <div className="flex items-center gap-2">
                     <div className="w-10 h-10 bg-[#DA0E29] rounded flex items-center justify-center">
                       <Plane className="w-5 h-5 text-white" />

@@ -64,3 +64,12 @@
 }
 
 /* Calendar Styling removed: use shadcn calendar component styles */
+
+/* Utility: hide native scrollbars (we'll use custom indicators instead) */
+.no-scrollbar {
+  -ms-overflow-style: none; /* IE and Edge */
+  scrollbar-width: none; /* Firefox */
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
