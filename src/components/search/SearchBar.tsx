@@ -65,7 +65,7 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
       }`}
     >
       {/* Top Row - Trip Type and Passengers */}
-      <div className="flex items-center gap-6 mb-4">
+      <div className="flex flex-wrap items-center gap-4 sm:gap-6 mb-4">
         {/* Trip Type Selector */}
         <Popover>
           <PopoverTrigger asChild>
@@ -228,7 +228,7 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
       </div>
 
       {/* Main Search Row */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
         {/* From */}
         <div className="flex items-center gap-2 flex-1 border border-[#D3D3D3] rounded-xl px-3 py-2.5 bg-white">
           <MapPin className="w-5 h-5 text-[#010D50]" />
@@ -245,7 +245,7 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="rounded-full shrink-0 h-8 w-8"
+          className="rounded-full shrink-0 h-8 w-8 md:self-auto self-end"
           onClick={() => {
             const temp = from;
             setFrom(to);
@@ -327,7 +327,7 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
         {/* Search Button */}
         <Button
           onClick={handleSearch}
-          className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-xl px-5 py-2.5 h-auto gap-2 text-sm font-medium"
+          className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-xl px-5 py-2.5 h-auto gap-2 text-sm font-medium w-full md:w-auto"
         >
           <Search className="w-5 h-5" />
           Search

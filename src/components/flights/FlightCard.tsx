@@ -53,9 +53,9 @@ export default function FlightCard({ flight, showReturn = true }: FlightCardProp
         </div>
 
         {/* Outbound Flight */}
-        <div className="bg-white rounded-xl p-3 flex items-center gap-4">
+        <div className="bg-white rounded-xl p-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
           {/* Departure */}
-          <div className="flex flex-col gap-1 w-36">
+          <div className="flex flex-col gap-1 w-full sm:w-36">
             <span className="text-xs text-[#010D50]">
               {flight.outbound.date}
             </span>
@@ -85,7 +85,7 @@ export default function FlightCard({ flight, showReturn = true }: FlightCardProp
           </div>
 
           {/* Arrival */}
-          <div className="flex flex-col items-end gap-1 w-36">
+          <div className="flex flex-col sm:items-end gap-1 w-full sm:w-36">
             <span className="text-xs text-[#010D50]">
               {flight.outbound.date}
             </span>
@@ -101,9 +101,9 @@ export default function FlightCard({ flight, showReturn = true }: FlightCardProp
 
         {/* Return Flight */}
         {showReturn && flight.inbound && (
-          <div className="bg-white rounded-xl p-3 flex items-center gap-4">
+          <div className="bg-white rounded-xl p-3 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
             {/* Arrival (Return) */}
-            <div className="flex flex-col gap-1 w-36">
+            <div className="flex flex-col gap-1 w-full sm:w-36">
               <span className="text-xs text-[#010D50]">
                 {flight.inbound.date}
               </span>
@@ -133,7 +133,7 @@ export default function FlightCard({ flight, showReturn = true }: FlightCardProp
             </div>
 
             {/* Departure (Return) */}
-            <div className="flex flex-col items-end gap-1 w-36">
+            <div className="flex flex-col sm:items-end gap-1 w-full sm:w-36">
               <span className="text-xs text-[#010D50]">
                 {flight.inbound.date}
               </span>
@@ -153,13 +153,13 @@ export default function FlightCard({ flight, showReturn = true }: FlightCardProp
       <div className="border-t border-dashed border-[#DAE0FF] my-4" />
 
       {/* Price and Actions */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
         <span className="text-lg font-medium text-[#010D50]">
           {flight.currency}
           {flight.pricePerPerson} /per person
         </span>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
           <Button
             variant="ghost"
             className="bg-[rgba(55,84,237,0.12)] hover:bg-[rgba(55,84,237,0.2)] text-[#3754ED] rounded-full px-4 py-2 h-auto text-xs font-medium"
@@ -185,11 +185,11 @@ export default function FlightCard({ flight, showReturn = true }: FlightCardProp
       {/* Expandable Ticket Options */}
       {showTicketOptions && flight.ticketOptions && (
         <div className="mt-4 pt-4 border-t border-[#EEEEEE]">
-          <div className="flex items-stretch gap-2">
+          <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory">
             {flight.ticketOptions.map((option) => (
               <div
                 key={option.type}
-                className="flex-1 border border-[#EEEEEE] rounded-lg p-3 flex flex-col gap-3"
+                className="min-w-[220px] sm:min-w-0 flex-1 border border-[#EEEEEE] rounded-lg p-3 flex flex-col gap-3 snap-start"
               >
                 <div className="flex flex-col gap-1">
                   <span className="text-xs text-[#010D50]">

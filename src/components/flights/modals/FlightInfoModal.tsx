@@ -36,7 +36,7 @@ export default function FlightInfoModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto p-6 gap-8 [&>button]:hidden bg-white rounded-3xl border-0">
+      <DialogContent className="max-w-[min(100vw-24px,960px)] max-h-[90vh] overflow-y-auto p-4 sm:p-6 gap-6 sm:gap-8 [&>button]:hidden bg-white rounded-3xl border-0">
         <DialogHeader className="sr-only">
           <DialogTitle>Flight information</DialogTitle>
         </DialogHeader>
@@ -116,7 +116,7 @@ export default function FlightInfoModal({
                     </div>
 
                     {/* Flight Route */}
-                    <div className="flex items-center justify-between gap-8">
+                    <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-6 md:gap-8">
                       {/* Route Details */}
                       <div className="flex items-center flex-1 gap-4">
                         {/* Visual Timeline with Location Icons */}
@@ -161,9 +161,9 @@ export default function FlightInfoModal({
                       </div>
 
                       {/* Times */}
-                      <div className="flex flex-col justify-between gap-12">
+                      <div className="flex flex-row md:flex-col justify-between md:justify-between gap-6 md:gap-12">
                         {/* Departure Time */}
-                        <div className="flex flex-col items-end gap-1">
+                        <div className="flex flex-col items-end md:items-end gap-1">
                           <span className="text-sm font-semibold text-[#010D50]">
                             {currentLeg.departureTime}
                           </span>

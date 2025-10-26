@@ -6,12 +6,12 @@ export default function ContactPage() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
       <Navbar />
       
-      <main className="mx-auto max-w-[1564px] px-[178px] py-20">
-        <div className="text-center mb-12">
-          <h1 className="text-5xl font-bold text-[#010D50] mb-4">
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 xl:px-12 py-12 sm:py-16 lg:py-20">
+        <div className="text-center mb-10 sm:mb-12">
+          <h1 className="text-3xl sm:text-5xl font-bold text-[#010D50] mb-4">
             Contact Us
           </h1>
-          <p className="text-xl text-[#3A478A]">
+          <p className="text-base sm:text-lg lg:text-xl text-[#3A478A]">
             We&apos;re here to help you plan your perfect journey
           </p>
         </div>

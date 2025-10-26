@@ -96,12 +96,12 @@ function SearchPageContent() {
       <Navbar />
 
       {/* Search Bar Section */}
-      <div className="mx-auto max-w-7xl px-8 py-4">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
         <SearchBar compact />
       </div>
 
       {/* Date Price Selector */}
-      <div className="mx-auto max-w-7xl px-8 mb-6 mt-6">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mb-6 mt-6">
         <div className="flex items-center gap-2 overflow-x-auto">
           <Button
             variant="ghost"
@@ -141,10 +141,10 @@ function SearchPageContent() {
       </div>
 
       {/* Main Content */}
-      <div className="mx-auto max-w-7xl px-8 pb-8">
-        <div className="flex gap-4">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-8">
+        <div className="flex flex-col lg:flex-row gap-4">
           {/* Filters Sidebar */}
-          <div className="w-72 flex flex-col gap-4">
+          <div className="w-full lg:w-72 flex flex-col gap-4 order-3 lg:order-1">
             {/* Filter Header */}
             <div className="flex flex-col gap-1">
               <span className="text-lg font-semibold text-[#010D50]">
@@ -530,16 +530,16 @@ function SearchPageContent() {
           </div>
 
           {/* Flight Results */}
-          <div className="flex-1 flex flex-col gap-2">
+          <div className="flex-1 flex flex-col gap-2 order-2 lg:order-2">
             {filteredFlights.map((flight) => (
               <FlightCard key={flight.id} flight={flight} />
             ))}
           </div>
 
           {/* Right Sidebar - Web Ref and Search Summary */}
-          <div className="w-80 flex flex-col gap-4">
+          <div className="w-full lg:w-80 flex flex-col gap-4 order-1 lg:order-3">
             {/* Contact Card */}
-            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-3 sticky top-4">
+            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-3 sticky top-20">
               <span className="text-base font-semibold text-[#3754ED]">
                 WEB REF: IN-649707636
               </span>

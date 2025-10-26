@@ -18,9 +18,9 @@ function BookingContent() {
       <Navbar />
 
       {/* Main Content */}
-      <div className="mx-auto max-w-7xl px-8 py-4">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           {/* Back Button */}
           <Link
             href="/search"
@@ -31,7 +31,7 @@ function BookingContent() {
           </Link>
 
           {/* Progress Steps */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
             <div className="flex items-center gap-1.5">
               <div className="w-5 h-5 rounded-full border border-[#010D50] flex items-center justify-center">
                 <span className="text-[10px] font-medium text-[#010D50]">1</span>
@@ -68,7 +68,7 @@ function BookingContent() {
         </div>
 
         {/* Content Grid */}
-        <div className="flex gap-4">
+        <div className="flex flex-col lg:flex-row gap-4">
           {/* Left Column - Forms */}
           <div className="flex-1 flex flex-col gap-3">
             {/* Travel Documents Alert */}
@@ -285,13 +285,13 @@ function BookingContent() {
                 </div>
 
                 {/* Form Fields */}
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <div className="flex flex-col gap-2 flex-1">
                     <label className="text-sm font-medium text-[#010D50]">
                       Name
                     </label>
-                    <div className="flex gap-2">
-                      <select className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium text-[#010D50] bg-white w-24">
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <select className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium text-[#010D50] bg-white w-full sm:w-24">
                         <option>Mr.</option>
                         <option>Mrs.</option>
                         <option>Ms.</option>
@@ -312,7 +312,7 @@ function BookingContent() {
                   </div>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <div className="flex flex-col gap-2 flex-1">
                     <label className="text-sm font-medium text-[#010D50]">
                       Date of Birth
@@ -360,13 +360,13 @@ function BookingContent() {
               </div>
 
               {/* Similar form fields as above */}
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <div className="flex flex-col gap-2 flex-1">
                   <label className="text-sm font-medium text-[#010D50]">
                     Name
                   </label>
-                  <div className="flex gap-2">
-                    <select className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium text-[#010D50] bg-white w-24">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <select className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium text-[#010D50] bg-white w-full sm:w-24">
                       <option>Mr.</option>
                       <option>Mrs.</option>
                       <option>Ms.</option>
@@ -419,7 +419,7 @@ function BookingContent() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
                 <Button
                   onClick={() => setShowUpgradeModal(true)}
                   variant="outline"
@@ -440,9 +440,9 @@ function BookingContent() {
           </div>
 
           {/* Right Sidebar */}
-          <div className="w-[482px] flex flex-col gap-4">
+          <div className="w-full lg:w-[482px] flex flex-col gap-4">
             {/* Price Summary */}
-            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-6">
+            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-6 order-2 lg:order-none">
               <span className="text-sm font-semibold text-[#010D50]">
                 Price Summary
               </span>
@@ -478,7 +478,7 @@ function BookingContent() {
             </div>
 
             {/* Web Ref Card */}
-            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
+            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4 order-1 lg:order-none">
               <span className="text-base font-semibold text-[#3754ED]">
                 WEB REF: IN-649707636
               </span>
@@ -502,7 +502,7 @@ function BookingContent() {
             </div>
 
             {/* Customer Reviews */}
-            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-6">
+            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-6 order-3 lg:order-none">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-[#010D50]">
                   Customer Reviews
@@ -515,9 +515,9 @@ function BookingContent() {
                 </div>
               </div>
 
-              <div className="flex gap-2 overflow-x-auto">
+              <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory pb-2">
                 {/* Review Card 1 */}
-                <div className="flex-1 min-w-0">
+                <div className="min-w-[240px] sm:min-w-0 flex-1 snap-start">
                   <div className="bg-[#F5F7FF] rounded-lg p-3 flex flex-col gap-1">
                     <div className="flex items-center gap-1">
                       <div className="w-8 h-8 rounded-full bg-[#C0C0C0]" />
@@ -544,7 +544,7 @@ function BookingContent() {
                 </div>
 
                 {/* Review Card 2 */}
-                <div className="flex-1 min-w-0">
+                <div className="min-w-[240px] sm:min-w-0 flex-1 snap-start">
                   <div className="bg-[#F5F7FF] rounded-lg p-3 flex flex-col gap-1">
                     <div className="flex items-center gap-1">
                       <div className="w-8 h-8 rounded-full bg-[#C0C0C0]" />

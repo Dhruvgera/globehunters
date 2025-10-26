@@ -137,7 +137,7 @@ export default function UpgradeOptionsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[1440px] max-h-[90vh] overflow-y-auto p-4 gap-2 [&>button]:hidden bg-white rounded-3xl border-0">
+      <DialogContent className="max-w-[min(100vw-24px,960px)] max-h-[90vh] overflow-y-auto p-4 sm:p-6 gap-3 sm:gap-4 [&>button]:hidden bg-white rounded-3xl border-0">
         <DialogHeader className="sr-only">
           <DialogTitle>Upgrade options</DialogTitle>
         </DialogHeader>
@@ -151,12 +151,12 @@ export default function UpgradeOptionsModal({
         </button>
 
         {/* Fare Options */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 overflow-x-auto snap-x snap-mandatory pb-1">
           {fareOptions.map((fare) => (
             <div
               key={fare.id}
               onClick={() => setSelectedFare(fare.id)}
-              className={`flex-1 rounded-[20px] p-4 cursor-pointer transition-all ${
+              className={`min-w-[260px] sm:min-w-0 flex-1 rounded-[20px] p-4 cursor-pointer transition-all snap-start ${
                 selectedFare === fare.id
                   ? "border-[3px] border-[#3754ED] bg-white shadow-[0px_4px_12px_0px_rgba(0,0,0,0.32)]"
                   : "border border-[#DFE0E4] bg-[#F5F7FF] shadow-[0px_4px_12px_0px_rgba(0,0,0,0.32)]"

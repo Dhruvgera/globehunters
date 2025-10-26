@@ -24,7 +24,7 @@ function PaymentContent() {
       <Navbar />
 
       {/* Main Content */}
-      <div className="mx-auto max-w-7xl px-6 py-4 flex flex-col gap-4">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 py-4 flex flex-col gap-4">
         {/* Back to Fare Options + Progress Steps */}
         <div className="flex flex-col gap-4">
           {/* Back Link */}
@@ -73,7 +73,7 @@ function PaymentContent() {
         </div>
 
         {/* Main Layout */}
-        <div className="flex gap-4">
+        <div className="flex flex-col lg:flex-row gap-4">
           {/* Left Column */}
           <div className="flex-1 flex flex-col gap-4">
             {/* Flight Summary Cards */}
@@ -277,7 +277,7 @@ function PaymentContent() {
             </div>
 
             {/* iAssure Protection Plan */}
-            <div className="bg-white border-2 border-[#3754ED] rounded-xl p-3 flex flex-col gap-3 relative">
+            <div className="bg-white border-2 border-[#3754ED] rounded-xl p-3 flex flex-col gap-3 relative overflow-x-auto">
               <div className="bg-[#F5F7FF] rounded-full px-4 py-3 w-fit">
                 <span className="text-sm font-semibold text-[#010D50]">
                   iAssure Protection (Recommended)
@@ -285,12 +285,12 @@ function PaymentContent() {
               </div>
 
               {/* Highlight box */}
-              <div className="absolute right-[173px] top-[94px] w-[110px] h-[637px] bg-gradient-to-b from-transparent via-[#C9FFDF] to-transparent pointer-events-none" />
+              <div className="hidden md:block absolute right-[173px] top-[94px] w-[110px] h-[637px] bg-gradient-to-b from-transparent via-[#C9FFDF] to-transparent pointer-events-none" />
 
               {/* Features and Pricing Grid */}
               <div className="flex flex-col gap-1">
                 {/* Price Row */}
-                <div className="flex items-center justify-between bg-[#F5F7FF] rounded-lg p-3">
+                <div className="flex items-center justify-between bg-[#F5F7FF] rounded-lg p-3 min-w-[640px] md:min-w-0">
                   <span className="w-[524px] text-sm font-medium text-[#010D50] opacity-0">Price</span>
                   <div className="flex items-center gap-0">
                     <div className="w-[109px] text-center py-0.5">
@@ -318,7 +318,7 @@ function PaymentContent() {
                   "24hrs price match guarantee",
                   "₹25 credit for future bookings",
                 ].map((feature, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 border-b border-[#F5F7FF]">
+                  <div key={i} className="flex items-center justify-between p-3 border-b border-[#F5F7FF] min-w-[640px] md:min-w-0">
                     <span className="w-[524px] text-sm font-medium text-[#010D50]">{feature}</span>
                     <div className="flex items-center gap-0">
                       <div className="w-[109px] flex items-center justify-center">
@@ -335,7 +335,7 @@ function PaymentContent() {
                 ))}
 
                 {/* Plan Selection Row */}
-                <div className="flex items-center justify-between p-3">
+                <div className="flex items-center justify-between p-3 min-w-[640px] md:min-w-0">
                   <span className="w-[524px] opacity-0">Select</span>
                   <div className="flex items-center gap-0">
                     <div
@@ -400,7 +400,7 @@ function PaymentContent() {
                   <label className="text-sm font-medium text-[#010D50]">Card Number</label>
                   <Input
                     placeholder="1234 5678 1234 5678"
-                    className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium"
+                    className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium w-full"
                   />
                 </div>
 
@@ -409,24 +409,24 @@ function PaymentContent() {
                   <label className="text-sm font-medium text-[#010D50]">Cardholder Name</label>
                   <Input
                     placeholder="Name"
-                    className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium"
+                    className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium w-full"
                   />
                 </div>
 
                 {/* Expiry and CVV */}
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <div className="flex-1 flex flex-col gap-2">
                     <label className="text-sm font-medium text-[#010D50]">Expiry Date</label>
                     <Input
                       placeholder="01/26"
-                      className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium"
+                      className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium w-full"
                     />
                   </div>
-                  <div className="w-[383px] flex flex-col gap-2">
+                  <div className="w-full sm:w-[383px] flex flex-col gap-2">
                     <label className="text-sm font-medium text-[#010D50]">CVV/CVC</label>
                     <Input
                       placeholder="123"
-                      className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium"
+                      className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium w-full"
                     />
                   </div>
                 </div>
@@ -448,39 +448,39 @@ function PaymentContent() {
                       <label className="text-sm font-medium text-[#010D50]">Street Address 1</label>
                       <Input
                         placeholder="Street Address"
-                        className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium"
+                        className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium w-full"
                       />
                     </div>
                     <div className="flex-1 flex flex-col gap-2">
                       <label className="text-sm font-medium text-[#010D50]">Street Address 2</label>
                       <Input
                         placeholder="Street Address"
-                        className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium"
+                        className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium w-full"
                       />
                     </div>
                   </div>
 
                   {/* City, State, Zip Row */}
-                  <div className="flex gap-3">
-                    <div className="w-[392px] flex flex-col gap-2">
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="w-full sm:w-[392px] flex flex-col gap-2">
                       <label className="text-sm font-medium text-[#010D50]">City</label>
                       <Input
                         placeholder="Town/City"
-                        className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium"
+                        className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium w-full"
                       />
                     </div>
-                    <div className="w-[262px] flex flex-col gap-2">
+                    <div className="w-full sm:w-[262px] flex flex-col gap-2">
                       <label className="text-sm font-medium text-[#010D50]">State</label>
                       <Input
                         placeholder="123"
-                        className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium"
+                        className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium w-full"
                       />
                     </div>
                     <div className="flex-1 flex flex-col gap-2">
                       <label className="text-sm font-medium text-[#010D50]">Zip/Postal Code</label>
                       <Input
                         placeholder="123"
-                        className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium"
+                        className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium w-full"
                       />
                     </div>
                   </div>
@@ -537,7 +537,7 @@ function PaymentContent() {
           </div>
 
           {/* Right Sidebar */}
-          <div className="w-[482px] flex flex-col gap-4">
+          <div className="w-full lg:w-[482px] flex flex-col gap-4">
             {/* Price Summary */}
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-3 flex flex-col gap-6">
               <span className="text-sm font-semibold text-[#010D50]">Price Summary</span>

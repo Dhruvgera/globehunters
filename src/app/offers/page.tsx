@@ -70,15 +70,15 @@ export default function OffersPage() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
       <Navbar />
       
-      <main className="mx-auto max-w-[1564px] px-[178px] py-20">
-        <div className="text-center mb-12">
+      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 xl:px-12 py-12 sm:py-16 lg:py-20">
+        <div className="text-center mb-10 sm:mb-12">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <Tag className="w-10 h-10 text-[#3754ED]" />
-            <h1 className="text-5xl font-bold text-[#010D50]">
+            <Tag className="w-8 h-8 sm:w-10 sm:h-10 text-[#3754ED]" />
+            <h1 className="text-3xl sm:text-5xl font-bold text-[#010D50]">
               Special Offers
             </h1>
           </div>
-          <p className="text-xl text-[#3A478A]">
+          <p className="text-base sm:text-lg lg:text-xl text-[#3A478A]">
             Exclusive deals and discounts on flights worldwide
           </p>
         </div>
@@ -124,20 +124,20 @@ export default function OffersPage() {
           ))}
         </div>
 
-        <div className="bg-white p-8 rounded-2xl shadow-md border border-[#DFE0E4] text-center">
-          <h2 className="text-3xl font-bold text-[#010D50] mb-4">
+        <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-[#DFE0E4] text-center">
+          <h2 className="text-2xl sm:text-3xl font-bold text-[#010D50] mb-4">
             Don&apos;t Miss Out!
           </h2>
-          <p className="text-lg text-[#3A478A] mb-6">
+          <p className="text-base sm:text-lg text-[#3A478A] mb-6">
             Subscribe to our newsletter and be the first to know about exclusive deals and offers
           </p>
-          <div className="flex gap-4 max-w-md mx-auto">
+          <div className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
             <input
               type="email"
               placeholder="Enter your email"
               className="flex-1 px-4 py-3 border border-[#DFE0E4] rounded-lg focus:ring-2 focus:ring-[#3754ED] focus:border-transparent outline-none"
             />
-            <Button className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white px-8 py-3 rounded-lg font-semibold">
+            <Button className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white px-8 py-3 rounded-lg font-semibold sm:w-auto w-full">
               Subscribe
             </Button>
           </div>
