@@ -245,7 +245,7 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="rounded-full shrink-0 h-8 w-8 md:self-auto self-end"
+          className="rounded-full shrink-0 h-8 w-8 self-center md:self-auto -my-1 md:my-0 border border-[#D3D3D3] bg-white shadow-sm"
           onClick={() => {
             const temp = from;
             setFrom(to);
@@ -282,13 +282,13 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
               </span>
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-6 bg-white border shadow-lg" align="start">
+          <PopoverContent className="w-auto p-3 sm:p-4 bg-white border shadow-md" align="start">
             <CalendarComponent
               mode="single"
               selected={departureDate}
               onSelect={setDepartureDate}
               initialFocus
-              className="[--cell-size:3rem]"
+              className="text-sm [--cell-size:2rem] sm:[--cell-size:2.25rem] lg:[--cell-size:2.5rem]"
             />
           </PopoverContent>
         </Popover>
@@ -309,13 +309,13 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
                 </span>
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-6 bg-white border shadow-lg" align="start">
+            <PopoverContent className="w-auto p-3 sm:p-4 bg-white border shadow-md" align="start">
               <CalendarComponent
                 mode="single"
                 selected={returnDate}
                 onSelect={setReturnDate}
                 initialFocus
-                className="[--cell-size:3rem]"
+                className="text-sm [--cell-size:2rem] sm:[--cell-size:2.25rem] lg:[--cell-size:2.5rem]"
                 disabled={(date) => {
                   return departureDate ? date < departureDate : false;
                 }}
