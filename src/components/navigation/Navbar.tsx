@@ -27,10 +27,20 @@ export default function Navbar() {
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-[#010D50] text-xs font-semibold">ATOL</span>
+                <Image
+                  src="/atol-logo-58963.png"
+                  alt="ATOL Protected"
+                  width={68}
+                  height={32}
+                />
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-[#010D50] text-xs font-semibold">IATA</span>
+                <Image
+                  src="/iata.svg"
+                  alt="IATA"
+                  width={56}
+                  height={32}
+                />
               </div>
             </div>
           </div>
@@ -83,11 +93,21 @@ export default function Navbar() {
               <div className="text-[#010D50] text-xs font-medium">
                 Praised by 98% Local/British Awards
               </div>
-              <div className="text-[#010D50] text-xs font-semibold">
-                ATOL
+              <div className="flex items-center gap-2">
+                <Image
+                  src="/atol-logo-58963.png"
+                  alt="ATOL Protected"
+                  width={84}
+                  height={42}
+                />
               </div>
-              <div className="text-[#010D50] text-xs font-semibold">
-                IATA
+              <div className="flex items-center gap-2">
+                <Image
+                  src="/iata.svg"
+                  alt="IATA"
+                  width={60}
+                  height={42}
+                />
               </div>
             </div>
           </div>

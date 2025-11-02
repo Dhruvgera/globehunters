@@ -32,50 +32,49 @@ function PaymentContent() {
 
       {/* Main Content */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 py-4 flex flex-col gap-4">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          {/* Back Button */}
+        {/* Back to Fare Options + Progress Steps */}
+        <div className="flex flex-col gap-4">
+          {/* Back Link */}
           <Link
             href="/booking"
-            className="flex items-center gap-2 text-sm font-medium text-[#010D50] hover:text-[#3754ED] transition-colors w-fit"
+            className="flex items-center gap-2 text-[#010D50] text-sm font-medium hover:text-[#3754ED] transition-colors w-fit"
           >
             <ChevronLeft className="w-4 h-4" />
             Back to Fare Options
           </Link>
 
           {/* Progress Steps */}
-          <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
-            <div className="flex items-center gap-1.5">
-              <div className="w-5 h-5 rounded-full border border-[#010D50] flex items-center justify-center">
-                <span className="text-[10px] font-medium text-[#010D50]">1</span>
+          <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex items-center justify-between shadow-sm">
+            {/* Step 1 - Completed */}
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-[#010D50] border border-[#010D50] flex items-center justify-center">
+                <span className="text-xs font-medium text-white">1</span>
               </div>
-              <span className="text-xs font-medium text-[#010D50]">
-                Your details
-              </span>
+              <span className="text-sm font-medium text-[#010D50]">Your details</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-5 h-5 rounded-full border border-[#010D50] flex items-center justify-center">
-                <span className="text-[10px] font-medium text-[#010D50]">2</span>
+
+            {/* Step 2 - Completed */}
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-[#010D50] border border-[#010D50] flex items-center justify-center">
+                <span className="text-xs font-medium text-white">2</span>
               </div>
-              <span className="text-xs font-medium text-[#010D50]">
-                Choose your fair
-              </span>
+              <span className="text-sm font-medium text-[#010D50]">Choose your fair</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-5 h-5 rounded-full border border-[#010D50] flex items-center justify-center">
-                <span className="text-[10px] font-medium text-[#010D50]">3</span>
+
+            {/* Step 3 - Current */}
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full border border-[#010D50] flex items-center justify-center">
+                <span className="text-xs font-medium text-[#010D50]">3</span>
               </div>
-              <span className="text-xs font-medium text-[#010D50]">
-                Payment Details
-              </span>
+              <span className="text-sm font-medium text-[#010D50]">Payment Details</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-5 h-5 rounded-full border border-[#010D50] flex items-center justify-center">
-                <span className="text-[10px] font-medium text-[#010D50]">4</span>
+
+            {/* Step 4 */}
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full border border-[#010D50] flex items-center justify-center">
+                <span className="text-xs font-medium text-[#010D50]">4</span>
               </div>
-              <span className="text-xs font-medium text-[#010D50]">
-                Confirmation
-              </span>
+              <span className="text-sm font-medium text-[#010D50]">Confirmation</span>
             </div>
           </div>
         </div>
