@@ -25,7 +25,7 @@ interface SearchBarProps {
 
 export default function SearchBar({ compact = false }: SearchBarProps) {
   const router = useRouter();
-  const [tripType, setTripType] = useState<"round-trip" | "one-way">(
+  const [tripType, setTripType] = useState<"round-trip" | "one-way" | "multi-city">(
     "round-trip"
   );
   const [from, setFrom] = useState("");
@@ -75,7 +75,7 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
             >
               <ArrowLeftRight className="w-5 h-5 text-[#010D50]" />
               <span className="text-sm font-medium text-[#010D50]">
-                {tripType === "round-trip" ? "Round Trip" : "One Way"}
+                {tripType === "round-trip" ? "Round Trip" : tripType === "one-way" ? "One Way" : "Multi City"}
               </span>
               <ChevronDown className="w-5 h-5 text-[#010D50]" />
             </Button>
@@ -95,6 +95,13 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
                 onClick={() => setTripType("one-way")}
               >
                 One Way
+              </Button>
+              <Button
+                variant="ghost"
+                className="justify-start"
+                onClick={() => setTripType("multi-city")}
+              >
+                Multi City
               </Button>
             </div>
           </PopoverContent>

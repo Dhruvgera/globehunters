@@ -9,10 +9,16 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import Link from "next/link";
 import UpgradeOptionsModal from "@/components/flights/modals/UpgradeOptionsModal";
+import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
+import { mockFlights } from "@/data/mockFlights";
 
 function BookingContent() {
   const router = useRouter();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [showFlightInfo, setShowFlightInfo] = useState(false);
+
+  // Use mock flight data for demonstration
+  const flight = mockFlights[0];
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
@@ -181,9 +187,13 @@ function BookingContent() {
                     <div className="w-1 h-1 rounded-full bg-[#010D50]" />
                     <span>1 Adult</span>
                   </div>
-                  <span className="text-sm font-medium text-[#3754ED] cursor-pointer">
+                  <Button
+                    variant="link"
+                    onClick={() => setShowFlightInfo(true)}
+                    className="text-sm font-medium text-[#3754ED] p-0 h-auto"
+                  >
                     View Details
-                  </span>
+                  </Button>
                 </div>
               </div>
 
@@ -245,9 +255,13 @@ function BookingContent() {
                     <div className="w-1 h-1 rounded-full bg-[#010D50]" />
                     <span>1 Adult</span>
                   </div>
-                  <span className="text-sm font-medium text-[#3754ED] cursor-pointer">
+                  <Button
+                    variant="link"
+                    onClick={() => setShowFlightInfo(true)}
+                    className="text-sm font-medium text-[#3754ED] p-0 h-auto"
+                  >
                     View Details
-                  </span>
+                  </Button>
                 </div>
               </div>
             </div>
@@ -403,14 +417,14 @@ function BookingContent() {
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-6">
               <div className="flex items-start gap-2">
                 <Checkbox className="mt-1" />
-                <p className="text-sm font-medium leading-relaxed text-[#010D50]">
+                <p className="text-xs leading-relaxed text-[#010D50]">
                   By clicking this checkbox, I acknowledge that I have read and
                   accepted Globehunters Terms & Conditions and Privacy Policy
                 </p>
               </div>
               <div className="flex items-start gap-2">
                 <Checkbox className="mt-1" />
-                <p className="text-sm font-medium leading-relaxed text-[#010D50]">
+                <p className="text-xs leading-relaxed text-[#010D50]">
                   By clicking this checkbox, I consent to receive marketing
                   messages via calls, texts, and emails from Globehunters at the
                   provided contact. I understand that my consent is not a
@@ -441,8 +455,32 @@ function BookingContent() {
 
           {/* Right Sidebar */}
           <div className="w-full lg:w-[482px] flex flex-col gap-4">
-            {/* Price Summary */}
-            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-6 order-2 lg:order-none">
+            {/* Web Ref Card */}
+            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4 order-1 lg:order-none">
+              <span className="text-base font-semibold text-[#3754ED]">
+                WEB REF: IN-649707636
+              </span>
+              <p className="text-sm text-[#3A478A]">
+                If you would like to speak to one of our travel consultants
+                please call us on the given number below.
+              </p>
+              <div className="flex items-center gap-3 bg-[rgba(55,84,237,0.12)] rounded-full px-4 py-3">
+                <div className="w-10 h-10 rounded-full bg-[#0B229E] flex items-center justify-center">
+                  <Phone className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[#010D50] text-[8px] font-medium leading-tight">
+                    24/7 Toll-Free
+                  </span>
+                  <span className="text-[#010D50] text-sm font-bold">
+                    020 4502 2984
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Price Summary - Sticky on Desktop */}
+            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-6 order-2 lg:order-none lg:sticky lg:top-20">
               <span className="text-sm font-semibold text-[#010D50]">
                 Price Summary
               </span>
@@ -474,30 +512,6 @@ function BookingContent() {
                 <span className="text-sm font-semibold text-[#010D50]">
                   £94,353.00
                 </span>
-              </div>
-            </div>
-
-            {/* Web Ref Card */}
-            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4 order-1 lg:order-none">
-              <span className="text-base font-semibold text-[#3754ED]">
-                WEB REF: IN-649707636
-              </span>
-              <p className="text-sm text-[#3A478A]">
-                If you would like to speak to one of our travel consultants
-                please call us on the given number below.
-              </p>
-              <div className="flex items-center gap-3 bg-[rgba(55,84,237,0.12)] rounded-full px-4 py-3">
-                <div className="w-10 h-10 rounded-full bg-[#0B229E] flex items-center justify-center">
-                  <Phone className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[#010D50] text-[8px] font-medium leading-tight">
-                    24/7 Toll-Free
-                  </span>
-                  <span className="text-[#010D50] text-sm font-bold">
-                    020 4502 2984
-                  </span>
-                </div>
               </div>
             </div>
 
@@ -579,6 +593,13 @@ function BookingContent() {
       <UpgradeOptionsModal
         open={showUpgradeModal}
         onOpenChange={setShowUpgradeModal}
+      />
+
+      {/* Flight Info Modal */}
+      <FlightInfoModal
+        flight={flight}
+        open={showFlightInfo}
+        onOpenChange={setShowFlightInfo}
       />
     </div>
   );

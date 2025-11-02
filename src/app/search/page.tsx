@@ -38,6 +38,7 @@ function SearchPageContent() {
   const [outboundJourneyTime, setOutboundJourneyTime] = useState<[number, number]>([0, 35]);
   const [inboundJourneyTime, setInboundJourneyTime] = useState<[number, number]>([7, 28]);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [displayedFlightsCount, setDisplayedFlightsCount] = useState(5);
 
   const [expandedFilters, setExpandedFilters] = useState<{
     [key: string]: boolean;
@@ -236,7 +237,7 @@ function SearchPageContent() {
                       checked={selectedStops.includes(0)}
                       onCheckedChange={() => toggleStop(0)}
                     />
-                    <span className="text-sm text-[#010D50]">Non-Stop</span>
+                    <span className="text-sm text-[#010D50]">Direct</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Checkbox
@@ -594,6 +595,48 @@ function SearchPageContent() {
         <div className="flex flex-col lg:flex-row gap-4">
           {/* Filters Sidebar - Hidden on mobile, shown on desktop */}
           <div className="hidden lg:flex w-full lg:w-72 flex-col gap-4 order-3 lg:order-1">
+            {/* Search Summary Card - Above Filters, Hidden on Mobile */}
+            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="text-[#010D50]"
+                >
+                  <path
+                    d="M12 2L2 7L12 12L22 7L12 2Z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M2 17L12 22L22 17"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M2 12L12 17L22 12"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span className="text-sm font-semibold text-[#010D50]">
+                  Search Summary
+                </span>
+              </div>
+              <p className="text-xs text-[#3A478A]">
+                If you would like to speak to one of our travel consultants
+                please call us on the given number below.
+              </p>
+            </div>
+
             {/* Filter Header */}
             <div className="flex flex-col gap-1">
               <span className="text-lg font-semibold text-[#010D50]">
@@ -627,7 +670,7 @@ function SearchPageContent() {
                       checked={selectedStops.includes(0)}
                       onCheckedChange={() => toggleStop(0)}
                     />
-                    <span className="text-sm text-[#010D50]">Non-Stop</span>
+                    <span className="text-sm text-[#010D50]">Direct</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Checkbox
@@ -980,12 +1023,25 @@ function SearchPageContent() {
 
           {/* Flight Results */}
           <div className="flex-1 flex flex-col gap-2 order-2 lg:order-2">
-            {filteredFlights.map((flight) => (
+            {filteredFlights.slice(0, displayedFlightsCount).map((flight) => (
               <FlightCard key={flight.id} flight={flight} />
             ))}
+
+            {/* Show More Results Button */}
+            {displayedFlightsCount < filteredFlights.length && (
+              <div className="flex justify-center mt-4">
+                <Button
+                  onClick={() => setDisplayedFlightsCount(prev => Math.min(prev + 5, filteredFlights.length))}
+                  variant="outline"
+                  className="bg-white hover:bg-[#F5F7FF] text-[#3754ED] border-[#3754ED] rounded-full px-8 py-2 h-auto text-sm font-medium"
+                >
+                  Show More Results
+                </Button>
+              </div>
+            )}
           </div>
 
-          {/* Right Sidebar - Web Ref and Search Summary */}
+          {/* Right Sidebar - Web Ref */}
           <div className="w-full lg:w-80 flex flex-col gap-4 order-1 lg:order-3">
             {/* Contact Card */}
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-3 sticky top-20">
@@ -1009,48 +1065,6 @@ function SearchPageContent() {
                   </span>
                 </div>
               </div>
-            </div>
-
-            {/* Search Summary Card */}
-            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-3">
-              <div className="flex items-center gap-2">
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  className="text-[#010D50]"
-                >
-                  <path
-                    d="M12 2L2 7L12 12L22 7L12 2Z"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M2 17L12 22L22 17"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M2 12L12 17L22 12"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <span className="text-sm font-semibold text-[#010D50]">
-                  Search Summary
-                </span>
-              </div>
-              <p className="text-xs text-[#3A478A]">
-                If you would like to speak to one of our travel consultants
-                please call us on the given number below.
-              </p>
             </div>
           </div>
         </div>

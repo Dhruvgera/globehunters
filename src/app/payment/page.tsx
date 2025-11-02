@@ -14,10 +14,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import Link from "next/link";
+import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
+import { mockFlights } from "@/data/mockFlights";
 
 function PaymentContent() {
   const [protectionPlan, setProtectionPlan] = useState<"basic" | "premium" | "all">("premium");
   const [additionalBaggage, setAdditionalBaggage] = useState(0);
+  const [isIAssureExpanded, setIsIAssureExpanded] = useState(false);
+  const [showFlightInfo, setShowFlightInfo] = useState(false);
+
+  // Use mock flight data for demonstration
+  const flight = mockFlights[0];
 
   return (
     <div className="min-h-screen bg-white">
@@ -25,49 +32,50 @@ function PaymentContent() {
 
       {/* Main Content */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 py-4 flex flex-col gap-4">
-        {/* Back to Fare Options + Progress Steps */}
-        <div className="flex flex-col gap-4">
-          {/* Back Link */}
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          {/* Back Button */}
           <Link
             href="/booking"
-            className="flex items-center gap-2 text-[#010D50] text-sm font-medium hover:text-[#3754ED] transition-colors w-fit"
+            className="flex items-center gap-2 text-sm font-medium text-[#010D50] hover:text-[#3754ED] transition-colors w-fit"
           >
             <ChevronLeft className="w-4 h-4" />
             Back to Fare Options
           </Link>
 
           {/* Progress Steps */}
-          <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex items-center justify-between shadow-sm">
-            {/* Step 1 - Completed */}
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-[#010D50] border border-[#010D50] flex items-center justify-center">
-                <span className="text-xs font-medium text-white">1</span>
+          <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
+            <div className="flex items-center gap-1.5">
+              <div className="w-5 h-5 rounded-full border border-[#010D50] flex items-center justify-center">
+                <span className="text-[10px] font-medium text-[#010D50]">1</span>
               </div>
-              <span className="text-sm font-medium text-[#010D50]">Your details</span>
+              <span className="text-xs font-medium text-[#010D50]">
+                Your details
+              </span>
             </div>
-
-            {/* Step 2 - Completed */}
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-[#010D50] border border-[#010D50] flex items-center justify-center">
-                <span className="text-xs font-medium text-white">2</span>
+            <div className="flex items-center gap-1.5">
+              <div className="w-5 h-5 rounded-full border border-[#010D50] flex items-center justify-center">
+                <span className="text-[10px] font-medium text-[#010D50]">2</span>
               </div>
-              <span className="text-sm font-medium text-[#010D50]">Choose your fair</span>
+              <span className="text-xs font-medium text-[#010D50]">
+                Choose your fair
+              </span>
             </div>
-
-            {/* Step 3 - Current */}
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full border border-[#010D50] flex items-center justify-center">
-                <span className="text-xs font-medium text-[#010D50]">3</span>
+            <div className="flex items-center gap-1.5">
+              <div className="w-5 h-5 rounded-full border border-[#010D50] flex items-center justify-center">
+                <span className="text-[10px] font-medium text-[#010D50]">3</span>
               </div>
-              <span className="text-sm font-medium text-[#010D50]">Payment Details</span>
+              <span className="text-xs font-medium text-[#010D50]">
+                Payment Details
+              </span>
             </div>
-
-            {/* Step 4 */}
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full border border-[#010D50] flex items-center justify-center">
-                <span className="text-xs font-medium text-[#010D50]">4</span>
+            <div className="flex items-center gap-1.5">
+              <div className="w-5 h-5 rounded-full border border-[#010D50] flex items-center justify-center">
+                <span className="text-[10px] font-medium text-[#010D50]">4</span>
               </div>
-              <span className="text-sm font-medium text-[#010D50]">Confirmation</span>
+              <span className="text-xs font-medium text-[#010D50]">
+                Confirmation
+              </span>
             </div>
           </div>
         </div>
@@ -123,7 +131,11 @@ function PaymentContent() {
                     <div className="w-1 h-1 rounded-full bg-[#010D50]" />
                     <span className="text-sm text-[#010D50]">1 Adult</span>
                   </div>
-                  <Button variant="link" className="text-[#3754ED] text-sm font-medium p-0 h-auto">
+                  <Button
+                    variant="link"
+                    onClick={() => setShowFlightInfo(true)}
+                    className="text-[#3754ED] text-sm font-medium p-0 h-auto"
+                  >
                     View Details
                   </Button>
                 </div>
@@ -174,7 +186,11 @@ function PaymentContent() {
                     <div className="w-1 h-1 rounded-full bg-[#010D50]" />
                     <span className="text-sm text-[#010D50]">1 Adult</span>
                   </div>
-                  <Button variant="link" className="text-[#3754ED] text-sm font-medium p-0 h-auto">
+                  <Button
+                    variant="link"
+                    onClick={() => setShowFlightInfo(true)}
+                    className="text-[#3754ED] text-sm font-medium p-0 h-auto"
+                  >
                     View Details
                   </Button>
                 </div>
@@ -277,18 +293,24 @@ function PaymentContent() {
             </div>
 
             {/* iAssure Protection Plan */}
-            <div className="bg-white border-2 border-[#3754ED] rounded-xl p-3 flex flex-col gap-3 relative overflow-x-auto">
-              <div className="bg-[#F5F7FF] rounded-full px-4 py-3 w-fit">
-                <span className="text-sm font-semibold text-[#010D50]">
-                  iAssure Protection (Recommended)
-                </span>
+            <div className="bg-white border-2 border-[#3754ED] rounded-xl p-3 flex flex-col gap-3 relative">
+              <div className="flex items-center justify-between">
+                <div className="bg-[#F5F7FF] rounded-full px-4 py-3 w-fit">
+                  <span className="text-sm font-semibold text-[#010D50]">
+                    iAssure Protection (Recommended)
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  onClick={() => setIsIAssureExpanded(!isIAssureExpanded)}
+                  className="lg:hidden text-[#3754ED] h-auto p-2"
+                >
+                  {isIAssureExpanded ? "Collapse" : "Compare Plans"}
+                </Button>
               </div>
 
-              {/* Highlight box */}
-              <div className="hidden md:block absolute right-[173px] top-[94px] w-[110px] h-[637px] bg-gradient-to-b from-transparent via-[#C9FFDF] to-transparent pointer-events-none" />
-
               {/* Features and Pricing Grid */}
-              <div className="flex flex-col gap-1">
+              <div className={`flex flex-col gap-1 ${isIAssureExpanded ? "block" : "hidden lg:block"} overflow-x-auto`}>
                 {/* Price Row */}
                 <div className="flex items-center justify-between bg-[#F5F7FF] rounded-lg p-3 min-w-[640px] md:min-w-0">
                   <span className="w-[524px] text-sm font-medium text-[#010D50] opacity-0">Price</span>
@@ -538,8 +560,28 @@ function PaymentContent() {
 
           {/* Right Sidebar */}
           <div className="w-full lg:w-[482px] flex flex-col gap-4">
+            {/* Web Ref Card */}
+            <div className="bg-white border border-[#DFE0E4] rounded-xl p-3 flex flex-col gap-4">
+              <span className="text-base font-semibold text-[#3754ED]">WEB REF: IN-649707636</span>
+              <p className="text-sm text-[#3A478A]">
+                If you would like to speak to one of our travel consultants please call us on the
+                given number below.
+              </p>
+              <div className="flex items-center gap-2 bg-[rgba(55,84,237,0.12)] rounded-[40px] px-4 py-2 w-fit">
+                <div className="w-9 h-9 rounded-full bg-[#0B229E] flex items-center justify-center">
+                  <Phone className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[#010D50] text-[8px] font-medium leading-tight">
+                    24/7 Toll-Free
+                  </span>
+                  <span className="text-[#010D50] text-sm font-bold">020 4502 2984</span>
+                </div>
+              </div>
+            </div>
+
             {/* Price Summary */}
-            <div className="bg-white border border-[#DFE0E4] rounded-xl p-3 flex flex-col gap-6">
+            <div className="bg-white border border-[#DFE0E4] rounded-xl p-3 flex flex-col gap-6 lg:sticky lg:top-20">
               <span className="text-sm font-semibold text-[#010D50]">Price Summary</span>
 
               <div className="flex flex-col gap-2">
@@ -585,29 +627,16 @@ function PaymentContent() {
                 <span className="text-sm font-semibold text-[#010D50]">₹100,105.4</span>
               </div>
             </div>
-
-            {/* Web Ref Card */}
-            <div className="bg-white border border-[#DFE0E4] rounded-xl p-3 flex flex-col gap-4">
-              <span className="text-[24px] font-semibold text-[#3754ED]">WEB REF: IN-649707636</span>
-              <p className="text-sm text-[#3A478A]">
-                If you would like to speak to one of our travel consultants please call us on the
-                given number below.
-              </p>
-              <div className="flex items-center gap-2 bg-[rgba(55,84,237,0.12)] rounded-[40px] px-4 py-2 w-fit">
-                <div className="w-9 h-9 rounded-full bg-[#0B229E] flex items-center justify-center">
-                  <Phone className="w-5 h-5 text-white" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-[#010D50] text-[8px] font-medium leading-tight">
-                    24/7 Toll-Free
-                  </span>
-                  <span className="text-[#010D50] text-sm font-bold">020 4502 2984</span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>
+
+      {/* Flight Info Modal */}
+      <FlightInfoModal
+        flight={flight}
+        open={showFlightInfo}
+        onOpenChange={setShowFlightInfo}
+      />
     </div>
   );
 }

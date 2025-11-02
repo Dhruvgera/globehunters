@@ -16,29 +16,22 @@ export default function Navbar() {
           <div className="flex items-center gap-6 sm:gap-10 lg:gap-16">
             {/* Logo */}
             <Link href="/" className="flex items-center" aria-label="GlobeHunters home">
-              <Image src="/gh-logo.svg" alt="GlobeHunters" width={144} height={28} priority />
+              <Image src="/gh-logo.svg" alt="GlobeHunters" width={180} height={35} priority />
             </Link>
 
-            {/* Navigation Links */}
+            {/* Awards and Certifications */}
             <div className="hidden md:flex items-center gap-6 lg:gap-8">
-              <Link
-                href="/"
-                className="text-[#010D50] text-sm font-medium hover:text-[#3754ED] transition-colors uppercase tracking-wide"
-              >
-                Home
-              </Link>
-              <Link
-                href="/contact"
-                className="text-[#010D50] text-sm font-medium hover:text-[#3754ED] transition-colors uppercase tracking-wide"
-              >
-                Contact Us
-              </Link>
-              <Link
-                href="/offers"
-                className="text-[#010D50] text-sm font-medium hover:text-[#3754ED] transition-colors uppercase tracking-wide"
-              >
-                Special Offer
-              </Link>
+              <div className="flex items-center gap-2">
+                <span className="text-[#010D50] text-xs font-medium">
+                  Praised by 98% Local/British Awards
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[#010D50] text-xs font-semibold">ATOL</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[#010D50] text-xs font-semibold">IATA</span>
+              </div>
             </div>
           </div>
 
@@ -87,27 +80,15 @@ export default function Navbar() {
         {mobileOpen && (
           <div className="md:hidden mt-4 border-t pt-3">
             <div className="flex flex-col gap-3">
-              <Link
-                href="/"
-                className="text-[#010D50] text-sm font-medium hover:text-[#3754ED] transition-colors uppercase tracking-wide"
-                onClick={() => setMobileOpen(false)}
-              >
-                Home
-              </Link>
-              <Link
-                href="/contact"
-                className="text-[#010D50] text-sm font-medium hover:text-[#3754ED] transition-colors uppercase tracking-wide"
-                onClick={() => setMobileOpen(false)}
-              >
-                Contact Us
-              </Link>
-              <Link
-                href="/offers"
-                className="text-[#010D50] text-sm font-medium hover:text-[#3754ED] transition-colors uppercase tracking-wide"
-                onClick={() => setMobileOpen(false)}
-              >
-                Special Offer
-              </Link>
+              <div className="text-[#010D50] text-xs font-medium">
+                Praised by 98% Local/British Awards
+              </div>
+              <div className="text-[#010D50] text-xs font-semibold">
+                ATOL
+              </div>
+              <div className="text-[#010D50] text-xs font-semibold">
+                IATA
+              </div>
             </div>
           </div>
         )}
