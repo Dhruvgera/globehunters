@@ -26,7 +26,7 @@ function BookingContent() {
       {/* Main Content */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div className="flex flex-col gap-4 mb-4">
           {/* Back Button */}
           <Link
             href="/search"
@@ -36,39 +36,38 @@ function BookingContent() {
             Back to search results
           </Link>
 
-          {/* Progress Steps */}
-          <div className="flex items-center gap-3 sm:gap-4 flex-wrap">
-            <div className="flex items-center gap-1.5">
-              <div className="w-5 h-5 rounded-full border border-[#010D50] flex items-center justify-center">
-                <span className="text-[10px] font-medium text-[#010D50]">1</span>
+          {/* Progress Steps - responsive: wraps on mobile, bordered bar on desktop */}
+          <div className="lg:bg-white lg:border lg:border-[#DFE0E4] lg:rounded-xl lg:p-4 flex items-center justify-between lg:shadow-sm flex-wrap gap-3 lg:gap-0">
+            {/* Step 1 - Current */}
+            <div className="flex items-center gap-1.5 lg:gap-2">
+              <div className="w-5 h-5 lg:w-6 lg:h-6 rounded-full border border-[#010D50] flex items-center justify-center">
+                <span className="text-[10px] lg:text-xs font-medium text-[#010D50]">1</span>
               </div>
-              <span className="text-xs font-medium text-[#010D50]">
-                Your details
-              </span>
+              <span className="text-xs lg:text-sm font-medium text-[#010D50]">Your details</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-5 h-5 rounded-full border border-[#010D50] flex items-center justify-center">
-                <span className="text-[10px] font-medium text-[#010D50]">2</span>
+
+            {/* Step 2 */}
+            <div className="flex items-center gap-1.5 lg:gap-2">
+              <div className="w-5 h-5 lg:w-6 lg:h-6 rounded-full border border-[#010D50] flex items-center justify-center">
+                <span className="text-[10px] lg:text-xs font-medium text-[#010D50]">2</span>
               </div>
-              <span className="text-xs font-medium text-[#010D50]">
-                Choose your fair
-              </span>
+              <span className="text-xs lg:text-sm font-medium text-[#010D50]">Choose your fair</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-5 h-5 rounded-full border border-[#010D50] flex items-center justify-center">
-                <span className="text-[10px] font-medium text-[#010D50]">3</span>
+
+            {/* Step 3 */}
+            <div className="flex items-center gap-1.5 lg:gap-2">
+              <div className="w-5 h-5 lg:w-6 lg:h-6 rounded-full border border-[#010D50] flex items-center justify-center">
+                <span className="text-[10px] lg:text-xs font-medium text-[#010D50]">3</span>
               </div>
-              <span className="text-xs font-medium text-[#010D50]">
-                Payment Details
-              </span>
+              <span className="text-xs lg:text-sm font-medium text-[#010D50]">Payment Details</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-5 h-5 rounded-full border border-[#010D50] flex items-center justify-center">
-                <span className="text-[10px] font-medium text-[#010D50]">4</span>
+
+            {/* Step 4 */}
+            <div className="flex items-center gap-1.5 lg:gap-2">
+              <div className="w-5 h-5 lg:w-6 lg:h-6 rounded-full border border-[#010D50] flex items-center justify-center">
+                <span className="text-[10px] lg:text-xs font-medium text-[#010D50]">4</span>
               </div>
-              <span className="text-xs font-medium text-[#010D50]">
-                Confirmation
-              </span>
+              <span className="text-xs lg:text-sm font-medium text-[#010D50]">Confirmation</span>
             </div>
           </div>
         </div>
@@ -305,22 +304,22 @@ function BookingContent() {
                       Name
                     </label>
                     <div className="flex flex-col sm:flex-row gap-2">
-                      <select className="border border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#010D50] bg-white w-full sm:w-24">
+                      <select className="border border-[#DFE0E4] rounded-xl px-4 h-12 min-h-12 text-base font-medium text-[#010D50] bg-white w-full sm:w-24 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%228%22%20viewBox%3D%220%200%2012%208%22%3E%3Cpath%20fill%3D%22%23010D50%22%20d%3D%22M1.41%200L6%204.58%2010.59%200%2012%201.41l-6%206-6-6z%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_1rem_center] bg-no-repeat">
                         <option>Mr.</option>
                         <option>Mrs.</option>
                         <option>Ms.</option>
                       </select>
                       <Input
                         placeholder="First Name"
-                        className="flex-1 border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#3A478A]"
+                        className="sm:flex-1 border-[#DFE0E4] rounded-xl px-4 h-12 min-h-12 text-base font-medium text-[#3A478A]"
                       />
                       <Input
                         placeholder="Middle Name"
-                        className="flex-1 border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#3A478A]"
+                        className="sm:flex-1 border-[#DFE0E4] rounded-xl px-4 h-12 min-h-12 text-base font-medium text-[#3A478A]"
                       />
                       <Input
                         placeholder="Last Name"
-                        className="flex-1 border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#3A478A]"
+                        className="sm:flex-1 border-[#DFE0E4] rounded-xl px-4 h-12 min-h-12 text-base font-medium text-[#3A478A]"
                       />
                     </div>
                   </div>
@@ -334,7 +333,7 @@ function BookingContent() {
                     <Input
                       type="date"
                       placeholder="DD/MM/YYYY"
-                      className="border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#3A478A]"
+                      className="border-[#DFE0E4] rounded-xl px-4 h-12 text-base font-medium text-[#3A478A]"
                     />
                   </div>
                   <div className="flex flex-col gap-2 flex-1">
@@ -344,7 +343,7 @@ function BookingContent() {
                     <Input
                       type="email"
                       placeholder="xyz123@gmail.com"
-                      className="border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#3A478A]"
+                      className="border-[#DFE0E4] rounded-xl px-4 h-12 text-base font-medium text-[#3A478A]"
                     />
                   </div>
                   <div className="flex flex-col gap-2 flex-1">
@@ -354,7 +353,7 @@ function BookingContent() {
                     <Input
                       type="tel"
                       placeholder="1234567890"
-                      className="border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#3A478A]"
+                      className="border-[#DFE0E4] rounded-xl px-4 h-12 text-base font-medium text-[#3A478A]"
                     />
                   </div>
                 </div>
@@ -380,22 +379,22 @@ function BookingContent() {
                     Name
                   </label>
                   <div className="flex flex-col sm:flex-row gap-2">
-                    <select className="border border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#010D50] bg-white w-full sm:w-24">
+                    <select className="border border-[#DFE0E4] rounded-xl px-4 h-12 min-h-12 text-base font-medium text-[#010D50] bg-white w-full sm:w-24 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2212%22%20height%3D%228%22%20viewBox%3D%220%200%2012%208%22%3E%3Cpath%20fill%3D%22%23010D50%22%20d%3D%22M1.41%200L6%204.58%2010.59%200%2012%201.41l-6%206-6-6z%22%2F%3E%3C%2Fsvg%3E')] bg-[length:12px] bg-[right_1rem_center] bg-no-repeat">
                       <option>Mr.</option>
                       <option>Mrs.</option>
                       <option>Ms.</option>
                     </select>
                     <Input
                       placeholder="First Name"
-                      className="flex-1 border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#3A478A]"
+                      className="sm:flex-1 border-[#DFE0E4] rounded-xl px-4 h-12 min-h-12 text-base font-medium text-[#3A478A]"
                     />
                     <Input
                       placeholder="Middle Name"
-                      className="flex-1 border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#3A478A]"
+                      className="sm:flex-1 border-[#DFE0E4] rounded-xl px-4 h-12 min-h-12 text-base font-medium text-[#3A478A]"
                     />
                     <Input
                       placeholder="Last Name"
-                      className="flex-1 border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#3A478A]"
+                      className="sm:flex-1 border-[#DFE0E4] rounded-xl px-4 h-12 min-h-12 text-base font-medium text-[#3A478A]"
                     />
                   </div>
                 </div>
@@ -408,7 +407,7 @@ function BookingContent() {
                 <Input
                   type="date"
                   placeholder="DD/MM/YYYY"
-                  className="border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#3A478A]"
+                  className="border-[#DFE0E4] rounded-xl px-4 h-12 text-base font-medium text-[#3A478A]"
                 />
               </div>
             </div>

@@ -88,26 +88,30 @@ export default function Navbar() {
 
         {/* Mobile Menu */}
         {mobileOpen && (
-          <div className="md:hidden mt-4 border-t pt-3">
-            <div className="flex flex-col gap-3">
-              <div className="text-[#010D50] text-xs font-medium">
+          <div className="md:hidden mt-4 border-t pt-4">
+            <div className="flex flex-col gap-4 pb-2">
+              <div className="text-[#010D50] text-sm font-medium leading-relaxed">
                 Praised by 98% Local/British Awards
               </div>
-              <div className="flex items-center gap-2">
-                <Image
-                  src="/atol-logo-58963.png"
-                  alt="ATOL Protected"
-                  width={84}
-                  height={42}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Image
-                  src="/iata.svg"
-                  alt="IATA"
-                  width={60}
-                  height={42}
-                />
+              <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex items-center">
+                  <Image
+                    src="/atol-logo-58963.png"
+                    alt="ATOL Protected"
+                    width={68}
+                    height={32}
+                    className="h-8 w-auto"
+                  />
+                </div>
+                <div className="flex items-center">
+                  <Image
+                    src="/iata.svg"
+                    alt="IATA"
+                    width={56}
+                    height={32}
+                    className="h-8 w-auto"
+                  />
+                </div>
               </div>
             </div>
           </div>
