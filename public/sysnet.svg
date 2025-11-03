@@ -1,0 +1,7 @@
+<svg width="100" height="50" viewBox="0 0 100 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100" height="50" rx="4" fill="#F59E0B"/>
+  <path d="M20 15L25 20L20 25L15 20L20 15Z" fill="white"/>
+  <path d="M30 15L35 20L30 25L25 20L30 15Z" fill="white" fill-opacity="0.7"/>
+  <text x="42" y="22" font-family="Arial, sans-serif" font-size="10" font-weight="bold" fill="white">SYSNET</text>
+  <text x="42" y="32" font-family="Arial, sans-serif" font-size="6" fill="white">Secure Payment</text>
+</svg>

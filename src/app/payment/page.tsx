@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import Navbar from "@/components/navigation/Navbar";
+import Footer from "@/components/navigation/Footer";
 import { ChevronLeft, Phone, Check, Briefcase, Package, ShoppingBag, XCircle, CheckCircle2, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -636,6 +637,8 @@ function PaymentContent() {
         open={showFlightInfo}
         onOpenChange={setShowFlightInfo}
       />
+
+      <Footer />
     </div>
   );
 }

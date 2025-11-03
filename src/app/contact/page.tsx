@@ -1,4 +1,5 @@
 import Navbar from "@/components/navigation/Navbar";
+import Footer from "@/components/navigation/Footer";
 import { Phone, Mail, MapPin } from "lucide-react";
 
 export default function ContactPage() {
@@ -104,6 +105,8 @@ export default function ContactPage() {
           </form>
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }

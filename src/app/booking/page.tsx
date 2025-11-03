@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/navigation/Navbar";
+import Footer from "@/components/navigation/Footer";
 import { ChevronLeft, Info, Phone, Plane, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -600,6 +601,8 @@ function BookingContent() {
         open={showFlightInfo}
         onOpenChange={setShowFlightInfo}
       />
+
+      <Footer />
     </div>
   );
 }

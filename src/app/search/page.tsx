@@ -2,6 +2,7 @@
 
 import { useState, Suspense, useEffect, useMemo, useRef } from "react";
 import Navbar from "@/components/navigation/Navbar";
+import Footer from "@/components/navigation/Footer";
 import SearchBar from "@/components/search/SearchBar";
 import FlightCard from "@/components/flights/FlightCard";
 import { mockFlights, mockDatePrices, mockAirlines, mockAirports } from "@/data/mockFlights";
@@ -1069,6 +1070,8 @@ function SearchPageContent() {
           </div>
         </div>
       </div>
+
+      <Footer />
     </div>
   );
 }

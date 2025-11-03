@@ -1,4 +1,5 @@
 import Navbar from "@/components/navigation/Navbar";
+import Footer from "@/components/navigation/Footer";
 import SearchBar from "@/components/search/SearchBar";
 import { Plane } from "lucide-react";
 
@@ -65,6 +66,8 @@ export default function Home() {
           </div>
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }

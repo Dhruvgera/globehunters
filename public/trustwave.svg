@@ -1,0 +1,8 @@
+<svg width="100" height="50" viewBox="0 0 100 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="100" height="50" rx="4" fill="white"/>
+  <rect x="0.5" y="0.5" width="99" height="49" rx="3.5" stroke="#E5E7EB"/>
+  <circle cx="25" cy="25" r="12" fill="#0066CC" fill-opacity="0.1"/>
+  <path d="M25 15L28 21L35 22L30 27L31 34L25 31L19 34L20 27L15 22L22 21L25 15Z" fill="#0066CC"/>
+  <text x="42" y="20" font-family="Arial, sans-serif" font-size="8" font-weight="bold" fill="#333">TRUSTWAVE</text>
+  <text x="42" y="30" font-family="Arial, sans-serif" font-size="6" fill="#666">Trusted Commerce</text>
+</svg>

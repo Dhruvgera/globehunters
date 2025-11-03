@@ -1,4 +1,5 @@
 import Navbar from "@/components/navigation/Navbar";
+import Footer from "@/components/navigation/Footer";
 import { Tag, Plane, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -143,6 +144,8 @@ export default function OffersPage() {
           </div>
         </div>
       </main>
+
+      <Footer />
     </div>
   );
 }
