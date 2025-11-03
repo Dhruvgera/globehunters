@@ -305,22 +305,22 @@ function BookingContent() {
                       Name
                     </label>
                     <div className="flex flex-col sm:flex-row gap-2">
-                      <select className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium text-[#010D50] bg-white w-full sm:w-24">
+                      <select className="border border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#010D50] bg-white w-full sm:w-24">
                         <option>Mr.</option>
                         <option>Mrs.</option>
                         <option>Ms.</option>
                       </select>
                       <Input
                         placeholder="First Name"
-                        className="flex-1 border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium text-[#3A478A]"
+                        className="flex-1 border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#3A478A]"
                       />
                       <Input
                         placeholder="Middle Name"
-                        className="flex-1 border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium text-[#3A478A]"
+                        className="flex-1 border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#3A478A]"
                       />
                       <Input
                         placeholder="Last Name"
-                        className="flex-1 border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium text-[#3A478A]"
+                        className="flex-1 border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#3A478A]"
                       />
                     </div>
                   </div>
@@ -334,7 +334,7 @@ function BookingContent() {
                     <Input
                       type="date"
                       placeholder="DD/MM/YYYY"
-                      className="border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium text-[#3A478A]"
+                      className="border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#3A478A]"
                     />
                   </div>
                   <div className="flex flex-col gap-2 flex-1">
@@ -344,7 +344,7 @@ function BookingContent() {
                     <Input
                       type="email"
                       placeholder="xyz123@gmail.com"
-                      className="border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium text-[#3A478A]"
+                      className="border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#3A478A]"
                     />
                   </div>
                   <div className="flex flex-col gap-2 flex-1">
@@ -354,7 +354,7 @@ function BookingContent() {
                     <Input
                       type="tel"
                       placeholder="1234567890"
-                      className="border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium text-[#3A478A]"
+                      className="border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#3A478A]"
                     />
                   </div>
                 </div>
@@ -380,22 +380,22 @@ function BookingContent() {
                     Name
                   </label>
                   <div className="flex flex-col sm:flex-row gap-2">
-                    <select className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium text-[#010D50] bg-white w-full sm:w-24">
+                    <select className="border border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#010D50] bg-white w-full sm:w-24">
                       <option>Mr.</option>
                       <option>Mrs.</option>
                       <option>Ms.</option>
                     </select>
                     <Input
                       placeholder="First Name"
-                      className="flex-1 border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium text-[#3A478A]"
+                      className="flex-1 border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#3A478A]"
                     />
                     <Input
                       placeholder="Middle Name"
-                      className="flex-1 border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium text-[#3A478A]"
+                      className="flex-1 border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#3A478A]"
                     />
                     <Input
                       placeholder="Last Name"
-                      className="flex-1 border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium text-[#3A478A]"
+                      className="flex-1 border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#3A478A]"
                     />
                   </div>
                 </div>
@@ -408,7 +408,7 @@ function BookingContent() {
                 <Input
                   type="date"
                   placeholder="DD/MM/YYYY"
-                  className="border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium text-[#3A478A]"
+                  className="border-[#DFE0E4] rounded-xl px-4 h-11 text-base font-medium text-[#3A478A]"
                 />
               </div>
             </div>

@@ -32,6 +32,7 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
   const [to, setTo] = useState("");
   const [departureDate, setDepartureDate] = useState<Date>();
   const [returnDate, setReturnDate] = useState<Date>();
+  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [passengers, setPassengers] = useState({
     adults: 1,
     children: 0,
@@ -43,8 +44,8 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
     const params = new URLSearchParams({
       from,
       to,
-      departureDate: departureDate?.toISOString() || "",
-      returnDate: returnDate?.toISOString() || "",
+      departureDate: (dateRange.from || departureDate)?.toISOString() || "",
+      returnDate: (dateRange.to || returnDate)?.toISOString() || "",
       adults: passengers.adults.toString(),
       children: passengers.children.toString(),
       infants: passengers.infants.toString(),
@@ -274,34 +275,8 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
           />
         </div>
 
-        {/* Departure Date */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className="flex items-center gap-2 flex-1 border-[#D3D3D3] rounded-xl px-3 py-2.5 h-auto justify-start hover:bg-transparent hover:border-[#D3D3D3]"
-            >
-              <Calendar className="w-5 h-5 text-[#010D50]" />
-              <span className="text-sm font-medium text-[#010D50]">
-                {departureDate
-                  ? format(departureDate, "EEE, dd MMM yyyy")
-                  : "Departure Date"}
-              </span>
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-3 sm:p-4 bg-white border shadow-md" align="start">
-            <CalendarComponent
-              mode="single"
-              selected={departureDate}
-              onSelect={setDepartureDate}
-              initialFocus
-              className="text-sm [--cell-size:2rem] sm:[--cell-size:2.25rem] lg:[--cell-size:2.5rem]"
-            />
-          </PopoverContent>
-        </Popover>
-
-        {/* Return Date */}
-        {tripType === "round-trip" && (
+        {/* Unified Date Picker for Round Trip */}
+        {tripType === "round-trip" ? (
           <Popover>
             <PopoverTrigger asChild>
               <Button
@@ -310,22 +285,51 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
               >
                 <Calendar className="w-5 h-5 text-[#010D50]" />
                 <span className="text-sm font-medium text-[#010D50]">
-                  {returnDate
-                    ? format(returnDate, "EEE, dd MMM yyyy")
-                    : "Return Date"}
+                  {dateRange.from ? (
+                    dateRange.to ? (
+                      `${format(dateRange.from, "dd MMM")} - ${format(dateRange.to, "dd MMM yyyy")}`
+                    ) : (
+                      format(dateRange.from, "EEE, dd MMM yyyy")
+                    )
+                  ) : (
+                    "Departure - Return Date"
+                  )}
+                </span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-3 sm:p-4 bg-white border shadow-md" align="start">
+              <CalendarComponent
+                mode="range"
+                selected={dateRange as any}
+                onSelect={(range: any) => setDateRange(range || {})}
+                initialFocus
+                numberOfMonths={2}
+                className="text-sm [--cell-size:2rem] sm:[--cell-size:2.25rem] lg:[--cell-size:2.5rem]"
+              />
+            </PopoverContent>
+          </Popover>
+        ) : (
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                className="flex items-center gap-2 flex-1 border-[#D3D3D3] rounded-xl px-3 py-2.5 h-auto justify-start hover:bg-transparent hover:border-[#D3D3D3]"
+              >
+                <Calendar className="w-5 h-5 text-[#010D50]" />
+                <span className="text-sm font-medium text-[#010D50]">
+                  {departureDate
+                    ? format(departureDate, "EEE, dd MMM yyyy")
+                    : "Departure Date"}
                 </span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-3 sm:p-4 bg-white border shadow-md" align="start">
               <CalendarComponent
                 mode="single"
-                selected={returnDate}
-                onSelect={setReturnDate}
+                selected={departureDate}
+                onSelect={setDepartureDate}
                 initialFocus
                 className="text-sm [--cell-size:2rem] sm:[--cell-size:2.25rem] lg:[--cell-size:2.5rem]"
-                disabled={(date) => {
-                  return departureDate ? date < departureDate : false;
-                }}
               />
             </PopoverContent>
           </Popover>

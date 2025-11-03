@@ -134,6 +134,7 @@ export default function UpgradeOptionsModal({
   onOpenChange,
 }: UpgradeOptionsModalProps) {
   const [selectedFare, setSelectedFare] = useState<string>("classic");
+  const [highlightedFare, setHighlightedFare] = useState<string>("classic");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -151,15 +152,15 @@ export default function UpgradeOptionsModal({
         </button>
 
         {/* Fare Options */}
-        <div className="flex items-center gap-3 overflow-x-auto snap-x snap-mandatory pb-1">
+        <div className="flex items-center gap-3 overflow-x-auto snap-x snap-mandatory pb-4 px-1">
           {fareOptions.map((fare) => (
             <div
               key={fare.id}
-              onClick={() => setSelectedFare(fare.id)}
+              onClick={() => setHighlightedFare(fare.id)}
               className={`min-w-[260px] sm:min-w-0 flex-1 rounded-[20px] p-4 cursor-pointer transition-all snap-start ${
-                selectedFare === fare.id
-                  ? "border-[3px] border-[#3754ED] bg-white shadow-[0px_4px_12px_0px_rgba(0,0,0,0.32)]"
-                  : "border border-[#DFE0E4] bg-[#F5F7FF] shadow-[0px_4px_12px_0px_rgba(0,0,0,0.32)]"
+                highlightedFare === fare.id
+                  ? "border-[3px] border-[#3754ED] bg-white shadow-[0px_4px_12px_0px_rgba(0,0,0,0.12)]"
+                  : "border border-[#DFE0E4] bg-[#F5F7FF] shadow-[0px_4px_12px_0px_rgba(0,0,0,0.12)]"
               }`}
             >
               <div className="flex flex-col gap-6">
@@ -173,11 +174,22 @@ export default function UpgradeOptionsModal({
                       {fare.price}
                     </span>
                   </div>
-                  {selectedFare === fare.id && (
-                    <div className="w-8 h-8 rounded-full bg-[#3754ED] flex items-center justify-center">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedFare(fare.id);
+                      setHighlightedFare(fare.id);
+                    }}
+                    className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${
+                      selectedFare === fare.id
+                        ? "bg-[#3754ED] border-[#3754ED]"
+                        : "bg-white border-[#DFE0E4]"
+                    }`}
+                  >
+                    {selectedFare === fare.id && (
                       <Check className="w-5 h-5 text-white" />
-                    </div>
-                  )}
+                    )}
+                  </button>
                 </div>
 
                 {/* Features */}
@@ -223,7 +235,10 @@ export default function UpgradeOptionsModal({
             <ChevronLeft className="w-5 h-5 text-[#010D50]" />
           </button>
 
-          <Button className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-full px-5 py-2 h-auto gap-1 text-sm font-bold">
+          <Button 
+            onClick={() => onOpenChange(false)}
+            className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-full px-5 py-2 h-auto gap-1 text-sm font-bold"
+          >
             Next
             <ChevronRight className="w-5 h-5" />
           </Button>

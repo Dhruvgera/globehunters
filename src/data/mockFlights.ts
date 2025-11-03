@@ -9,7 +9,7 @@ export const mockFlights: Flight[] = [
       code: "AI",
     },
     outbound: {
-      departureTime: "5:55",
+      departureTime: "05:55",
       arrivalTime: "08:05",
       departureAirport: {
         code: "BOM",
@@ -28,7 +28,7 @@ export const mockFlights: Flight[] = [
     },
     inbound: {
       departureTime: "08:05",
-      arrivalTime: "5:55",
+      arrivalTime: "05:55",
       departureAirport: {
         code: "DEL",
         name: "Indira Gandhi International Airport",
@@ -62,7 +62,7 @@ export const mockFlights: Flight[] = [
       code: "IX",
     },
     outbound: {
-      departureTime: "6:30",
+      departureTime: "06:30",
       arrivalTime: "09:00",
       departureAirport: {
         code: "BOM",
@@ -115,7 +115,7 @@ export const mockFlights: Flight[] = [
       code: "QP",
     },
     outbound: {
-      departureTime: "7:15",
+      departureTime: "07:15",
       arrivalTime: "09:50",
       departureAirport: {
         code: "BOM",
@@ -168,7 +168,7 @@ export const mockFlights: Flight[] = [
       code: "6E",
     },
     outbound: {
-      departureTime: "8:45",
+      departureTime: "08:45",
       arrivalTime: "11:15",
       departureAirport: {
         code: "BOM",
