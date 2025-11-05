@@ -1,6 +1,7 @@
 "use client";
 
 import { Star } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface Review {
   name: string;
@@ -19,16 +20,17 @@ export function CustomerReviewsCard({
   totalReviews,
   reviews,
 }: CustomerReviewsCardProps) {
+  const t = useTranslations('booking.reviews');
   return (
     <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-6 order-3 lg:order-none">
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-[#010D50]">
-          Customer Reviews
+          {t('title')}
         </span>
         <div className="flex items-center gap-1 bg-white rounded-full py-1">
           <Star className="w-5 h-5 fill-[#FBEF04] text-[#FBEF04]" />
           <span className="text-sm font-medium text-[#010D50]">
-            {overallRating} ({totalReviews.toLocaleString()} Reviews)
+            {overallRating} ({totalReviews.toLocaleString()} {t('reviews')})
           </span>
         </div>
       </div>

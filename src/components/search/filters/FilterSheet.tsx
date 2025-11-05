@@ -15,6 +15,7 @@ import { AirportFilter } from "./AirportFilter";
 import { AirlineFilter } from "./AirlineFilter";
 import { ExtrasFilter } from "./ExtrasFilter";
 import { FilterState } from "@/types/flight";
+import { useTranslations } from "next-intl";
 
 interface Airport {
   code: string;
@@ -73,22 +74,24 @@ export function FilterSheet({
   onToggleExtra,
   resultCount,
 }: FilterSheetProps) {
+  const t = useTranslations('search.filters');
+  
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="h-[85vh] overflow-y-auto">
         <SheetHeader>
           <SheetTitle className="text-lg font-semibold text-[#010D50]">
-            Filters
+            {t('title')}
           </SheetTitle>
           <span className="text-xs text-[#3A478A] text-left">
-            Showing {resultCount} results
+            {t('showing')} {resultCount} {t('results')}
           </span>
         </SheetHeader>
 
         <div className="flex flex-col gap-4 mt-6">
           {/* Number of Stops */}
           <FilterSection
-            title="Number of Stops"
+            title={t('numberOfStops')}
             isExpanded={expandedFilters.stops}
             onToggle={() => onToggleExpand("stops")}
           >
@@ -100,7 +103,7 @@ export function FilterSheet({
 
           {/* Price Filter */}
           <FilterSection
-            title="Price"
+            title={t('price')}
             isExpanded={expandedFilters.price}
             onToggle={() => onToggleExpand("price")}
           >
@@ -114,7 +117,7 @@ export function FilterSheet({
 
           {/* Time Filter */}
           <FilterSection
-            title="Time"
+            title={t('time')}
             isExpanded={expandedFilters.time}
             onToggle={() => onToggleExpand("time")}
           >
@@ -132,7 +135,7 @@ export function FilterSheet({
 
           {/* Journey Time Filter */}
           <FilterSection
-            title="Journey Time"
+            title={t('journeyTime')}
             isExpanded={expandedFilters.journey}
             onToggle={() => onToggleExpand("journey")}
           >
@@ -150,7 +153,7 @@ export function FilterSheet({
 
           {/* Departure Airport Filter */}
           <FilterSection
-            title="Departure Airport"
+            title={t('departureAirport')}
             isExpanded={expandedFilters.departure}
             onToggle={() => onToggleExpand("departure")}
           >
@@ -164,7 +167,7 @@ export function FilterSheet({
 
           {/* Arrival Airport Filter */}
           <FilterSection
-            title="Arrival Airport"
+            title={t('arrivalAirport')}
             isExpanded={expandedFilters.arrival}
             onToggle={() => onToggleExpand("arrival")}
           >
@@ -178,7 +181,7 @@ export function FilterSheet({
 
           {/* Airlines Filter */}
           <FilterSection
-            title="Airlines"
+            title={t('airlines')}
             isExpanded={expandedFilters.airlines}
             onToggle={() => onToggleExpand("airlines")}
           >
@@ -192,7 +195,7 @@ export function FilterSheet({
 
           {/* Extras Filter */}
           <FilterSection
-            title="Extras"
+            title={t('extras')}
             isExpanded={expandedFilters.extras}
             onToggle={() => onToggleExpand("extras")}
           >

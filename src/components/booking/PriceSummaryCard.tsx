@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 
 interface PriceSummaryCardProps {
   flightFare: number;
@@ -15,6 +16,7 @@ export function PriceSummaryCard({
   adults,
   isSticky = true,
 }: PriceSummaryCardProps) {
+  const t = useTranslations('booking.priceSummary');
   const [isExpanded, setIsExpanded] = useState(false);
   const total = flightFare + taxesAndFees;
 
@@ -26,13 +28,13 @@ export function PriceSummaryCard({
     >
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-[#010D50]">
-          Price Summary
+          {t('title')}
         </span>
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className="lg:hidden text-[#3754ED] text-sm font-medium"
         >
-          {isExpanded ? "Hide Details" : "Show Details"}
+          {isExpanded ? t('hideDetails') : t('showDetails')}
         </button>
       </div>
 
@@ -44,20 +46,20 @@ export function PriceSummaryCard({
       >
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-[#010D50]">
-            Traveler: {adults} Adult{adults > 1 ? "s" : ""}
+            {t('traveler')}: {adults} {adults > 1 ? t('adults') : t('adult')}
           </span>
           <span className="text-sm font-medium text-[#010D50]">
             £{total.toLocaleString()}
           </span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-sm text-[#3A478A]">Flight fare</span>
+          <span className="text-sm text-[#3A478A]">{t('flightFare')}</span>
           <span className="text-sm text-[#3A478A]">
             £{flightFare.toLocaleString()}
           </span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-sm text-[#3A478A]">Tax, fees and charges</span>
+          <span className="text-sm text-[#3A478A]">{t('taxesAndFees')}</span>
           <span className="text-sm text-[#3A478A]">
             £{taxesAndFees.toLocaleString()}
           </span>
@@ -72,7 +74,7 @@ export function PriceSummaryCard({
 
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-[#010D50]">
-          Trip Total
+          {t('tripTotal')}
         </span>
         <span className="text-sm font-semibold text-[#010D50]">
           £{total.toLocaleString()}.00

@@ -9,6 +9,7 @@ import { AirportFilter } from "./AirportFilter";
 import { AirlineFilter } from "./AirlineFilter";
 import { ExtrasFilter } from "./ExtrasFilter";
 import { FilterState } from "@/types/flight";
+import { useTranslations } from "next-intl";
 
 interface Airport {
   code: string;
@@ -63,21 +64,23 @@ export function FilterSidebar({
   onToggleExtra,
   resultCount,
 }: FilterSidebarProps) {
+  const t = useTranslations('search.filters');
+  
   return (
     <div className="w-full lg:w-72 flex flex-col gap-4">
       {/* Filter Header */}
       <div className="flex flex-col gap-1">
         <span className="text-lg font-semibold text-[#010D50]">
-          Filters By
+          {t('filtersBy')}
         </span>
         <span className="text-xs text-[#3A478A]">
-          Showing {resultCount} results
+          {t('showing')} {resultCount} {t('results')}
         </span>
       </div>
 
       {/* Number of Stops */}
       <FilterSection
-        title="Number of Stops"
+        title={t('numberOfStops')}
         isExpanded={expandedFilters.stops}
         onToggle={() => onToggleExpand("stops")}
       >
@@ -89,7 +92,7 @@ export function FilterSidebar({
 
       {/* Price Filter */}
       <FilterSection
-        title="Price"
+        title={t('price')}
         isExpanded={expandedFilters.price}
         onToggle={() => onToggleExpand("price")}
       >
@@ -103,7 +106,7 @@ export function FilterSidebar({
 
       {/* Time Filter */}
       <FilterSection
-        title="Time"
+        title={t('time')}
         isExpanded={expandedFilters.time}
         onToggle={() => onToggleExpand("time")}
       >
@@ -121,7 +124,7 @@ export function FilterSidebar({
 
       {/* Journey Time Filter */}
       <FilterSection
-        title="Journey Time"
+        title={t('journeyTime')}
         isExpanded={expandedFilters.journey}
         onToggle={() => onToggleExpand("journey")}
       >
@@ -135,7 +138,7 @@ export function FilterSidebar({
 
       {/* Departure Airport Filter */}
       <FilterSection
-        title="Departure Airport"
+        title={t('departureAirport')}
         isExpanded={expandedFilters.departure}
         onToggle={() => onToggleExpand("departure")}
       >
@@ -149,7 +152,7 @@ export function FilterSidebar({
 
       {/* Arrival Airport Filter */}
       <FilterSection
-        title="Arrival Airport"
+        title={t('arrivalAirport')}
         isExpanded={expandedFilters.arrival}
         onToggle={() => onToggleExpand("arrival")}
       >
@@ -163,7 +166,7 @@ export function FilterSidebar({
 
       {/* Airlines Filter */}
       <FilterSection
-        title="Airlines"
+        title={t('airlines')}
         isExpanded={expandedFilters.airlines}
         onToggle={() => onToggleExpand("airlines")}
       >
@@ -177,7 +180,7 @@ export function FilterSidebar({
 
       {/* Extras Filter */}
       <FilterSection
-        title="Extras"
+        title={t('extras')}
         isExpanded={expandedFilters.extras}
         onToggle={() => onToggleExpand("extras")}
       >

@@ -1,6 +1,7 @@
 "use client";
 
 import { Slider } from "@/components/ui/slider";
+import { useTranslations } from "next-intl";
 
 interface TimeFilterProps {
   outboundTime: [number, number];
@@ -15,6 +16,8 @@ export function TimeFilter({
   onOutboundChange,
   onInboundChange,
 }: TimeFilterProps) {
+  const t = useTranslations('search.filters');
+  
   const formatTime = (hour: number) => {
     if (hour === 24) return "23:59";
     return `${String(hour).padStart(2, "0")}:00`;
@@ -24,7 +27,7 @@ export function TimeFilter({
     <div className="flex flex-col gap-3">
       {/* Outbound */}
       <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium text-[#3A478A]">Outbound</span>
+        <span className="text-xs font-medium text-[#3A478A]">{t('outbound')}</span>
         <div className="flex flex-col gap-2">
           <Slider
             value={outboundTime}
@@ -49,7 +52,7 @@ export function TimeFilter({
 
       {/* Inbound */}
       <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium text-[#3A478A]">Inbound</span>
+        <span className="text-xs font-medium text-[#3A478A]">{t('inbound')}</span>
         <div className="flex flex-col gap-2">
           <Slider
             value={inboundTime}

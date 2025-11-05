@@ -1,9 +1,13 @@
+"use client";
+
 import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
 import { Tag, Plane, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 
 export default function OffersPage() {
+  const t = useTranslations('offers');
   const offers = [
     {
       id: 1,
@@ -76,11 +80,11 @@ export default function OffersPage() {
           <div className="flex items-center justify-center gap-3 mb-4">
             <Tag className="w-8 h-8 sm:w-10 sm:h-10 text-[#3754ED]" />
             <h1 className="text-3xl sm:text-5xl font-bold text-[#010D50]">
-              Special Offers
+              {t('title')}
             </h1>
           </div>
           <p className="text-base sm:text-lg lg:text-xl text-[#3A478A]">
-            Exclusive deals and discounts on flights worldwide
+            {t('subtitle')}
           </p>
         </div>
 
@@ -118,7 +122,7 @@ export default function OffersPage() {
                 </div>
 
                 <Button className="w-full bg-[#3754ED] hover:bg-[#2A3FB8] text-white py-6 rounded-lg text-lg font-semibold">
-                  Book Now
+                  {t('bookNow')}
                 </Button>
               </div>
             </div>
@@ -127,19 +131,19 @@ export default function OffersPage() {
 
         <div className="bg-white p-6 sm:p-8 rounded-2xl shadow-md border border-[#DFE0E4] text-center">
           <h2 className="text-2xl sm:text-3xl font-bold text-[#010D50] mb-4">
-            Don&apos;t Miss Out!
+            {t('newsletter.title')}
           </h2>
           <p className="text-base sm:text-lg text-[#3A478A] mb-6">
-            Subscribe to our newsletter and be the first to know about exclusive deals and offers
+            {t('newsletter.subtitle')}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
             <input
               type="email"
-              placeholder="Enter your email"
+              placeholder={t('newsletter.placeholder')}
               className="flex-1 px-4 py-3 border border-[#DFE0E4] rounded-lg focus:ring-2 focus:ring-[#3754ED] focus:border-transparent outline-none"
             />
             <Button className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white px-8 py-3 rounded-lg font-semibold sm:w-auto w-full">
-              Subscribe
+              {t('newsletter.subscribe')}
             </Button>
           </div>
         </div>

@@ -7,6 +7,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useTranslations } from "next-intl";
 
 type TripType = "round-trip" | "one-way" | "multi-city";
 
@@ -19,14 +20,16 @@ export function TripTypeSelector({
   tripType,
   onTripTypeChange,
 }: TripTypeSelectorProps) {
+  const t = useTranslations('search.tripType');
+  
   const getTripTypeLabel = (type: TripType) => {
     switch (type) {
       case "round-trip":
-        return "Round Trip";
+        return t('roundTrip');
       case "one-way":
-        return "One Way";
+        return t('oneWay');
       case "multi-city":
-        return "Multi City";
+        return t('multiCity');
     }
   };
 
@@ -51,21 +54,21 @@ export function TripTypeSelector({
             className="justify-start"
             onClick={() => onTripTypeChange("round-trip")}
           >
-            Round Trip
+            {t('roundTrip')}
           </Button>
           <Button
             variant="ghost"
             className="justify-start"
             onClick={() => onTripTypeChange("one-way")}
           >
-            One Way
+            {t('oneWay')}
           </Button>
           <Button
             variant="ghost"
             className="justify-start"
             onClick={() => onTripTypeChange("multi-city")}
           >
-            Multi City
+            {t('multiCity')}
           </Button>
         </div>
       </PopoverContent>

@@ -1,6 +1,7 @@
 "use client";
 
 import { Slider } from "@/components/ui/slider";
+import { useTranslations } from "next-intl";
 
 interface JourneyTimeFilterProps {
   outboundDuration: [number, number];
@@ -15,11 +16,12 @@ export function JourneyTimeFilter({
   onOutboundChange,
   onInboundChange,
 }: JourneyTimeFilterProps) {
+  const t = useTranslations('search.filters');
   return (
     <div className="flex flex-col gap-3">
       {/* Outbound */}
       <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium text-[#3A478A]">Outbound</span>
+        <span className="text-xs font-medium text-[#3A478A]">{t('outbound')}</span>
         <div className="flex flex-col gap-2">
           <Slider
             value={outboundDuration}
@@ -33,10 +35,10 @@ export function JourneyTimeFilter({
           />
           <div className="flex items-center justify-between">
             <span className="text-xs text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-              {outboundDuration[0]} Hours
+              {outboundDuration[0]} {t('hours')}
             </span>
             <span className="text-xs text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-              {outboundDuration[1]} Hours
+              {outboundDuration[1]} {t('hours')}
             </span>
           </div>
         </div>
@@ -44,7 +46,7 @@ export function JourneyTimeFilter({
 
       {/* Inbound */}
       <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium text-[#3A478A]">Inbound</span>
+        <span className="text-xs font-medium text-[#3A478A]">{t('inbound')}</span>
         <div className="flex flex-col gap-2">
           <Slider
             value={inboundDuration}
@@ -58,10 +60,10 @@ export function JourneyTimeFilter({
           />
           <div className="flex items-center justify-between">
             <span className="text-xs text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-              {inboundDuration[0]} Hours
+              {inboundDuration[0]} {t('hours')}
             </span>
             <span className="text-xs text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-              {inboundDuration[1]} Hours
+              {inboundDuration[1]} {t('hours')}
             </span>
           </div>
         </div>

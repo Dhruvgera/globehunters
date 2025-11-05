@@ -3,6 +3,7 @@
 import { useRef, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 
 interface DatePrice {
   date: string;
@@ -20,6 +21,7 @@ export function DatePriceSelector({
   selectedIndex,
   onSelectDate,
 }: DatePriceSelectorProps) {
+  const t = useTranslations('search.flights');
   const dateStripRef = useRef<HTMLDivElement>(null);
 
   const scrollDatesBy = (dir: 1 | -1) => {
@@ -78,7 +80,7 @@ export function DatePriceSelector({
                   {datePrice.date}
                 </span>
                 <div className="flex flex-col items-center">
-                  <span className="text-xs text-[#3A478A]">From</span>
+                  <span className="text-xs text-[#3A478A]">{t('from')}</span>
                   <span className="text-sm font-medium text-[#010D50]">
                     £{datePrice.price}
                   </span>

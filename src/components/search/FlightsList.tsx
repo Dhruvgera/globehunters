@@ -3,6 +3,7 @@
 import { Flight } from "@/types/flight";
 import FlightCard from "@/components/flights/FlightCard";
 import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 
 interface FlightsListProps {
   flights: Flight[];
@@ -15,6 +16,7 @@ export function FlightsList({
   displayCount,
   onLoadMore,
 }: FlightsListProps) {
+  const t = useTranslations('search.flights');
   const displayedFlights = flights.slice(0, displayCount);
   const hasMore = displayCount < flights.length;
 
@@ -32,7 +34,7 @@ export function FlightsList({
             variant="outline"
             className="bg-white hover:bg-[#F5F7FF] text-[#3754ED] border-[#3754ED] rounded-full px-8 py-2 h-auto text-sm font-medium"
           >
-            Show More Results
+            {t('loadMore')}
           </Button>
         </div>
       )}

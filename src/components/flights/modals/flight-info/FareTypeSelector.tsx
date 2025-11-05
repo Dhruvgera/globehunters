@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 
 type FareType = "value" | "classic" | "flex";
 
@@ -19,16 +20,17 @@ export function FareTypeSelector({
   onSelectFare,
   prices,
 }: FareTypeSelectorProps) {
+  const t = useTranslations('flightInfo');
   const fares: { type: FareType; label: string; price: number }[] = [
-    { type: "value", label: "Eco Value", price: prices.value },
-    { type: "classic", label: "Eco Classic", price: prices.classic },
-    { type: "flex", label: "Eco Flex", price: prices.flex },
+    { type: "value", label: t('fareTypes.ecoValue'), price: prices.value },
+    { type: "classic", label: t('fareTypes.ecoClassic'), price: prices.classic },
+    { type: "flex", label: t('fareTypes.ecoFlex'), price: prices.flex },
   ];
 
   return (
     <div className="flex flex-col gap-3">
       <span className="text-sm font-semibold text-[#010D50]">
-        Choose your fare
+        {t('fareDetails.chooseFare')}
       </span>
       <div className="flex gap-2">
         {fares.map((fare) => (

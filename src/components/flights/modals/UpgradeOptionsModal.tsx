@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { X, Info, ChevronLeft, ChevronRight, ShoppingBag, Briefcase, Package, XCircle, Check } from "lucide-react";
+import { X, Check, Briefcase, Package, ShoppingBag, XCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 
 interface UpgradeOptionsModalProps {
@@ -133,6 +134,7 @@ export default function UpgradeOptionsModal({
   open,
   onOpenChange,
 }: UpgradeOptionsModalProps) {
+  const t = useTranslations('upgradeOptions');
   const [selectedFare, setSelectedFare] = useState<string>("classic");
   const [highlightedFare, setHighlightedFare] = useState<string>("classic");
 
@@ -140,7 +142,7 @@ export default function UpgradeOptionsModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[min(100vw-24px,960px)] max-h-[90vh] overflow-y-auto p-4 sm:p-6 gap-3 sm:gap-4 [&>button]:hidden bg-white rounded-3xl border-0">
         <DialogHeader className="sr-only">
-          <DialogTitle>Upgrade options</DialogTitle>
+          <DialogTitle>{t('title')}</DialogTitle>
         </DialogHeader>
         {/* Close Button */}
         <button
@@ -148,7 +150,7 @@ export default function UpgradeOptionsModal({
           className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100"
         >
           <X className="h-5 w-5" />
-          <span className="sr-only">Close</span>
+          <span className="sr-only">{t('close')}</span>
         </button>
 
         {/* Fare Options */}
@@ -195,7 +197,7 @@ export default function UpgradeOptionsModal({
                 {/* Features */}
                 <div className="flex flex-col gap-4">
                   <span className="text-sm text-[#3A478A]">
-                    Included in this fare:
+                    {t('includedInFare')}
                   </span>
                   <div className="flex flex-col gap-3">
                     {fare.features.map((feature, index) => {

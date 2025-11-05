@@ -7,6 +7,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useTranslations } from "next-intl";
 
 interface Passengers {
   adults: number;
@@ -27,6 +28,7 @@ export function PassengersSelector({
   onPassengersChange,
   onTravelClassChange,
 }: PassengersSelectorProps) {
+  const t = useTranslations('search.passengers');
   const totalPassengers =
     passengers.adults + passengers.children + passengers.infants;
 
@@ -50,8 +52,7 @@ export function PassengersSelector({
         >
           <Users className="w-5 h-5 text-[#010D50]" />
           <span className="text-sm font-medium text-[#010D50]">
-            {totalPassengers} Adult{totalPassengers > 1 ? "s" : ""},{" "}
-            {travelClass}
+            {totalPassengers} {totalPassengers > 1 ? t('adultPlural') : t('adultSingular')}, {travelClass}
           </span>
           <ChevronDown className="w-5 h-5 text-[#010D50]" />
         </Button>
@@ -60,7 +61,7 @@ export function PassengersSelector({
         <div className="flex flex-col gap-4">
           {/* Adults */}
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Adults</span>
+            <span className="text-sm font-medium">{t('adults')}</span>
             <div className="flex items-center gap-2">
               <Button
                 size="sm"
@@ -82,7 +83,7 @@ export function PassengersSelector({
 
           {/* Children */}
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Children (2-11)</span>
+            <span className="text-sm font-medium">{t('children')}</span>
             <div className="flex items-center gap-2">
               <Button
                 size="sm"
@@ -104,7 +105,7 @@ export function PassengersSelector({
 
           {/* Infants */}
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Infants (&lt;2)</span>
+            <span className="text-sm font-medium">{t('infants')}</span>
             <div className="flex items-center gap-2">
               <Button
                 size="sm"
@@ -126,17 +127,21 @@ export function PassengersSelector({
 
           {/* Travel Class */}
           <div className="border-t pt-4">
-            <p className="text-sm font-medium mb-2">Travel Class</p>
+            <p className="text-sm font-medium mb-2">{t('travelClass')}</p>
             <div className="flex flex-col gap-2">
-              {["Economy", "Premium Economy", "Business", "First"].map(
-                (cls) => (
+              {[
+                { key: 'Economy', label: t('economy') },
+                { key: 'Premium Economy', label: t('premiumEconomy') },
+                { key: 'Business', label: t('business') },
+                { key: 'First', label: t('first') }
+              ].map((cls) => (
                   <Button
-                    key={cls}
-                    variant={travelClass === cls ? "default" : "ghost"}
+                    key={cls.key}
+                    variant={travelClass === cls.key ? "default" : "ghost"}
                     className="justify-start"
-                    onClick={() => onTravelClassChange(cls)}
+                    onClick={() => onTravelClassChange(cls.key)}
                   >
-                    {cls}
+                    {cls.label}
                   </Button>
                 )
               )}

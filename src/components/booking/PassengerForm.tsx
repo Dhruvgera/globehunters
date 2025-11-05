@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useTranslations } from "next-intl";
 
 interface PassengerFormProps {
   passengerIndex: number;
@@ -29,6 +30,8 @@ export function PassengerForm({
   onCancel,
   showPassportFields = false,
 }: PassengerFormProps) {
+  const t = useTranslations('booking.passengerDetails');
+  
   const [formData, setFormData] = useState<Partial<Passenger>>({
     title: initialData?.title || "Mr",
     firstName: initialData?.firstName || "",
@@ -70,26 +73,26 @@ export function PassengerForm({
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="bg-white border border-[#DFE0E4] rounded-xl p-6">
         <h3 className="text-lg font-semibold text-[#010D50] mb-4">
-          Passenger {passengerIndex + 1}
+          {t('passenger')} {passengerIndex + 1}
         </h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Title */}
           <div className="space-y-2">
-            <Label htmlFor={`title-${passengerIndex}`}>Title *</Label>
+            <Label htmlFor={`title-${passengerIndex}`}>{t('titleLabel')} {t('required')}</Label>
             <Select
               value={formData.title}
               onValueChange={(value) => handleChange("title", value)}
             >
               <SelectTrigger id={`title-${passengerIndex}`}>
-                <SelectValue placeholder="Select title" />
+                <SelectValue placeholder={t('selectTitle')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Mr">Mr</SelectItem>
-                <SelectItem value="Mrs">Mrs</SelectItem>
-                <SelectItem value="Miss">Miss</SelectItem>
-                <SelectItem value="Ms">Ms</SelectItem>
-                <SelectItem value="Dr">Dr</SelectItem>
+                <SelectItem value="Mr">{t('mr')}</SelectItem>
+                <SelectItem value="Mrs">{t('mrs')}</SelectItem>
+                <SelectItem value="Miss">{t('miss')}</SelectItem>
+                <SelectItem value="Ms">{t('ms')}</SelectItem>
+                <SelectItem value="Dr">{t('dr')}</SelectItem>
               </SelectContent>
             </Select>
             {errors.title && (
@@ -99,13 +102,13 @@ export function PassengerForm({
 
           {/* First Name */}
           <div className="space-y-2">
-            <Label htmlFor={`firstName-${passengerIndex}`}>First Name *</Label>
+            <Label htmlFor={`firstName-${passengerIndex}`}>{t('firstName')} {t('required')}</Label>
             <Input
               id={`firstName-${passengerIndex}`}
               type="text"
               value={formData.firstName}
               onChange={(e) => handleChange("firstName", e.target.value)}
-              placeholder="Enter first name"
+              placeholder={t('firstName')}
               className={errors.firstName ? "border-red-500" : ""}
             />
             {errors.firstName && (
@@ -115,13 +118,13 @@ export function PassengerForm({
 
           {/* Last Name */}
           <div className="space-y-2">
-            <Label htmlFor={`lastName-${passengerIndex}`}>Last Name *</Label>
+            <Label htmlFor={`lastName-${passengerIndex}`}>{t('lastName')} {t('required')}</Label>
             <Input
               id={`lastName-${passengerIndex}`}
               type="text"
               value={formData.lastName}
               onChange={(e) => handleChange("lastName", e.target.value)}
-              placeholder="Enter last name"
+              placeholder={t('lastName')}
               className={errors.lastName ? "border-red-500" : ""}
             />
             {errors.lastName && (
@@ -131,7 +134,7 @@ export function PassengerForm({
 
           {/* Date of Birth */}
           <div className="space-y-2">
-            <Label htmlFor={`dob-${passengerIndex}`}>Date of Birth *</Label>
+            <Label htmlFor={`dob-${passengerIndex}`}>{t('dateOfBirth')} {t('required')}</Label>
             <Input
               id={`dob-${passengerIndex}`}
               type="date"
@@ -146,13 +149,13 @@ export function PassengerForm({
 
           {/* Email */}
           <div className="space-y-2">
-            <Label htmlFor={`email-${passengerIndex}`}>Email *</Label>
+            <Label htmlFor={`email-${passengerIndex}`}>{t('email')} {t('required')}</Label>
             <Input
               id={`email-${passengerIndex}`}
               type="email"
               value={formData.email}
               onChange={(e) => handleChange("email", e.target.value)}
-              placeholder="email@example.com"
+              placeholder={t('emailPlaceholder')}
               className={errors.email ? "border-red-500" : ""}
             />
             {errors.email && (
@@ -162,13 +165,13 @@ export function PassengerForm({
 
           {/* Phone */}
           <div className="space-y-2">
-            <Label htmlFor={`phone-${passengerIndex}`}>Phone *</Label>
+            <Label htmlFor={`phone-${passengerIndex}`}>{t('phone')} {t('required')}</Label>
             <Input
               id={`phone-${passengerIndex}`}
               type="tel"
               value={formData.phone}
               onChange={(e) => handleChange("phone", e.target.value)}
-              placeholder="+1234567890"
+              placeholder={t('phonePlaceholder')}
               className={errors.phone ? "border-red-500" : ""}
             />
             {errors.phone && (
@@ -181,14 +184,14 @@ export function PassengerForm({
         {showPassportFields && (
           <div className="mt-6 pt-6 border-t border-[#DFE0E4]">
             <h4 className="text-md font-semibold text-[#010D50] mb-4">
-              Passport Information (Optional)
+              {t('passportNumber')} (Optional)
             </h4>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Passport Number */}
               <div className="space-y-2">
                 <Label htmlFor={`passport-${passengerIndex}`}>
-                  Passport Number
+                  {t('passportNumber')}
                 </Label>
                 <Input
                   id={`passport-${passengerIndex}`}
@@ -210,7 +213,7 @@ export function PassengerForm({
               {/* Passport Expiry */}
               <div className="space-y-2">
                 <Label htmlFor={`passportExpiry-${passengerIndex}`}>
-                  Passport Expiry
+                  {t('passportExpiry')}
                 </Label>
                 <Input
                   id={`passportExpiry-${passengerIndex}`}
@@ -231,7 +234,7 @@ export function PassengerForm({
               {/* Nationality */}
               <div className="space-y-2">
                 <Label htmlFor={`nationality-${passengerIndex}`}>
-                  Nationality
+                  {t('nationality')}
                 </Label>
                 <Input
                   id={`nationality-${passengerIndex}`}
@@ -259,14 +262,14 @@ export function PassengerForm({
             onClick={onCancel}
             className="rounded-full px-6 py-2 h-auto text-sm font-medium"
           >
-            Cancel
+            {t('cancel')}
           </Button>
         )}
         <Button
           type="submit"
           className="bg-[#3754ED] hover:bg-[#2942D1] text-white rounded-full px-6 py-2 h-auto text-sm font-medium"
         >
-          Save Passenger
+          {t('save')}
         </Button>
       </div>
     </form>

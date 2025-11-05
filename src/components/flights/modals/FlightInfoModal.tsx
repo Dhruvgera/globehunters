@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Flight } from "@/types/flight";
+import { useTranslations } from "next-intl";
 
 interface FlightInfoModalProps {
   flight: Flight;
@@ -23,6 +24,7 @@ export default function FlightInfoModal({
   open,
   onOpenChange,
 }: FlightInfoModalProps) {
+  const t = useTranslations('flightInfo');
   const router = useRouter();
   const [selectedLeg, setSelectedLeg] = useState<"outbound" | "inbound">(
     "outbound"
@@ -38,7 +40,7 @@ export default function FlightInfoModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[min(100vw-24px,960px)] max-w-full max-h-[90vh] overflow-y-auto overflow-x-clip p-4 sm:p-6 gap-6 sm:gap-8 [&>button]:hidden bg-white rounded-3xl border-0 box-border">
         <DialogHeader className="sr-only">
-          <DialogTitle>Flight information</DialogTitle>
+          <DialogTitle>{t('modal.title')}</DialogTitle>
         </DialogHeader>
         {/* Header with Flight Leg Selector */}
         <div className="flex flex-col gap-4">
@@ -199,32 +201,32 @@ export default function FlightInfoModal({
                 {/* Segment Baggage & Meals */}
                 <div className="flex flex-col gap-3">
                   <span className="text-sm font-semibold text-[#010D50]">
-                    Included with this segment
+                    {t('modal.includedSegment')}
                   </span>
                   <div className="flex flex-col md:flex-row gap-3">
                     {/* Baggage for this segment */}
                     <div className="flex-1 bg-[#F5F7FF] rounded-xl p-3 flex flex-col gap-3">
-                      <span className="text-sm font-medium text-[#010D50]">Baggage Allowance</span>
+                      <span className="text-sm font-medium text-[#010D50]">{t('baggage.title')}</span>
                       <div className="flex flex-col gap-2">
                         <div className="flex items-start gap-2">
                           <ShoppingBag className="w-5 h-5 text-[#010D50] shrink-0" />
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-xs font-medium text-[#010D50]">1 personal item</span>
-                            <span className="text-xs text-[#3A478A]">Fits under seat</span>
+                            <span className="text-xs font-medium text-[#010D50]">{t('baggage.personalItem')}</span>
+                            <span className="text-xs text-[#3A478A]">{t('baggage.personalItemDesc')}</span>
                           </div>
                         </div>
                         <div className="flex items-start gap-2">
                           <Briefcase className="w-5 h-5 text-[#010D50] shrink-0" />
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-xs font-medium text-[#010D50]">1 carry-on bag</span>
-                            <span className="text-xs text-[#3A478A]">Max 10kg</span>
+                            <span className="text-xs font-medium text-[#010D50]">{t('baggage.carryOn')}</span>
+                            <span className="text-xs text-[#3A478A]">{t('baggage.carryOnDesc')}</span>
                           </div>
                         </div>
                         <div className="flex items-start gap-2">
                           <Package className="w-5 h-5 text-[#010D50] shrink-0" />
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-xs font-medium text-[#010D50]">2 checked bags</span>
-                            <span className="text-xs text-[#3A478A]">Max 23kg each</span>
+                            <span className="text-xs font-medium text-[#010D50]">{t('baggage.checked')}</span>
+                            <span className="text-xs text-[#3A478A]">{t('baggage.checkedDesc')}</span>
                           </div>
                         </div>
                       </div>
@@ -232,27 +234,27 @@ export default function FlightInfoModal({
 
                     {/* Meals for this segment */}
                     <div className="flex-1 bg-[#F5F7FF] rounded-xl p-3 flex flex-col gap-3">
-                      <span className="text-sm font-medium text-[#010D50]">Meals & Refreshments</span>
+                      <span className="text-sm font-medium text-[#010D50]">{t('meals.title')}</span>
                       <div className="flex flex-col gap-2">
                         <div className="flex items-start gap-2">
                           <UtensilsCrossed className="w-5 h-5 text-[#010D50] shrink-0" />
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-xs font-medium text-[#010D50]">Complimentary meal</span>
-                            <span className="text-xs text-[#3A478A]">Hot meal service included</span>
+                            <span className="text-xs font-medium text-[#010D50]">{t('meals.complimentary')}</span>
+                            <span className="text-xs text-[#3A478A]">{t('meals.complimentaryDesc')}</span>
                           </div>
                         </div>
                         <div className="flex items-start gap-2">
                           <UtensilsCrossed className="w-5 h-5 text-[#010D50] shrink-0" />
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-xs font-medium text-[#010D50]">Beverages</span>
-                            <span className="text-xs text-[#3A478A]">Soft drinks, tea, coffee</span>
+                            <span className="text-xs font-medium text-[#010D50]">{t('meals.beverages')}</span>
+                            <span className="text-xs text-[#3A478A]">{t('meals.beveragesDesc')}</span>
                           </div>
                         </div>
                         <div className="flex items-start gap-2">
                           <UtensilsCrossed className="w-5 h-5 text-[#010D50] shrink-0" />
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-xs font-medium text-[#010D50]">Special meals</span>
-                            <span className="text-xs text-[#3A478A]">Available on request</span>
+                            <span className="text-xs font-medium text-[#010D50]">{t('meals.special')}</span>
+                            <span className="text-xs text-[#3A478A]">{t('meals.specialDesc')}</span>
                           </div>
                         </div>
                       </div>
@@ -266,7 +268,7 @@ export default function FlightInfoModal({
                     {/* Stopover Duration */}
                     <div className="bg-[#F5F7FF] rounded-xl px-4 py-3 flex items-center gap-3 w-fit">
                       <span className="text-sm text-[#3A478A]">
-                        Stopover at Casablanca (CMN) for
+                        {t('modal.stopoverAt')} Casablanca (CMN) {t('modal.for')}
                       </span>
                       <div className="flex items-center gap-2">
                         <Clock className="w-5 h-5 text-[#010D50]" />
@@ -281,13 +283,10 @@ export default function FlightInfoModal({
                       <Info className="w-6 h-6 text-[#FF0202] shrink-0" />
                       <div className="flex flex-col gap-2">
                         <span className="text-sm font-medium text-[#FF0202]">
-                          Baggage Alert: Re-Check Required
+                          {t('baggage.alert.title')}
                         </span>
                         <span className="text-sm text-[#FF0202]">
-                          Due to airline or flight changes during your stop, you
-                          MUST collect your checked luggage and re-check it with
-                          the connecting airline. Always confirm your baggage tag
-                          instructions upon arrival at your layover city.
+                          {t('baggage.alert.message')}
                         </span>
                       </div>
                     </div>

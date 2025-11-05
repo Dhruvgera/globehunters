@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface TermsAndConditionsProps {
   onUpgradeClick: () => void;
@@ -13,6 +14,7 @@ interface TermsAndConditionsProps {
 export function TermsAndConditions({
   onUpgradeClick,
 }: TermsAndConditionsProps) {
+  const t = useTranslations('booking.terms');
   const router = useRouter();
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [marketingConsent, setMarketingConsent] = useState(false);
@@ -26,8 +28,7 @@ export function TermsAndConditions({
           className="mt-1"
         />
         <p className="text-xs leading-relaxed text-[#010D50]">
-          By clicking this checkbox, I acknowledge that I have read and accepted
-          Globehunters Terms & Conditions and Privacy Policy
+          {t('acceptTerms')}
         </p>
       </div>
       <div className="flex items-start gap-2">
@@ -37,9 +38,7 @@ export function TermsAndConditions({
           className="mt-1"
         />
         <p className="text-xs leading-relaxed text-[#010D50]">
-          By clicking this checkbox, I consent to receive marketing messages via
-          calls, texts, and emails from Globehunters at the provided contact. I
-          understand that my consent is not a condition of purchase.
+          {t('acceptMarketing')}
         </p>
       </div>
 
@@ -50,7 +49,7 @@ export function TermsAndConditions({
           variant="outline"
           className="border-[#3754ED] text-[#3754ED] rounded-full px-5 py-2 h-auto text-sm font-bold hover:bg-[#F5F7FF]"
         >
-          Upgrade options
+          {t('upgradeOptions')}
           <ChevronLeft className="w-5 h-5 rotate-180" />
         </Button>
         <Button
@@ -58,7 +57,7 @@ export function TermsAndConditions({
           disabled={!termsAccepted}
           className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-full px-5 py-2 h-auto text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          Book
+          {t('book')}
           <ChevronLeft className="w-5 h-5 rotate-180" />
         </Button>
       </div>

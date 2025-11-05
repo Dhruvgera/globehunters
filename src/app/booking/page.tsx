@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
 import { useBookingStore, useSelectedFlight } from "@/store/bookingStore";
+import { useTranslations } from "next-intl";
 
 // Import new modular components
 import { BookingHeader } from "@/components/booking/BookingHeader";
@@ -33,6 +34,7 @@ const mockReviews = [
 ];
 
 function BookingContent() {
+  const t = useTranslations('booking');
   const router = useRouter();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showFlightInfo, setShowFlightInfo] = useState(false);
@@ -102,36 +104,27 @@ function BookingContent() {
             {/* Travel Documents Alert */}
             <AlertBanner type="success">
               <p className="font-medium">
-                Please remember that it is your responsibility to have in your
-                possession all the necessary travel documents with you
+                {t('alerts.travelDocuments.line1')}
               </p>
               <p>
-                Valid travel ID (passport or ID card). Visa for your final
-                destination and any transit countries (if required).
+                {t('alerts.travelDocuments.line2')}
               </p>
               <p>
-                We strongly recommend you check the entry requirements for any
-                country you travel through. You can find this info on the
-                website of the countries&apos; relevant authorities, or via your
-                embassy or consulate.
+                {t('alerts.travelDocuments.line3')}
               </p>
             </AlertBanner>
 
             {/* Price Change Alert */}
-            <AlertBanner type="info" title="Heads up! The result for your search is now coming back with a different price.">
+            <AlertBanner type="info" title={t('alerts.priceChange.title')}>
               <p>
-                Ticket price changed from £94,348 to £94,353. You can continue,
-                or we can help you find other flights.
+                {t('alerts.priceChange.message')}
               </p>
             </AlertBanner>
 
             {/* Baggage Alert */}
-            <AlertBanner type="error" title="Baggage Alert: Re-Check Required">
+            <AlertBanner type="error" title={t('alerts.baggageAlert.title')}>
               <p>
-                Due to airline or flight changes during your stop, you MUST
-                collect your checked luggage and re-check it with the connecting
-                airline. Always confirm your baggage tag instructions upon
-                arrival at your layover city.
+                {t('alerts.baggageAlert.message')}
               </p>
             </AlertBanner>
 
@@ -139,12 +132,12 @@ function BookingContent() {
             <div className="flex flex-col gap-3">
               <FlightSummaryCard
                 leg={outboundLeg}
-                passengers="1 Adult"
+                passengers={`1 ${t('flightSummary.passenger')}`}
                 onViewDetails={() => setShowFlightInfo(true)}
               />
               <FlightSummaryCard
                 leg={inboundLeg}
-                passengers="1 Adult"
+                passengers={`1 ${t('flightSummary.passenger')}`}
                 onViewDetails={() => setShowFlightInfo(true)}
               />
             </div>

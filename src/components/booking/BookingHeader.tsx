@@ -2,17 +2,20 @@
 
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface BookingHeaderProps {
   currentStep?: number;
 }
 
 export function BookingHeader({ currentStep = 1 }: BookingHeaderProps) {
+  const t = useTranslations('booking.header');
+  
   const steps = [
-    { number: 1, label: "Your details" },
-    { number: 2, label: "Choose your fare" },
-    { number: 3, label: "Payment Details" },
-    { number: 4, label: "Confirmation" },
+    { number: 1, label: t('step1') },
+    { number: 2, label: t('step2') },
+    { number: 3, label: t('step3') },
+    { number: 4, label: t('step4') },
   ];
 
   return (
@@ -23,7 +26,7 @@ export function BookingHeader({ currentStep = 1 }: BookingHeaderProps) {
         className="flex items-center gap-2 text-sm font-medium text-[#010D50] hover:text-[#3754ED] transition-colors w-fit"
       >
         <ChevronLeft className="w-4 h-4" />
-        Back to search results
+        {t('backToSearch')}
       </Link>
 
       {/* Progress Steps */}

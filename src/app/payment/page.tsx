@@ -20,8 +20,10 @@ import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
 import { useBookingStore, useSelectedFlight } from "@/store/bookingStore";
 import { CONTACT_INFO, PRICING_CONFIG } from "@/config/constants";
 import { formatPrice } from "@/utils/pricing";
+import { useTranslations } from "next-intl";
 
 function PaymentContent() {
+  const t = useTranslations('payment');
   const router = useRouter();
   const [isIAssureExpanded, setIsIAssureExpanded] = useState(false);
   const [showFlightInfo, setShowFlightInfo] = useState(false);
@@ -82,7 +84,7 @@ function PaymentContent() {
             className="flex items-center gap-2 text-[#010D50] text-sm font-medium hover:text-[#3754ED] transition-colors w-fit"
           >
             <ChevronLeft className="w-4 h-4" />
-            Back to Fare Options
+            {t('header.backToFare')}
           </Link>
 
           {/* Progress Steps - responsive: one line on mobile, bordered bar on desktop */}
@@ -92,7 +94,7 @@ function PaymentContent() {
               <div className="w-5 h-5 lg:w-6 lg:h-6 rounded-full bg-[#010D50] border border-[#010D50] flex items-center justify-center">
                 <span className="text-[10px] lg:text-xs font-medium text-white">1</span>
               </div>
-              <span className="hidden lg:inline text-xs lg:text-sm font-medium text-[#010D50]">Your details</span>
+              <span className="hidden lg:inline text-xs lg:text-sm font-medium text-[#010D50]">{t('header.step1')}</span>
             </div>
 
             {/* Step 2 - Completed */}
@@ -100,7 +102,7 @@ function PaymentContent() {
               <div className="w-5 h-5 lg:w-6 lg:h-6 rounded-full bg-[#010D50] border border-[#010D50] flex items-center justify-center">
                 <span className="text-[10px] lg:text-xs font-medium text-white">2</span>
               </div>
-              <span className="hidden lg:inline text-xs lg:text-sm font-medium text-[#010D50]">Choose your fare</span>
+              <span className="hidden lg:inline text-xs lg:text-sm font-medium text-[#010D50]">{t('header.step2')}</span>
             </div>
 
             {/* Step 3 - Current */}
@@ -108,7 +110,7 @@ function PaymentContent() {
               <div className="w-5 h-5 lg:w-6 lg:h-6 rounded-full border-2 border-[#010D50] flex items-center justify-center">
                 <span className="text-[10px] lg:text-xs font-medium text-[#010D50]">3</span>
               </div>
-              <span className="hidden lg:inline text-xs lg:text-sm font-medium text-[#010D50]">Payment Details</span>
+              <span className="hidden lg:inline text-xs lg:text-sm font-medium text-[#010D50]">{t('header.step3')}</span>
             </div>
 
             {/* Step 4 */}
@@ -116,7 +118,7 @@ function PaymentContent() {
               <div className="w-5 h-5 lg:w-6 lg:h-6 rounded-full border border-[#010D50] flex items-center justify-center">
                 <span className="text-[10px] lg:text-xs font-medium text-[#010D50]">4</span>
               </div>
-              <span className="hidden lg:inline text-xs lg:text-sm font-medium text-[#010D50]">Confirmation</span>
+              <span className="hidden lg:inline text-xs lg:text-sm font-medium text-[#010D50]">{t('header.step4')}</span>
             </div>
           </div>
         </div>
@@ -329,11 +331,11 @@ function PaymentContent() {
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-3 flex flex-col gap-6">
               <div className="flex items-center justify-between">
                 <div className="bg-[#F5F7FF] rounded-full px-4 py-3">
-                  <span className="text-sm font-semibold text-[#010D50]">Baggage Allowance</span>
+                  <span className="text-sm font-semibold text-[#010D50]">{t('baggage.title')}</span>
                 </div>
                 <div className="bg-[#F5F7FF] rounded-full px-3 py-1.5">
                   <span className="text-sm font-medium text-[#3754ED]">
-                    For more information on baggage, Call Now
+                    {t('baggage.callForInfo')}
                   </span>
                 </div>
               </div>
@@ -345,13 +347,13 @@ function PaymentContent() {
                   <div className="flex items-center gap-3">
                     <ShoppingBag className="w-6 h-6 text-[#010D50]" />
                     <div className="flex flex-col gap-1">
-                      <span className="text-sm font-medium text-[#010D50]">Personal item</span>
-                      <span className="text-sm text-[#3A478A]">Fits under the seat</span>
+                      <span className="text-sm font-medium text-[#010D50]">{t('baggage.personalItem')}</span>
+                      <span className="text-sm text-[#3A478A]">{t('baggage.personalItemDesc')}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
                     <CheckCircle2 className="w-5 h-5 text-[#008234]" />
-                    <span className="text-sm font-medium text-[#008234]">Included</span>
+                    <span className="text-sm font-medium text-[#008234]">{t('baggage.included')}</span>
                   </div>
                 </div>
 
@@ -360,13 +362,13 @@ function PaymentContent() {
                   <div className="flex items-center gap-3">
                     <Briefcase className="w-6 h-6 text-[#010D50]" />
                     <div className="flex flex-col gap-1">
-                      <span className="text-sm font-medium text-[#010D50]">Carry-on bag</span>
-                      <span className="text-sm text-[#3A478A]">(56cm x 36cm x 23cm)</span>
+                      <span className="text-sm font-medium text-[#010D50]">{t('baggage.carryOn')}</span>
+                      <span className="text-sm text-[#3A478A]">{t('baggage.carryOnDimensions')}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
                     <CheckCircle2 className="w-5 h-5 text-[#008234]" />
-                    <span className="text-sm font-medium text-[#008234]">Included</span>
+                    <span className="text-sm font-medium text-[#008234]">{t('baggage.included')}</span>
                   </div>
                 </div>
 
@@ -375,13 +377,13 @@ function PaymentContent() {
                   <div className="flex items-center gap-3">
                     <Package className="w-6 h-6 text-[#010D50]" />
                     <div className="flex flex-col gap-1">
-                      <span className="text-sm font-medium text-[#010D50]">Checked bags</span>
-                      <span className="text-sm text-[#3A478A]">Per person each way</span>
+                      <span className="text-sm font-medium text-[#010D50]">{t('baggage.checkedBags')}</span>
+                      <span className="text-sm text-[#3A478A]">{t('baggage.checkedBagsDesc')}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
                     <XCircle className="w-5 h-5 text-[#FF0202]" />
-                    <span className="text-sm font-medium text-[#FF0202]">Not Included</span>
+                    <span className="text-sm font-medium text-[#FF0202]">{t('baggage.notIncluded')}</span>
                   </div>
                 </div>
 
@@ -391,15 +393,15 @@ function PaymentContent() {
                     <div className="flex items-center gap-3">
                       <Package className="w-6 h-6 text-[#010D50] shrink-0" />
                       <div className="flex flex-col gap-1">
-                        <span className="text-sm font-medium text-[#010D50]">Add additional baggage</span>
-                        <span className="text-sm text-[#3A478A]">Add additional checked bags</span>
+                        <span className="text-sm font-medium text-[#010D50]">{t('baggage.addBaggage')}</span>
+                        <span className="text-sm text-[#3A478A]">{t('baggage.addBaggageDesc')}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Price and Counter - Below on mobile, inline on desktop */}
                   <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 lg:gap-2 pl-0 lg:pl-9">
-                    <span className="text-sm font-semibold text-[#010D50]">₹4500 /per person (20kg)</span>
+                    <span className="text-sm font-semibold text-[#010D50]">{t('baggage.baggagePrice')}</span>
                     <div className="bg-[rgba(55,84,237,0.12)] rounded-full px-4 py-3 flex items-center gap-2">
                       <button
                         onClick={() => setAdditionalBaggage(Math.max(0, additionalBaggage - 1))}
@@ -427,7 +429,7 @@ function PaymentContent() {
               <div className="flex items-center justify-between">
                 <div className="bg-[#F5F7FF] rounded-full px-4 py-3 w-fit">
                   <span className="text-sm font-semibold text-[#010D50]">
-                    iAssure Protection (Recommended)
+                    {t('iAssure.title')}
                   </span>
                 </div>
                 <Button
@@ -435,7 +437,7 @@ function PaymentContent() {
                   onClick={() => setIsIAssureExpanded(!isIAssureExpanded)}
                   className="lg:hidden text-[#3754ED] h-auto p-2 text-sm"
                 >
-                  {isIAssureExpanded ? "Hide Plans" : "Compare Plans"}
+                  {isIAssureExpanded ? t('iAssure.hidePlans') : t('iAssure.comparePlans')}
                 </Button>
               </div>
 
@@ -450,17 +452,17 @@ function PaymentContent() {
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <h3 className="text-sm font-semibold text-[#010D50]">Basic</h3>
+                      <h3 className="text-sm font-semibold text-[#010D50]">{t('iAssure.basic')}</h3>
                       <p className="text-lg font-bold text-[#3754ED] mt-1">₹8,623.68</p>
                     </div>
                     <Checkbox checked={protectionPlan === "basic"} />
                   </div>
                   <div className="flex flex-col gap-2">
                     {[
-                      "24/7 Support",
-                      "Free changes in 24hrs",
-                      "100% refund on death",
-                      "100% refund on airline cancellation",
+                      t('iAssure.features.support247'),
+                      t('iAssure.features.freeChanges24h'),
+                      t('iAssure.features.refundDeath'),
+                      t('iAssure.features.refundAirline'),
                     ].map((feature, i) => (
                       <div key={i} className="flex items-start gap-2">
                         <Check className="w-4 h-4 text-[#008234] shrink-0 mt-0.5" />
@@ -479,18 +481,18 @@ function PaymentContent() {
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <h3 className="text-sm font-semibold text-[#010D50]">Premium</h3>
+                      <h3 className="text-sm font-semibold text-[#010D50]">{t('iAssure.premium')}</h3>
                       <p className="text-lg font-bold text-[#3754ED] mt-1">₹10,779.60</p>
                     </div>
                     <Checkbox checked={protectionPlan === "premium"} />
                   </div>
                   <div className="flex flex-col gap-2">
                     {[
-                      "All Basic features",
-                      "Free changes anytime",
-                      "Refund on lockdown/travel ban",
-                      "Baggage compensation",
-                      "Flight delay compensation",
+                      t('iAssure.features.allBasic'),
+                      t('iAssure.features.freeChangesAnytime'),
+                      t('iAssure.features.refundLockdown'),
+                      t('iAssure.features.baggageCompensation'),
+                      t('iAssure.features.flightDelay'),
                     ].map((feature, i) => (
                       <div key={i} className="flex items-start gap-2">
                         <Check className="w-4 h-4 text-[#008234] shrink-0 mt-0.5" />
@@ -509,17 +511,17 @@ function PaymentContent() {
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <h3 className="text-sm font-semibold text-[#010D50]">All Included</h3>
+                      <h3 className="text-sm font-semibold text-[#010D50]">{t('iAssure.allIncluded')}</h3>
                       <p className="text-lg font-bold text-[#3754ED] mt-1">₹12,935.52</p>
                     </div>
                     <Checkbox checked={protectionPlan === "all"} />
                   </div>
                   <div className="flex flex-col gap-2">
                     {[
-                      "All Premium features",
-                      "24hrs price match guarantee",
-                      "₹25 credit for future bookings",
-                      "Priority customer service",
+                      t('iAssure.features.allPremium'),
+                      t('iAssure.features.priceMatch'),
+                      t('iAssure.features.futureCredit'),
+                      t('iAssure.features.priorityService'),
                     ].map((feature, i) => (
                       <div key={i} className="flex items-start gap-2">
                         <Check className="w-4 h-4 text-[#008234] shrink-0 mt-0.5" />
@@ -550,16 +552,16 @@ function PaymentContent() {
 
                 {/* Features */}
                 {[
-                  "One-on-One 24/7 Support",
-                  "Rebook, rename and cancel in first 24hrs for free",
-                  "100% refund in the event of passenger's death",
-                  "Free changes anytime",
-                  "100% refund in case of cancellations by airlines",
-                  "Refund in case of State lockdown, travel ban, or mechanical failure",
-                  "Compensation per mishandled checked-in bag",
-                  "Flight delay compensation",
-                  "24hrs price match guarantee",
-                  "₹25 credit for future bookings",
+                  t('iAssure.features.support247Full'),
+                  t('iAssure.features.rebookRename'),
+                  t('iAssure.features.refundDeathFull'),
+                  t('iAssure.features.freeChangesAnytime'),
+                  t('iAssure.features.refundAirlineFull'),
+                  t('iAssure.features.refundLockdownFull'),
+                  t('iAssure.features.baggageCompensationFull'),
+                  t('iAssure.features.flightDelay'),
+                  t('iAssure.features.priceMatch'),
+                  t('iAssure.features.futureCredit'),
                 ].map((feature, i) => (
                   <div key={i} className="flex items-center justify-between p-3 border-b border-[#F5F7FF]">
                     <span className="w-[524px] text-sm font-medium text-[#010D50]">{feature}</span>
@@ -594,7 +596,7 @@ function PaymentContent() {
                       className="w-[109px] flex flex-col items-center justify-center gap-1 py-0.5 cursor-pointer"
                     >
                       <Checkbox checked={protectionPlan === "basic"} />
-                      <span className="text-xs font-medium text-[#010D50]">Basic</span>
+                      <span className="text-xs font-medium text-[#010D50]">{t('iAssure.basic')}</span>
                     </div>
                     <div
                       role="button"
@@ -609,7 +611,7 @@ function PaymentContent() {
                       className="w-[109px] flex flex-col items-center justify-center gap-1 py-0.5 cursor-pointer"
                     >
                       <Checkbox checked={protectionPlan === "premium"} />
-                      <span className="text-xs font-medium text-[#010D50]">Premium</span>
+                      <span className="text-xs font-medium text-[#010D50]">{t('iAssure.premium')}</span>
                     </div>
                     <div
                       role="button"
@@ -624,7 +626,7 @@ function PaymentContent() {
                       className="w-[109px] flex flex-col items-center justify-center gap-1 py-0.5 cursor-pointer"
                     >
                       <Checkbox checked={protectionPlan === "all"} />
-                      <span className="text-xs font-medium text-[#010D50]">All Included</span>
+                      <span className="text-xs font-medium text-[#010D50]">{t('iAssure.allIncluded')}</span>
                     </div>
                   </div>
                 </div>
@@ -635,7 +637,7 @@ function PaymentContent() {
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-3 flex flex-col gap-6">
               <div className="flex items-center justify-between">
                 <div className="bg-[#F5F7FF] rounded-full px-4 py-3 w-fit">
-                  <span className="text-sm font-semibold text-[#010D50]">Payment Details</span>
+                  <span className="text-sm font-semibold text-[#010D50]">{t('header.title')}</span>
                 </div>
                 {/* Mobile: Total Payment Amount */}
                 <div className="lg:hidden bg-[#F5F7FF] rounded-full px-3 py-1.5">
@@ -648,18 +650,18 @@ function PaymentContent() {
               <div className="flex flex-col gap-3">
                 {/* Card Number */}
                 <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium text-[#010D50]">Card Number</label>
+                  <label className="text-sm font-medium text-[#010D50]">{t('form.cardNumber')}</label>
                   <Input
-                    placeholder="1234 5678 1234 5678"
+                    placeholder={t('form.cardNumberPlaceholder')}
                     className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium w-full"
                   />
                 </div>
 
                 {/* Cardholder Name */}
                 <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium text-[#010D50]">Cardholder Name</label>
+                  <label className="text-sm font-medium text-[#010D50]">{t('form.cardholderName')}</label>
                   <Input
-                    placeholder="Name"
+                    placeholder={t('form.cardholderPlaceholder')}
                     className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium w-full"
                   />
                 </div>
@@ -667,16 +669,16 @@ function PaymentContent() {
                 {/* Expiry and CVV */}
                 <div className="flex flex-col sm:flex-row gap-3">
                   <div className="flex-1 flex flex-col gap-2">
-                    <label className="text-sm font-medium text-[#010D50]">Expiry Date</label>
+                    <label className="text-sm font-medium text-[#010D50]">{t('form.expiryDate')}</label>
                     <Input
-                      placeholder="01/26"
+                      placeholder={t('form.expiryPlaceholder')}
                       className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium w-full"
                     />
                   </div>
                   <div className="w-full sm:w-[383px] flex flex-col gap-2">
-                    <label className="text-sm font-medium text-[#010D50]">CVV/CVC</label>
+                    <label className="text-sm font-medium text-[#010D50]">{t('form.cvv')}</label>
                     <Input
-                      placeholder="123"
+                      placeholder={t('form.cvvPlaceholder')}
                       className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium w-full"
                     />
                   </div>
@@ -689,23 +691,23 @@ function PaymentContent() {
               {/* Billing Address */}
               <div className="flex flex-col gap-6">
                 <div className="bg-[#F5F7FF] rounded-full px-4 py-3 w-fit">
-                  <span className="text-sm font-semibold text-[#010D50]">Billing Address</span>
+                  <span className="text-sm font-semibold text-[#010D50]">{t('form.billingAddress')}</span>
                 </div>
 
                 <div className="flex flex-col gap-3">
                   {/* Street Address Row */}
                   <div className="flex gap-3">
                     <div className="flex-1 flex flex-col gap-2">
-                      <label className="text-sm font-medium text-[#010D50]">Street Address 1</label>
+                      <label className="text-sm font-medium text-[#010D50]">{t('form.streetAddress1')}</label>
                       <Input
-                        placeholder="Street Address"
+                        placeholder={t('form.streetPlaceholder')}
                         className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium w-full"
                       />
                     </div>
                     <div className="flex-1 flex flex-col gap-2">
-                      <label className="text-sm font-medium text-[#010D50]">Street Address 2</label>
+                      <label className="text-sm font-medium text-[#010D50]">{t('form.streetAddress2')}</label>
                       <Input
-                        placeholder="Street Address"
+                        placeholder={t('form.streetPlaceholder')}
                         className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium w-full"
                       />
                     </div>
@@ -714,23 +716,23 @@ function PaymentContent() {
                   {/* City, State, Zip Row */}
                   <div className="flex flex-col sm:flex-row gap-3">
                     <div className="w-full sm:w-[392px] flex flex-col gap-2">
-                      <label className="text-sm font-medium text-[#010D50]">City</label>
+                      <label className="text-sm font-medium text-[#010D50]">{t('form.city')}</label>
                       <Input
-                        placeholder="Town/City"
+                        placeholder={t('form.cityPlaceholder')}
                         className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium w-full"
                       />
                     </div>
                     <div className="w-full sm:w-[262px] flex flex-col gap-2">
-                      <label className="text-sm font-medium text-[#010D50]">State</label>
+                      <label className="text-sm font-medium text-[#010D50]">{t('form.state')}</label>
                       <Input
-                        placeholder="123"
+                        placeholder={t('form.statePlaceholder')}
                         className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium w-full"
                       />
                     </div>
                     <div className="flex-1 flex flex-col gap-2">
-                      <label className="text-sm font-medium text-[#010D50]">Zip/Postal Code</label>
+                      <label className="text-sm font-medium text-[#010D50]">{t('form.zipCode')}</label>
                       <Input
-                        placeholder="123"
+                        placeholder={t('form.zipPlaceholder')}
                         className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium w-full"
                       />
                     </div>
@@ -739,10 +741,10 @@ function PaymentContent() {
                   {/* Country and Telephone Row */}
                   <div className="flex gap-3">
                     <div className="flex-1 flex flex-col gap-2">
-                      <label className="text-sm font-medium text-[#010D50]">Country</label>
+                      <label className="text-sm font-medium text-[#010D50]">{t('form.country')}</label>
                       <Select>
                         <SelectTrigger className="border-[#DFE0E4] rounded-xl h-12 text-base font-medium">
-                          <SelectValue placeholder="India" />
+                          <SelectValue placeholder={t('form.countryPlaceholder')} />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="india">India</SelectItem>
@@ -752,9 +754,9 @@ function PaymentContent() {
                       </Select>
                     </div>
                     <div className="flex-1 flex flex-col gap-2">
-                      <label className="text-sm font-medium text-[#010D50]">Telephone</label>
+                      <label className="text-sm font-medium text-[#010D50]">{t('form.telephone')}</label>
                       <Input
-                        placeholder="+91 "
+                        placeholder={t('form.telephonePlaceholder')}
                         className="border border-[#DFE0E4] rounded-xl px-4 py-3 text-base font-medium"
                       />
                     </div>
@@ -771,17 +773,12 @@ function PaymentContent() {
                   htmlFor="payment-terms"
                   className="text-sm font-medium text-[#010D50] leading-relaxed"
                 >
-                  By checking this box, I acknowledge that passenger information matches the passport
-                  or official ID for travel, and that name changes are not allowed. I confirm that I
-                  have reviewed the flight itinerary and agree to the Refund & Cancellation Policy. I
-                  understand tickets are non-transferable and non-changeable unless stated otherwise. I
-                  accept full responsibility for valid travel documentation and understand Globehunters
-                  cannot be held responsible for denied boarding due to passport or visa validity.
+                  {t('form.termsCheckbox')}
                 </label>
               </div>
 
               <Button className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-full px-5 py-2 h-auto gap-1 text-sm font-bold w-fit">
-                Complete Booking
+                {t('form.completeBooking')}
                 <ChevronLeft className="w-5 h-5 rotate-180" />
               </Button>
             </div>
@@ -793,8 +790,7 @@ function PaymentContent() {
             <div className="hidden lg:flex bg-white border border-[#DFE0E4] rounded-xl p-3 flex-col gap-4">
               <span className="text-base font-semibold text-[#3754ED]">WEB REF: IN-649707636</span>
               <p className="text-sm text-[#3A478A]">
-                If you would like to speak to one of our travel consultants please call us on the
-                given number below.
+                {t('webRefMessage')}
               </p>
               <div className="flex items-center gap-2 bg-[rgba(55,84,237,0.12)] rounded-[40px] px-4 py-2 w-fit">
                 <div className="w-9 h-9 rounded-full bg-[#0B229E] flex items-center justify-center">
@@ -802,7 +798,7 @@ function PaymentContent() {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[#010D50] text-[8px] font-medium leading-tight">
-                    24/7 Toll-Free
+                    {t('tollFree')}
                   </span>
                   <span className="text-[#010D50] text-sm font-bold">020 4502 2984</span>
                 </div>
@@ -812,27 +808,27 @@ function PaymentContent() {
             {/* Price Summary */}
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-3 flex flex-col gap-6 order-2 lg:order-none lg:sticky lg:top-20">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-[#010D50]">Price Summary</span>
+                <span className="text-sm font-semibold text-[#010D50]">{t('priceSummary')}</span>
                 <button
                   onClick={() => setIsPriceSummaryExpanded(!isPriceSummaryExpanded)}
                   className="lg:hidden text-[#3754ED] text-sm font-medium"
                 >
-                  {isPriceSummaryExpanded ? "Hide Details" : "Show Details"}
+                  {isPriceSummaryExpanded ? t('hideDetails') : t('showDetails')}
                 </button>
               </div>
 
               {/* Breakdown - Hidden on mobile unless expanded, always visible on desktop */}
               <div className={`flex-col gap-2 ${isPriceSummaryExpanded ? "flex" : "hidden lg:flex"}`}>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-[#010D50]">Traveler: 1 Adult</span>
+                  <span className="text-sm font-medium text-[#010D50]">{t('traveler')}: 1 {t('adult')}</span>
                   <span className="text-sm font-medium text-[#010D50]">₹{baseFare.toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-[#3A478A]">Flight fare</span>
+                  <span className="text-sm text-[#3A478A]">{t('flightFare')}</span>
                   <span className="text-sm text-[#3A478A]">₹45,995</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-[#3A478A]">Tax, fees and charges</span>
+                  <span className="text-sm text-[#3A478A]">{t('taxesAndFees')}</span>
                   <span className="text-sm text-[#3A478A]">₹48,358</span>
                 </div>
               </div>
@@ -849,21 +845,21 @@ function PaymentContent() {
               <div className={`border-t border-[#DFE0E4] ${isPriceSummaryExpanded ? "block" : "hidden lg:block"}`} />
 
               <div className={`flex items-center justify-between ${isPriceSummaryExpanded ? "flex" : "hidden lg:flex"}`}>
-                <span className="text-sm text-[#3A478A]">Additional Baggage ({additionalBaggage} bags)</span>
+                <span className="text-sm text-[#3A478A]">{t('additionalBaggage')} ({additionalBaggage} {t('bags')})</span>
                 <span className="text-sm text-[#3A478A]">₹{baggageCost.toLocaleString('en-IN')}</span>
               </div>
 
               <div className={`border-t border-[#DFE0E4] ${isPriceSummaryExpanded ? "block" : "hidden lg:block"}`} />
 
               <div className={`flex items-center justify-between ${isPriceSummaryExpanded ? "flex" : "hidden lg:flex"}`}>
-                <span className="text-sm text-[#3A478A]">Discount code (-{discountPercent * 100}%)</span>
+                <span className="text-sm text-[#3A478A]">{t('discountCode')} (-{discountPercent * 100}%)</span>
                 <span className="text-sm text-[#3A478A]">-₹{discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
               </div>
 
               <div className={`border-t border-[#DFE0E4] ${isPriceSummaryExpanded ? "block" : "hidden lg:block"}`} />
 
               <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-[#010D50]">Trip Total</span>
+                <span className="text-sm font-semibold text-[#010D50]">{t('tripTotal')}</span>
                 <span className="text-sm font-semibold text-[#010D50]">₹{tripTotal.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
               </div>
             </div>

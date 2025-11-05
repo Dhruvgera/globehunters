@@ -2,6 +2,7 @@
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plane } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface Airline {
   code: string;
@@ -22,6 +23,7 @@ export function AirlineFilter({
   onToggle,
   onToggleAll,
 }: AirlineFilterProps) {
+  const t = useTranslations('search.filters');
   const allSelected = selectedAirlines.length === airlines.length;
 
   return (
@@ -29,7 +31,7 @@ export function AirlineFilter({
       {/* Select All */}
       <div className="flex items-center gap-2">
         <Checkbox checked={allSelected} onCheckedChange={onToggleAll} />
-        <span className="text-sm text-[#010D50]">Select All</span>
+        <span className="text-sm text-[#010D50]">{t('selectAll')}</span>
       </div>
 
       {/* Individual Airlines */}

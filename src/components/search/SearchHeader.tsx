@@ -3,6 +3,7 @@
 import SearchBar from "@/components/search/SearchBar";
 import { Button } from "@/components/ui/button";
 import { SlidersHorizontal } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface SearchHeaderProps {
   onFilterClick: () => void;
@@ -10,6 +11,8 @@ interface SearchHeaderProps {
 }
 
 export function SearchHeader({ onFilterClick, resultCount }: SearchHeaderProps) {
+  const t = useTranslations('search.button');
+  
   return (
     <>
       {/* Search Bar Section */}
@@ -24,7 +27,7 @@ export function SearchHeader({ onFilterClick, resultCount }: SearchHeaderProps) 
           className="w-full bg-[#3754ED] hover:bg-[#2942D1] text-white flex items-center justify-center gap-2"
         >
           <SlidersHorizontal className="w-5 h-5" />
-          Filters ({resultCount} results)
+          {t('filters')} ({resultCount} {t('results')})
         </Button>
       </div>
     </>

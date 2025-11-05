@@ -1,0 +1,500 @@
+{
+  "home": {
+    "hero": {
+      "title": "Find Your Perfect Flight",
+      "subtitle": "Search and compare flights from hundreds of airlines to find the best deals for your next adventure"
+    },
+    "features": {
+      "bestPrice": {
+        "title": "Best Price Guarantee",
+        "description": "We compare prices from hundreds of airlines to ensure you get the best deal available"
+      },
+      "secureBooking": {
+        "title": "Secure Booking",
+        "description": "Your payment information is encrypted and secure with our advanced security protocols"
+      },
+      "support": {
+        "title": "24/7 Support",
+        "description": "Our dedicated support team is available round the clock to assist you with any queries"
+      }
+    }
+  },
+  "common": {
+    "navigation": {
+      "logoAlt": "GlobeHunters",
+      "awards": "Praised by 98% Local/British Awards",
+      "atolAlt": "ATOL Protected",
+      "iataAlt": "IATA",
+      "phone": {
+        "label": "24/7 Toll-Free",
+        "number": "020 4502 2984",
+        "ariaLabel": "Call GlobeHunters"
+      },
+      "menu": {
+        "toggleAriaLabel": "Toggle menu"
+      }
+    },
+    "footer": {
+      "trustBadges": {
+        "iataAlt": "IATA",
+        "atolAlt": "ATOL Protected",
+        "trustwaveAlt": "Trustwave"
+      },
+      "regional": {
+        "title": "GlobeHunters Regional Sites"
+      },
+      "destinations": {
+        "title": "Popular Globehunters Destinations"
+      },
+      "security": {
+        "title": "Secure Online Booking",
+        "cardsTitle": "Cards We Accept",
+        "sysnetAlt": "Sysnet Secure"
+      },
+      "links": {
+        "aboutUs": "About Us",
+        "siteMap": "Site Map",
+        "terms": "Terms & Conditions",
+        "contactUs": "Contact Us",
+        "cookiePolicy": "Cookie Policy",
+        "blog": "Blog",
+        "privacyPolicy": "Privacy Policy"
+      },
+      "copyright": "© Copyright 2025 - GlobeHunters | GlobeHunters is a trading name of A1 Travel Deals Limited, registered in England No. W0981096",
+      "disclaimer": "For the latest travel advice and information, including entry requirements and travel restrictions, please visit the official government website. Email: service@globehunters.co.uk"
+    }
+  },
+  "search": {
+    "tripType": {
+      "roundTrip": "Round Trip",
+      "oneWay": "One Way",
+      "multiCity": "Multi City"
+    },
+    "passengers": {
+      "adults": "Adults",
+      "children": "Children (2-11)",
+      "infants": "Infants (<2)",
+      "adultSingular": "Adult",
+      "adultPlural": "Adults",
+      "travelClass": "Travel Class",
+      "economy": "Economy",
+      "premiumEconomy": "Premium Economy",
+      "business": "Business",
+      "first": "First"
+    },
+    "button": {
+      "search": "Search",
+      "filters": "Filters",
+      "results": "results"
+    },
+    "header": {
+      "modifySearch": "Modify your search"
+    },
+    "contact": {
+      "webRef": "WEB REF",
+      "title": "If you would like to speak to one of our travel consultants please call us on the given number below.",
+      "tollFree": "24/7 Toll-Free",
+      "phone": "020 4502 2984"
+    },
+    "summary": {
+      "title": "Search Summary",
+      "subtitle": "If you would like to speak to one of our travel consultants please call us on the given number below.",
+      "from": "From",
+      "to": "To",
+      "departure": "Departure",
+      "return": "Return",
+      "passengers": "Passengers",
+      "class": "Class"
+    },
+    "filters": {
+      "title": "Filters",
+      "filtersBy": "Filters By",
+      "showing": "Showing",
+      "results": "results",
+      "clear": "Clear all",
+      "apply": "Apply Filters",
+      "stops": "Stops",
+      "numberOfStops": "Number of Stops",
+      "time": "Time",
+      "departureAirport": "Departure Airport",
+      "arrivalAirport": "Arrival Airport",
+      "direct": "Direct",
+      "oneStop": "1 Stop",
+      "twoPlus": "2+ Stops",
+      "nonStop": "Non-stop",
+      "stop": "stop",
+      "stops_plural": "stops",
+      "price": "Price",
+      "departureTime": "Departure Time",
+      "outbound": "Outbound",
+      "inbound": "Inbound",
+      "journeyTime": "Journey Time",
+      "hours": "hours",
+      "airlines": "Airlines",
+      "selectAll": "Select All",
+      "departureAirports": "Departure Airports",
+      "arrivalAirports": "Arrival Airports",
+      "extras": "Extras",
+      "refundable": "Refundable",
+      "meals": "Meals",
+      "baggage": "Baggage",
+      "changeFlight": "Change flight",
+      "directOnly": "Direct Only",
+      "fullRefund": "Full Refund"
+    },
+    "flights": {
+      "loadMore": "Show More Results",
+      "noResults": "No flights found",
+      "viewDetails": "View Flight Details",
+      "viewFlightInfo": "View Flight Info",
+      "ticketOptions": "Ticket Options",
+      "select": "Select",
+      "bookNow": "Book Now",
+      "selectFlight": "Select this flight",
+      "perPerson": "/per person",
+      "from": "From"
+    },
+    "datePicker": {
+      "selectDates": "Select dates",
+      "departure": "Departure Date",
+      "return": "Return",
+      "departureReturn": "Departure - Return Date"
+    },
+    "location": {
+      "placeholder": "Country, city or airport"
+    }
+  },
+  "booking": {
+    "loading": "Loading...",
+    "header": {
+      "backToSearch": "Back to search results",
+      "step1": "Your details",
+      "step2": "Choose your fare",
+      "step3": "Payment Details",
+      "step4": "Confirmation"
+    },
+    "alerts": {
+      "travelDocuments": {
+        "title": "Travel Documents Required",
+        "line1": "Please remember that it is your responsibility to have in your possession all the necessary travel documents with you",
+        "line2": "Valid travel ID (passport or ID card). Visa for your final destination and any transit countries (if required).",
+        "line3": "We strongly recommend you check the entry requirements for any country you travel through. You can find this info on the website of the countries' relevant authorities, or via your embassy or consulate."
+      },
+      "priceChange": {
+        "title": "Heads up! The result for your search is now coming back with a different price.",
+        "message": "Ticket price changed from £94,348 to £94,353. You can continue, or we can help you find other flights."
+      },
+      "baggageAlert": {
+        "title": "Baggage Alert: Re-Check Required",
+        "message": "Due to airline or flight changes during your stop, you MUST collect your checked luggage and re-check it with the connecting airline. Always confirm your baggage tag instructions upon arrival at your layover city."
+      }
+    },
+    "webRef": {
+      "title": "WEB REF",
+      "message": "If you would like to speak to one of our travel consultants please call us on the given number below."
+    },
+    "flightSummary": {
+      "outbound": "Outbound",
+      "inbound": "Inbound",
+      "viewDetails": "View Details",
+      "duration": "Duration",
+      "economy": "Economy",
+      "passenger": "Adult",
+      "passengers": "Adults",
+      "to": "to"
+    },
+    "passengerDetails": {
+      "heading": "Passenger Details",
+      "leadPassenger": "Lead Passenger",
+      "mustBe18": "(Must be 18 or older)",
+      "instructions": "Please enter passenger name(s) and dates(s) of birth EXACTLY as shown on the passport or their government-issued ID that will be used for this trip",
+      "passenger": "Passenger",
+      "adult": "Adult",
+      "child": "Child",
+      "infant": "Infant",
+      "name": "Name",
+      "firstName": "First Name",
+      "middleName": "Middle Name",
+      "lastName": "Last Name",
+      "dateOfBirth": "Date of Birth",
+      "dateOfBirthPlaceholder": "DD/MM/YYYY",
+      "emailID": "Email ID",
+      "emailPlaceholder": "xyz123@gmail.com",
+      "phoneNo": "Phone no.",
+      "phonePlaceholder": "1234567890",
+      "gender": "Gender",
+      "male": "Male",
+      "female": "Female",
+      "titleLabel": "Title",
+      "selectTitle": "Select title",
+      "mr": "Mr",
+      "mrs": "Mrs",
+      "miss": "Miss",
+      "ms": "Ms",
+      "dr": "Dr",
+      "email": "Email",
+      "phone": "Phone",
+      "passportNumber": "Passport Number",
+      "passportExpiry": "Passport Expiry",
+      "nationality": "Nationality",
+      "required": "Required",
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "terms": {
+      "title": "Terms & Conditions",
+      "acceptTerms": "By clicking this checkbox, I acknowledge that I have read and accepted Globehunters Terms & Conditions and Privacy Policy",
+      "acceptMarketing": "By clicking this checkbox, I consent to receive marketing messages via calls, texts, and emails from Globehunters at the provided contact. I understand that my consent is not a condition of purchase.",
+      "upgradeOptions": "Upgrade options",
+      "book": "Book"
+    },
+    "priceSummary": {
+      "title": "Price Summary",
+      "showDetails": "Show Details",
+      "hideDetails": "Hide Details",
+      "traveler": "Traveler",
+      "flightFare": "Flight fare",
+      "taxesAndFees": "Tax, fees and charges",
+      "tripTotal": "Trip Total",
+      "total": "Total",
+      "adult": "Adult",
+      "adults": "Adults",
+      "child": "Child",
+      "children": "Children",
+      "infant": "Infant",
+      "infants": "Infants"
+    },
+    "reviews": {
+      "title": "Customer Reviews",
+      "reviews": "Reviews"
+    }
+  },
+  "payment": {
+    "viewDetails": "View Details",
+    "economy": "Economy",
+    "adult": "Adult",
+    "tollFree": "24/7 Toll-Free",
+    "webRefMessage": "If you would like to speak to one of our travel consultants please call us on the given number below.",
+    "priceSummary": "Price Summary",
+    "showDetails": "Show Details",
+    "hideDetails": "Hide Details",
+    "traveler": "Traveler",
+    "flightFare": "Flight fare",
+    "taxesAndFees": "Tax, fees and charges",
+    "additionalBaggage": "Additional Baggage",
+    "bags": "bags",
+    "discountCode": "Discount code",
+    "tripTotal": "Trip Total",
+    "header": {
+      "title": "Payment Details",
+      "secure": "Secure Payment",
+      "backToFare": "Back to Fare Options",
+      "step1": "Your details",
+      "step2": "Choose your fare",
+      "step3": "Payment Details",
+      "step4": "Confirmation"
+    },
+    "baggage": {
+      "title": "Baggage Allowance",
+      "callForInfo": "For more information on baggage, Call Now",
+      "personalItem": "Personal item",
+      "personalItemDesc": "Fits under the seat",
+      "carryOn": "Carry-on bag",
+      "carryOnDimensions": "(56cm x 36cm x 23cm)",
+      "checkedBags": "Checked bags",
+      "checkedBagsDesc": "Per person each way",
+      "addBaggage": "Add additional baggage",
+      "addBaggageDesc": "Add additional checked bags",
+      "baggagePrice": "₹4500 /per person (20kg)",
+      "included": "Included",
+      "notIncluded": "Not Included"
+    },
+    "iAssure": {
+      "title": "iAssure Protection (Recommended)",
+      "comparePlans": "Compare Plans",
+      "hidePlans": "Hide Plans",
+      "basic": "Basic",
+      "premium": "Premium",
+      "allIncluded": "All Included",
+      "features": {
+        "support247": "24/7 Support",
+        "freeChanges24h": "Free changes in 24hrs",
+        "refundDeath": "100% refund on death",
+        "refundAirline": "100% refund on airline cancellation",
+        "allBasic": "All Basic features",
+        "freeChangesAnytime": "Free changes anytime",
+        "refundLockdown": "Refund on lockdown/travel ban",
+        "baggageCompensation": "Baggage compensation",
+        "flightDelay": "Flight delay compensation",
+        "allPremium": "All Premium features",
+        "priceMatch": "24hrs price match guarantee",
+        "futureCredit": "₹25 credit for future bookings",
+        "priorityService": "Priority customer service",
+        "support247Full": "One-on-One 24/7 Support",
+        "rebookRename": "Rebook, rename and cancel in first 24hrs for free",
+        "refundDeathFull": "100% refund in the event of passenger's death",
+        "refundAirlineFull": "100% refund in case of cancellations by airlines",
+        "refundLockdownFull": "Refund in case of State lockdown, travel ban, or mechanical failure",
+        "baggageCompensationFull": "Compensation per mishandled checked-in bag"
+      }
+    },
+    "form": {
+      "cardDetails": "Card Details",
+      "cardNumber": "Card Number",
+      "cardNumberPlaceholder": "1234 5678 1234 5678",
+      "cardholderName": "Cardholder Name",
+      "cardholderPlaceholder": "Name",
+      "expiryDate": "Expiry Date",
+      "expiryPlaceholder": "01/26",
+      "cvv": "CVV/CVC",
+      "cvvPlaceholder": "123",
+      "billingAddress": "Billing Address",
+      "streetAddress1": "Street Address 1",
+      "streetAddress2": "Street Address 2",
+      "streetPlaceholder": "Street Address",
+      "city": "City",
+      "cityPlaceholder": "Town/City",
+      "state": "State",
+      "statePlaceholder": "123",
+      "zipCode": "Zip/Postal Code",
+      "zipPlaceholder": "123",
+      "country": "Country",
+      "countryPlaceholder": "India",
+      "telephone": "Telephone",
+      "telephonePlaceholder": "+91 ",
+      "termsCheckbox": "By checking this box, I acknowledge that passenger information matches the passport or official ID for travel, and that name changes are not allowed. I confirm that I have reviewed the flight itinerary and agree to the Refund & Cancellation Policy. I understand tickets are non-transferable and non-changeable unless stated otherwise. I accept full responsibility for valid travel documentation and understand Globehunters cannot be held responsible for denied boarding due to passport or visa validity.",
+      "completeBooking": "Complete Booking"
+    }
+  },
+  "contact": {
+    "title": "Contact Us",
+    "subtitle": "We're here to help you plan your perfect journey",
+    "phone": {
+      "title": "Phone",
+      "subtitle": "24/7 Toll-Free",
+      "number": "020 4502 2984"
+    },
+    "email": {
+      "title": "Email",
+      "subtitle": "Send us a message",
+      "address": "info@globehunters.com"
+    },
+    "office": {
+      "title": "Office",
+      "subtitle": "Visit us",
+      "location": "London, UK"
+    },
+    "form": {
+      "title": "Send us a Message",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "Email",
+      "message": "Message",
+      "firstNamePlaceholder": "John",
+      "lastNamePlaceholder": "Doe",
+      "emailPlaceholder": "john.doe@example.com",
+      "messagePlaceholder": "How can we help you?",
+      "send": "Send Message"
+    }
+  },
+  "offers": {
+    "title": "Special Offers",
+    "subtitle": "Exclusive deals and discounts on flights worldwide",
+    "bookNow": "Book Now",
+    "newsletter": {
+      "title": "Don't Miss Out!",
+      "subtitle": "Subscribe to our newsletter and be the first to know about exclusive deals and offers",
+      "placeholder": "Enter your email",
+      "subscribe": "Subscribe"
+    }
+  },
+  "flightInfo": {
+    "modal": {
+      "title": "Flight information",
+      "close": "Close",
+      "selectFlight": "Select this flight",
+      "includedSegment": "Included with this segment",
+      "stopoverAt": "Stopover at",
+      "for": "for"
+    },
+    "tabs": {
+      "outbound": "Outbound",
+      "inbound": "Inbound"
+    },
+    "baggage": {
+      "title": "Baggage Allowance",
+      "personalItem": "1 personal item",
+      "personalItemDesc": "Fits under seat",
+      "carryOn": "1 carry-on bag",
+      "carryOnDesc": "Max 10kg",
+      "checked": "2 checked bags",
+      "checkedDesc": "Max 23kg each",
+      "alert": {
+        "title": "Baggage Alert: Re-Check Required",
+        "message": "Due to airline or flight changes during your stop, you MUST collect your checked luggage and re-check it with the connecting airline. Always confirm your baggage tag instructions upon arrival at your layover city."
+      }
+    },
+    "meals": {
+      "title": "Meals & Refreshments",
+      "complimentary": "Complimentary meal",
+      "complimentaryDesc": "Hot meal service included",
+      "beverages": "Beverages",
+      "beveragesDesc": "Soft drinks, tea, coffee",
+      "special": "Special meals",
+      "specialDesc": "Available on request",
+      "defaultDescription": "Complimentary meals and refreshments",
+      "noMeals": "No meals included"
+    },
+    "details": {
+      "departure": "Departure",
+      "arrival": "Arrival",
+      "duration": "Duration",
+      "stops": "Stops",
+      "aircraft": "Aircraft",
+      "flightNumber": "Flight Number",
+      "operated": "Operated by",
+      "layover": "Layover",
+      "in": "in",
+      "to": "to"
+    },
+    "stopover": {
+      "stopoverIn": "stopover in",
+      "recheckBaggage": "You may need to collect and re-check your baggage during this stop."
+    },
+    "footer": {
+      "totalPrice": "Total Price",
+      "bookNow": "Book Now"
+    },
+    "fareDetails": {
+      "title": "Fare Details",
+      "chooseFare": "Choose your fare",
+      "whatsIncluded": "What's included",
+      "checkedBaggage": "Checked baggage",
+      "cabinBaggage": "Cabin baggage",
+      "seatSelection": "Seat selection",
+      "flexibleTickets": "Flexible tickets",
+      "cancellation": "Cancellation",
+      "changeable": "Changeable",
+      "refundable": "Refundable",
+      "yes": "Yes",
+      "no": "No",
+      "fee": "Fee applies"
+    },
+    "fareTypes": {
+      "ecoValue": "Eco Value",
+      "ecoClassic": "Eco Classic",
+      "ecoFlex": "Eco Flex"
+    }
+  },
+  "upgradeOptions": {
+    "title": "Upgrade options",
+    "close": "Close",
+    "includedInFare": "Included in this fare:",
+    "subtitle": "Choose a better experience",
+    "current": "Current Selection",
+    "upgrade": "Upgrade",
+    "perPerson": "per person",
+    "features": "Features",
+    "select": "Select"
+  }
+}

@@ -2,6 +2,7 @@
 
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 
 interface FlightActionsProps {
   currency: string;
@@ -18,11 +19,12 @@ export function FlightActions({
   onViewFlightInfo,
   onToggleTicketOptions,
 }: FlightActionsProps) {
+  const t = useTranslations('search.flights');
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
       <span className="text-lg font-medium text-[#010D50]">
         {currency}
-        {pricePerPerson} /per person
+        {pricePerPerson} {t('perPerson')}
       </span>
 
       <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
@@ -31,14 +33,14 @@ export function FlightActions({
           className="bg-[rgba(55,84,237,0.12)] hover:bg-[rgba(55,84,237,0.2)] text-[#3754ED] rounded-full px-4 py-2 h-auto text-xs font-medium"
           onClick={onViewFlightInfo}
         >
-          View Flight Info
+          {t('viewFlightInfo')}
         </Button>
         <Button
           variant="outline"
           className="rounded-lg px-6 py-2 h-auto text-xs font-medium border-none hover:bg-gray-100"
           onClick={onToggleTicketOptions}
         >
-          Ticket Options
+          {t('ticketOptions')}
           {showTicketOptions ? (
             <ChevronUp className="w-4 h-4 ml-1" />
           ) : (

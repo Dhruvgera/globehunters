@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { CreditCard, Lock } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface PaymentFormProps {
   onSubmit: (cardDetails: CardDetails, billingAddress: BillingAddress) => void;
@@ -14,6 +15,8 @@ interface PaymentFormProps {
 }
 
 export function PaymentForm({ onSubmit, loading = false }: PaymentFormProps) {
+  const t = useTranslations('payment.form');
+  
   const [cardDetails, setCardDetails] = useState<Partial<CardDetails>>({
     cardNumber: "",
     cardholderName: "",
@@ -76,19 +79,19 @@ export function PaymentForm({ onSubmit, loading = false }: PaymentFormProps) {
       <div className="bg-white border border-[#DFE0E4] rounded-xl p-6">
         <div className="flex items-center gap-2 mb-4">
           <CreditCard className="w-5 h-5 text-[#3754ED]" />
-          <h3 className="text-lg font-semibold text-[#010D50]">Card Details</h3>
+          <h3 className="text-lg font-semibold text-[#010D50]">{t('cardDetails')}</h3>
         </div>
 
         <div className="grid grid-cols-1 gap-4">
           {/* Card Number */}
           <div className="space-y-2">
-            <Label htmlFor="cardNumber">Card Number *</Label>
+            <Label htmlFor="cardNumber">{t('cardNumber')} {t('required')}</Label>
             <Input
               id="cardNumber"
               type="text"
               value={cardDetails.cardNumber}
               onChange={(e) => handleCardChange("cardNumber", e.target.value)}
-              placeholder="1234 5678 9012 3456"
+              placeholder={t('cardNumberPlaceholder')}
               maxLength={19}
               className={errors.cardNumber ? "border-red-500" : ""}
             />
@@ -99,13 +102,13 @@ export function PaymentForm({ onSubmit, loading = false }: PaymentFormProps) {
 
           {/* Cardholder Name */}
           <div className="space-y-2">
-            <Label htmlFor="cardholderName">Cardholder Name *</Label>
+            <Label htmlFor="cardholderName">{t('cardholderName')} {t('required')}</Label>
             <Input
               id="cardholderName"
               type="text"
               value={cardDetails.cardholderName}
               onChange={(e) => handleCardChange("cardholderName", e.target.value)}
-              placeholder="John Doe"
+              placeholder={t('cardholderPlaceholder')}
               className={errors.cardholderName ? "border-red-500" : ""}
             />
             {errors.cardholderName && (
@@ -116,13 +119,13 @@ export function PaymentForm({ onSubmit, loading = false }: PaymentFormProps) {
           {/* Expiry and CVV */}
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="expiryMonth">Month *</Label>
+              <Label htmlFor="expiryMonth">{t('month')} {t('required')}</Label>
               <Input
                 id="expiryMonth"
                 type="text"
                 value={cardDetails.expiryMonth}
                 onChange={(e) => handleCardChange("expiryMonth", e.target.value)}
-                placeholder="MM"
+                placeholder={t('monthPlaceholder')}
                 maxLength={2}
                 className={errors.expiryMonth ? "border-red-500" : ""}
               />
@@ -132,13 +135,13 @@ export function PaymentForm({ onSubmit, loading = false }: PaymentFormProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="expiryYear">Year *</Label>
+              <Label htmlFor="expiryYear">{t('year')} {t('required')}</Label>
               <Input
                 id="expiryYear"
                 type="text"
                 value={cardDetails.expiryYear}
                 onChange={(e) => handleCardChange("expiryYear", e.target.value)}
-                placeholder="YY"
+                placeholder={t('yearPlaceholder')}
                 maxLength={2}
                 className={errors.expiryYear ? "border-red-500" : ""}
               />
@@ -148,13 +151,13 @@ export function PaymentForm({ onSubmit, loading = false }: PaymentFormProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="cvv">CVV *</Label>
+              <Label htmlFor="cvv">{t('cvv')} {t('required')}</Label>
               <Input
                 id="cvv"
                 type="text"
                 value={cardDetails.cvv}
                 onChange={(e) => handleCardChange("cvv", e.target.value)}
-                placeholder="123"
+                placeholder={t('cvvPlaceholder')}
                 maxLength={4}
                 className={errors.cvv ? "border-red-500" : ""}
               />
@@ -169,19 +172,19 @@ export function PaymentForm({ onSubmit, loading = false }: PaymentFormProps) {
       {/* Billing Address Section */}
       <div className="bg-white border border-[#DFE0E4] rounded-xl p-6">
         <h3 className="text-lg font-semibold text-[#010D50] mb-4">
-          Billing Address
+          {t('billingAddress')}
         </h3>
 
         <div className="grid grid-cols-1 gap-4">
           {/* Address Line 1 */}
           <div className="space-y-2">
-            <Label htmlFor="addressLine1">Address Line 1 *</Label>
+            <Label htmlFor="addressLine1">{t('addressLine1')} {t('required')}</Label>
             <Input
               id="addressLine1"
               type="text"
               value={billingAddress.addressLine1}
               onChange={(e) => handleAddressChange("addressLine1", e.target.value)}
-              placeholder="123 Main St"
+              placeholder={t('addressLine1Placeholder')}
               className={errors.addressLine1 ? "border-red-500" : ""}
             />
             {errors.addressLine1 && (
@@ -191,26 +194,26 @@ export function PaymentForm({ onSubmit, loading = false }: PaymentFormProps) {
 
           {/* Address Line 2 */}
           <div className="space-y-2">
-            <Label htmlFor="addressLine2">Address Line 2</Label>
+            <Label htmlFor="addressLine2">{t('addressLine2')}</Label>
             <Input
               id="addressLine2"
               type="text"
               value={billingAddress.addressLine2}
               onChange={(e) => handleAddressChange("addressLine2", e.target.value)}
-              placeholder="Apt 4B (Optional)"
+              placeholder={t('addressLine2Placeholder')}
             />
           </div>
 
           {/* City, State, Postal Code */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="city">City *</Label>
+              <Label htmlFor="city">{t('city')} {t('required')}</Label>
               <Input
                 id="city"
                 type="text"
                 value={billingAddress.city}
                 onChange={(e) => handleAddressChange("city", e.target.value)}
-                placeholder="New York"
+                placeholder={t('cityPlaceholder')}
                 className={errors.city ? "border-red-500" : ""}
               />
               {errors.city && (
@@ -219,13 +222,13 @@ export function PaymentForm({ onSubmit, loading = false }: PaymentFormProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="state">State/Province *</Label>
+              <Label htmlFor="state">{t('state')} {t('required')}</Label>
               <Input
                 id="state"
                 type="text"
                 value={billingAddress.state}
                 onChange={(e) => handleAddressChange("state", e.target.value)}
-                placeholder="NY"
+                placeholder={t('statePlaceholder')}
                 className={errors.state ? "border-red-500" : ""}
               />
               {errors.state && (
@@ -234,13 +237,13 @@ export function PaymentForm({ onSubmit, loading = false }: PaymentFormProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="postalCode">Postal Code *</Label>
+              <Label htmlFor="postalCode">{t('postalCode')} {t('required')}</Label>
               <Input
                 id="postalCode"
                 type="text"
                 value={billingAddress.postalCode}
                 onChange={(e) => handleAddressChange("postalCode", e.target.value)}
-                placeholder="10001"
+                placeholder={t('postalCodePlaceholder')}
                 className={errors.postalCode ? "border-red-500" : ""}
               />
               {errors.postalCode && (
@@ -251,13 +254,13 @@ export function PaymentForm({ onSubmit, loading = false }: PaymentFormProps) {
 
           {/* Country */}
           <div className="space-y-2">
-            <Label htmlFor="country">Country *</Label>
+            <Label htmlFor="country">{t('country')} {t('required')}</Label>
             <Input
               id="country"
               type="text"
               value={billingAddress.country}
               onChange={(e) => handleAddressChange("country", e.target.value)}
-              placeholder="United States"
+              placeholder={t('countryPlaceholder')}
               className={errors.country ? "border-red-500" : ""}
             />
             {errors.country && (
@@ -274,12 +277,12 @@ export function PaymentForm({ onSubmit, loading = false }: PaymentFormProps) {
         className="w-full bg-[#3754ED] hover:bg-[#2942D1] text-white rounded-full px-6 py-3 h-auto text-base font-semibold flex items-center justify-center gap-2"
       >
         <Lock className="w-5 h-5" />
-        {loading ? "Processing..." : "Complete Payment"}
+        {loading ? t('processing') : t('completePayment')}
       </Button>
 
       {/* Security Notice */}
       <div className="text-center text-xs text-[#3A478A]">
-        <p>Your payment information is secure and encrypted</p>
+        <p>{t('securityNotice')}</p>
       </div>
     </form>
   );

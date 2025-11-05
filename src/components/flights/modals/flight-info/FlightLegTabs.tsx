@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 
 interface FlightLegTabsProps {
   selectedLeg: "outbound" | "inbound";
@@ -8,6 +9,7 @@ interface FlightLegTabsProps {
 }
 
 export function FlightLegTabs({ selectedLeg, onSelectLeg }: FlightLegTabsProps) {
+  const t = useTranslations('flightInfo.tabs');
   return (
     <div className="flex gap-2 p-1 bg-[#F5F5F5] rounded-lg">
       <Button
@@ -19,7 +21,7 @@ export function FlightLegTabs({ selectedLeg, onSelectLeg }: FlightLegTabsProps) 
             : "text-[#3A478A] hover:bg-white/50"
         }`}
       >
-        Outbound
+        {t('outbound')}
       </Button>
       <Button
         variant="ghost"
@@ -30,7 +32,7 @@ export function FlightLegTabs({ selectedLeg, onSelectLeg }: FlightLegTabsProps) 
             : "text-[#3A478A] hover:bg-white/50"
         }`}
       >
-        Inbound
+        {t('inbound')}
       </Button>
     </div>
   );

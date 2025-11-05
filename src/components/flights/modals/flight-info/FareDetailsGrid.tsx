@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 type FareType = "value" | "classic" | "flex";
 
@@ -15,40 +16,43 @@ interface FareDetailsGridProps {
   selectedFare: FareType;
 }
 
-const fareDetails: FareDetail[] = [
-  {
-    feature: "Checked baggage",
-    value: "1 x 23kg",
-    classic: "2 x 23kg",
-    flex: "2 x 23kg",
-  },
-  {
-    feature: "Cabin baggage",
-    value: "1 x 7kg",
-    classic: "1 x 7kg",
-    flex: "1 x 7kg",
-  },
-  {
-    feature: "Seat selection",
-    value: false,
-    classic: true,
-    flex: true,
-  },
-  {
-    feature: "Flexible tickets",
-    value: false,
-    classic: false,
-    flex: true,
-  },
-  {
-    feature: "Cancellation",
-    value: false,
-    classic: false,
-    flex: true,
-  },
-];
 
 export function FareDetailsGrid({ selectedFare }: FareDetailsGridProps) {
+  const t = useTranslations('flightInfo.fareDetails');
+  
+  const fareDetails: FareDetail[] = [
+    {
+      feature: t('checkedBaggage'),
+      value: "1 x 23kg",
+      classic: "2 x 23kg",
+      flex: "2 x 23kg",
+    },
+    {
+      feature: t('cabinBaggage'),
+      value: "1 x 7kg",
+      classic: "1 x 7kg",
+      flex: "1 x 7kg",
+    },
+    {
+      feature: t('seatSelection'),
+      value: false,
+      classic: true,
+      flex: true,
+    },
+    {
+      feature: t('flexibleTickets'),
+      value: false,
+      classic: false,
+      flex: true,
+    },
+    {
+      feature: t('cancellation'),
+      value: false,
+      classic: false,
+      flex: true,
+    },
+  ];
+  
   const renderValue = (value: boolean | string) => {
     if (typeof value === "boolean") {
       return value ? (
@@ -63,7 +67,7 @@ export function FareDetailsGrid({ selectedFare }: FareDetailsGridProps) {
   return (
     <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-3">
       <span className="text-sm font-semibold text-[#010D50]">
-        What&apos;s included
+        {t('whatsIncluded')}
       </span>
       <div className="flex flex-col gap-2">
         {fareDetails.map((detail, index) => (

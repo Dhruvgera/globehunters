@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useTranslations } from "next-intl";
 
 interface TicketOption {
   type: string;
@@ -19,6 +20,7 @@ export function TicketOptionsPanel({
   currency,
   onSelectFlight,
 }: TicketOptionsPanelProps) {
+  const t = useTranslations('search.flights');
   const optionsRef = useRef<HTMLDivElement>(null);
   const [optionsProgress, setOptionsProgress] = useState(0);
 
@@ -63,7 +65,7 @@ export function TicketOptionsPanel({
                 }
                 className="w-full bg-[#3754ED] hover:bg-[#2A3FB8] text-white border border-[#3754ED] rounded-full py-2 h-auto text-xs font-medium"
               >
-                Select {option.type.split(" ")[1]}
+                {t('select')} {option.type.split(" ")[1]}
               </Button>
             </div>
           </div>

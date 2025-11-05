@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/popover";
 import { DatePicker } from "@/components/ui/date-picker";
 import { format } from "date-fns";
+import { useTranslations } from "next-intl";
 
 type TripType = "round-trip" | "one-way" | "multi-city";
 
@@ -31,6 +32,8 @@ export function DateSelector({
   isOpen,
   onOpenChange,
 }: DateSelectorProps) {
+  const t = useTranslations('search.datePicker');
+  
   const getDateLabel = () => {
     if (tripType === "round-trip") {
       if (departureDate && returnDate) {
@@ -42,11 +45,11 @@ export function DateSelector({
       if (departureDate) {
         return format(departureDate, "dd MMM yyyy");
       }
-      return "Departure - Return Date";
+      return t('departureReturn');
     } else {
       return departureDate
         ? format(departureDate, "EEE, dd MMM yyyy")
-        : "Departure Date";
+        : t('departure');
     }
   };
 

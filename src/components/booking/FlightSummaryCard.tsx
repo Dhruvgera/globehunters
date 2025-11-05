@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Plane } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 interface FlightLeg {
   from: string;
@@ -27,6 +28,7 @@ export function FlightSummaryCard({
   passengers,
   onViewDetails,
 }: FlightSummaryCardProps) {
+  const t = useTranslations('booking.flightSummary');
   return (
     <div className="bg-[#F5F7FF] rounded-xl p-4 flex flex-col gap-4 overflow-hidden">
       {/* Mobile: Compact layout */}
@@ -40,7 +42,7 @@ export function FlightSummaryCard({
               {leg.airline}
             </span>
             <span className="text-xs text-[#3A478A]">
-              {leg.from} to {leg.to}
+              {leg.from} {t('to')} {leg.to}
             </span>
           </div>
         </div>
@@ -63,7 +65,7 @@ export function FlightSummaryCard({
           </div>
         </div>
         <div className="flex flex-col items-end">
-          <span className="text-xs text-[#3A478A]">Duration</span>
+          <span className="text-xs text-[#3A478A]">{t('duration')}</span>
           <span className="text-sm font-semibold text-[#010D50]">
             {leg.duration}
           </span>
@@ -75,13 +77,13 @@ export function FlightSummaryCard({
         onClick={onViewDetails}
         className="lg:hidden text-sm font-medium text-[#3754ED] p-0 h-auto w-fit"
       >
-        View Details
+        {t('viewDetails')}
       </Button>
 
       {/* Desktop: Full layout */}
       <div className="hidden lg:flex flex-col gap-6">
         <span className="text-sm font-semibold text-[#010D50]">
-          {leg.from} to {leg.to}
+          {leg.from} {t('to')} {leg.to}
         </span>
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-3 flex-wrap">
@@ -130,7 +132,7 @@ export function FlightSummaryCard({
           </span>
         </div>
         <div className="flex items-center gap-3 text-sm text-[#010D50]">
-          <span>Economy</span>
+          <span>{t('economy')}</span>
           <div className="w-1 h-1 rounded-full bg-[#010D50]" />
           <span>{passengers}</span>
         </div>
@@ -139,7 +141,7 @@ export function FlightSummaryCard({
           onClick={onViewDetails}
           className="text-sm font-medium text-[#3754ED] p-0 h-auto"
         >
-          View Details
+          {t('viewDetails')}
         </Button>
       </div>
     </div>

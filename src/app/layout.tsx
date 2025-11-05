@@ -3,6 +3,8 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import SmoothScrolling from "@/components/animations/SmoothScrolling";
 import RouteTransitions from "@/components/animations/RouteTransitions";
+import { NextIntlClientProvider } from "next-intl";
+import { getMessages, defaultLocale } from "@/i18n/config";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -14,18 +16,22 @@ export const metadata: Metadata = {
   description: "Search and compare flights from hundreds of airlines to find the best deals for your next adventure",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const messages = await getMessages(defaultLocale);
+
   return (
-    <html lang="en">
+    <html lang={defaultLocale}>
       <body className={`${inter.className} antialiased`}>
-        <SmoothScrolling />
-        <RouteTransitions>
-          {children}
-        </RouteTransitions>
+        <NextIntlClientProvider locale={defaultLocale} messages={messages}>
+          <SmoothScrolling />
+          <RouteTransitions>
+            {children}
+          </RouteTransitions>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

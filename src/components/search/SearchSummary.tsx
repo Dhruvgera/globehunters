@@ -1,6 +1,9 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 export function SearchSummary() {
+  const t = useTranslations('search.summary');
   return (
     <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-3">
       <div className="flex items-center gap-2">
@@ -34,12 +37,11 @@ export function SearchSummary() {
           />
         </svg>
         <span className="text-sm font-semibold text-[#010D50]">
-          Search Summary
+          {t('title')}
         </span>
       </div>
       <p className="text-xs text-[#3A478A]">
-        If you would like to speak to one of our travel consultants please call
-        us on the given number below.
+        {t('subtitle')}
       </p>
     </div>
   );

@@ -1,8 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
 import { Shield, CreditCard } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export default function Footer() {
+  const t = useTranslations('common.footer');
   const destinations = [
     { name: "Abu Dhabi", href: "/flights/abu-dhabi" },
     { name: "Adelaide", href: "/flights/adelaide" },
@@ -45,13 +49,13 @@ export default function Footer() {
   ];
 
   const footerLinks = [
-    { name: "About Us", href: "/about" },
-    { name: "Site Map", href: "/sitemap" },
-    { name: "Terms & Conditions", href: "/terms" },
-    { name: "Contact Us", href: "/contact" },
-    { name: "Cookie Policy", href: "/cookies" },
-    { name: "Blog", href: "/blog" },
-    { name: "Privacy Policy", href: "/privacy" },
+    { key: "aboutUs", href: "/about" },
+    { key: "siteMap", href: "/sitemap" },
+    { key: "terms", href: "/terms" },
+    { key: "contactUs", href: "/contact" },
+    { key: "cookiePolicy", href: "/cookies" },
+    { key: "blog", href: "/blog" },
+    { key: "privacyPolicy", href: "/privacy" },
   ];
 
   return (
@@ -61,21 +65,21 @@ export default function Footer() {
         <div className="flex flex-wrap items-center justify-center gap-6 mb-12 pb-8 border-b border-[#DFE0E4]">
           <Image
             src="/iata.svg"
-            alt="IATA"
+            alt={t('trustBadges.iataAlt')}
             width={80}
             height={40}
             className="h-10 w-auto opacity-90 hover:opacity-100 transition-opacity"
           />
           <Image
             src="/atol.svg"
-            alt="ATOL Protected"
+            alt={t('trustBadges.atolAlt')}
             width={80}
             height={40}
             className="h-10 w-auto opacity-90 hover:opacity-100 transition-opacity"
           />
           <Image
             src="/trustwave.svg"
-            alt="Trustwave"
+            alt={t('trustBadges.trustwaveAlt')}
             width={80}
             height={40}
             className="h-10 w-auto opacity-90 hover:opacity-100 transition-opacity"
@@ -85,7 +89,7 @@ export default function Footer() {
         {/* Regional Sites */}
         <div className="mb-10 pb-8 border-b border-[#DFE0E4]">
           <h3 className="text-sm font-semibold text-[#3A478A] mb-4 text-center">
-            GlobeHunters Regional Sites
+            {t('regional.title')}
           </h3>
           <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
             <Link href="https://globehunters.com.au" className="text-[#3A478A] hover:text-[#010D50] transition-colors">
@@ -118,7 +122,7 @@ export default function Footer() {
         {/* Popular Destinations - Hidden on mobile */}
         <div className="hidden md:block mb-10 pb-8 border-b border-[#DFE0E4]">
           <h3 className="text-lg font-semibold text-[#010D50] mb-6">
-            Popular Globehunters Destinations
+            {t('destinations.title')}
           </h3>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-x-4 gap-y-2 text-sm">
             {destinations.map((destination) => (
@@ -141,12 +145,12 @@ export default function Footer() {
               <div className="w-10 h-10 rounded-full bg-[rgba(55,84,237,0.2)] flex items-center justify-center">
                 <Shield className="w-5 h-5 text-[#3754ED]" />
               </div>
-              <h3 className="text-lg font-semibold text-[#010D50]">Secure Online Booking</h3>
+              <h3 className="text-lg font-semibold text-[#010D50]">{t('security.title')}</h3>
             </div>
             <div className="flex items-center gap-2">
               <Image
                 src="/sysnet.svg"
-                alt="Sysnet Secure"
+                alt={t('security.sysnetAlt')}
                 width={80}
                 height={40}
                 className="h-10 w-auto opacity-90"
@@ -160,7 +164,7 @@ export default function Footer() {
               <div className="w-10 h-10 rounded-full bg-[rgba(55,84,237,0.2)] flex items-center justify-center">
                 <CreditCard className="w-5 h-5 text-[#3754ED]" />
               </div>
-              <h3 className="text-lg font-semibold text-[#010D50]">Cards We Accept</h3>
+              <h3 className="text-lg font-semibold text-[#010D50]">{t('security.cardsTitle')}</h3>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <Image src="/visa.svg" alt="Visa" width={50} height={32} className="h-8 w-auto opacity-90" />
@@ -176,9 +180,9 @@ export default function Footer() {
         {/* Footer Links */}
         <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm mb-8">
           {footerLinks.map((link, index) => (
-            <span key={link.name} className="flex items-center gap-2">
+            <span key={link.key} className="flex items-center gap-2">
               <Link href={link.href} className="text-[#3A478A] hover:text-[#010D50] transition-colors">
-                {link.name}
+                {t(`links.${link.key}`)}
               </Link>
               {index < footerLinks.length - 1 && (
                 <span className="text-[#DFE0E4]">|</span>
@@ -190,12 +194,10 @@ export default function Footer() {
         {/* Copyright */}
         <div className="text-center text-sm text-[#3A478A]">
           <p className="mb-2">
-            © Copyright 2025 - GlobeHunters | GlobeHunters is a trading name of A1 Travel Deals Limited, 
-            registered in England No. W0981096
+            {t('copyright')}
           </p>
           <p className="text-xs leading-relaxed max-w-5xl mx-auto">
-            For the latest travel advice and information, including entry requirements and travel restrictions, 
-            please visit the official government website. Email: service@globehunters.co.uk
+            {t('disclaimer')}
           </p>
         </div>
       </div>
