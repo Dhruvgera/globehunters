@@ -115,8 +115,8 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Popular Destinations */}
-        <div className="mb-10 pb-8 border-b border-[#DFE0E4]">
+        {/* Popular Destinations - Hidden on mobile */}
+        <div className="hidden md:block mb-10 pb-8 border-b border-[#DFE0E4]">
           <h3 className="text-lg font-semibold text-[#010D50] mb-6">
             Popular Globehunters Destinations
           </h3>
