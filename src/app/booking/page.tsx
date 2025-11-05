@@ -11,7 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import Link from "next/link";
 import UpgradeOptionsModal from "@/components/flights/modals/UpgradeOptionsModal";
 import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
-import { mockFlights } from "@/data/mockFlights";
+import { useBookingStore, useSelectedFlight } from "@/store/bookingStore";
+import { CONTACT_INFO } from "@/config/constants";
 
 function BookingContent() {
   const router = useRouter();
@@ -19,8 +20,14 @@ function BookingContent() {
   const [showFlightInfo, setShowFlightInfo] = useState(false);
   const [isPriceSummaryExpanded, setIsPriceSummaryExpanded] = useState(false);
 
-  // Use mock flight data for demonstration
-  const flight = mockFlights[0];
+  // Get selected flight from Zustand store
+  const flight = useSelectedFlight();
+
+  // Redirect to search if no flight selected
+  if (!flight) {
+    router.push('/search');
+    return null;
+  }
   return (
     <div className="min-h-screen bg-white">
       <Navbar />

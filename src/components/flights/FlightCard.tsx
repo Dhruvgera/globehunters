@@ -6,6 +6,7 @@ import { Flight } from "@/types/flight";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
+import { useBookingStore } from "@/store/bookingStore";
 
 interface FlightCardProps {
   flight: Flight;

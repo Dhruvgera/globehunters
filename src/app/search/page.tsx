@@ -5,7 +5,11 @@ import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
 import SearchBar from "@/components/search/SearchBar";
 import FlightCard from "@/components/flights/FlightCard";
-import { mockFlights, mockDatePrices, mockAirlines, mockAirports } from "@/data/mockFlights";
+import { useFlights } from "@/hooks/useFlights";
+import { useBookingStore } from "@/store/bookingStore";
+import { filterFlights, sortFlights } from "@/utils/flightFilter";
+import { FilterState } from "@/types/flight";
+import { CONTACT_INFO } from "@/config/constants";
 import { ChevronDown, Phone, Plane, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -18,26 +22,25 @@ import {
 } from "@/components/ui/sheet";
 
 function SearchPageContent() {
-  const [selectedStops, setSelectedStops] = useState<number[]>([0]);
-  const [selectedAirlines, setSelectedAirlines] = useState<string[]>([
-    "Air India",
-    "Air India Express",
-    "Akasa Air",
-    "Indigo",
-  ]);
-  const [selectedDepartureAirports, setSelectedDepartureAirports] = useState<string[]>([
-    "BOM",
-  ]);
-  const [selectedArrivalAirports, setSelectedArrivalAirports] = useState<string[]>([
-    "DEL",
-    "AMD",
-    "HYD",
-  ]);
-  const [priceRange, setPriceRange] = useState<[number, number]>([400, 1200]);
-  const [outboundTimeRange, setOutboundTimeRange] = useState<[number, number]>([0, 24]);
-  const [inboundTimeRange, setInboundTimeRange] = useState<[number, number]>([0, 24]);
-  const [outboundJourneyTime, setOutboundJourneyTime] = useState<[number, number]>([0, 35]);
-  const [inboundJourneyTime, setInboundJourneyTime] = useState<[number, number]>([7, 28]);
+  // Get search params from global state
+  const searchParams = useBookingStore((state) => state.searchParams);
+
+  // Fetch flights using custom hook
+  const { flights, filters: apiFilters, datePrices, loading, error } = useFlights(searchParams);
+
+  // Filter state
+  const [filterState, setFilterState] = useState<FilterState>({
+    stops: [0],
+    priceRange: [400, 1200],
+    departureTimeOutbound: [0, 24],
+    departureTimeInbound: [0, 24],
+    journeyTimeOutbound: [0, 35],
+    journeyTimeInbound: [7, 28],
+    departureAirports: ["BOM"],
+    arrivalAirports: ["DEL", "AMD", "HYD"],
+    airlines: ["Air India", "Air India Express", "Akasa Air", "Indigo"],
+  });
+
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [displayedFlightsCount, setDisplayedFlightsCount] = useState(5);
 
@@ -53,52 +56,75 @@ function SearchPageContent() {
     airlines: true,
   });
 
+  // Update filter state when API filters load
+  useEffect(() => {
+    if (apiFilters) {
+      setFilterState((prev) => ({
+        ...prev,
+        airlines: apiFilters.airlines.map(a => a.name),
+        departureAirports: apiFilters.departureAirports.map(a => a.code),
+        arrivalAirports: apiFilters.arrivalAirports.map(a => a.code),
+        priceRange: [apiFilters.minPrice, apiFilters.maxPrice],
+      }));
+    }
+  }, [apiFilters]);
+
   const toggleFilter = (filter: string) => {
     setExpandedFilters((prev) => ({ ...prev, [filter]: !prev[filter] }));
   };
 
   const toggleStop = (stops: number) => {
-    setSelectedStops((prev) =>
-      prev.includes(stops) ? prev.filter((s) => s !== stops) : [...prev, stops]
-    );
+    setFilterState((prev) => ({
+      ...prev,
+      stops: prev.stops.includes(stops)
+        ? prev.stops.filter((s) => s !== stops)
+        : [...prev.stops, stops],
+    }));
   };
 
   const toggleAirline = (airline: string) => {
-    setSelectedAirlines((prev) =>
-      prev.includes(airline)
-        ? prev.filter((a) => a !== airline)
-        : [...prev, airline]
-    );
+    setFilterState((prev) => ({
+      ...prev,
+      airlines: prev.airlines.includes(airline)
+        ? prev.airlines.filter((a) => a !== airline)
+        : [...prev.airlines, airline],
+    }));
   };
 
   const toggleAllAirlines = () => {
-    if (selectedAirlines.length === mockAirlines.length) {
-      setSelectedAirlines([]);
-    } else {
-      setSelectedAirlines(mockAirlines.map((a) => a.name));
+    if (apiFilters) {
+      setFilterState((prev) => ({
+        ...prev,
+        airlines:
+          prev.airlines.length === apiFilters.airlines.length
+            ? []
+            : apiFilters.airlines.map((a) => a.name),
+      }));
     }
   };
 
   const toggleDepartureAirport = (code: string) => {
-    setSelectedDepartureAirports((prev) =>
-      prev.includes(code) ? prev.filter((a) => a !== code) : [...prev, code]
-    );
+    setFilterState((prev) => ({
+      ...prev,
+      departureAirports: prev.departureAirports.includes(code)
+        ? prev.departureAirports.filter((a) => a !== code)
+        : [...prev.departureAirports, code],
+    }));
   };
 
   const toggleArrivalAirport = (code: string) => {
-    setSelectedArrivalAirports((prev) =>
-      prev.includes(code) ? prev.filter((a) => a !== code) : [...prev, code]
-    );
+    setFilterState((prev) => ({
+      ...prev,
+      arrivalAirports: prev.arrivalAirports.includes(code)
+        ? prev.arrivalAirports.filter((a) => a !== code)
+        : [...prev.arrivalAirports, code],
+    }));
   };
 
-  // Filter flights based on selected filters
-  const filteredFlights = mockFlights.filter((flight) => {
-    const stopsMatch = selectedStops.includes(flight.outbound.stops);
-    const airlineMatch = selectedAirlines.includes(flight.airline.name);
-    const priceMatch =
-      flight.price >= priceRange[0] && flight.price <= priceRange[1];
-    return stopsMatch && airlineMatch && priceMatch;
-  });
+  // Filter flights using utility function
+  const filteredFlights = useMemo(() => {
+    return filterFlights(flights, filterState);
+  }, [flights, filterState]);
 
   const [selectedDateIndex, setSelectedDateIndex] = useState<number>(3);
   const dateStripRef = useRef<HTMLDivElement>(null);
@@ -168,7 +194,7 @@ function SearchPageContent() {
             ref={dateStripRef}
             className="flex-1 flex items-stretch gap-2 overflow-x-auto no-scrollbar snap-x snap-mandatory"
           >
-            {mockDatePrices.map((datePrice, index) => {
+            {datePrices?.map((datePrice, index) => {
               const active = index === selectedDateIndex;
               return (
                 <button
@@ -395,9 +421,9 @@ function SearchPageContent() {
                     </span>
                     <div className="flex flex-col gap-2">
                       <Slider
-                        value={outboundJourneyTime}
+                        value={filterState.journeyTimeOutbound}
                         onValueChange={(value) =>
-                          setOutboundJourneyTime(value as [number, number])
+                          setFilterState((prev) => ({ ...prev, journeyTimeOutbound: value as [number, number] }))
                         }
                         min={0}
                         max={35}
@@ -406,10 +432,10 @@ function SearchPageContent() {
                       />
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-                          {outboundJourneyTime[0]} Hours
+                          {filterState.journeyTimeOutbound[0]} Hours
                         </span>
                         <span className="text-xs text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-                          {outboundJourneyTime[1]} Hours
+                          {filterState.journeyTimeOutbound[1]} Hours
                         </span>
                       </div>
                     </div>
@@ -421,9 +447,9 @@ function SearchPageContent() {
                     </span>
                     <div className="flex flex-col gap-2">
                       <Slider
-                        value={inboundJourneyTime}
+                        value={filterState.journeyTimeInbound}
                         onValueChange={(value) =>
-                          setInboundJourneyTime(value as [number, number])
+                          setFilterState((prev) => ({ ...prev, journeyTimeInbound: value as [number, number] }))
                         }
                         min={0}
                         max={35}
@@ -432,10 +458,10 @@ function SearchPageContent() {
                       />
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-                          {inboundJourneyTime[0]} Hours
+                          {filterState.journeyTimeInbound[0]} Hours
                         </span>
                         <span className="text-xs text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-                          {inboundJourneyTime[1]} Hours
+                          {filterState.journeyTimeInbound[1]} Hours
                         </span>
                       </div>
                     </div>
@@ -828,9 +854,9 @@ function SearchPageContent() {
                     </span>
                     <div className="flex flex-col gap-2">
                       <Slider
-                        value={outboundJourneyTime}
+                        value={filterState.journeyTimeOutbound}
                         onValueChange={(value) =>
-                          setOutboundJourneyTime(value as [number, number])
+                          setFilterState((prev) => ({ ...prev, journeyTimeOutbound: value as [number, number] }))
                         }
                         min={0}
                         max={35}
@@ -839,10 +865,10 @@ function SearchPageContent() {
                       />
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-                          {outboundJourneyTime[0]} Hours
+                          {filterState.journeyTimeOutbound[0]} Hours
                         </span>
                         <span className="text-xs text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-                          {outboundJourneyTime[1]} Hours
+                          {filterState.journeyTimeOutbound[1]} Hours
                         </span>
                       </div>
                     </div>
@@ -854,9 +880,9 @@ function SearchPageContent() {
                     </span>
                     <div className="flex flex-col gap-2">
                       <Slider
-                        value={inboundJourneyTime}
+                        value={filterState.journeyTimeInbound}
                         onValueChange={(value) =>
-                          setInboundJourneyTime(value as [number, number])
+                          setFilterState((prev) => ({ ...prev, journeyTimeInbound: value as [number, number] }))
                         }
                         min={0}
                         max={35}
@@ -865,10 +891,10 @@ function SearchPageContent() {
                       />
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-                          {inboundJourneyTime[0]} Hours
+                          {filterState.journeyTimeInbound[0]} Hours
                         </span>
                         <span className="text-xs text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-                          {inboundJourneyTime[1]} Hours
+                          {filterState.journeyTimeInbound[1]} Hours
                         </span>
                       </div>
                     </div>

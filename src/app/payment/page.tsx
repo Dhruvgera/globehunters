@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import { useRouter } from "next/navigation";
 import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
 import { ChevronLeft, Phone, Check, Briefcase, Package, ShoppingBag, XCircle, CheckCircle2, Minus, Plus } from "lucide-react";
@@ -16,17 +17,32 @@ import {
 } from "@/components/ui/select";
 import Link from "next/link";
 import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
-import { mockFlights } from "@/data/mockFlights";
+import { useBookingStore, useSelectedFlight } from "@/store/bookingStore";
+import { CONTACT_INFO, PRICING_CONFIG } from "@/config/constants";
+import { formatPrice } from "@/utils/pricing";
 
 function PaymentContent() {
-  const [protectionPlan, setProtectionPlan] = useState<"basic" | "premium" | "all">("premium");
-  const [additionalBaggage, setAdditionalBaggage] = useState(0);
+  const router = useRouter();
   const [isIAssureExpanded, setIsIAssureExpanded] = useState(false);
   const [showFlightInfo, setShowFlightInfo] = useState(false);
   const [isPriceSummaryExpanded, setIsPriceSummaryExpanded] = useState(false);
 
-  // Use mock flight data for demonstration
-  const flight = mockFlights[0];
+  // Get selected flight from Zustand store
+  const flight = useSelectedFlight();
+
+  // Get and set protection plan and baggage from/to Zustand store
+  const addOns = useBookingStore((state) => state.addOns);
+  const setProtectionPlan = useBookingStore((state) => state.setProtectionPlan);
+  const setAdditionalBaggage = useBookingStore((state) => state.setAdditionalBaggage);
+
+  const protectionPlan = addOns.protectionPlan || 'premium';
+  const additionalBaggage = addOns.additionalBaggage;
+
+  // Redirect to search if no flight selected
+  if (!flight) {
+    router.push('/search');
+    return null;
+  }
 
   // Price calculation - Single source of truth for all pricing
   // TODO: Replace with API data
@@ -36,8 +52,8 @@ function PaymentContent() {
     premium: 10779.60,
     all: 12935.52,
   };
-  const baggagePrice = 4500; // per bag
-  const discountPercent = 0.20; // 20% discount
+  const baggagePrice = PRICING_CONFIG.baggagePrice;
+  const discountPercent = PRICING_CONFIG.defaultDiscount;
 
   // Calculate totals
   const protectionPlanCost = protectionPlanPrices[protectionPlan];
