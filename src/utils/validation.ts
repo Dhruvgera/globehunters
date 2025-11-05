@@ -268,6 +268,11 @@ export function validateBillingAddress(address: BillingAddress): PaymentFormErro
 /**
  * Check if form has errors
  */
-export function hasErrors(errors: Record<string, any>): boolean {
-  return Object.values(errors).some(error => error !== undefined && error !== '');
+export function hasErrors(errors: unknown): boolean {
+  if (errors && typeof errors === 'object') {
+    return Object.values(errors as Record<string, unknown>).some(
+      (error) => error !== undefined && error !== ''
+    );
+  }
+  return false;
 }
