@@ -17,6 +17,7 @@ function BookingContent() {
   const router = useRouter();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showFlightInfo, setShowFlightInfo] = useState(false);
+  const [isPriceSummaryExpanded, setIsPriceSummaryExpanded] = useState(false);
 
   // Use mock flight data for demonstration
   const flight = mockFlights[0];
@@ -37,14 +38,14 @@ function BookingContent() {
             Back to search results
           </Link>
 
-          {/* Progress Steps - responsive: wraps on mobile, bordered bar on desktop */}
-          <div className="lg:bg-white lg:border lg:border-[#DFE0E4] lg:rounded-xl lg:p-4 flex items-center justify-between lg:shadow-sm flex-wrap gap-3 lg:gap-0">
+          {/* Progress Steps - responsive: one line on mobile, bordered bar on desktop */}
+          <div className="lg:bg-white lg:border lg:border-[#DFE0E4] lg:rounded-xl lg:p-4 flex items-center justify-between lg:shadow-sm gap-2 lg:gap-0">
             {/* Step 1 - Current */}
             <div className="flex items-center gap-1.5 lg:gap-2">
-              <div className="w-5 h-5 lg:w-6 lg:h-6 rounded-full border border-[#010D50] flex items-center justify-center">
+              <div className="w-5 h-5 lg:w-6 lg:h-6 rounded-full border-2 border-[#010D50] flex items-center justify-center">
                 <span className="text-[10px] lg:text-xs font-medium text-[#010D50]">1</span>
               </div>
-              <span className="text-xs lg:text-sm font-medium text-[#010D50]">Your details</span>
+              <span className="hidden lg:inline text-xs lg:text-sm font-medium text-[#010D50]">Your details</span>
             </div>
 
             {/* Step 2 */}
@@ -52,7 +53,7 @@ function BookingContent() {
               <div className="w-5 h-5 lg:w-6 lg:h-6 rounded-full border border-[#010D50] flex items-center justify-center">
                 <span className="text-[10px] lg:text-xs font-medium text-[#010D50]">2</span>
               </div>
-              <span className="text-xs lg:text-sm font-medium text-[#010D50]">Choose your fair</span>
+              <span className="hidden lg:inline text-xs lg:text-sm font-medium text-[#010D50]">Choose your fare</span>
             </div>
 
             {/* Step 3 */}
@@ -60,7 +61,7 @@ function BookingContent() {
               <div className="w-5 h-5 lg:w-6 lg:h-6 rounded-full border border-[#010D50] flex items-center justify-center">
                 <span className="text-[10px] lg:text-xs font-medium text-[#010D50]">3</span>
               </div>
-              <span className="text-xs lg:text-sm font-medium text-[#010D50]">Payment Details</span>
+              <span className="hidden lg:inline text-xs lg:text-sm font-medium text-[#010D50]">Payment Details</span>
             </div>
 
             {/* Step 4 */}
@@ -68,13 +69,30 @@ function BookingContent() {
               <div className="w-5 h-5 lg:w-6 lg:h-6 rounded-full border border-[#010D50] flex items-center justify-center">
                 <span className="text-[10px] lg:text-xs font-medium text-[#010D50]">4</span>
               </div>
-              <span className="text-xs lg:text-sm font-medium text-[#010D50]">Confirmation</span>
+              <span className="hidden lg:inline text-xs lg:text-sm font-medium text-[#010D50]">Confirmation</span>
             </div>
           </div>
         </div>
 
         {/* Content Grid */}
         <div className="flex flex-col lg:flex-row gap-4">
+          {/* Web Ref Card - Mobile Only (shown at top) */}
+          <div className="lg:hidden bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
+            <span className="text-base font-semibold text-[#3754ED]">
+              WEB REF: IN-649707636
+            </span>
+            <div className="flex items-center gap-3 bg-[rgba(55,84,237,0.12)] rounded-full px-4 py-3">
+              <div className="w-10 h-10 rounded-full bg-[#0B229E] flex items-center justify-center">
+                <Phone className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[#010D50] text-sm font-bold">
+                  020 4502 2984
+                </span>
+              </div>
+            </div>
+          </div>
+
           {/* Left Column - Forms */}
           <div className="flex-1 flex flex-col gap-3">
             {/* Travel Documents Alert */}
@@ -130,138 +148,218 @@ function BookingContent() {
             {/* Flight Summary Cards */}
             <div className="flex flex-col gap-3">
               {/* Outbound Flight */}
-              <div className="bg-[#F5F7FF] rounded-xl p-4 flex flex-col sm:flex-row gap-4 overflow-hidden">
-                <div className="flex-1 flex flex-col gap-6 min-w-0">
-                  <span className="text-sm font-semibold text-[#010D50]">
-                    London to Lagos
-                  </span>
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-[#010D50]">LGW</span>
-                        <span className="text-sm font-semibold text-[#010D50]">
-                          16:40
-                        </span>
-                      </div>
-                      <svg width="61" height="5" viewBox="0 0 61 5" fill="none">
-                        <circle cx="20" cy="2.5" r="2.5" fill="#010D50" />
-                        <line
-                          x1="0"
-                          y1="2.5"
-                          x2="61"
-                          y2="2.5"
-                          stroke="#010D50"
-                          strokeDasharray="4 4"
-                        />
-                      </svg>
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1">
-                          <span className="text-sm font-semibold text-[#010D50]">
-                            05:50
-                          </span>
-                          <span className="text-xs text-[#FF0202]">+1</span>
-                        </div>
-                        <span className="text-sm text-[#010D50]">LOS</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm text-[#010D50] flex-wrap">
-                      <span>1 Stop</span>
-                      <div className="w-1 h-1 rounded-full bg-[#010D50]" />
-                      <span>13h 10m</span>
-                      <div className="w-1 h-1 rounded-full bg-[#010D50]" />
-                      <span>Sun, 9 Oct</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex sm:items-end sm:justify-between items-start gap-2 sm:flex-col">
+              <div className="bg-[#F5F7FF] rounded-xl p-4 flex flex-col gap-4 overflow-hidden">
+                {/* Mobile: Show only essential info */}
+                <div className="flex lg:hidden items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-10 h-10 bg-[#DA0E29] rounded flex items-center justify-center">
                       <Plane className="w-5 h-5 text-white" />
                     </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-semibold text-[#010D50]">Royal Air Maroc</span>
+                      <span className="text-xs text-[#3A478A]">London to Lagos</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex lg:hidden items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="flex flex-col">
+                      <span className="text-xs text-[#3A478A]">LGW</span>
+                      <span className="text-sm font-semibold text-[#010D50]">16:40</span>
+                    </div>
+                    <span className="text-xs text-[#3A478A]">→</span>
+                    <div className="flex flex-col">
+                      <span className="text-xs text-[#3A478A]">LOS</span>
+                      <span className="text-sm font-semibold text-[#010D50]">05:50</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-xs text-[#3A478A]">Duration</span>
+                    <span className="text-sm font-semibold text-[#010D50]">13h 10m</span>
+                  </div>
+                </div>
+                <Button
+                  variant="link"
+                  onClick={() => setShowFlightInfo(true)}
+                  className="lg:hidden text-sm font-medium text-[#3754ED] p-0 h-auto w-fit"
+                >
+                  View Details
+                </Button>
+
+                {/* Desktop: Show full details */}
+                <div className="hidden lg:flex flex-col sm:flex-row gap-4">
+                  <div className="flex-1 flex flex-col gap-6 min-w-0">
                     <span className="text-sm font-semibold text-[#010D50]">
-                      Royal Air Maroc
+                      London to Lagos
                     </span>
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-[#010D50]">LGW</span>
+                          <span className="text-sm font-semibold text-[#010D50]">
+                            16:40
+                          </span>
+                        </div>
+                        <svg width="61" height="5" viewBox="0 0 61 5" fill="none">
+                          <circle cx="20" cy="2.5" r="2.5" fill="#010D50" />
+                          <line
+                            x1="0"
+                            y1="2.5"
+                            x2="61"
+                            y2="2.5"
+                            stroke="#010D50"
+                            strokeDasharray="4 4"
+                          />
+                        </svg>
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1">
+                            <span className="text-sm font-semibold text-[#010D50]">
+                              05:50
+                            </span>
+                            <span className="text-xs text-[#FF0202]">+1</span>
+                          </div>
+                          <span className="text-sm text-[#010D50]">LOS</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm text-[#010D50] flex-wrap">
+                        <span>1 Stop</span>
+                        <div className="w-1 h-1 rounded-full bg-[#010D50]" />
+                        <span>13h 10m</span>
+                        <div className="w-1 h-1 rounded-full bg-[#010D50]" />
+                        <span>Sun, 9 Oct</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 text-sm text-[#010D50]">
-                    <span>Economy</span>
-                    <div className="w-1 h-1 rounded-full bg-[#010D50]" />
-                    <span>1 Adult</span>
+                  <div className="flex sm:items-end sm:justify-between items-start gap-2 sm:flex-col">
+                    <div className="flex items-center gap-2">
+                      <div className="w-10 h-10 bg-[#DA0E29] rounded flex items-center justify-center">
+                        <Plane className="w-5 h-5 text-white" />
+                      </div>
+                      <span className="text-sm font-semibold text-[#010D50]">
+                        Royal Air Maroc
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm text-[#010D50]">
+                      <span>Economy</span>
+                      <div className="w-1 h-1 rounded-full bg-[#010D50]" />
+                      <span>1 Adult</span>
+                    </div>
+                    <Button
+                      variant="link"
+                      onClick={() => setShowFlightInfo(true)}
+                      className="text-sm font-medium text-[#3754ED] p-0 h-auto"
+                    >
+                      View Details
+                    </Button>
                   </div>
-                  <Button
-                    variant="link"
-                    onClick={() => setShowFlightInfo(true)}
-                    className="text-sm font-medium text-[#3754ED] p-0 h-auto"
-                  >
-                    View Details
-                  </Button>
                 </div>
               </div>
 
               {/* Return Flight */}
-              <div className="bg-[#F5F7FF] rounded-xl p-4 flex flex-col sm:flex-row gap-4 overflow-hidden">
-                <div className="flex-1 flex flex-col gap-6 min-w-0">
-                  <span className="text-sm font-semibold text-[#010D50]">
-                    Lagos to London
-                  </span>
-                  <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-[#010D50]">LOS</span>
-                        <span className="text-sm font-semibold text-[#010D50]">
-                          05:50
-                        </span>
-                      </div>
-                      <svg width="61" height="5" viewBox="0 0 61 5" fill="none">
-                        <circle cx="20" cy="2.5" r="2.5" fill="#010D50" />
-                        <line
-                          x1="0"
-                          y1="2.5"
-                          x2="61"
-                          y2="2.5"
-                          stroke="#010D50"
-                          strokeDasharray="4 4"
-                        />
-                      </svg>
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1">
-                          <span className="text-sm font-semibold text-[#010D50]">
-                            16:40
-                          </span>
-                          <span className="text-xs text-[#FF0202]">+1</span>
-                        </div>
-                        <span className="text-sm text-[#010D50]">LGW</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 text-sm text-[#010D50] flex-wrap">
-                      <span>1 Stop</span>
-                      <div className="w-1 h-1 rounded-full bg-[#010D50]" />
-                      <span>13h 10m</span>
-                      <div className="w-1 h-1 rounded-full bg-[#010D50]" />
-                      <span>Wed, 12 Oct</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex sm:items-end sm:justify-between items-start gap-2 sm:flex-col">
+              <div className="bg-[#F5F7FF] rounded-xl p-4 flex flex-col gap-4 overflow-hidden">
+                {/* Mobile: Show only essential info */}
+                <div className="flex lg:hidden items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="w-10 h-10 bg-[#DA0E29] rounded flex items-center justify-center">
                       <Plane className="w-5 h-5 text-white" />
                     </div>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-semibold text-[#010D50]">Royal Air Maroc</span>
+                      <span className="text-xs text-[#3A478A]">Lagos to London</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex lg:hidden items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="flex flex-col">
+                      <span className="text-xs text-[#3A478A]">LOS</span>
+                      <span className="text-sm font-semibold text-[#010D50]">05:50</span>
+                    </div>
+                    <span className="text-xs text-[#3A478A]">→</span>
+                    <div className="flex flex-col">
+                      <span className="text-xs text-[#3A478A]">LGW</span>
+                      <span className="text-sm font-semibold text-[#010D50]">16:40</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-xs text-[#3A478A]">Duration</span>
+                    <span className="text-sm font-semibold text-[#010D50]">13h 10m</span>
+                  </div>
+                </div>
+                <Button
+                  variant="link"
+                  onClick={() => setShowFlightInfo(true)}
+                  className="lg:hidden text-sm font-medium text-[#3754ED] p-0 h-auto w-fit"
+                >
+                  View Details
+                </Button>
+
+                {/* Desktop: Show full details */}
+                <div className="hidden lg:flex flex-col sm:flex-row gap-4">
+                  <div className="flex-1 flex flex-col gap-6 min-w-0">
                     <span className="text-sm font-semibold text-[#010D50]">
-                      Royal Air Maroc
+                      Lagos to London
                     </span>
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-[#010D50]">LOS</span>
+                          <span className="text-sm font-semibold text-[#010D50]">
+                            05:50
+                          </span>
+                        </div>
+                        <svg width="61" height="5" viewBox="0 0 61 5" fill="none">
+                          <circle cx="20" cy="2.5" r="2.5" fill="#010D50" />
+                          <line
+                            x1="0"
+                            y1="2.5"
+                            x2="61"
+                            y2="2.5"
+                            stroke="#010D50"
+                            strokeDasharray="4 4"
+                          />
+                        </svg>
+                        <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1">
+                            <span className="text-sm font-semibold text-[#010D50]">
+                              16:40
+                            </span>
+                            <span className="text-xs text-[#FF0202]">+1</span>
+                          </div>
+                          <span className="text-sm text-[#010D50]">LGW</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm text-[#010D50] flex-wrap">
+                        <span>1 Stop</span>
+                        <div className="w-1 h-1 rounded-full bg-[#010D50]" />
+                        <span>13h 10m</span>
+                        <div className="w-1 h-1 rounded-full bg-[#010D50]" />
+                        <span>Wed, 12 Oct</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 text-sm text-[#010D50]">
-                    <span>Economy</span>
-                    <div className="w-1 h-1 rounded-full bg-[#010D50]" />
-                    <span>1 Adult</span>
+                  <div className="flex sm:items-end sm:justify-between items-start gap-2 sm:flex-col">
+                    <div className="flex items-center gap-2">
+                      <div className="w-10 h-10 bg-[#DA0E29] rounded flex items-center justify-center">
+                        <Plane className="w-5 h-5 text-white" />
+                      </div>
+                      <span className="text-sm font-semibold text-[#010D50]">
+                        Royal Air Maroc
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm text-[#010D50]">
+                      <span>Economy</span>
+                      <div className="w-1 h-1 rounded-full bg-[#010D50]" />
+                      <span>1 Adult</span>
+                    </div>
+                    <Button
+                      variant="link"
+                      onClick={() => setShowFlightInfo(true)}
+                      className="text-sm font-medium text-[#3754ED] p-0 h-auto"
+                    >
+                      View Details
+                    </Button>
                   </div>
-                  <Button
-                    variant="link"
-                    onClick={() => setShowFlightInfo(true)}
-                    className="text-sm font-medium text-[#3754ED] p-0 h-auto"
-                  >
-                    View Details
-                  </Button>
                 </div>
               </div>
             </div>
@@ -455,8 +553,8 @@ function BookingContent() {
 
           {/* Right Sidebar */}
           <div className="w-full lg:w-[482px] flex flex-col gap-4">
-            {/* Web Ref Card */}
-            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4 order-1 lg:order-none">
+            {/* Web Ref Card - Desktop Only */}
+            <div className="hidden lg:flex bg-white border border-[#DFE0E4] rounded-xl p-4 flex-col gap-4">
               <span className="text-base font-semibold text-[#3754ED]">
                 WEB REF: IN-649707636
               </span>
@@ -481,10 +579,20 @@ function BookingContent() {
 
             {/* Price Summary - Sticky on Desktop */}
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-6 order-2 lg:order-none lg:sticky lg:top-20">
-              <span className="text-sm font-semibold text-[#010D50]">
-                Price Summary
-              </span>
-              <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-[#010D50]">
+                  Price Summary
+                </span>
+                <button
+                  onClick={() => setIsPriceSummaryExpanded(!isPriceSummaryExpanded)}
+                  className="lg:hidden text-[#3754ED] text-sm font-medium"
+                >
+                  {isPriceSummaryExpanded ? "Hide Details" : "Show Details"}
+                </button>
+              </div>
+
+              {/* Breakdown - Hidden on mobile unless expanded, always visible on desktop */}
+              <div className={`flex-col gap-2 ${isPriceSummaryExpanded ? "flex" : "hidden lg:flex"}`}>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-[#010D50]">
                     Traveler: 1 Adult
@@ -504,7 +612,9 @@ function BookingContent() {
                   <span className="text-sm text-[#3A478A]">£48,358</span>
                 </div>
               </div>
-              <div className="border-t border-[#DFE0E4]" />
+
+              <div className={`border-t border-[#DFE0E4] ${isPriceSummaryExpanded ? "block" : "hidden lg:block"}`} />
+
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-[#010D50]">
                   Trip Total

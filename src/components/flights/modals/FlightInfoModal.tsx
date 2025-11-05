@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, Check, Info, Clock, Briefcase, Package, ShoppingBag, XCircle as XIcon, Plane, MapPin } from "lucide-react";
+import { X, Check, Info, Clock, Briefcase, Package, ShoppingBag, XCircle as XIcon, Plane, MapPin, UtensilsCrossed } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -190,6 +190,70 @@ export default function FlightInfoModal({
                           <span className="text-xs sm:text-sm font-medium text-[#3A478A] whitespace-nowrap">
                             {currentLeg.date}
                           </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Segment Baggage & Meals */}
+                <div className="flex flex-col gap-3">
+                  <span className="text-sm font-semibold text-[#010D50]">
+                    Included with this segment
+                  </span>
+                  <div className="flex flex-col md:flex-row gap-3">
+                    {/* Baggage for this segment */}
+                    <div className="flex-1 bg-[#F5F7FF] rounded-xl p-3 flex flex-col gap-3">
+                      <span className="text-sm font-medium text-[#010D50]">Baggage Allowance</span>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-start gap-2">
+                          <ShoppingBag className="w-5 h-5 text-[#010D50] shrink-0" />
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-xs font-medium text-[#010D50]">1 personal item</span>
+                            <span className="text-xs text-[#3A478A]">Fits under seat</span>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Briefcase className="w-5 h-5 text-[#010D50] shrink-0" />
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-xs font-medium text-[#010D50]">1 carry-on bag</span>
+                            <span className="text-xs text-[#3A478A]">Max 10kg</span>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <Package className="w-5 h-5 text-[#010D50] shrink-0" />
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-xs font-medium text-[#010D50]">2 checked bags</span>
+                            <span className="text-xs text-[#3A478A]">Max 23kg each</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Meals for this segment */}
+                    <div className="flex-1 bg-[#F5F7FF] rounded-xl p-3 flex flex-col gap-3">
+                      <span className="text-sm font-medium text-[#010D50]">Meals & Refreshments</span>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-start gap-2">
+                          <UtensilsCrossed className="w-5 h-5 text-[#010D50] shrink-0" />
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-xs font-medium text-[#010D50]">Complimentary meal</span>
+                            <span className="text-xs text-[#3A478A]">Hot meal service included</span>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <UtensilsCrossed className="w-5 h-5 text-[#010D50] shrink-0" />
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-xs font-medium text-[#010D50]">Beverages</span>
+                            <span className="text-xs text-[#3A478A]">Soft drinks, tea, coffee</span>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-2">
+                          <UtensilsCrossed className="w-5 h-5 text-[#010D50] shrink-0" />
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-xs font-medium text-[#010D50]">Special meals</span>
+                            <span className="text-xs text-[#3A478A]">Available on request</span>
+                          </div>
                         </div>
                       </div>
                     </div>

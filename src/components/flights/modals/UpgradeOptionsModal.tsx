@@ -195,7 +195,7 @@ export default function UpgradeOptionsModal({
                 {/* Features */}
                 <div className="flex flex-col gap-4">
                   <span className="text-sm text-[#3A478A]">
-                    Included in this fair:
+                    Included in this fare:
                   </span>
                   <div className="flex flex-col gap-3">
                     {fare.features.map((feature, index) => {

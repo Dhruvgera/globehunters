@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   MapPin,
@@ -38,6 +38,19 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
     infants: 0,
   });
   const [travelClass, setTravelClass] = useState("Economy");
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+
+  // Auto-close date picker when return date is selected for round-trip
+  useEffect(() => {
+    if (tripType === "round-trip" && returnDate && departureDate && isDatePickerOpen) {
+      // Close the popover after a short delay to allow the user to see the selection
+      setTimeout(() => setIsDatePickerOpen(false), 200);
+    }
+    // For one-way and multi-city, close when departure date is selected
+    if ((tripType === "one-way" || tripType === "multi-city") && departureDate && isDatePickerOpen) {
+      setTimeout(() => setIsDatePickerOpen(false), 200);
+    }
+  }, [returnDate, departureDate, tripType, isDatePickerOpen]);
 
   const handleSearch = () => {
     const params = new URLSearchParams({
@@ -275,7 +288,7 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
         </div>
 
         {/* Date Picker */}
-        <Popover>
+        <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
           <PopoverTrigger asChild>
             <Button
               variant="outline"

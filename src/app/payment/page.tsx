@@ -23,6 +23,7 @@ function PaymentContent() {
   const [additionalBaggage, setAdditionalBaggage] = useState(0);
   const [isIAssureExpanded, setIsIAssureExpanded] = useState(false);
   const [showFlightInfo, setShowFlightInfo] = useState(false);
+  const [isPriceSummaryExpanded, setIsPriceSummaryExpanded] = useState(false);
 
   // Use mock flight data for demonstration
   const flight = mockFlights[0];
@@ -44,14 +45,14 @@ function PaymentContent() {
             Back to Fare Options
           </Link>
 
-          {/* Progress Steps - responsive: wraps on mobile, bordered bar on desktop */}
-          <div className="lg:bg-white lg:border lg:border-[#DFE0E4] lg:rounded-xl lg:p-4 flex items-center justify-between lg:shadow-sm flex-wrap gap-3 lg:gap-0">
+          {/* Progress Steps - responsive: one line on mobile, bordered bar on desktop */}
+          <div className="lg:bg-white lg:border lg:border-[#DFE0E4] lg:rounded-xl lg:p-4 flex items-center justify-between lg:shadow-sm gap-2 lg:gap-0">
             {/* Step 1 - Completed */}
             <div className="flex items-center gap-1.5 lg:gap-2">
               <div className="w-5 h-5 lg:w-6 lg:h-6 rounded-full bg-[#010D50] border border-[#010D50] flex items-center justify-center">
                 <span className="text-[10px] lg:text-xs font-medium text-white">1</span>
               </div>
-              <span className="text-xs lg:text-sm font-medium text-[#010D50]">Your details</span>
+              <span className="hidden lg:inline text-xs lg:text-sm font-medium text-[#010D50]">Your details</span>
             </div>
 
             {/* Step 2 - Completed */}
@@ -59,15 +60,15 @@ function PaymentContent() {
               <div className="w-5 h-5 lg:w-6 lg:h-6 rounded-full bg-[#010D50] border border-[#010D50] flex items-center justify-center">
                 <span className="text-[10px] lg:text-xs font-medium text-white">2</span>
               </div>
-              <span className="text-xs lg:text-sm font-medium text-[#010D50]">Choose your fair</span>
+              <span className="hidden lg:inline text-xs lg:text-sm font-medium text-[#010D50]">Choose your fare</span>
             </div>
 
             {/* Step 3 - Current */}
             <div className="flex items-center gap-1.5 lg:gap-2">
-              <div className="w-5 h-5 lg:w-6 lg:h-6 rounded-full border border-[#010D50] flex items-center justify-center">
+              <div className="w-5 h-5 lg:w-6 lg:h-6 rounded-full border-2 border-[#010D50] flex items-center justify-center">
                 <span className="text-[10px] lg:text-xs font-medium text-[#010D50]">3</span>
               </div>
-              <span className="text-xs lg:text-sm font-medium text-[#010D50]">Payment Details</span>
+              <span className="hidden lg:inline text-xs lg:text-sm font-medium text-[#010D50]">Payment Details</span>
             </div>
 
             {/* Step 4 */}
@@ -75,124 +76,211 @@ function PaymentContent() {
               <div className="w-5 h-5 lg:w-6 lg:h-6 rounded-full border border-[#010D50] flex items-center justify-center">
                 <span className="text-[10px] lg:text-xs font-medium text-[#010D50]">4</span>
               </div>
-              <span className="text-xs lg:text-sm font-medium text-[#010D50]">Confirmation</span>
+              <span className="hidden lg:inline text-xs lg:text-sm font-medium text-[#010D50]">Confirmation</span>
             </div>
           </div>
         </div>
 
         {/* Main Layout */}
         <div className="flex flex-col lg:flex-row gap-4">
+          {/* Web Ref Card - Mobile Only (shown at top) */}
+          <div className="lg:hidden bg-white border border-[#DFE0E4] rounded-xl p-3 flex flex-col gap-4">
+            <span className="text-base font-semibold text-[#3754ED]">WEB REF: IN-649707636</span>
+            <div className="flex items-center gap-2 bg-[rgba(55,84,237,0.12)] rounded-[40px] px-4 py-2 w-fit">
+              <div className="w-9 h-9 rounded-full bg-[#0B229E] flex items-center justify-center">
+                <Phone className="w-5 h-5 text-white" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[#010D50] text-sm font-bold">020 4502 2984</span>
+              </div>
+            </div>
+          </div>
+
           {/* Left Column */}
           <div className="flex-1 flex flex-col gap-4">
             {/* Flight Summary Cards */}
             <div className="flex flex-col gap-3">
               {/* London to Lagos */}
-              <div className="bg-[#F5F7FF] rounded-xl p-3 flex flex-col gap-6">
-                <span className="text-sm font-semibold text-[#010D50]">London to Lagos</span>
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-sm font-semibold text-[#010D50]">LGW</span>
-                    <span className="text-sm font-semibold text-[#010D50]">16:40</span>
-                  </div>
-                  <div className="flex flex-col items-center flex-1 mx-4">
-                    <div className="flex items-center w-full relative">
-                      <div className="flex-1 border-t border-dashed border-[#010D50]" />
-                      <svg width="61" height="5" viewBox="0 0 61 5" fill="none" className="absolute left-1/2 -translate-x-1/2">
-                        <circle cx="20" cy="2.5" r="2.5" fill="#010D50" />
-                        <line x1="0" y1="2.5" x2="61" y2="2.5" stroke="#010D50" strokeDasharray="2 2" />
-                      </svg>
-                      <div className="flex-1 border-t border-dashed border-[#010D50]" />
+              <div className="bg-[#F5F7FF] rounded-xl p-3 flex flex-col gap-3">
+                {/* Mobile: Compact view */}
+                <div className="flex lg:hidden items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-[#DA0E29] rounded flex items-center justify-center">
+                      <span className="text-white text-xs font-bold">RAM</span>
                     </div>
-                    <div className="flex items-center gap-3 mt-3">
-                      <span className="text-sm font-medium text-[#010D50]">1 Stop</span>
-                      <div className="w-1 h-1 rounded-full bg-[#010D50]" />
-                      <span className="text-sm font-medium text-[#010D50]">13h 10m</span>
-                      <div className="w-1 h-1 rounded-full bg-[#010D50]" />
-                      <span className="text-sm font-medium text-[#010D50]">Sun, 9 Oct</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <div className="flex items-end gap-1">
-                      <span className="text-sm font-semibold text-[#010D50]">05:50</span>
-                      <span className="text-xs text-[#FF0202]">+1</span>
-                    </div>
-                    <span className="text-sm font-semibold text-[#010D50]">LOS</span>
+                    <span className="text-xs font-semibold text-[#010D50]">London to Lagos</span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="flex lg:hidden items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-12 h-8 bg-[#DA0E29] rounded flex items-center justify-center">
-                      <span className="text-white text-base font-bold">RAM</span>
+                    <div className="flex flex-col">
+                      <span className="text-xs text-[#3A478A]">LGW</span>
+                      <span className="text-sm font-semibold text-[#010D50]">16:40</span>
                     </div>
-                    <span className="text-sm font-semibold text-[#010D50]">Royal Air Maroc</span>
+                    <span className="text-xs text-[#3A478A]">→</span>
+                    <div className="flex flex-col">
+                      <span className="text-xs text-[#3A478A]">LOS</span>
+                      <span className="text-sm font-semibold text-[#010D50]">05:50</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-[#010D50]">Economy</span>
-                    <div className="w-1 h-1 rounded-full bg-[#010D50]" />
-                    <span className="text-sm text-[#010D50]">1 Adult</span>
+                  <div className="flex flex-col items-end">
+                    <span className="text-xs text-[#3A478A]">Duration</span>
+                    <span className="text-sm font-semibold text-[#010D50]">13h 10m</span>
                   </div>
-                  <Button
-                    variant="link"
-                    onClick={() => setShowFlightInfo(true)}
-                    className="text-[#3754ED] text-sm font-medium p-0 h-auto"
-                  >
-                    View Details
-                  </Button>
+                </div>
+                <Button
+                  variant="link"
+                  onClick={() => setShowFlightInfo(true)}
+                  className="lg:hidden text-sm font-medium text-[#3754ED] p-0 h-auto w-fit"
+                >
+                  View Details
+                </Button>
+
+                {/* Desktop: Full view */}
+                <div className="hidden lg:flex flex-col gap-6">
+                  <span className="text-sm font-semibold text-[#010D50]">London to Lagos</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm font-semibold text-[#010D50]">LGW</span>
+                      <span className="text-sm font-semibold text-[#010D50]">16:40</span>
+                    </div>
+                    <div className="flex flex-col items-center flex-1 mx-4">
+                      <div className="flex items-center w-full relative">
+                        <div className="flex-1 border-t border-dashed border-[#010D50]" />
+                        <svg width="61" height="5" viewBox="0 0 61 5" fill="none" className="absolute left-1/2 -translate-x-1/2">
+                          <circle cx="20" cy="2.5" r="2.5" fill="#010D50" />
+                          <line x1="0" y1="2.5" x2="61" y2="2.5" stroke="#010D50" strokeDasharray="2 2" />
+                        </svg>
+                        <div className="flex-1 border-t border-dashed border-[#010D50]" />
+                      </div>
+                      <div className="flex items-center gap-3 mt-3">
+                        <span className="text-sm font-medium text-[#010D50]">1 Stop</span>
+                        <div className="w-1 h-1 rounded-full bg-[#010D50]" />
+                        <span className="text-sm font-medium text-[#010D50]">13h 10m</span>
+                        <div className="w-1 h-1 rounded-full bg-[#010D50]" />
+                        <span className="text-sm font-medium text-[#010D50]">Sun, 9 Oct</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="flex items-end gap-1">
+                        <span className="text-sm font-semibold text-[#010D50]">05:50</span>
+                        <span className="text-xs text-[#FF0202]">+1</span>
+                      </div>
+                      <span className="text-sm font-semibold text-[#010D50]">LOS</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-12 h-8 bg-[#DA0E29] rounded flex items-center justify-center">
+                        <span className="text-white text-base font-bold">RAM</span>
+                      </div>
+                      <span className="text-sm font-semibold text-[#010D50]">Royal Air Maroc</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-[#010D50]">Economy</span>
+                      <div className="w-1 h-1 rounded-full bg-[#010D50]" />
+                      <span className="text-sm text-[#010D50]">1 Adult</span>
+                    </div>
+                    <Button
+                      variant="link"
+                      onClick={() => setShowFlightInfo(true)}
+                      className="text-[#3754ED] text-sm font-medium p-0 h-auto"
+                    >
+                      View Details
+                    </Button>
+                  </div>
                 </div>
               </div>
 
               {/* Lagos to London */}
-              <div className="bg-[#F5F7FF] rounded-xl p-3 flex flex-col gap-6">
-                <span className="text-sm font-semibold text-[#010D50]">Lagos to London</span>
-                <div className="flex items-center justify-between">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-sm font-semibold text-[#010D50]">LOS</span>
-                    <span className="text-sm font-semibold text-[#010D50]">05:50</span>
-                  </div>
-                  <div className="flex flex-col items-center flex-1 mx-4">
-                    <div className="flex items-center w-full relative">
-                      <div className="flex-1 border-t border-dashed border-[#010D50]" />
-                      <svg width="61" height="5" viewBox="0 0 61 5" fill="none" className="absolute left-1/2 -translate-x-1/2">
-                        <circle cx="20" cy="2.5" r="2.5" fill="#010D50" />
-                        <line x1="0" y1="2.5" x2="61" y2="2.5" stroke="#010D50" strokeDasharray="2 2" />
-                      </svg>
-                      <div className="flex-1 border-t border-dashed border-[#010D50]" />
+              <div className="bg-[#F5F7FF] rounded-xl p-3 flex flex-col gap-3">
+                {/* Mobile: Compact view */}
+                <div className="flex lg:hidden items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 bg-[#DA0E29] rounded flex items-center justify-center">
+                      <span className="text-white text-xs font-bold">RAM</span>
                     </div>
-                    <div className="flex items-center gap-3 mt-3">
-                      <span className="text-sm font-medium text-[#010D50]">1 Stop</span>
-                      <div className="w-1 h-1 rounded-full bg-[#010D50]" />
-                      <span className="text-sm font-medium text-[#010D50]">13h 10m</span>
-                      <div className="w-1 h-1 rounded-full bg-[#010D50]" />
-                      <span className="text-sm font-medium text-[#010D50]">Wed, 12 Oct</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <div className="flex items-end gap-1">
-                      <span className="text-sm font-semibold text-[#010D50]">16:40</span>
-                      <span className="text-xs text-[#FF0202]">+1</span>
-                    </div>
-                    <span className="text-sm font-semibold text-[#010D50]">LGW</span>
+                    <span className="text-xs font-semibold text-[#010D50]">Lagos to London</span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between">
+                <div className="flex lg:hidden items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-12 h-8 bg-[#DA0E29] rounded flex items-center justify-center">
-                      <span className="text-white text-base font-bold">RAM</span>
+                    <div className="flex flex-col">
+                      <span className="text-xs text-[#3A478A]">LOS</span>
+                      <span className="text-sm font-semibold text-[#010D50]">05:50</span>
                     </div>
-                    <span className="text-sm font-semibold text-[#010D50]">Royal Air Maroc</span>
+                    <span className="text-xs text-[#3A478A]">→</span>
+                    <div className="flex flex-col">
+                      <span className="text-xs text-[#3A478A]">LGW</span>
+                      <span className="text-sm font-semibold text-[#010D50]">16:40</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-[#010D50]">Economy</span>
-                    <div className="w-1 h-1 rounded-full bg-[#010D50]" />
-                    <span className="text-sm text-[#010D50]">1 Adult</span>
+                  <div className="flex flex-col items-end">
+                    <span className="text-xs text-[#3A478A]">Duration</span>
+                    <span className="text-sm font-semibold text-[#010D50]">13h 10m</span>
                   </div>
-                  <Button
-                    variant="link"
-                    onClick={() => setShowFlightInfo(true)}
-                    className="text-[#3754ED] text-sm font-medium p-0 h-auto"
-                  >
-                    View Details
-                  </Button>
+                </div>
+                <Button
+                  variant="link"
+                  onClick={() => setShowFlightInfo(true)}
+                  className="lg:hidden text-sm font-medium text-[#3754ED] p-0 h-auto w-fit"
+                >
+                  View Details
+                </Button>
+
+                {/* Desktop: Full view */}
+                <div className="hidden lg:flex flex-col gap-6">
+                  <span className="text-sm font-semibold text-[#010D50]">Lagos to London</span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm font-semibold text-[#010D50]">LOS</span>
+                      <span className="text-sm font-semibold text-[#010D50]">05:50</span>
+                    </div>
+                    <div className="flex flex-col items-center flex-1 mx-4">
+                      <div className="flex items-center w-full relative">
+                        <div className="flex-1 border-t border-dashed border-[#010D50]" />
+                        <svg width="61" height="5" viewBox="0 0 61 5" fill="none" className="absolute left-1/2 -translate-x-1/2">
+                          <circle cx="20" cy="2.5" r="2.5" fill="#010D50" />
+                          <line x1="0" y1="2.5" x2="61" y2="2.5" stroke="#010D50" strokeDasharray="2 2" />
+                        </svg>
+                        <div className="flex-1 border-t border-dashed border-[#010D50]" />
+                      </div>
+                      <div className="flex items-center gap-3 mt-3">
+                        <span className="text-sm font-medium text-[#010D50]">1 Stop</span>
+                        <div className="w-1 h-1 rounded-full bg-[#010D50]" />
+                        <span className="text-sm font-medium text-[#010D50]">13h 10m</span>
+                        <div className="w-1 h-1 rounded-full bg-[#010D50]" />
+                        <span className="text-sm font-medium text-[#010D50]">Wed, 12 Oct</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="flex items-end gap-1">
+                        <span className="text-sm font-semibold text-[#010D50]">16:40</span>
+                        <span className="text-xs text-[#FF0202]">+1</span>
+                      </div>
+                      <span className="text-sm font-semibold text-[#010D50]">LGW</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-12 h-8 bg-[#DA0E29] rounded flex items-center justify-center">
+                        <span className="text-white text-base font-bold">RAM</span>
+                      </div>
+                      <span className="text-sm font-semibold text-[#010D50]">Royal Air Maroc</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-[#010D50]">Economy</span>
+                      <div className="w-1 h-1 rounded-full bg-[#010D50]" />
+                      <span className="text-sm text-[#010D50]">1 Adult</span>
+                    </div>
+                    <Button
+                      variant="link"
+                      onClick={() => setShowFlightInfo(true)}
+                      className="text-[#3754ED] text-sm font-medium p-0 h-auto"
+                    >
+                      View Details
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -560,8 +648,8 @@ function PaymentContent() {
 
           {/* Right Sidebar */}
           <div className="w-full lg:w-[482px] flex flex-col gap-4">
-            {/* Web Ref Card */}
-            <div className="bg-white border border-[#DFE0E4] rounded-xl p-3 flex flex-col gap-4">
+            {/* Web Ref Card - Desktop Only */}
+            <div className="hidden lg:flex bg-white border border-[#DFE0E4] rounded-xl p-3 flex-col gap-4">
               <span className="text-base font-semibold text-[#3754ED]">WEB REF: IN-649707636</span>
               <p className="text-sm text-[#3A478A]">
                 If you would like to speak to one of our travel consultants please call us on the
@@ -581,10 +669,19 @@ function PaymentContent() {
             </div>
 
             {/* Price Summary */}
-            <div className="bg-white border border-[#DFE0E4] rounded-xl p-3 flex flex-col gap-6 lg:sticky lg:top-20">
-              <span className="text-sm font-semibold text-[#010D50]">Price Summary</span>
+            <div className="bg-white border border-[#DFE0E4] rounded-xl p-3 flex flex-col gap-6 order-2 lg:order-none lg:sticky lg:top-20">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-[#010D50]">Price Summary</span>
+                <button
+                  onClick={() => setIsPriceSummaryExpanded(!isPriceSummaryExpanded)}
+                  className="lg:hidden text-[#3754ED] text-sm font-medium"
+                >
+                  {isPriceSummaryExpanded ? "Hide Details" : "Show Details"}
+                </button>
+              </div>
 
-              <div className="flex flex-col gap-2">
+              {/* Breakdown - Hidden on mobile unless expanded, always visible on desktop */}
+              <div className={`flex-col gap-2 ${isPriceSummaryExpanded ? "flex" : "hidden lg:flex"}`}>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-[#010D50]">Traveler: 1 Adult</span>
                   <span className="text-sm font-medium text-[#010D50]">₹94, 353</span>
@@ -599,28 +696,28 @@ function PaymentContent() {
                 </div>
               </div>
 
-              <div className="border-t border-[#DFE0E4]" />
+              <div className={`border-t border-[#DFE0E4] ${isPriceSummaryExpanded ? "block" : "hidden lg:block"}`} />
 
-              <div className="flex items-center justify-between">
+              <div className={`flex items-center justify-between ${isPriceSummaryExpanded ? "flex" : "hidden lg:flex"}`}>
                 <span className="text-sm text-[#3A478A]">iAssure Protection Plan (Premium)</span>
                 <span className="text-sm text-[#3A478A]">₹10,779</span>
               </div>
 
-              <div className="border-t border-[#DFE0E4]" />
+              <div className={`border-t border-[#DFE0E4] ${isPriceSummaryExpanded ? "block" : "hidden lg:block"}`} />
 
-              <div className="flex items-center justify-between">
+              <div className={`flex items-center justify-between ${isPriceSummaryExpanded ? "flex" : "hidden lg:flex"}`}>
                 <span className="text-sm text-[#3A478A]">Additional Baggage</span>
                 <span className="text-sm text-[#3A478A]">₹20,000</span>
               </div>
 
-              <div className="border-t border-[#DFE0E4]" />
+              <div className={`border-t border-[#DFE0E4] ${isPriceSummaryExpanded ? "block" : "hidden lg:block"}`} />
 
-              <div className="flex items-center justify-between">
+              <div className={`flex items-center justify-between ${isPriceSummaryExpanded ? "flex" : "hidden lg:flex"}`}>
                 <span className="text-sm text-[#3A478A]">Discount code</span>
                 <span className="text-sm text-[#3A478A]">-20%</span>
               </div>
 
-              <div className="border-t border-[#DFE0E4]" />
+              <div className={`border-t border-[#DFE0E4] ${isPriceSummaryExpanded ? "block" : "hidden lg:block"}`} />
 
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-[#010D50]">Trip Total</span>
