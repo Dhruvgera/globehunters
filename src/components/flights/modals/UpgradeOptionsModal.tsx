@@ -154,25 +154,25 @@ export default function UpgradeOptionsModal({
         </button>
 
         {/* Fare Options */}
-        <div className="flex items-center gap-3 overflow-x-auto snap-x snap-mandatory pb-4 px-1">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:overflow-x-auto sm:snap-x sm:snap-mandatory pb-4 px-1">
           {fareOptions.map((fare) => (
             <div
               key={fare.id}
               onClick={() => setHighlightedFare(fare.id)}
-              className={`min-w-[260px] sm:min-w-0 flex-1 rounded-[20px] p-4 cursor-pointer transition-all snap-start ${
+              className={`w-full sm:min-w-[260px] md:min-w-0 sm:flex-1 rounded-xl p-3 sm:p-4 cursor-pointer transition-all sm:snap-start ${
                 highlightedFare === fare.id
                   ? "border-[3px] border-[#3754ED] bg-white shadow-[0px_4px_12px_0px_rgba(0,0,0,0.12)]"
                   : "border border-[#DFE0E4] bg-[#F5F7FF] shadow-[0px_4px_12px_0px_rgba(0,0,0,0.12)]"
               }`}
             >
-              <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-3 sm:gap-6">
                 {/* Header */}
                 <div className="flex items-start justify-between">
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-1 sm:gap-3">
                     <span className="text-sm font-semibold text-[#010D50]">
                       {fare.name}
                     </span>
-                    <span className="text-[20px] font-medium text-[#010D50]">
+                    <span className="text-lg sm:text-[20px] font-bold sm:font-medium text-[#3754ED] sm:text-[#010D50]">
                       {fare.price}
                     </span>
                   </div>
@@ -182,24 +182,24 @@ export default function UpgradeOptionsModal({
                       setSelectedFare(fare.id);
                       setHighlightedFare(fare.id);
                     }}
-                    className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all ${
+                    className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full border-2 flex items-center justify-center transition-all ${
                       selectedFare === fare.id
                         ? "bg-[#3754ED] border-[#3754ED]"
                         : "bg-white border-[#DFE0E4]"
                     }`}
                   >
                     {selectedFare === fare.id && (
-                      <Check className="w-5 h-5 text-white" />
+                      <Check className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                     )}
                   </button>
                 </div>
 
                 {/* Features */}
-                <div className="flex flex-col gap-4">
-                  <span className="text-sm text-[#3A478A]">
+                <div className="flex flex-col gap-2 sm:gap-4">
+                  <span className="text-xs sm:text-sm text-[#3A478A]">
                     {t('includedInFare')}
                   </span>
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-2 sm:gap-3">
                     {fare.features.map((feature, index) => {
                       const IconComponent = 
                         feature.icon === "personal_bag" ? ShoppingBag :
@@ -211,13 +211,13 @@ export default function UpgradeOptionsModal({
                         ShoppingBag;
                       
                       return (
-                        <div key={index} className="flex items-start gap-3">
-                          <IconComponent className="w-6 h-6 text-[#010D50] shrink-0" />
-                          <div className="flex flex-col gap-1">
-                            <span className="text-sm font-medium text-[#010D50]">
+                        <div key={index} className="flex items-start gap-2 sm:gap-3">
+                          <IconComponent className="w-4 h-4 sm:w-6 sm:h-6 text-[#010D50] shrink-0 mt-0.5" />
+                          <div className="flex flex-col gap-0.5 sm:gap-1">
+                            <span className="text-xs sm:text-sm font-medium text-[#010D50]">
                               {feature.title}
                             </span>
-                            <span className="text-sm text-[#3A478A]">
+                            <span className="text-xs sm:text-sm text-[#3A478A]">
                               {feature.description}
                             </span>
                           </div>
