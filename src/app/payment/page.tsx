@@ -391,16 +391,107 @@ function PaymentContent() {
                 <Button
                   variant="ghost"
                   onClick={() => setIsIAssureExpanded(!isIAssureExpanded)}
-                  className="lg:hidden text-[#3754ED] h-auto p-2"
+                  className="lg:hidden text-[#3754ED] h-auto p-2 text-sm"
                 >
-                  {isIAssureExpanded ? "Collapse" : "Compare Plans"}
+                  {isIAssureExpanded ? "Hide Plans" : "Compare Plans"}
                 </Button>
               </div>
 
-              {/* Features and Pricing Grid */}
-              <div className={`flex flex-col gap-1 ${isIAssureExpanded ? "block" : "hidden lg:block"} overflow-x-auto`}>
+              {/* Mobile: Card-based layout */}
+              <div className={`lg:hidden flex flex-col gap-3 ${isIAssureExpanded ? "flex" : "hidden"}`}>
+                {/* Basic Plan */}
+                <div
+                  onClick={() => setProtectionPlan("basic")}
+                  className={`border-2 rounded-xl p-3 cursor-pointer transition-all ${
+                    protectionPlan === "basic" ? "border-[#3754ED] bg-[#F5F7FF]" : "border-[#DFE0E4] bg-white"
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-[#010D50]">Basic</h3>
+                      <p className="text-lg font-bold text-[#3754ED] mt-1">₹8,623.68</p>
+                    </div>
+                    <Checkbox checked={protectionPlan === "basic"} />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {[
+                      "24/7 Support",
+                      "Free changes in 24hrs",
+                      "100% refund on death",
+                      "100% refund on airline cancellation",
+                    ].map((feature, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <Check className="w-4 h-4 text-[#008234] shrink-0 mt-0.5" />
+                        <span className="text-xs text-[#010D50]">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Premium Plan */}
+                <div
+                  onClick={() => setProtectionPlan("premium")}
+                  className={`border-2 rounded-xl p-3 cursor-pointer transition-all ${
+                    protectionPlan === "premium" ? "border-[#3754ED] bg-[#F5F7FF]" : "border-[#DFE0E4] bg-white"
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-[#010D50]">Premium</h3>
+                      <p className="text-lg font-bold text-[#3754ED] mt-1">₹10,779.60</p>
+                    </div>
+                    <Checkbox checked={protectionPlan === "premium"} />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {[
+                      "All Basic features",
+                      "Free changes anytime",
+                      "Refund on lockdown/travel ban",
+                      "Baggage compensation",
+                      "Flight delay compensation",
+                    ].map((feature, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <Check className="w-4 h-4 text-[#008234] shrink-0 mt-0.5" />
+                        <span className="text-xs text-[#010D50]">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* All Included Plan */}
+                <div
+                  onClick={() => setProtectionPlan("all")}
+                  className={`border-2 rounded-xl p-3 cursor-pointer transition-all ${
+                    protectionPlan === "all" ? "border-[#3754ED] bg-[#F5F7FF]" : "border-[#DFE0E4] bg-white"
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-[#010D50]">All Included</h3>
+                      <p className="text-lg font-bold text-[#3754ED] mt-1">₹12,935.52</p>
+                    </div>
+                    <Checkbox checked={protectionPlan === "all"} />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {[
+                      "All Premium features",
+                      "24hrs price match guarantee",
+                      "₹25 credit for future bookings",
+                      "Priority customer service",
+                    ].map((feature, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <Check className="w-4 h-4 text-[#008234] shrink-0 mt-0.5" />
+                        <span className="text-xs text-[#010D50]">{feature}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Desktop: Table layout */}
+              <div className="hidden lg:flex flex-col gap-1">
                 {/* Price Row */}
-                <div className="flex items-center justify-between bg-[#F5F7FF] rounded-lg p-3 min-w-[640px] md:min-w-0">
+                <div className="flex items-center justify-between bg-[#F5F7FF] rounded-lg p-3">
                   <span className="w-[524px] text-sm font-medium text-[#010D50] opacity-0">Price</span>
                   <div className="flex items-center gap-0">
                     <div className="w-[109px] text-center py-0.5">
@@ -428,7 +519,7 @@ function PaymentContent() {
                   "24hrs price match guarantee",
                   "₹25 credit for future bookings",
                 ].map((feature, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 border-b border-[#F5F7FF] min-w-[640px] md:min-w-0">
+                  <div key={i} className="flex items-center justify-between p-3 border-b border-[#F5F7FF]">
                     <span className="w-[524px] text-sm font-medium text-[#010D50]">{feature}</span>
                     <div className="flex items-center gap-0">
                       <div className="w-[109px] flex items-center justify-center">
@@ -445,7 +536,7 @@ function PaymentContent() {
                 ))}
 
                 {/* Plan Selection Row */}
-                <div className="flex items-center justify-between p-3 min-w-[640px] md:min-w-0">
+                <div className="flex items-center justify-between p-3">
                   <span className="w-[524px] opacity-0">Select</span>
                   <div className="flex items-center gap-0">
                     <div
