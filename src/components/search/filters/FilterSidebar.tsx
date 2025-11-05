@@ -7,6 +7,7 @@ import { TimeFilter } from "./TimeFilter";
 import { JourneyTimeFilter } from "./JourneyTimeFilter";
 import { AirportFilter } from "./AirportFilter";
 import { AirlineFilter } from "./AirlineFilter";
+import { ExtrasFilter } from "./ExtrasFilter";
 import { FilterState } from "@/types/flight";
 
 interface Airport {
@@ -42,6 +43,7 @@ interface FilterSidebarProps {
   onUpdatePrice: (range: [number, number]) => void;
   onUpdateDepartureTime: (type: "outbound" | "inbound", range: [number, number]) => void;
   onUpdateJourneyTime: (type: "outbound" | "inbound", range: [number, number]) => void;
+  onToggleExtra: (extra: string) => void;
   resultCount: number;
 }
 
@@ -58,6 +60,7 @@ export function FilterSidebar({
   onUpdatePrice,
   onUpdateDepartureTime,
   onUpdateJourneyTime,
+  onToggleExtra,
   resultCount,
 }: FilterSidebarProps) {
   return (
@@ -169,6 +172,18 @@ export function FilterSidebar({
           selectedAirlines={filterState.airlines}
           onToggle={onToggleAirline}
           onToggleAll={onToggleAllAirlines}
+        />
+      </FilterSection>
+
+      {/* Extras Filter */}
+      <FilterSection
+        title="Extras"
+        isExpanded={expandedFilters.extras}
+        onToggle={() => onToggleExpand("extras")}
+      >
+        <ExtrasFilter
+          selectedExtras={filterState.extras}
+          onToggle={onToggleExtra}
         />
       </FilterSection>
     </div>

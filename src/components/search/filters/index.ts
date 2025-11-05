@@ -5,5 +5,6 @@ export { TimeFilter } from "./TimeFilter";
 export { JourneyTimeFilter } from "./JourneyTimeFilter";
 export { AirportFilter } from "./AirportFilter";
 export { AirlineFilter } from "./AirlineFilter";
+export { ExtrasFilter } from "./ExtrasFilter";
 export { FilterSidebar } from "./FilterSidebar";
 export { FilterSheet } from "./FilterSheet";

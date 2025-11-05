@@ -62,5 +62,6 @@ export interface FilterState {
   departureAirports: string[];
   arrivalAirports: string[];
   airlines: string[];
+  extras: string[];
 }
 

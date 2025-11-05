@@ -64,6 +64,7 @@ function SearchPageContent() {
     departureAirports: [],
     arrivalAirports: [],
     airlines: [],
+    extras: [],
   });
 
   // UI state
@@ -137,6 +138,15 @@ function SearchPageContent() {
     }));
   };
 
+  const toggleExtra = (extra: string) => {
+    setFilterState((prev) => ({
+      ...prev,
+      extras: prev.extras.includes(extra)
+        ? prev.extras.filter((e) => e !== extra)
+        : [...prev.extras, extra],
+    }));
+  };
+
   // Filter flights
   const filteredFlights = useMemo(() => {
     return filterFlights(effectiveFlights, filterState);
@@ -180,6 +190,7 @@ function SearchPageContent() {
         onUpdatePrice={updatePriceRange}
         onUpdateDepartureTime={updateDepartureTime}
         onUpdateJourneyTime={updateJourneyTime}
+        onToggleExtra={toggleExtra}
         resultCount={filteredFlights.length}
       />
 
@@ -202,6 +213,7 @@ function SearchPageContent() {
               onUpdatePrice={updatePriceRange}
               onUpdateDepartureTime={updateDepartureTime}
               onUpdateJourneyTime={updateJourneyTime}
+              onToggleExtra={toggleExtra}
               resultCount={filteredFlights.length}
             />
           </div>
