@@ -44,7 +44,7 @@ export default function FlightInfoModal({
         <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-3">
               {/* Flight Leg Tabs */}
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar flex-1">
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 flex-1">
                 <Button
                   variant={selectedLeg === "outbound" ? "default" : "outline"}
                   className={`${
@@ -298,8 +298,8 @@ export default function FlightInfoModal({
           </div>
 
           {/* Fare Type Selector */}
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-3 overflow-x-auto no-scrollbar">
+          <div className="flex flex-col gap-5 sm:gap-6">
+            <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-1">
               <Button
                 variant={selectedFareType === "value" ? "default" : "outline"}
                 className={`${
@@ -452,7 +452,7 @@ export default function FlightInfoModal({
           </div>
 
         {/* Footer */}
-        <div className="bg-[#F5F7FF] rounded-xl px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-3">
+        <div className="sticky bottom-0 z-20 bg-white rounded-xl px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-3 border border-[#EEF0F7] shadow-[0_-8px_24px_-12px_rgba(2,6,23,0.35)]">
           <span className="text-sm sm:text-lg font-medium text-[#3754ED] whitespace-nowrap">
             {flight.currency}
             {flight.pricePerPerson} <span className="hidden sm:inline">/per person</span>
