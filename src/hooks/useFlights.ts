@@ -2,7 +2,7 @@
  * Custom hook for fetching and managing flights
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Flight, SearchParams } from '@/types/flight';
 import { flightService, FlightSearchResponse } from '@/services/api/flightService';
 
@@ -31,7 +31,7 @@ export function useFlights(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const fetchFlights = async () => {
+  const fetchFlights = useCallback(async () => {
     if (!searchParams) {
       return;
     }
@@ -51,13 +51,13 @@ export function useFlights(
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchParams]);
 
   useEffect(() => {
     if (enabled && searchParams) {
       fetchFlights();
     }
-  }, [searchParams, enabled]);
+  }, [searchParams, enabled, fetchFlights]);
 
   return {
     flights,

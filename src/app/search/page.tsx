@@ -8,8 +8,9 @@ import FlightCard from "@/components/flights/FlightCard";
 import { useFlights } from "@/hooks/useFlights";
 import { useBookingStore } from "@/store/bookingStore";
 import { filterFlights, sortFlights } from "@/utils/flightFilter";
-import { FilterState } from "@/types/flight";
+import { FilterState, SearchParams } from "@/types/flight";
 import { CONTACT_INFO } from "@/config/constants";
+import { mockFlights, mockDatePrices, mockAirlines, mockAirports } from "@/data/mockFlights";
 import { ChevronDown, Phone, Plane, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,24 +22,55 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 
+// Default search params - created ONCE outside component to avoid re-renders
+const DEFAULT_SEARCH_PARAMS: SearchParams = {
+  from: "BOM",
+  to: "DEL",
+  departureDate: new Date(),
+  returnDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  passengers: {
+    adults: 1,
+    children: 0,
+    infants: 0,
+  },
+  class: "Economy",
+  tripType: "round-trip",
+};
+
 function SearchPageContent() {
   // Get search params from global state
   const searchParams = useBookingStore((state) => state.searchParams);
 
-  // Fetch flights using custom hook
-  const { flights, filters: apiFilters, datePrices, loading, error } = useFlights(searchParams);
+  // Use default search params if none exist - DEFAULT_SEARCH_PARAMS is stable
+  const effectiveSearchParams = searchParams || DEFAULT_SEARCH_PARAMS;
 
-  // Filter state
+  // Fetch flights using custom hook
+  const { flights, filters: apiFilters, datePrices, loading, error } = useFlights(effectiveSearchParams);
+
+  // Use mock data as fallback when API data isn't available (memoized to prevent infinite loops)
+  const effectiveFlights = useMemo(() => flights.length > 0 ? flights : mockFlights, [flights]);
+  
+  const effectiveFilters = useMemo(() => apiFilters || {
+    airlines: mockAirlines,
+    departureAirports: mockAirports.departure,
+    arrivalAirports: mockAirports.arrival,
+    minPrice: 400,
+    maxPrice: 1200,
+  }, [apiFilters]);
+
+  const effectiveDatePrices = useMemo(() => datePrices || mockDatePrices, [datePrices]);
+
+  // Filter state - Start with all filters open to show all flights
   const [filterState, setFilterState] = useState<FilterState>({
-    stops: [0],
-    priceRange: [400, 1200],
+    stops: [0, 1, 2],
+    priceRange: [0, 2000],
     departureTimeOutbound: [0, 24],
     departureTimeInbound: [0, 24],
     journeyTimeOutbound: [0, 35],
-    journeyTimeInbound: [7, 28],
-    departureAirports: ["BOM"],
-    arrivalAirports: ["DEL", "AMD", "HYD"],
-    airlines: ["Air India", "Air India Express", "Akasa Air", "Indigo"],
+    journeyTimeInbound: [0, 35],
+    departureAirports: [],
+    arrivalAirports: [],
+    airlines: [],
   });
 
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
@@ -56,18 +88,19 @@ function SearchPageContent() {
     airlines: true,
   });
 
-  // Update filter state when API filters load
-  useEffect(() => {
-    if (apiFilters) {
-      setFilterState((prev) => ({
-        ...prev,
-        airlines: apiFilters.airlines.map(a => a.name),
-        departureAirports: apiFilters.departureAirports.map(a => a.code),
-        arrivalAirports: apiFilters.arrivalAirports.map(a => a.code),
-        priceRange: [apiFilters.minPrice, apiFilters.maxPrice],
-      }));
-    }
-  }, [apiFilters]);
+  // Update filter state when filters load (API or mock)
+  // Temporarily disabled to test if this is causing the issue
+  // useEffect(() => {
+  //   if (effectiveFilters) {
+  //     setFilterState((prev) => ({
+  //       ...prev,
+  //       airlines: effectiveFilters.airlines.map(a => a.name),
+  //       departureAirports: effectiveFilters.departureAirports.map(a => a.code),
+  //       arrivalAirports: effectiveFilters.arrivalAirports.map(a => a.code),
+  //       priceRange: [effectiveFilters.minPrice, effectiveFilters.maxPrice],
+  //     }));
+  //   }
+  // }, [effectiveFilters]);
 
   const toggleFilter = (filter: string) => {
     setExpandedFilters((prev) => ({ ...prev, [filter]: !prev[filter] }));
@@ -92,15 +125,13 @@ function SearchPageContent() {
   };
 
   const toggleAllAirlines = () => {
-    if (apiFilters) {
-      setFilterState((prev) => ({
-        ...prev,
-        airlines:
-          prev.airlines.length === apiFilters.airlines.length
-            ? []
-            : apiFilters.airlines.map((a) => a.name),
-      }));
-    }
+    setFilterState((prev) => ({
+      ...prev,
+      airlines:
+        prev.airlines.length === effectiveFilters.airlines.length
+          ? []
+          : effectiveFilters.airlines.map((a) => a.name),
+    }));
   };
 
   const toggleDepartureAirport = (code: string) => {
@@ -123,8 +154,8 @@ function SearchPageContent() {
 
   // Filter flights using utility function
   const filteredFlights = useMemo(() => {
-    return filterFlights(flights, filterState);
-  }, [flights, filterState]);
+    return filterFlights(effectiveFlights, filterState);
+  }, [effectiveFlights, filterState]);
 
   const [selectedDateIndex, setSelectedDateIndex] = useState<number>(3);
   const dateStripRef = useRef<HTMLDivElement>(null);
@@ -194,7 +225,7 @@ function SearchPageContent() {
             ref={dateStripRef}
             className="flex-1 flex items-stretch gap-2 overflow-x-auto no-scrollbar snap-x snap-mandatory"
           >
-            {datePrices?.map((datePrice, index) => {
+            {effectiveDatePrices.map((datePrice, index) => {
               const active = index === selectedDateIndex;
               return (
                 <button
@@ -261,21 +292,21 @@ function SearchPageContent() {
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2">
                     <Checkbox
-                      checked={selectedStops.includes(0)}
+                      checked={filterState.stops.includes(0)}
                       onCheckedChange={() => toggleStop(0)}
                     />
                     <span className="text-sm text-[#010D50]">Direct</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Checkbox
-                      checked={selectedStops.includes(1)}
+                      checked={filterState.stops.includes(1)}
                       onCheckedChange={() => toggleStop(1)}
                     />
                     <span className="text-sm text-[#010D50]">1 Stop</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Checkbox
-                      checked={selectedStops.includes(2)}
+                      checked={filterState.stops.includes(2)}
                       onCheckedChange={() => toggleStop(2)}
                     />
                     <span className="text-sm text-[#010D50]">2+ Stops</span>
@@ -303,9 +334,9 @@ function SearchPageContent() {
               {expandedFilters.price && (
                 <div className="flex flex-col items-center gap-2">
                   <Slider
-                    value={priceRange}
+                    value={filterState.priceRange}
                     onValueChange={(value) =>
-                      setPriceRange(value as [number, number])
+                      setFilterState((prev) => ({ ...prev, priceRange: value as [number, number] }))
                     }
                     min={0}
                     max={2000}
@@ -314,10 +345,10 @@ function SearchPageContent() {
                   />
                   <div className="flex items-center justify-between w-full">
                     <span className="text-xs text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-                      £{priceRange[0]}
+                      £{filterState.priceRange[0]}
                     </span>
                     <span className="text-xs text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-                      £{priceRange[1]}
+                      £{filterState.priceRange[1]}
                     </span>
                   </div>
                 </div>
@@ -348,9 +379,9 @@ function SearchPageContent() {
                     </span>
                     <div className="flex flex-col gap-2">
                       <Slider
-                        value={outboundTimeRange}
+                        value={filterState.departureTimeOutbound}
                         onValueChange={(value) =>
-                          setOutboundTimeRange(value as [number, number])
+                          setFilterState((prev) => ({ ...prev, departureTimeOutbound: value as [number, number] }))
                         }
                         min={0}
                         max={24}
@@ -359,10 +390,10 @@ function SearchPageContent() {
                       />
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-                          {String(outboundTimeRange[0]).padStart(2, "0")}:00
+                          {String(filterState.departureTimeOutbound[0]).padStart(2, "0")}:00
                         </span>
                         <span className="text-sm text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-                          {outboundTimeRange[1] === 24 ? "23:59" : `${String(outboundTimeRange[1]).padStart(2, "0")}:00`}
+                          {filterState.departureTimeOutbound[1] === 24 ? "23:59" : `${String(filterState.departureTimeOutbound[1]).padStart(2, "0")}:00`}
                         </span>
                       </div>
                     </div>
@@ -374,9 +405,9 @@ function SearchPageContent() {
                     </span>
                     <div className="flex flex-col gap-2">
                       <Slider
-                        value={inboundTimeRange}
+                        value={filterState.departureTimeInbound}
                         onValueChange={(value) =>
-                          setInboundTimeRange(value as [number, number])
+                          setFilterState((prev) => ({ ...prev, departureTimeInbound: value as [number, number] }))
                         }
                         min={0}
                         max={24}
@@ -385,10 +416,10 @@ function SearchPageContent() {
                       />
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-                          {String(inboundTimeRange[0]).padStart(2, "0")}:00
+                          {String(filterState.departureTimeInbound[0]).padStart(2, "0")}:00
                         </span>
                         <span className="text-sm text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-                          {inboundTimeRange[1] === 24 ? "23:59" : `${String(inboundTimeRange[1]).padStart(2, "0")}:00`}
+                          {filterState.departureTimeInbound[1] === 24 ? "23:59" : `${String(filterState.departureTimeInbound[1]).padStart(2, "0")}:00`}
                         </span>
                       </div>
                     </div>
@@ -488,14 +519,14 @@ function SearchPageContent() {
 
               {expandedFilters.departure && (
                 <div className="flex flex-col gap-2">
-                  {mockAirports.departure.map((airport) => (
+                  {effectiveFilters.departureAirports.map((airport) => (
                     <div
                       key={airport.code}
                       className="flex items-center justify-between"
                     >
                       <div className="flex items-center gap-2">
                         <Checkbox
-                          checked={selectedDepartureAirports.includes(
+                          checked={filterState.departureAirports.includes(
                             airport.code
                           )}
                           onCheckedChange={() =>
@@ -533,14 +564,14 @@ function SearchPageContent() {
 
               {expandedFilters.arrival && (
                 <div className="flex flex-col gap-2">
-                  {mockAirports.arrival.map((airport) => (
+                  {effectiveFilters.arrivalAirports.map((airport) => (
                     <div
                       key={airport.code}
                       className="flex items-center justify-between"
                     >
                       <div className="flex items-center gap-2">
                         <Checkbox
-                          checked={selectedArrivalAirports.includes(airport.code)}
+                          checked={filterState.arrivalAirports.includes(airport.code)}
                           onCheckedChange={() =>
                             toggleArrivalAirport(airport.code)
                           }
@@ -578,7 +609,7 @@ function SearchPageContent() {
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2">
                     <Checkbox
-                      checked={selectedAirlines.length === mockAirlines.length}
+                      checked={filterState.airlines.length === effectiveFilters.airlines.length}
                       onCheckedChange={toggleAllAirlines}
                     />
                     <span className="text-sm text-[#010D50]">
@@ -586,14 +617,14 @@ function SearchPageContent() {
                     </span>
                   </div>
 
-                  {mockAirlines.map((airline) => (
+                  {effectiveFilters.airlines.map((airline) => (
                     <div
                       key={airline.code}
                       className="flex items-center justify-between"
                     >
                       <div className="flex items-center gap-2">
                         <Checkbox
-                          checked={selectedAirlines.includes(airline.name)}
+                          checked={filterState.airlines.includes(airline.name)}
                           onCheckedChange={() => toggleAirline(airline.name)}
                         />
                         <div className="flex items-center gap-2">
@@ -694,21 +725,21 @@ function SearchPageContent() {
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2">
                     <Checkbox
-                      checked={selectedStops.includes(0)}
+                      checked={filterState.stops.includes(0)}
                       onCheckedChange={() => toggleStop(0)}
                     />
                     <span className="text-sm text-[#010D50]">Direct</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Checkbox
-                      checked={selectedStops.includes(1)}
+                      checked={filterState.stops.includes(1)}
                       onCheckedChange={() => toggleStop(1)}
                     />
                     <span className="text-sm text-[#010D50]">1 Stop</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Checkbox
-                      checked={selectedStops.includes(2)}
+                      checked={filterState.stops.includes(2)}
                       onCheckedChange={() => toggleStop(2)}
                     />
                     <span className="text-sm text-[#010D50]">2+ Stops</span>
@@ -736,9 +767,9 @@ function SearchPageContent() {
               {expandedFilters.price && (
                 <div className="flex flex-col items-center gap-2">
                   <Slider
-                    value={priceRange}
+                    value={filterState.priceRange}
                     onValueChange={(value) =>
-                      setPriceRange(value as [number, number])
+                      setFilterState((prev) => ({ ...prev, priceRange: value as [number, number] }))
                     }
                     min={0}
                     max={2000}
@@ -747,10 +778,10 @@ function SearchPageContent() {
                   />
                   <div className="flex items-center justify-between w-full">
                     <span className="text-xs text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-                      £{priceRange[0]}
+                      £{filterState.priceRange[0]}
                     </span>
                     <span className="text-xs text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-                      £{priceRange[1]}
+                      £{filterState.priceRange[1]}
                     </span>
                   </div>
                 </div>
@@ -781,9 +812,9 @@ function SearchPageContent() {
                     </span>
                     <div className="flex flex-col gap-2">
                       <Slider
-                        value={outboundTimeRange}
+                        value={filterState.departureTimeOutbound}
                         onValueChange={(value) =>
-                          setOutboundTimeRange(value as [number, number])
+                          setFilterState((prev) => ({ ...prev, departureTimeOutbound: value as [number, number] }))
                         }
                         min={0}
                         max={24}
@@ -792,10 +823,10 @@ function SearchPageContent() {
                       />
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-                          {String(outboundTimeRange[0]).padStart(2, "0")}:00
+                          {String(filterState.departureTimeOutbound[0]).padStart(2, "0")}:00
                         </span>
                         <span className="text-sm text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-                          {outboundTimeRange[1] === 24 ? "23:59" : `${String(outboundTimeRange[1]).padStart(2, "0")}:00`}
+                          {filterState.departureTimeOutbound[1] === 24 ? "23:59" : `${String(filterState.departureTimeOutbound[1]).padStart(2, "0")}:00`}
                         </span>
                       </div>
                     </div>
@@ -807,9 +838,9 @@ function SearchPageContent() {
                     </span>
                     <div className="flex flex-col gap-2">
                       <Slider
-                        value={inboundTimeRange}
+                        value={filterState.departureTimeInbound}
                         onValueChange={(value) =>
-                          setInboundTimeRange(value as [number, number])
+                          setFilterState((prev) => ({ ...prev, departureTimeInbound: value as [number, number] }))
                         }
                         min={0}
                         max={24}
@@ -818,10 +849,10 @@ function SearchPageContent() {
                       />
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-                          {String(inboundTimeRange[0]).padStart(2, "0")}:00
+                          {String(filterState.departureTimeInbound[0]).padStart(2, "0")}:00
                         </span>
                         <span className="text-sm text-[#010D50] border border-[#DFE0E4] rounded-md px-2 py-0.5 bg-white">
-                          {inboundTimeRange[1] === 24 ? "23:59" : `${String(inboundTimeRange[1]).padStart(2, "0")}:00`}
+                          {filterState.departureTimeInbound[1] === 24 ? "23:59" : `${String(filterState.departureTimeInbound[1]).padStart(2, "0")}:00`}
                         </span>
                       </div>
                     </div>
@@ -921,14 +952,14 @@ function SearchPageContent() {
 
               {expandedFilters.departure && (
                 <div className="flex flex-col gap-2">
-                  {mockAirports.departure.map((airport) => (
+                  {effectiveFilters.departureAirports.map((airport) => (
                     <div
                       key={airport.code}
                       className="flex items-center justify-between"
                     >
                       <div className="flex items-center gap-2">
                         <Checkbox
-                          checked={selectedDepartureAirports.includes(
+                          checked={filterState.departureAirports.includes(
                             airport.code
                           )}
                           onCheckedChange={() =>
@@ -966,14 +997,14 @@ function SearchPageContent() {
 
               {expandedFilters.arrival && (
                 <div className="flex flex-col gap-2">
-                  {mockAirports.arrival.map((airport) => (
+                  {effectiveFilters.arrivalAirports.map((airport) => (
                     <div
                       key={airport.code}
                       className="flex items-center justify-between"
                     >
                       <div className="flex items-center gap-2">
                         <Checkbox
-                          checked={selectedArrivalAirports.includes(airport.code)}
+                          checked={filterState.arrivalAirports.includes(airport.code)}
                           onCheckedChange={() =>
                             toggleArrivalAirport(airport.code)
                           }
@@ -1011,7 +1042,7 @@ function SearchPageContent() {
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2">
                     <Checkbox
-                      checked={selectedAirlines.length === mockAirlines.length}
+                      checked={filterState.airlines.length === effectiveFilters.airlines.length}
                       onCheckedChange={toggleAllAirlines}
                     />
                     <span className="text-sm text-[#010D50]">
@@ -1019,14 +1050,14 @@ function SearchPageContent() {
                     </span>
                   </div>
 
-                  {mockAirlines.map((airline) => (
+                  {effectiveFilters.airlines.map((airline) => (
                     <div
                       key={airline.code}
                       className="flex items-center justify-between"
                     >
                       <div className="flex items-center gap-2">
                         <Checkbox
-                          checked={selectedAirlines.includes(airline.name)}
+                          checked={filterState.airlines.includes(airline.name)}
                           onCheckedChange={() => toggleAirline(airline.name)}
                         />
                         <div className="flex items-center gap-2">

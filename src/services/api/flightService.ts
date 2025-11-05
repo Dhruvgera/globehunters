@@ -68,8 +68,8 @@ class FlightService {
       // );
       // return response.data;
 
-      // Mock implementation - simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // Mock implementation - no delay for development
+      // await new Promise(resolve => setTimeout(resolve, 800));
 
       return {
         flights: mockFlights,

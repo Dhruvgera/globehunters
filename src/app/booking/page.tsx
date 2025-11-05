@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
@@ -23,9 +23,15 @@ function BookingContent() {
   // Get selected flight from Zustand store
   const flight = useSelectedFlight();
 
-  // Redirect to search if no flight selected
+  // Redirect to search if no flight selected (must be in useEffect, not during render)
+  useEffect(() => {
+    if (!flight) {
+      router.push('/search');
+    }
+  }, [flight, router]);
+
+  // Show loading state while redirecting
   if (!flight) {
-    router.push('/search');
     return null;
   }
   return (
