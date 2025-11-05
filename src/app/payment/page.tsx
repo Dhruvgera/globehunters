@@ -28,6 +28,24 @@ function PaymentContent() {
   // Use mock flight data for demonstration
   const flight = mockFlights[0];
 
+  // Price calculation - Single source of truth for all pricing
+  // TODO: Replace with API data
+  const baseFare = 94353; // Flight fare + taxes
+  const protectionPlanPrices = {
+    basic: 8623.68,
+    premium: 10779.60,
+    all: 12935.52,
+  };
+  const baggagePrice = 4500; // per bag
+  const discountPercent = 0.20; // 20% discount
+
+  // Calculate totals
+  const protectionPlanCost = protectionPlanPrices[protectionPlan];
+  const baggageCost = additionalBaggage * baggagePrice;
+  const subtotal = baseFare + protectionPlanCost + baggageCost;
+  const discountAmount = subtotal * discountPercent;
+  const tripTotal = subtotal - discountAmount;
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
@@ -331,49 +349,51 @@ function PaymentContent() {
                 </div>
 
                 {/* Checked bags - Not Included */}
-                <div className="flex flex-col items-end gap-2">
-                  <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-3">
-                      <Package className="w-6 h-6 text-[#010D50]" />
-                      <div className="flex flex-col gap-1">
-                        <span className="text-sm font-medium text-[#010D50]">Checked bags</span>
-                        <span className="text-sm text-[#3A478A]">Per person each way</span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <XCircle className="w-5 h-5 text-[#FF0202]" />
-                      <span className="text-sm font-medium text-[#FF0202]">Not Included</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Package className="w-6 h-6 text-[#010D50]" />
+                    <div className="flex flex-col gap-1">
+                      <span className="text-sm font-medium text-[#010D50]">Checked bags</span>
+                      <span className="text-sm text-[#3A478A]">Per person each way</span>
                     </div>
                   </div>
+                  <div className="flex items-center gap-1">
+                    <XCircle className="w-5 h-5 text-[#FF0202]" />
+                    <span className="text-sm font-medium text-[#FF0202]">Not Included</span>
+                  </div>
+                </div>
 
-                  {/* Add Additional Baggage */}
-                  <div className="flex items-center justify-between w-full">
+                {/* Add Additional Baggage */}
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start justify-between w-full">
                     <div className="flex items-center gap-3">
-                      <Package className="w-6 h-6 text-[#010D50]" />
+                      <Package className="w-6 h-6 text-[#010D50] shrink-0" />
                       <div className="flex flex-col gap-1">
                         <span className="text-sm font-medium text-[#010D50]">Add additional baggage</span>
                         <span className="text-sm text-[#3A478A]">Add additional checked bags</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-[#010D50]">₹4500 /per person (20kg)</span>
-                      <div className="bg-[rgba(55,84,237,0.12)] rounded-full px-4 py-3 flex items-center gap-2">
-                        <button
-                          onClick={() => setAdditionalBaggage(Math.max(0, additionalBaggage - 1))}
-                          className="text-[#3754ED] hover:text-[#2A3FB8]"
-                        >
-                          <Minus className="w-5 h-5" />
-                        </button>
-                        <span className="text-sm font-medium text-[#3754ED] min-w-[20px] text-center">
-                          {additionalBaggage}
-                        </span>
-                        <button
-                          onClick={() => setAdditionalBaggage(additionalBaggage + 1)}
-                          className="text-[#3754ED] hover:text-[#2A3FB8]"
-                        >
-                          <Plus className="w-5 h-5" />
-                        </button>
-                      </div>
+                  </div>
+
+                  {/* Price and Counter - Below on mobile, inline on desktop */}
+                  <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 lg:gap-2 pl-0 lg:pl-9">
+                    <span className="text-sm font-semibold text-[#010D50]">₹4500 /per person (20kg)</span>
+                    <div className="bg-[rgba(55,84,237,0.12)] rounded-full px-4 py-3 flex items-center gap-2">
+                      <button
+                        onClick={() => setAdditionalBaggage(Math.max(0, additionalBaggage - 1))}
+                        className="text-[#3754ED] hover:text-[#2A3FB8]"
+                      >
+                        <Minus className="w-5 h-5" />
+                      </button>
+                      <span className="text-sm font-medium text-[#3754ED] min-w-[20px] text-center">
+                        {additionalBaggage}
+                      </span>
+                      <button
+                        onClick={() => setAdditionalBaggage(additionalBaggage + 1)}
+                        className="text-[#3754ED] hover:text-[#2A3FB8]"
+                      >
+                        <Plus className="w-5 h-5" />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -591,8 +611,16 @@ function PaymentContent() {
 
             {/* Payment Details */}
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-3 flex flex-col gap-6">
-              <div className="bg-[#F5F7FF] rounded-full px-4 py-3 w-fit">
-                <span className="text-sm font-semibold text-[#010D50]">Payment Details</span>
+              <div className="flex items-center justify-between">
+                <div className="bg-[#F5F7FF] rounded-full px-4 py-3 w-fit">
+                  <span className="text-sm font-semibold text-[#010D50]">Payment Details</span>
+                </div>
+                {/* Mobile: Total Payment Amount */}
+                <div className="lg:hidden bg-[#F5F7FF] rounded-full px-3 py-1.5">
+                  <span className="text-sm font-semibold text-[#010D50]">
+                    Total: ₹{tripTotal.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+                  </span>
+                </div>
               </div>
 
               <div className="flex flex-col gap-3">
@@ -775,7 +803,7 @@ function PaymentContent() {
               <div className={`flex-col gap-2 ${isPriceSummaryExpanded ? "flex" : "hidden lg:flex"}`}>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-[#010D50]">Traveler: 1 Adult</span>
-                  <span className="text-sm font-medium text-[#010D50]">₹94, 353</span>
+                  <span className="text-sm font-medium text-[#010D50]">₹{baseFare.toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-[#3A478A]">Flight fare</span>
@@ -790,29 +818,31 @@ function PaymentContent() {
               <div className={`border-t border-[#DFE0E4] ${isPriceSummaryExpanded ? "block" : "hidden lg:block"}`} />
 
               <div className={`flex items-center justify-between ${isPriceSummaryExpanded ? "flex" : "hidden lg:flex"}`}>
-                <span className="text-sm text-[#3A478A]">iAssure Protection Plan (Premium)</span>
-                <span className="text-sm text-[#3A478A]">₹10,779</span>
+                <span className="text-sm text-[#3A478A]">
+                  iAssure Protection Plan ({protectionPlan === "basic" ? "Basic" : protectionPlan === "premium" ? "Premium" : "All Included"})
+                </span>
+                <span className="text-sm text-[#3A478A]">₹{protectionPlanCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
 
               <div className={`border-t border-[#DFE0E4] ${isPriceSummaryExpanded ? "block" : "hidden lg:block"}`} />
 
               <div className={`flex items-center justify-between ${isPriceSummaryExpanded ? "flex" : "hidden lg:flex"}`}>
-                <span className="text-sm text-[#3A478A]">Additional Baggage</span>
-                <span className="text-sm text-[#3A478A]">₹20,000</span>
+                <span className="text-sm text-[#3A478A]">Additional Baggage ({additionalBaggage} bags)</span>
+                <span className="text-sm text-[#3A478A]">₹{baggageCost.toLocaleString('en-IN')}</span>
               </div>
 
               <div className={`border-t border-[#DFE0E4] ${isPriceSummaryExpanded ? "block" : "hidden lg:block"}`} />
 
               <div className={`flex items-center justify-between ${isPriceSummaryExpanded ? "flex" : "hidden lg:flex"}`}>
-                <span className="text-sm text-[#3A478A]">Discount code</span>
-                <span className="text-sm text-[#3A478A]">-20%</span>
+                <span className="text-sm text-[#3A478A]">Discount code (-{discountPercent * 100}%)</span>
+                <span className="text-sm text-[#3A478A]">-₹{discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
               </div>
 
               <div className={`border-t border-[#DFE0E4] ${isPriceSummaryExpanded ? "block" : "hidden lg:block"}`} />
 
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-[#010D50]">Trip Total</span>
-                <span className="text-sm font-semibold text-[#010D50]">₹100,105.4</span>
+                <span className="text-sm font-semibold text-[#010D50]">₹{tripTotal.toLocaleString('en-IN', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}</span>
               </div>
             </div>
           </div>
