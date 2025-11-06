@@ -24,13 +24,19 @@ export default function Navbar() {
             {/* Awards and Certifications */}
             <div className="hidden md:flex items-center gap-6 lg:gap-8">
               <div className="flex items-center gap-2">
-                <span className="text-[#010D50] text-xs font-medium">
+                {/* <span className="text-[#010D50] text-xs font-medium">
                   {t('awards')}
-                </span>
+                </span> */}
+                <Image
+                  src="/ba.png"
+                  alt={t('awards')}
+                  width={176}
+                  height={100}
+                />
               </div>
               <div className="flex items-center gap-2">
                 <Image
-                  src="/atol-logo-58963.png"
+                  src="/atol.png"
                   alt={t('atolAlt')}
                   width={68}
                   height={32}

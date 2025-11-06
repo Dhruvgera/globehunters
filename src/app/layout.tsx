@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import "flag-icons/css/flag-icons.min.css";
 import SmoothScrolling from "@/components/animations/SmoothScrolling";
 import RouteTransitions from "@/components/animations/RouteTransitions";
 import { NextIntlClientProvider } from "next-intl";

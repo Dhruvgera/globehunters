@@ -62,59 +62,100 @@ export default function Footer() {
     <footer className="bg-[#F8F9FA] border-t border-[#DFE0E4] mt-20">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
         {/* Trust Badges Section */}
-        <div className="flex flex-wrap items-center justify-center gap-6 mb-12 pb-8 border-b border-[#DFE0E4]">
-          <Image
-            src="/iata.svg"
-            alt={t('trustBadges.iataAlt')}
-            width={80}
-            height={40}
-            className="h-10 w-auto opacity-90 hover:opacity-100 transition-opacity"
-          />
-          <Image
-            src="/atol.svg"
-            alt={t('trustBadges.atolAlt')}
-            width={80}
-            height={40}
-            className="h-10 w-auto opacity-90 hover:opacity-100 transition-opacity"
-          />
-          <Image
-            src="/trustwave.svg"
-            alt={t('trustBadges.trustwaveAlt')}
-            width={80}
-            height={40}
-            className="h-10 w-auto opacity-90 hover:opacity-100 transition-opacity"
-          />
+        <div className="flex flex-wrap items-center justify-center gap-8 sm:gap-12 mb-12 pb-8 border-b border-[#DFE0E4] px-4">
+          <div className="flex items-center h-12">
+            <Image
+              src="/yotpo.svg"
+              alt={t('trustBadges.iataAlt')}
+              width={108}
+              height={48}
+              className="h-12 w-auto opacity-90 hover:opacity-100 transition-opacity"
+              priority
+            />
+          </div>
+          <div className="flex items-center h-12">
+            <Image
+              src="/atol.png"
+              alt={t('trustBadges.atolAlt')}
+              width={90}
+              height={48}
+              className="h-12 w-auto opacity-90 hover:opacity-100 transition-opacity"
+              priority
+            />
+          </div>
+          <div className="flex items-center h-8">
+            <Image
+              src="/trustwave.svg"
+              alt={t('trustBadges.trustwaveAlt')}
+              width={120}
+              height={32}
+              className="h-8 w-auto opacity-90 hover:opacity-100 transition-opacity"
+              priority
+            />
+          </div>
         </div>
 
         {/* Regional Sites */}
-        <div className="mb-10 pb-8 border-b border-[#DFE0E4]">
+        <div className="mb-10 pb-8 border-b border-[#DFE0E4] px-4">
           <h3 className="text-sm font-semibold text-[#3A478A] mb-4 text-center">
             {t('regional.title')}
           </h3>
-          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm">
-            <Link href="https://globehunters.com.au" className="text-[#3A478A] hover:text-[#010D50] transition-colors">
-              Globehunters.com.au
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Link 
+              href="https://globehunters.com.au" 
+              className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 rounded-full px-4 py-2 text-sm font-medium text-gray-800 transition-colors"
+            >
+              <span className="fi fi-au"></span>
+              Australia
             </Link>
-            <Link href="https://globehunters.co.uk" className="text-[#3A478A] hover:text-[#010D50] transition-colors">
-              Globehunters.co.uk
+            <Link 
+              href="https://globehunters.co.uk" 
+              className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 rounded-full px-4 py-2 text-sm font-medium text-gray-800 transition-colors"
+            >
+              <span className="fi fi-gb"></span>
+              United Kingdom
             </Link>
-            <Link href="https://globehunters.co.nz" className="text-[#3A478A] hover:text-[#010D50] transition-colors">
-              Globehunters.co.nz
+            <Link 
+              href="https://globehunters.co.nz" 
+              className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 rounded-full px-4 py-2 text-sm font-medium text-gray-800 transition-colors"
+            >
+              <span className="fi fi-nz"></span>
+              New Zealand
             </Link>
-            <Link href="https://globehunters.com" className="text-[#3A478A] hover:text-[#010D50] transition-colors">
-              Globehunters.com
+            <Link 
+              href="https://globehunters.com" 
+              className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 rounded-full px-4 py-2 text-sm font-medium text-gray-800 transition-colors"
+            >
+              <span className="text-blue-500">🌐</span>
+              Global
             </Link>
-            <Link href="https://globehunters.ie" className="text-[#3A478A] hover:text-[#010D50] transition-colors">
-              Globehunters.ie
+            <Link 
+              href="https://globehunters.us" 
+              className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 rounded-full px-4 py-2 text-sm font-medium text-gray-800 transition-colors"
+            >
+              <span className="fi fi-us"></span>
+              United States
             </Link>
-            <Link href="https://globehunters.ca" className="text-[#3A478A] hover:text-[#010D50] transition-colors">
-              Globehunters.ca
+            <Link 
+              href="https://globehunters.ca" 
+              className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 rounded-full px-4 py-2 text-sm font-medium text-gray-800 transition-colors"
+            >
+              <span className="fi fi-ca"></span>
+              Canada
             </Link>
-            <Link href="https://globehunters.in" className="text-[#3A478A] hover:text-[#010D50] transition-colors">
-              Globehunters.in
+            <Link 
+              href="https://globehunters.in" 
+              className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 rounded-full px-4 py-2 text-sm font-medium text-gray-800 transition-colors"
+            >
+              <span className="fi fi-in"></span>
+              India
             </Link>
-            <Link href="https://globehunters.ae" className="text-[#3A478A] hover:text-[#010D50] transition-colors">
-              Globehunters.ae
+            <Link 
+              href="https://globehunters.ae" 
+              className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 rounded-full px-4 py-2 text-sm font-medium text-gray-800 transition-colors"
+            >
+              <span className="fi fi-ae"></span>
+              United Arab Emirates
             </Link>
           </div>
         </div>
@@ -149,10 +190,10 @@ export default function Footer() {
             </div>
             <div className="flex items-center gap-2">
               <Image
-                src="/sysnet.svg"
+                src="/sysnet.png"
                 alt={t('security.sysnetAlt')}
-                width={80}
-                height={40}
+                width={300}
+                height={150}
                 className="h-10 w-auto opacity-90"
               />
             </div>
@@ -167,12 +208,12 @@ export default function Footer() {
               <h3 className="text-lg font-semibold text-[#010D50]">{t('security.cardsTitle')}</h3>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <Image src="/visa.svg" alt="Visa" width={50} height={32} className="h-8 w-auto opacity-90" />
-              <Image src="/mastercard.svg" alt="Mastercard" width={50} height={32} className="h-8 w-auto opacity-90" />
-              <Image src="/amex.svg" alt="American Express" width={50} height={32} className="h-8 w-auto opacity-90" />
-              <Image src="/maestro.svg" alt="Maestro" width={50} height={32} className="h-8 w-auto opacity-90" />
+              <Image src="/visa.png" alt="Visa" width={100} height={64} className="h-8 w-auto opacity-90" />
+              <Image src="/mastercard.png" alt="Mastercard" width={100} height={64} className="h-8 w-auto opacity-90" />
+              <Image src="/amex.png" alt="American Express" width={100} height={64} className="h-8 w-auto opacity-90" />
+              {/* <Image src="/maestro.svg" alt="Maestro" width={50} height={32} className="h-8 w-auto opacity-90" />
               <Image src="/discover.svg" alt="Discover" width={50} height={32} className="h-8 w-auto opacity-90" />
-              <Image src="/jcb.svg" alt="JCB" width={50} height={32} className="h-8 w-auto opacity-90" />
+              <Image src="/jcb.svg" alt="JCB" width={50} height={32} className="h-8 w-auto opacity-90" /> */}
             </div>
           </div>
         </div>
