@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { X, Check, Info, Clock, Briefcase, Package, ShoppingBag, XCircle as XIcon, Plane, MapPin, UtensilsCrossed } from "lucide-react";
+import Image from "next/image";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,7 @@ export default function FlightInfoModal({
 }: FlightInfoModalProps) {
   const t = useTranslations('flightInfo');
   const router = useRouter();
+  const [imgError, setImgError] = useState(false);
   const [selectedLeg, setSelectedLeg] = useState<"outbound" | "inbound">(
     "outbound"
   );
@@ -36,6 +38,53 @@ export default function FlightInfoModal({
 
   const currentLeg =
     selectedLeg === "outbound" ? flight.outbound : flight.inbound;
+
+  function cabinClassName(code?: string) {
+    if (!code) return undefined;
+    const m = String(code).toUpperCase();
+    switch (m) {
+      case 'F': return 'First';
+      case 'C': return 'Business';
+      case 'W': return 'Premium Economy';
+      case 'Y':
+      case 'M':
+        return 'Economy';
+      default:
+        return m;
+    }
+  }
+  function hasSegmentBaggage(): boolean {
+    const label = currentLeg?.segmentBaggage;
+    const qty = currentLeg?.segmentBaggageQuantity;
+    const unit = currentLeg?.segmentBaggageUnit;
+    const lower = label ? String(label).toLowerCase() : '';
+    if (lower === 'none' || lower === 'no' || lower === '0') return false;
+    if (qty && qty !== '0') return true;
+    return !!label;
+  }
+  function formatBaggageText(): string {
+    // Prefer segment baggage; fallback to flight-level
+    if (hasSegmentBaggage()) {
+      const qty = currentLeg?.segmentBaggageQuantity;
+      const unit = currentLeg?.segmentBaggageUnit;
+      const label = currentLeg?.segmentBaggage || '';
+      const lower = label ? label.toLowerCase() : '';
+      if (lower === 'none' || lower === 'no' || lower === '0') return '';
+      if (qty && unit) {
+        const u = String(unit).toLowerCase();
+        const normUnit = u === 'k' ? 'kg' : (u === 'p' ? 'pc' : unit);
+        return `${qty} ${normUnit}`;
+      }
+      return label;
+    }
+    // Flight-level baggage (e.g., "Included")
+    if (flight.hasBaggage && flight.baggage) {
+      const lower = String(flight.baggage).toLowerCase();
+      if (lower === 'none' || lower === 'no' || lower === '0') return '';
+      return String(flight.baggage);
+    }
+    return '';
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -112,20 +161,49 @@ export default function FlightInfoModal({
                     {/* Airline Info */}
                     <div className="flex flex-col justify-center gap-3">
                       <div className="flex items-center gap-2">
-                        <div className="w-10 h-10 bg-[#DA0E29] rounded flex items-center justify-center">
-                          <Plane className="w-5 h-5 text-white" />
-                        </div>
+                        {!imgError ? (
+                          <div className="w-10 h-10 relative flex items-center justify-center">
+                            <Image
+                              src={`https://images.kiwi.com/airlines/64/${flight.airline.code}.png`}
+                              alt={`${flight.airline.name} logo`}
+                              width={40}
+                              height={40}
+                              className="object-contain"
+                              onError={() => setImgError(true)}
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-10 h-10 bg-[#DA0E29] rounded flex items-center justify-center">
+                            <span className="text-white text-xs font-bold">{flight.airline.code}</span>
+                          </div>
+                        )}
                         <span className="text-sm font-semibold text-[#010D50]">
                           {flight.airline.name}
                         </span>
                       </div>
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs sm:text-sm text-[#3A478A]">
-                        <span>AT555 - Economy</span>
-                        <div className="hidden sm:block w-1.5 h-1.5 rounded-full bg-[#010D50]" />
-                        <span>6009 km</span>
-                        <div className="hidden sm:block w-1.5 h-1.5 rounded-full bg-[#010D50]" />
-                        <span>Airbus A330-200</span>
-                      </div>
+                      {(currentLeg?.carrierCode || currentLeg?.flightNumber || currentLeg?.cabinClass || currentLeg?.distance || currentLeg?.aircraftType) && (
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs sm:text-sm text-[#3A478A]">
+                          {(currentLeg?.carrierCode || currentLeg?.flightNumber || currentLeg?.cabinClass) && (
+                            <span>
+                              {(currentLeg?.carrierCode || '')}
+                              {currentLeg?.flightNumber ? `${currentLeg?.carrierCode ? '' : ''}${currentLeg.flightNumber}` : ''}
+                              {currentLeg?.cabinClass ? ` - ${cabinClassName(currentLeg.cabinClass)}` : ''}
+                            </span>
+                          )}
+                          {currentLeg?.distance && (
+                            <>
+                              <div className="hidden sm:block w-1.5 h-1.5 rounded-full bg-[#010D50]" />
+                              <span>{currentLeg.distance}</span>
+                            </>
+                          )}
+                          {currentLeg?.aircraftType && (
+                            <>
+                              <div className="hidden sm:block w-1.5 h-1.5 rounded-full bg-[#010D50]" />
+                              <span>{currentLeg.aircraftType}</span>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Flight Route */}
@@ -147,17 +225,44 @@ export default function FlightInfoModal({
                               {currentLeg.departureAirport.city} (
                               {currentLeg.departureAirport.code})
                             </span>
-                            <span className="text-xs sm:text-sm text-[#3A478A]">
-                              Terminal 3
-                            </span>
+                            {currentLeg?.departureTerminal && (
+                              <span className="text-xs sm:text-sm text-[#3A478A]">
+                                Terminal {currentLeg.departureTerminal}
+                              </span>
+                            )}
                           </div>
 
-                          {/* Travel Time */}
-                          <div className="flex items-center gap-1">
-                            <Clock className="w-3 sm:w-4 h-3 sm:h-4 text-[#3A478A] shrink-0" />
-                            <span className="text-xs sm:text-sm text-[#3A478A]">
-                              Travel time: {currentLeg.duration}
-                            </span>
+                          {/* Travel Time - show individual flights if available, otherwise show total */}
+                          <div className="flex flex-col gap-2">
+                            {currentLeg.individualFlights && currentLeg.individualFlights.length > 0 ? (
+                              <>
+                                {/* Individual Flight Times */}
+                                {currentLeg.individualFlights.map((flight, idx) => (
+                                  <div key={idx} className="flex items-center gap-1">
+                                    <Plane className="w-3 sm:w-4 h-3 sm:h-4 text-[#3A478A] shrink-0" />
+                                    <span className="text-xs sm:text-sm text-[#3A478A]">
+                                      {flight.departureAirport} → {flight.arrivalAirport}: {flight.duration}
+                                    </span>
+                                  </div>
+                                ))}
+                                {/* Total Journey Time */}
+                                {currentLeg.totalJourneyTime && (
+                                  <div className="flex items-center gap-1 mt-1">
+                                    <Clock className="w-3 sm:w-4 h-3 sm:h-4 text-[#010D50] shrink-0" />
+                                    <span className="text-xs sm:text-sm font-medium text-[#010D50]">
+                                      Total journey time: {currentLeg.totalJourneyTime}
+                                    </span>
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <div className="flex items-center gap-1">
+                                <Clock className="w-3 sm:w-4 h-3 sm:h-4 text-[#3A478A] shrink-0" />
+                                <span className="text-xs sm:text-sm text-[#3A478A]">
+                                  Flight time: {currentLeg.duration}
+                                </span>
+                              </div>
+                            )}
                           </div>
 
                           {/* Arrival */}
@@ -166,9 +271,11 @@ export default function FlightInfoModal({
                               {currentLeg.arrivalAirport.city} (
                               {currentLeg.arrivalAirport.code})
                             </span>
-                            <span className="text-xs sm:text-sm text-[#3A478A]">
-                              Terminal 3
-                            </span>
+                            {currentLeg?.arrivalTerminal && (
+                              <span className="text-xs sm:text-sm text-[#3A478A]">
+                                Terminal {currentLeg.arrivalTerminal}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -199,105 +306,86 @@ export default function FlightInfoModal({
                   </div>
                 </div>
 
-                {/* Segment Baggage & Meals */}
-                <div className="flex flex-col gap-3">
-                  <span className="text-sm font-semibold text-[#010D50]">
-                    {t('modal.includedSegment')}
-                  </span>
-                  <div className="flex flex-col md:flex-row gap-3">
-                    {/* Baggage for this segment */}
-                    <div className="flex-1 bg-[#F5F7FF] rounded-xl p-3 flex flex-col gap-3">
-                      <span className="text-sm font-medium text-[#010D50]">{t('baggage.title')}</span>
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-start gap-2">
-                          <ShoppingBag className="w-5 h-5 text-[#010D50] shrink-0" />
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-xs font-medium text-[#010D50]">{t('baggage.personalItem')}</span>
-                            <span className="text-xs text-[#3A478A]">{t('baggage.personalItemDesc')}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <Briefcase className="w-5 h-5 text-[#010D50] shrink-0" />
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-xs font-medium text-[#010D50]">{t('baggage.carryOn')}</span>
-                            <span className="text-xs text-[#3A478A]">{t('baggage.carryOnDesc')}</span>
-                          </div>
-                        </div>
+                {/* Segment Baggage (conditional, prefer leg-specific baggage) */}
+                {formatBaggageText() && (
+                  <div className="flex flex-col gap-3">
+                    <span className="text-sm font-semibold text-[#010D50]">
+                      {t('modal.includedSegment')}
+                    </span>
+                    <div className="flex flex-col md:flex-row gap-3">
+                      <div className="flex-1 bg-[#F5F7FF] rounded-xl p-3 flex flex-col gap-3">
+                        <span className="text-sm font-medium text-[#010D50]">{t('baggage.title')}</span>
                         <div className="flex items-start gap-2">
                           <Package className="w-5 h-5 text-[#010D50] shrink-0" />
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-xs font-medium text-[#010D50]">{t('baggage.checked')}</span>
+                            <span className="text-xs font-medium text-[#010D50]">{formatBaggageText()}</span>
                             <span className="text-xs text-[#3A478A]">{t('baggage.checkedDesc')}</span>
                           </div>
                         </div>
                       </div>
                     </div>
-
-                    {/* Meals for this segment */}
-                    <div className="flex-1 bg-[#F5F7FF] rounded-xl p-3 flex flex-col gap-3">
-                      <span className="text-sm font-medium text-[#010D50]">{t('meals.title')}</span>
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-start gap-2">
-                          <UtensilsCrossed className="w-5 h-5 text-[#010D50] shrink-0" />
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-xs font-medium text-[#010D50]">{t('meals.complimentary')}</span>
-                            <span className="text-xs text-[#3A478A]">{t('meals.complimentaryDesc')}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <UtensilsCrossed className="w-5 h-5 text-[#010D50] shrink-0" />
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-xs font-medium text-[#010D50]">{t('meals.beverages')}</span>
-                            <span className="text-xs text-[#3A478A]">{t('meals.beveragesDesc')}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-2">
-                          <UtensilsCrossed className="w-5 h-5 text-[#010D50] shrink-0" />
-                          <div className="flex flex-col gap-0.5">
-                            <span className="text-xs font-medium text-[#010D50]">{t('meals.special')}</span>
-                            <span className="text-xs text-[#3A478A]">{t('meals.specialDesc')}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Stopover Info (if applicable) */}
-                {currentLeg.stopDetails !== "Direct" && (
+                {currentLeg.stopDetails && currentLeg.stopDetails !== "Direct" && (
                   <div className="flex flex-col gap-3">
-                    {/* Stopover Duration */}
-                    <div className="bg-[#F5F7FF] rounded-xl px-4 py-3 flex items-center gap-3 w-fit">
-                      <span className="text-sm text-[#3A478A]">
-                        {t('modal.stopoverAt')} Casablanca (CMN) {t('modal.for')}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-5 h-5 text-[#010D50]" />
-                        <span className="text-sm font-medium text-[#010D50]">
-                          5h 15m
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Baggage Alert */}
-                    <div className="bg-[#FFE1E1] border border-[#FF9393] rounded-xl p-3 flex items-start gap-2">
-                      <Info className="w-6 h-6 text-[#FF0202] shrink-0" />
+                    {/* Stopover Durations */}
+                    {currentLeg.layovers && currentLeg.layovers.length > 0 ? (
                       <div className="flex flex-col gap-2">
-                        <span className="text-sm font-medium text-[#FF0202]">
-                          {t('baggage.alert.title')}
-                        </span>
-                        <span className="text-sm text-[#FF0202]">
-                          {t('baggage.alert.message')}
-                        </span>
+                        {currentLeg.layovers.map((lay, idx) => (
+                          <div key={idx} className="bg-[#F5F7FF] rounded-xl px-4 py-3 flex items-center gap-3 w-fit">
+                            <span className="text-sm text-[#3A478A]">
+                              Stopover at {lay.viaAirport} for <span className="font-medium text-[#010D50]">{lay.duration}</span>
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                    </div>
+                    ) : (
+                      <div className="bg-[#F5F7FF] rounded-xl px-4 py-3 flex items-center gap-3 w-fit">
+                        <span className="text-sm text-[#3A478A]">{currentLeg.stopDetails}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Refundable and Meals (Extras) */}
+                {(flight.refundable !== null || flight.meals !== undefined) && (
+                  <div className="flex flex-col md:flex-row gap-3">
+                    {flight.refundable !== null && (
+                      <div className="flex-1 bg-[#F5F7FF] rounded-xl p-3 flex items-start gap-3">
+                        <Info className={`w-5 h-5 ${flight.refundable ? 'text-[#008234]' : 'text-[#FF0202]'} shrink-0`} />
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-sm font-medium text-[#010D50]">
+                            {flight.refundable ? 'Refundable' : 'Non-Refundable'}
+                          </span>
+                          {flight.refundableText && (
+                            <span className="text-xs text-[#3A478A] break-words">{flight.refundableText}</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {flight.meals !== undefined && (
+                      <div className="flex-1 bg-[#F5F7FF] rounded-xl p-3 flex items-start gap-3">
+                        <UtensilsCrossed className="w-5 h-5 text-[#010D50] shrink-0" />
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-sm font-medium text-[#010D50]">
+                            {flight.meals ? 'Meals included' : 'Meals not included'}
+                          </span>
+                          {flight.meals && (
+                            <span className="text-xs text-[#3A478A]">{t('meals.complimentaryDesc')}</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             )}
           </div>
 
-          {/* Fare Type Selector */}
+          {/* Fare Type Selector (only if options exist) */}
+          {flight.ticketOptions && flight.ticketOptions.length > 0 && (
           <div className="flex flex-col gap-5 sm:gap-6">
             <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-1">
               <Button
@@ -450,6 +538,7 @@ export default function FlightInfoModal({
                 </div>
               </div>
           </div>
+          )}
 
         {/* Footer */}
         <div className="sticky bottom-0 z-20 bg-white rounded-xl px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-3 border border-[#EEF0F7] shadow-[0_-8px_24px_-12px_rgba(2,6,23,0.35)]">

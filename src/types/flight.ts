@@ -4,15 +4,41 @@ export interface Airport {
   city: string;
 }
 
+export interface IndividualFlight {
+  departureAirport: string;
+  arrivalAirport: string;
+  departureTime: string;
+  arrivalTime: string;
+  duration: string;
+  flightNumber?: string;
+  carrierCode?: string;
+}
+
 export interface FlightSegment {
   departureTime: string;
   arrivalTime: string;
   departureAirport: Airport;
   arrivalAirport: Airport;
   date: string;
-  duration: string;
+  duration: string; // Total flying time (excluding layovers)
+  totalJourneyTime?: string; // Total time including layovers
   stops: number;
   stopDetails?: string;
+  carrierCode?: string;
+  flightNumber?: string;
+  cabinClass?: string;
+  aircraftType?: string;
+  distance?: string | number;
+  departureTerminal?: string;
+  arrivalTerminal?: string;
+  layovers?: Array<{
+    viaAirport: string;
+    duration: string; // e.g., "2h 15m"
+  }>;
+  individualFlights?: IndividualFlight[]; // Individual flight legs with their durations
+  segmentBaggage?: string;
+  segmentBaggageQuantity?: string;
+  segmentBaggageUnit?: string;
 }
 
 export interface Airline {
@@ -38,6 +64,12 @@ export interface Flight {
   originalCurrency?: string;   // Original currency from API
   ticketOptions?: TicketOption[];
   webRef?: string;
+  baggage?: string;
+  // Extras for filters/details
+  refundable?: boolean | null;
+  refundableText?: string;
+  hasBaggage?: boolean;
+  meals?: boolean;
 }
 
 export interface SearchParams {

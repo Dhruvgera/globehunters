@@ -80,6 +80,7 @@ export interface VyspaFlight {
   available_seats?: number | string;
   refundable?: '0' | '1';
   refundable_text?: string;
+  Baggage?: string;
   BaggageQuantity?: string;
   BaggageUnit?: string;
   Bdown?: string; // Price breakdown string format: "ADT~2~143.00~252.92~0.00~0.00~395.92~0"

@@ -9,7 +9,9 @@ import {
   parseIntSafe, 
   formatDuration,
   parsePriceBreakdownString,
+  calculateDuration,
 } from './utils';
+import { getAircraftName } from './aircraftTypes';
 import type { 
   VyspaApiResponse, 
   VyspaResult, 
@@ -141,6 +143,10 @@ function transformResult(result: VyspaResult): Flight | null {
     ? transformSegmentToFlightSegment(inboundSegment)
     : undefined;
 
+  const hasBaggage =
+    (firstFlight.Baggage && String(firstFlight.Baggage).toLowerCase() !== 'none') ||
+    (firstFlight.BaggageQuantity && firstFlight.BaggageQuantity !== '0') ? true : false;
+
   const flight: Flight = {
     id: result.Result_id,
     airline: airline,
@@ -150,6 +156,12 @@ function transformResult(result: VyspaResult): Flight | null {
     pricePerPerson: Math.round(pricePerPerson),
     currency: result.currency_code.toUpperCase(), // Store code, not symbol
     webRef: result.Result_id,
+    baggage: result.Baggage,
+    refundable: typeof (firstFlight as any).refundable === 'string'
+      ? ((firstFlight as any).refundable === '1')
+      : (typeof (firstFlight as any).refundable === 'boolean' ? (firstFlight as any).refundable : null),
+    refundableText: (firstFlight as any).refundable_text,
+    hasBaggage,
   };
 
   return flight;
@@ -191,15 +203,74 @@ function transformSegmentToFlightSegment(segment: VyspaSegment): FlightSegment {
   const stops = segment.Stops || 0;
   const stopDetails = getStopDetails(segment);
 
+  // Compute layover durations between connecting flights
+  const layovers: Array<{ viaAirport: string; duration: string }> = [];
+  let totalLayoverMinutes = 0;
+  if (segment.Flights.length > 1) {
+    for (let i = 0; i < segment.Flights.length - 1; i++) {
+      const current = segment.Flights[i];
+      const next = segment.Flights[i + 1];
+      // Duration from arrival of current to departure of next
+      const minutes = calculateDuration(
+        current.arrival_date,
+        current.arrival_time as any, // accepts string|number
+        next.departure_date,
+        next.departure_time as any
+      );
+      totalLayoverMinutes += minutes;
+      layovers.push({
+        viaAirport: current.arrival_airport,
+        duration: formatDuration(minutes),
+      });
+    }
+  }
+
+  // Extract individual flight information
+  const individualFlights = segment.Flights.map((flight) => ({
+    departureAirport: flight.departure_airport,
+    arrivalAirport: flight.arrival_airport,
+    departureTime: formatTime(flight.departure_time),
+    arrivalTime: formatTime(flight.arrival_time),
+    duration: flight.travel_time ? formatDuration(parseIntSafe(flight.travel_time, 0)) : '',
+    flightNumber: String(flight.flight_number || '').trim() || undefined,
+    carrierCode: flight.airline_code,
+  }));
+
+  // Calculate total journey time (flying time + layovers)
+  const totalJourneyMinutes = totalDuration + totalLayoverMinutes;
+  const totalJourneyTime = formatDuration(totalJourneyMinutes);
+
+  // Format distance with unit (API returns miles)
+  const distanceValue = firstFlight.distance;
+  const distanceStr = distanceValue !== undefined && distanceValue !== null && String(distanceValue).trim() !== '' 
+    ? `${distanceValue} mi` 
+    : undefined;
+
+  // Convert aircraft type code to human-readable name
+  const aircraftName = getAircraftName(firstFlight.aircraft_type);
+
   return {
     departureTime,
     arrivalTime,
     departureAirport,
     arrivalAirport,
     date,
-    duration,
+    duration, // Total flying time only
+    totalJourneyTime, // Total time including layovers
     stops,
     stopDetails,
+    carrierCode: firstFlight.airline_code,
+    flightNumber: String(firstFlight.flight_number || '').trim() || undefined,
+    cabinClass: firstFlight.cabin_class,
+    aircraftType: aircraftName || undefined,
+    distance: distanceStr,
+    departureTerminal: firstFlight.departure_terminal,
+    arrivalTerminal: lastFlight.arrival_terminal,
+    layovers: layovers.length > 0 ? layovers : undefined,
+    individualFlights: individualFlights.length > 1 ? individualFlights : undefined,
+    segmentBaggage: firstFlight.Baggage,
+    segmentBaggageQuantity: firstFlight.BaggageQuantity,
+    segmentBaggageUnit: firstFlight.BaggageUnit,
   };
 }
 

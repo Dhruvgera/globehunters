@@ -128,22 +128,19 @@ function matchesExtras(flight: Flight, selectedExtras: string[]): boolean {
   if (selectedExtras.length === 0) {
     return true;
   }
-  
-  // TODO: Once Flight type includes extras fields, implement actual filtering:
-  // return selectedExtras.every(extra => {
-  //   switch (extra) {
-  //     case 'refundable':
-  //       return flight.refundable === true;
-  //     case 'meals':
-  //       return flight.meals === true;
-  //     case 'baggage':
-  //       return flight.baggage === true;
-  //     default:
-  //       return true;
-  //   }
-  // });
-  
-  return true;
+
+  return selectedExtras.every((extra) => {
+    switch (extra) {
+      case 'refundable':
+        return flight.refundable === true;
+      case 'meals':
+        return flight.meals === true;
+      case 'baggage':
+        return flight.hasBaggage === true || !!flight.baggage;
+      default:
+        return true;
+    }
+  });
 }
 
 /**
