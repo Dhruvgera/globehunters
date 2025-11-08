@@ -8,7 +8,7 @@ import Footer from "@/components/navigation/Footer";
 import { useFlights } from "@/hooks/useFlights";
 import { useDatePrices } from "@/hooks/useDatePrices";
 import { useBookingStore } from "@/store/bookingStore";
-import { filterFlights } from "@/utils/flightFilter";
+import { filterFlights, sortFlights } from "@/utils/flightFilter";
 import { FilterState, SearchParams } from "@/types/flight";
 import { mockFlights, mockDatePrices, mockAirlines, mockAirports } from "@/data/mockFlights";
 import { useFilterExpansion } from "@/hooks/useFilterExpansion";
@@ -45,6 +45,7 @@ function SearchPageContent() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
   const prevLoadingRef = useRef(false);
+  const [isDateChanging, setIsDateChanging] = useState(false);
   
   // Parse URL parameters and set in store on mount
   useEffect(() => {
@@ -86,10 +87,20 @@ function SearchPageContent() {
     { enabled: isInitialized }
   );
 
+  // Keep last successful flights to avoid blanking the UI during date changes
+  const lastFlightsRef = useRef<typeof flights>([]);
+  useEffect(() => {
+    if (flights && flights.length > 0 && !loading && !error) {
+      lastFlightsRef.current = flights;
+    }
+  }, [flights, loading, error]);
+
   // Mark first attempt only after a loading cycle completes (prevents early "no results" / empty flash)
   useEffect(() => {
     if (prevLoadingRef.current && !loading) {
       setHasAttemptedFetch(true);
+      // Turn off date-changing indicator after fetch completes
+      setIsDateChanging(false);
     }
     prevLoadingRef.current = loading;
   }, [loading]);
@@ -144,8 +155,11 @@ function SearchPageContent() {
 
   // Only use mock data if explicitly in error state and no real data
   const effectiveFlights = useMemo(() => {
-    // If loading, don't show mock data
-    if (loading) return [];
+    // While loading after initial results, keep showing last results
+    if (loading) {
+      if (flights.length > 0) return flights;
+      if (lastFlightsRef.current.length > 0) return lastFlightsRef.current;
+    }
     // If we have real data, use it
     if (flights.length > 0) return flights;
     // If error and no data, show mock data as fallback
@@ -176,6 +190,8 @@ function SearchPageContent() {
     // Get the actual date object
     const selectedDate = getDateFromIndex(index, 'departure');
     if (selectedDate) {
+      // Immediately show subtle updating indicator
+      setIsDateChanging(true);
       // Check if we need to adjust return date (for round trips)
       let updatedReturnDate = effectiveSearchParams.returnDate;
       
@@ -207,6 +223,8 @@ function SearchPageContent() {
     // Get the actual date object
     const selectedDate = getDateFromIndex(index, 'return');
     if (selectedDate) {
+      // Immediately show subtle updating indicator
+      setIsDateChanging(true);
       // Validate that return date is not before departure date
       if (selectedDate < effectiveSearchParams.departureDate) {
         console.warn('⚠️  Cannot select return date before departure date');
@@ -320,10 +338,28 @@ function SearchPageContent() {
     }));
   };
 
+  // Prepare flights for instant render: default sort (price asc) and memoize
+  const preparedFlights = useMemo(() => {
+    return sortFlights(effectiveFlights, 'price-asc');
+  }, [effectiveFlights]);
+
+  // Prefetch airline logos for top results to avoid layout delays
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const top = preparedFlights.slice(0, 20);
+    const logos = Array.from(new Set(top.map(f => f.airline?.logo).filter(Boolean)));
+    logos.forEach((src) => {
+      try {
+        const img = new Image();
+        img.src = src as string;
+      } catch {}
+    });
+  }, [preparedFlights]);
+
   // Filter flights
   const filteredFlights = useMemo(() => {
-    return filterFlights(effectiveFlights, filterState);
-  }, [effectiveFlights, filterState]);
+    return filterFlights(preparedFlights, filterState);
+  }, [preparedFlights, filterState]);
 
   // Handler for loading more flights
   const handleLoadMore = () => {
@@ -343,15 +379,6 @@ function SearchPageContent() {
       {/* Date Price Selector - Always show when not in error state */}
       {!error && departureDates.length > 0 && (
         <div className="relative">
-          {/* Subtle loading indicator when changing dates (but we already have flights) */}
-          {loading && flights.length > 0 && (
-            <div className="absolute top-2 right-4 z-10">
-              <div className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full border border-blue-200 text-xs">
-                <div className="animate-spin rounded-full h-3 w-3 border-b border-blue-600"></div>
-                <span>Updating...</span>
-              </div>
-            </div>
-          )}
           <DatePriceSelector
             departureDates={departureDates}
             returnDates={effectiveSearchParams.tripType === 'round-trip' ? returnDates : undefined}
@@ -366,8 +393,8 @@ function SearchPageContent() {
         </div>
       )}
 
-      {/* Loading State - Show during bootstrap and while first fetch is pending */}
-      {(!isInitialized || (loading && flights.length === 0) || (isInitialized && !loading && flights.length === 0 && !hasAttemptedFetch)) && (
+      {/* Loading State - Show during bootstrap, first fetch, and any date change */}
+      {(!isInitialized || loading || isDateChanging || (isInitialized && !loading && flights.length === 0 && !hasAttemptedFetch)) && (
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
           <div className="flex flex-col items-center justify-center gap-4">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -451,7 +478,7 @@ function SearchPageContent() {
       )}
 
       {/* Mobile Filter Sheet */}
-      {!loading && !error && <FilterSheet
+      {!loading && !error && !isDateChanging && <FilterSheet
         isOpen={isFilterSheetOpen}
         onOpenChange={setIsFilterSheetOpen}
         filterState={filterState}
@@ -470,29 +497,29 @@ function SearchPageContent() {
         resultCount={filteredFlights.length}
       />
       }
-      {/* Main Content - Show when we have flights */}
-      {!error && flights.length > 0 && filteredFlights.length > 0 && (
+      {/* Main Content - Hide during date change; show when we have flights */}
+      {!error && !isDateChanging && preparedFlights.length > 0 && filteredFlights.length > 0 && (
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-8">
           <div className="flex flex-col lg:flex-row gap-4">
             {/* Filters Sidebar - Desktop Only */}
             <div className="hidden lg:flex w-full lg:w-72 flex-col gap-4 order-3 lg:order-1">
               <SearchSummary />
               <FilterSidebar
-              filterState={filterState}
-              filters={effectiveFilters}
-              expandedFilters={expandedFilters}
-              onToggleExpand={toggleFilter}
-              onToggleStop={toggleStop}
-              onToggleAirline={toggleAirline}
-              onToggleAllAirlines={toggleAllAirlines}
-              onToggleDepartureAirport={toggleDepartureAirport}
-              onToggleArrivalAirport={toggleArrivalAirport}
-              onUpdatePrice={updatePriceRange}
-              onUpdateDepartureTime={updateDepartureTime}
-              onUpdateJourneyTime={updateJourneyTime}
-              onToggleExtra={toggleExtra}
-              resultCount={filteredFlights.length}
-            />
+                filterState={filterState}
+                filters={effectiveFilters}
+                expandedFilters={expandedFilters}
+                onToggleExpand={toggleFilter}
+                onToggleStop={toggleStop}
+                onToggleAirline={toggleAirline}
+                onToggleAllAirlines={toggleAllAirlines}
+                onToggleDepartureAirport={toggleDepartureAirport}
+                onToggleArrivalAirport={toggleArrivalAirport}
+                onUpdatePrice={updatePriceRange}
+                onUpdateDepartureTime={updateDepartureTime}
+                onUpdateJourneyTime={updateJourneyTime}
+                onToggleExtra={toggleExtra}
+                resultCount={filteredFlights.length}
+              />
           </div>
 
           {/* Flight Results */}

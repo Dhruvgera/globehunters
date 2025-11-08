@@ -57,11 +57,53 @@ export interface FlightPricing {
 }
 
 class FlightService {
+  // In-memory response cache (session-scoped)
+  private static CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+  private responseCache: Map<string, { data: FlightSearchResponse; ts: number }> = new Map();
+
+  private makeCacheKey(params: SearchParams): string {
+    const format = (d?: Date) => d ? this.formatDate(d) : '';
+    return [
+      params.from,
+      params.to,
+      format(params.departureDate),
+      format(params.returnDate),
+      params.passengers.adults,
+      params.passengers.children,
+      params.passengers.infants || 0,
+      params.class,
+      params.tripType
+    ].join('|');
+  }
+
+  private getFromCache(params: SearchParams): FlightSearchResponse | null {
+    const key = this.makeCacheKey(params);
+    const entry = this.responseCache.get(key);
+    if (!entry) return null;
+    const isFresh = Date.now() - entry.ts < FlightService.CACHE_TTL_MS;
+    if (!isFresh) {
+      this.responseCache.delete(key);
+      return null;
+    }
+    return entry.data;
+  }
+
+  private saveToCache(params: SearchParams, data: FlightSearchResponse) {
+    const key = this.makeCacheKey(params);
+    this.responseCache.set(key, { data, ts: Date.now() });
+  }
+
   /**
    * Search for flights using Vyspa API via server action
    */
   async searchFlights(params: SearchParams): Promise<FlightSearchResponse> {
     try {
+      // 1) Return cached result if present (instant render on date you already prefetched)
+      const cached = this.getFromCache(params);
+      if (cached) {
+        return cached;
+      }
+
       // Convert SearchParams to FlightSearchRequest format
       const vyspaParams: FlightSearchRequest = {
         origin1: params.from,
@@ -80,10 +122,13 @@ class FlightService {
       const response = await searchFlightsAction(vyspaParams);
 
       // Add mock date prices for now (Vyspa doesn't provide this)
-      return {
+      const result: FlightSearchResponse = {
         ...response,
         datePrices: mockDatePrices,
       };
+      // 2) Save to cache
+      this.saveToCache(params, result);
+      return result;
     } catch (error) {
       console.error('Error searching flights:', error);
       throw error;
