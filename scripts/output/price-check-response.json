@@ -1,0 +1,1155 @@
+{
+  "status": 200,
+  "headers": {
+    "server": "nginx/1.20.1",
+    "date": "Sat, 08 Nov 2025 17:32:56 GMT",
+    "content-type": "application/json",
+    "transfer-encoding": "chunked",
+    "connection": "keep-alive",
+    "expires": "Thu, 19 Nov 1981 08:52:00 GMT",
+    "cache-control": "no-store, no-cache, must-revalidate",
+    "pragma": "no-cache",
+    "set-cookie": [
+      "PHPSESSID=f391b1938d2aaf05da74ba7c92628bba; path=/",
+      "loggedIn=1; path=/"
+    ],
+    "vary": "Accept-Encoding",
+    "strict-transport-security": "max-age=31536000; includeSubDomains; preload"
+  },
+  "data": {
+    "success": 1,
+    "message": "Price Check Successful.",
+    "priceCheck": {
+      "success": 1,
+      "fareCat": "",
+      "cofirmFolder": "",
+      "fold_no": "",
+      "flight_data": {
+        "result": {
+          "FlightPswResult": {
+            "id": 253810950,
+            "psc_request_id": 54505609,
+            "Origin": "JFK",
+            "Destination": "LHR",
+            "base_fare": 511,
+            "tax": 1678.09,
+            "total_fare": 2189.09,
+            "iso_currency_code": "USD",
+            "fare_type": "",
+            "pax_type_count": 2,
+            "last_ticket_date": "2025-11-15",
+            "ticket_advisory": "",
+            "flight_count": 100,
+            "trip_count": 2,
+            "created": "2025-11-08 17:32:30",
+            "folder_id": "",
+            "sent_to_folder": 0,
+            "updated": "2025-11-08 17:32:30",
+            "FareCat": "PU",
+            "Designator": "",
+            "gds": "X",
+            "markupAmt": 0,
+            "CommissionAmount": 0,
+            "segment1_elapse_flying_time": 1195,
+            "segment1_majority_carrier": "SK",
+            "segment2_elapse_flying_time": 845,
+            "segment2_majority_carrier": "SK",
+            "segment3_elapse_flying_time": "",
+            "segment3_majority_carrier": "",
+            "validating_carrier": "SK",
+            "segment4_elapse_flying_time": "",
+            "segment4_majority_carrier": "",
+            "segment5_elapse_flying_time": "",
+            "segment5_majority_carrier": "",
+            "segment6_elapse_flying_time": "",
+            "segment6_majority_carrier": "",
+            "isLowest": 0,
+            "itinerary_id": "",
+            "search_session_id": 0,
+            "config_id": "",
+            "avlSeats": 9,
+            "refundable": 2,
+            "module_id": 203,
+            "account_code": ""
+          },
+          "FlightPublished": {
+            "id": 54505609,
+            "session_id": "",
+            "departure_date": "2025-11-30",
+            "return_date": "2025-12-04",
+            "departure_airport_id": "JFK",
+            "arrival_airport_id": "LHR",
+            "departure_time": "0001-2359",
+            "arrival_time": "0001-2359",
+            "ticket_type": 2,
+            "adults": 2,
+            "children": 1,
+            "seniors": 0,
+            "misc_pax_num": 0,
+            "misc_pax_type": "",
+            "airline_preference": "",
+            "airlines": "",
+            "cabin_class": "",
+            "cabin2_class": "",
+            "cabin3_class": "",
+            "cabin4_class": "",
+            "cabin5_class": "",
+            "cabin6_class": "",
+            "number_of_alternates": 80,
+            "direct_flight_only": 0,
+            "exclude_penalty_fares": 0,
+            "use_direct_access": 0,
+            "include_multi_airports": 0,
+            "online_connections_only": 0,
+            "psc_request": "",
+            "psw_response": "",
+            "psw_results": 295,
+            "staff_id": "",
+            "status": "success",
+            "created": "2025-11-08 17:32:15",
+            "modified": "2025-11-08 17:32:31",
+            "arrival2_airport_id": "",
+            "arrival3_airport_id": "",
+            "calendar_search": 0,
+            "departure2_airport_id": "",
+            "departure2_date": "",
+            "departure3_airport_id": "",
+            "departure3_date": "",
+            "exclude_connection": "",
+            "exclude_intracity_connection": 0,
+            "infants": 0,
+            "only_it_fares": 0,
+            "fares_indicator": "",
+            "outbound_time_qualifier": "",
+            "return_time_qualifier": "",
+            "via1_airport_id": "",
+            "child_ages": 9,
+            "infant_seats": "",
+            "searchSourceId": 13,
+            "branchSearched": "",
+            "arrival4_airport_id": "",
+            "departure4_airport_id": "",
+            "departure4_date": "",
+            "arrival5_airport_id": "",
+            "departure5_airport_id": "",
+            "departure5_date": "",
+            "arrival6_airport_id": "",
+            "departure6_airport_id": "",
+            "departure6_date": "",
+            "error_message": "",
+            "searched_fare_types": "",
+            "selected_gds": "",
+            "trip_ninja_search": 0
+          }
+        },
+        "flights": [
+          {
+            "FlightPswFlightnew": {
+              "id": 12235031,
+              "key": "S**WTFS-916-80",
+              "link_indicator": "Seamless",
+              "airline_code": "SK",
+              "flight_number": 916,
+              "fare_class": "",
+              "distance": 3856,
+              "travel_time": 455,
+              "flight_date": "30Nov",
+              "flight_day": "Sun",
+              "departure_terminal": 1,
+              "arrival_terminal": 3,
+              "departure_airport": "JFK",
+              "arrival_airport": "CPH",
+              "departure_date": "2025-11-30",
+              "arrival_date": "2025-12-01",
+              "departure_time": 1735,
+              "arrival_time": 710,
+              "day_change_indicator": "",
+              "dep_arr_date_diff": "",
+              "aircraft_type": 333,
+              "meal_type": "",
+              "number_stops": 0,
+              "etk_eligible": 1,
+              "code_share_info": "",
+              "operating_carrier": "SK",
+              "segment_old": 0,
+              "segment": 0,
+              "created": "2025-10-26 07:10:10"
+            },
+            "Link": {
+              "is_connection": 0,
+              "FareBasis": "ULXA6GHT/CH",
+              "CabinClass": "Y",
+              "Baggage": "",
+              "fare_class": "U",
+              "FareRuleKey": "",
+              "FareInfoRef": "",
+              "segment": 1,
+              "is_tripninja": 0,
+              "tripninja_ids": ""
+            }
+          },
+          {
+            "FlightPswFlightnew": {
+              "id": 13167932,
+              "key": "SMTWT**-1507-21",
+              "link_indicator": "Seamless",
+              "airline_code": "SK",
+              "flight_number": 1507,
+              "fare_class": "",
+              "distance": 610,
+              "travel_time": 120,
+              "flight_date": "01Dec",
+              "flight_day": "Mon",
+              "departure_terminal": 3,
+              "arrival_terminal": 2,
+              "departure_airport": "CPH",
+              "arrival_airport": "LHR",
+              "departure_date": "2025-12-01",
+              "arrival_date": "2025-12-01",
+              "departure_time": 1730,
+              "arrival_time": 1830,
+              "day_change_indicator": "",
+              "dep_arr_date_diff": "",
+              "aircraft_type": "32N",
+              "meal_type": "",
+              "number_stops": 0,
+              "etk_eligible": 1,
+              "code_share_info": " SAS CONNECT SK1507",
+              "operating_carrier": "SK",
+              "segment_old": 0,
+              "segment": 0,
+              "created": "2025-10-27 03:19:51"
+            },
+            "Link": {
+              "is_connection": 0,
+              "FareBasis": "ULXA6GHT/CH",
+              "CabinClass": "Y",
+              "Baggage": "",
+              "fare_class": "U",
+              "FareRuleKey": "",
+              "FareInfoRef": "",
+              "segment": 1,
+              "is_tripninja": 0,
+              "tripninja_ids": ""
+            }
+          },
+          {
+            "FlightPswFlightnew": {
+              "id": 12279210,
+              "key": "*MTWTFS-500-14",
+              "link_indicator": "Seamless",
+              "airline_code": "SK",
+              "flight_number": 500,
+              "fare_class": "",
+              "distance": 610,
+              "travel_time": 110,
+              "flight_date": "04Dec",
+              "flight_day": "Thu",
+              "departure_terminal": 2,
+              "arrival_terminal": 3,
+              "departure_airport": "LHR",
+              "arrival_airport": "CPH",
+              "departure_date": "2025-12-04",
+              "arrival_date": "2025-12-04",
+              "departure_time": 640,
+              "arrival_time": 930,
+              "day_change_indicator": "",
+              "dep_arr_date_diff": "",
+              "aircraft_type": "32N",
+              "meal_type": "",
+              "number_stops": 0,
+              "etk_eligible": 1,
+              "code_share_info": " SAS CONNECT SK500",
+              "operating_carrier": "SK",
+              "segment_old": 0,
+              "segment": 0,
+              "created": "2025-10-26 07:28:25"
+            },
+            "Link": {
+              "is_connection": 0,
+              "FareBasis": "LLXA6GHT/CH",
+              "CabinClass": "Y",
+              "Baggage": "",
+              "fare_class": "L",
+              "FareRuleKey": "",
+              "FareInfoRef": "",
+              "segment": 2,
+              "is_tripninja": 0,
+              "tripninja_ids": ""
+            }
+          },
+          {
+            "FlightPswFlightnew": {
+              "id": 16238730,
+              "key": "S*TWTFS-915-16",
+              "link_indicator": "Seamless",
+              "airline_code": "SK",
+              "flight_number": 915,
+              "fare_class": "",
+              "distance": 3856,
+              "travel_time": 530,
+              "flight_date": "04Dec",
+              "flight_day": "Thu",
+              "departure_terminal": 3,
+              "arrival_terminal": 1,
+              "departure_airport": "CPH",
+              "arrival_airport": "JFK",
+              "departure_date": "2025-12-04",
+              "arrival_date": "2025-12-04",
+              "departure_time": 1255,
+              "arrival_time": 1545,
+              "day_change_indicator": "",
+              "dep_arr_date_diff": "",
+              "aircraft_type": 333,
+              "meal_type": "",
+              "number_stops": 0,
+              "etk_eligible": 1,
+              "code_share_info": "",
+              "operating_carrier": "SK",
+              "segment_old": 0,
+              "segment": 0,
+              "created": "2025-11-07 09:10:47"
+            },
+            "Link": {
+              "is_connection": 0,
+              "FareBasis": "LLXA6GHT/CH",
+              "CabinClass": "Y",
+              "Baggage": "",
+              "fare_class": "L",
+              "FareRuleKey": "",
+              "FareInfoRef": "",
+              "segment": 2,
+              "is_tripninja": 0,
+              "tripninja_ids": ""
+            }
+          }
+        ],
+        "passengers": [
+          {
+            "FlightPswPassenger": {
+              "id": 491650533,
+              "psw_result_id": 253810950,
+              "pax_type": "ADT",
+              "num_pax": 2,
+              "base_fare": 186,
+              "total_fare": 784.63,
+              "tax": 598.63,
+              "markupAmt": 0,
+              "CommissionAmount": 0,
+              "markup_id": 0,
+              "ob_route": "",
+              "ob_airline_code": "",
+              "ob_fare_type": "PU",
+              "ob_fare_basis_code": "ULXA6GHT",
+              "ib_route": "",
+              "ib_airline_code": "",
+              "ib_fare_type": "PU",
+              "ib_fare_basis_code": "LLXA6GHT",
+              "created": "2025-11-08 17:32:30",
+              "stop3_fare_basis_code": "",
+              "stop3_fare_type": ""
+            }
+          },
+          {
+            "FlightPswPassenger": {
+              "id": 491650535,
+              "psw_result_id": 253810950,
+              "pax_type": "CHD",
+              "num_pax": 1,
+              "base_fare": 139,
+              "total_fare": 619.83,
+              "tax": 480.83,
+              "markupAmt": 0,
+              "CommissionAmount": 0,
+              "markup_id": 0,
+              "ob_route": "",
+              "ob_airline_code": "",
+              "ob_fare_type": "PU",
+              "ob_fare_basis_code": "ULXA6GHT/CH",
+              "ib_route": "",
+              "ib_airline_code": "",
+              "ib_fare_type": "PU",
+              "ib_fare_basis_code": "LLXA6GHT/CH",
+              "created": "2025-11-08 17:32:30",
+              "stop3_fare_basis_code": "",
+              "stop3_fare_type": ""
+            }
+          }
+        ]
+      },
+      "price_data": [
+        {
+          "pricingArr": [
+            {
+              "passengers": 2,
+              "paxtype": "ADT",
+              "markup_id": 0,
+              "base": 186,
+              "AgtNet": 0,
+              "gross": 186,
+              "base_cur": "USD",
+              "sellcurr": "USD",
+              "total": 1569.26,
+              "tax": 598.63,
+              "last_ticket_date": "2025-11-15",
+              "CabinClass": 4,
+              "BookingCode": "U",
+              "inMarkup": 0,
+              "cust_tot_spl_comm_amt": 0,
+              "baggage": {
+                "JFK-LHR": {
+                  "ADT": "SK***"
+                },
+                "LHR-JFK": {
+                  "ADT": "SK***"
+                }
+              }
+            },
+            {
+              "passengers": 1,
+              "paxtype": "CHD",
+              "markup_id": 0,
+              "base": 139,
+              "AgtNet": 0,
+              "gross": 139,
+              "base_cur": "USD",
+              "sellcurr": "USD",
+              "total": 619.83,
+              "tax": 480.83,
+              "last_ticket_date": "2025-11-15",
+              "CabinClass": 4,
+              "BookingCode": "U",
+              "inMarkup": 0,
+              "cust_tot_spl_comm_amt": 0,
+              "baggage": {
+                "JFK-LHR": {
+                  "CHD": "SK***"
+                },
+                "LHR-JFK": {
+                  "CHD": "SK***"
+                }
+              }
+            }
+          ],
+          "baggageTxt": {
+            "JFK-LHR": {
+              "ADT": "SK***",
+              "CHD": "SK***"
+            },
+            "LHR-JFK": {
+              "ADT": "SK***",
+              "CHD": "SK***"
+            }
+          },
+          "BrandInfo": [
+            {
+              "BrandName": "LIGHT",
+              "BookingCode": "U",
+              "cabinCode": "Y",
+              "seatsAvailable": 3,
+              "CabinName": "Economy"
+            },
+            {
+              "BrandName": "LIGHT",
+              "BookingCode": "U",
+              "cabinCode": "Y",
+              "seatsAvailable": 3,
+              "CabinName": "Economy"
+            },
+            {
+              "BrandName": "LIGHT",
+              "BookingCode": "L",
+              "cabinCode": "Y",
+              "seatsAvailable": 9,
+              "CabinName": "Economy"
+            },
+            {
+              "BrandName": "LIGHT",
+              "BookingCode": "L",
+              "cabinCode": "Y",
+              "seatsAvailable": 9,
+              "CabinName": "Economy"
+            }
+          ],
+          "Total_Fare": {
+            "BrandId": 0,
+            "base": 511,
+            "AgtNet": 0,
+            "basecurr": "USD",
+            "markup": 0,
+            "comm": 0,
+            "gross": 511,
+            "sellcurr": "USD",
+            "total_base": 2189.09,
+            "total": 2189.09,
+            "tax": 1678.09,
+            "taxcurr": "USD",
+            "Name": "LIGHT"
+          }
+        },
+        {
+          "pricingArr": [
+            {
+              "passengers": 2,
+              "paxtype": "ADT",
+              "markup_id": 0,
+              "base": 286,
+              "AgtNet": 0,
+              "gross": 286,
+              "base_cur": "USD",
+              "sellcurr": "USD",
+              "total": 1769.26,
+              "tax": 598.63,
+              "last_ticket_date": "2025-11-15",
+              "CabinClass": 4,
+              "BookingCode": "U",
+              "inMarkup": 0,
+              "cust_tot_spl_comm_amt": 0,
+              "baggage": {
+                "JFK-LHR": {
+                  "ADT": "SK***1p"
+                },
+                "LHR-JFK": {
+                  "ADT": "SK***1p"
+                }
+              }
+            },
+            {
+              "passengers": 1,
+              "paxtype": "CHD",
+              "markup_id": 0,
+              "base": 214,
+              "AgtNet": 0,
+              "gross": 214,
+              "base_cur": "USD",
+              "sellcurr": "USD",
+              "total": 694.83,
+              "tax": 480.83,
+              "last_ticket_date": "2025-11-15",
+              "CabinClass": 4,
+              "BookingCode": "U",
+              "inMarkup": 0,
+              "cust_tot_spl_comm_amt": 0,
+              "baggage": {
+                "JFK-LHR": {
+                  "CHD": "SK***1p"
+                },
+                "LHR-JFK": {
+                  "CHD": "SK***1p"
+                }
+              }
+            }
+          ],
+          "baggageTxt": {
+            "JFK-LHR": {
+              "ADT": "SK***1p",
+              "CHD": "SK***1p"
+            },
+            "LHR-JFK": {
+              "ADT": "SK***1p",
+              "CHD": "SK***1p"
+            }
+          },
+          "BrandInfo": [
+            {
+              "BrandName": "STANDARD",
+              "BookingCode": "U",
+              "cabinCode": "Y",
+              "seatsAvailable": 3,
+              "CabinName": "Economy"
+            },
+            {
+              "BrandName": "STANDARD",
+              "BookingCode": "U",
+              "cabinCode": "Y",
+              "seatsAvailable": 3,
+              "CabinName": "Economy"
+            },
+            {
+              "BrandName": "STANDARD",
+              "BookingCode": "L",
+              "cabinCode": "Y",
+              "seatsAvailable": 9,
+              "CabinName": "Economy"
+            },
+            {
+              "BrandName": "STANDARD",
+              "BookingCode": "L",
+              "cabinCode": "Y",
+              "seatsAvailable": 9,
+              "CabinName": "Economy"
+            }
+          ],
+          "Total_Fare": {
+            "BrandId": 0,
+            "base": 786,
+            "AgtNet": 0,
+            "basecurr": "USD",
+            "markup": 0,
+            "comm": 0,
+            "gross": 786,
+            "sellcurr": "USD",
+            "total_base": 2464.09,
+            "total": 2464.09,
+            "tax": 1678.09,
+            "taxcurr": "USD",
+            "Name": "STANDARD"
+          }
+        },
+        {
+          "pricingArr": [
+            {
+              "passengers": 2,
+              "paxtype": "ADT",
+              "markup_id": 0,
+              "base": 536,
+              "AgtNet": 0,
+              "gross": 536,
+              "base_cur": "USD",
+              "sellcurr": "USD",
+              "total": 2269.26,
+              "tax": 598.63,
+              "last_ticket_date": "2025-11-15",
+              "CabinClass": 4,
+              "BookingCode": "U",
+              "inMarkup": 0,
+              "cust_tot_spl_comm_amt": 0,
+              "baggage": {
+                "JFK-LHR": {
+                  "ADT": "SK***1p"
+                },
+                "LHR-JFK": {
+                  "ADT": "SK***1p"
+                }
+              }
+            },
+            {
+              "passengers": 1,
+              "paxtype": "CHD",
+              "markup_id": 0,
+              "base": 402,
+              "AgtNet": 0,
+              "gross": 402,
+              "base_cur": "USD",
+              "sellcurr": "USD",
+              "total": 882.83,
+              "tax": 480.83,
+              "last_ticket_date": "2025-11-15",
+              "CabinClass": 4,
+              "BookingCode": "U",
+              "inMarkup": 0,
+              "cust_tot_spl_comm_amt": 0,
+              "baggage": {
+                "JFK-LHR": {
+                  "CHD": "SK***1p"
+                },
+                "LHR-JFK": {
+                  "CHD": "SK***1p"
+                }
+              }
+            }
+          ],
+          "baggageTxt": {
+            "JFK-LHR": {
+              "ADT": "SK***1p",
+              "CHD": "SK***1p"
+            },
+            "LHR-JFK": {
+              "ADT": "SK***1p",
+              "CHD": "SK***1p"
+            }
+          },
+          "BrandInfo": [
+            {
+              "BrandName": "FLEX",
+              "BookingCode": "U",
+              "cabinCode": "Y",
+              "seatsAvailable": 3,
+              "CabinName": "Economy"
+            },
+            {
+              "BrandName": "FLEX",
+              "BookingCode": "U",
+              "cabinCode": "Y",
+              "seatsAvailable": 3,
+              "CabinName": "Economy"
+            },
+            {
+              "BrandName": "FLEX",
+              "BookingCode": "L",
+              "cabinCode": "Y",
+              "seatsAvailable": 9,
+              "CabinName": "Economy"
+            },
+            {
+              "BrandName": "FLEX",
+              "BookingCode": "L",
+              "cabinCode": "Y",
+              "seatsAvailable": 9,
+              "CabinName": "Economy"
+            }
+          ],
+          "Total_Fare": {
+            "BrandId": 0,
+            "base": 1474,
+            "AgtNet": 0,
+            "basecurr": "USD",
+            "markup": 0,
+            "comm": 0,
+            "gross": 1474,
+            "sellcurr": "USD",
+            "total_base": 3152.09,
+            "total": 3152.09,
+            "tax": 1678.09,
+            "taxcurr": "USD",
+            "Name": "FLEX"
+          }
+        },
+        {
+          "pricingArr": [
+            {
+              "passengers": 2,
+              "paxtype": "ADT",
+              "markup_id": 0,
+              "base": 2241,
+              "AgtNet": 0,
+              "gross": 2241,
+              "base_cur": "USD",
+              "sellcurr": "USD",
+              "total": 6537.26,
+              "tax": 1027.63,
+              "last_ticket_date": "2025-11-15",
+              "CabinClass": 3,
+              "BookingCode": "B",
+              "inMarkup": 0,
+              "cust_tot_spl_comm_amt": 0,
+              "baggage": {
+                "JFK-LHR": {
+                  "ADT": "SK***2p"
+                },
+                "LHR-JFK": {
+                  "ADT": "SK***2p"
+                }
+              }
+            },
+            {
+              "passengers": 1,
+              "paxtype": "CHD",
+              "markup_id": 0,
+              "base": 1681,
+              "AgtNet": 0,
+              "gross": 1681,
+              "base_cur": "USD",
+              "sellcurr": "USD",
+              "total": 2708.63,
+              "tax": 1027.63,
+              "last_ticket_date": "2025-11-15",
+              "CabinClass": 3,
+              "BookingCode": "B",
+              "inMarkup": 0,
+              "cust_tot_spl_comm_amt": 0,
+              "baggage": {
+                "JFK-LHR": {
+                  "CHD": "SK***2p"
+                },
+                "LHR-JFK": {
+                  "CHD": "SK***2p"
+                }
+              }
+            }
+          ],
+          "baggageTxt": {
+            "JFK-LHR": {
+              "ADT": "SK***2p",
+              "CHD": "SK***2p"
+            },
+            "LHR-JFK": {
+              "ADT": "SK***2p",
+              "CHD": "SK***2p"
+            }
+          },
+          "BrandInfo": [
+            {
+              "BrandName": "PREMIUM",
+              "BookingCode": "B",
+              "cabinCode": "S",
+              "seatsAvailable": 3,
+              "CabinName": "PremiumEconomy"
+            },
+            {
+              "BrandName": "PREMIUM",
+              "BookingCode": "B",
+              "cabinCode": "S",
+              "seatsAvailable": 3,
+              "CabinName": "PremiumEconomy"
+            },
+            {
+              "BrandName": "PREMIUM",
+              "BookingCode": "B",
+              "cabinCode": "S",
+              "seatsAvailable": 9,
+              "CabinName": "PremiumEconomy"
+            },
+            {
+              "BrandName": "PREMIUM",
+              "BookingCode": "B",
+              "cabinCode": "S",
+              "seatsAvailable": 9,
+              "CabinName": "PremiumEconomy"
+            }
+          ],
+          "Total_Fare": {
+            "BrandId": 0,
+            "base": 6163,
+            "AgtNet": 0,
+            "basecurr": "USD",
+            "markup": 0,
+            "comm": 0,
+            "gross": 6163,
+            "sellcurr": "USD",
+            "total_base": 9245.89,
+            "total": 9245.89,
+            "tax": 3082.89,
+            "taxcurr": "USD",
+            "Name": "PREMIUM"
+          }
+        },
+        {
+          "pricingArr": [
+            {
+              "passengers": 2,
+              "paxtype": "ADT",
+              "markup_id": 0,
+              "base": 2691,
+              "AgtNet": 0,
+              "gross": 2691,
+              "base_cur": "USD",
+              "sellcurr": "USD",
+              "total": 7437.26,
+              "tax": 1027.63,
+              "last_ticket_date": "2025-11-15",
+              "CabinClass": 3,
+              "BookingCode": "B",
+              "inMarkup": 0,
+              "cust_tot_spl_comm_amt": 0,
+              "baggage": {
+                "JFK-LHR": {
+                  "ADT": "SK***2p"
+                },
+                "LHR-JFK": {
+                  "ADT": "SK***2p"
+                }
+              }
+            },
+            {
+              "passengers": 1,
+              "paxtype": "CHD",
+              "markup_id": 0,
+              "base": 2018,
+              "AgtNet": 0,
+              "gross": 2018,
+              "base_cur": "USD",
+              "sellcurr": "USD",
+              "total": 3045.63,
+              "tax": 1027.63,
+              "last_ticket_date": "2025-11-15",
+              "CabinClass": 3,
+              "BookingCode": "B",
+              "inMarkup": 0,
+              "cust_tot_spl_comm_amt": 0,
+              "baggage": {
+                "JFK-LHR": {
+                  "CHD": "SK***2p"
+                },
+                "LHR-JFK": {
+                  "CHD": "SK***2p"
+                }
+              }
+            }
+          ],
+          "baggageTxt": {
+            "JFK-LHR": {
+              "ADT": "SK***2p",
+              "CHD": "SK***2p"
+            },
+            "LHR-JFK": {
+              "ADT": "SK***2p",
+              "CHD": "SK***2p"
+            }
+          },
+          "BrandInfo": [
+            {
+              "BrandName": "PREMIUM FLEX",
+              "BookingCode": "B",
+              "cabinCode": "S",
+              "seatsAvailable": 3,
+              "CabinName": "PremiumEconomy"
+            },
+            {
+              "BrandName": "PREMIUM FLEX",
+              "BookingCode": "B",
+              "cabinCode": "S",
+              "seatsAvailable": 3,
+              "CabinName": "PremiumEconomy"
+            },
+            {
+              "BrandName": "PREMIUM FLEX",
+              "BookingCode": "B",
+              "cabinCode": "S",
+              "seatsAvailable": 9,
+              "CabinName": "PremiumEconomy"
+            },
+            {
+              "BrandName": "PREMIUM FLEX",
+              "BookingCode": "B",
+              "cabinCode": "S",
+              "seatsAvailable": 9,
+              "CabinName": "PremiumEconomy"
+            }
+          ],
+          "Total_Fare": {
+            "BrandId": 0,
+            "base": 7400,
+            "AgtNet": 0,
+            "basecurr": "USD",
+            "markup": 0,
+            "comm": 0,
+            "gross": 7400,
+            "sellcurr": "USD",
+            "total_base": 10482.89,
+            "total": 10482.89,
+            "tax": 3082.89,
+            "taxcurr": "USD",
+            "Name": "PREMIUM FLEX"
+          }
+        },
+        {
+          "pricingArr": [
+            {
+              "passengers": 2,
+              "paxtype": "ADT",
+              "markup_id": 0,
+              "base": 6937,
+              "AgtNet": 0,
+              "gross": 6937,
+              "base_cur": "USD",
+              "sellcurr": "USD",
+              "total": 18849.26,
+              "tax": 2487.63,
+              "last_ticket_date": "2025-11-11",
+              "CabinClass": 2,
+              "BookingCode": "C",
+              "inMarkup": 0,
+              "cust_tot_spl_comm_amt": 0,
+              "baggage": {
+                "JFK-LHR": {
+                  "ADT": "SK***2p"
+                },
+                "LHR-JFK": {
+                  "ADT": "SK***2p"
+                }
+              }
+            },
+            {
+              "passengers": 1,
+              "paxtype": "CHD",
+              "markup_id": 0,
+              "base": 5203,
+              "AgtNet": 0,
+              "gross": 5203,
+              "base_cur": "USD",
+              "sellcurr": "USD",
+              "total": 7690.63,
+              "tax": 2487.63,
+              "last_ticket_date": "2025-11-11",
+              "CabinClass": 2,
+              "BookingCode": "C",
+              "inMarkup": 0,
+              "cust_tot_spl_comm_amt": 0,
+              "baggage": {
+                "JFK-LHR": {
+                  "CHD": "SK***2p"
+                },
+                "LHR-JFK": {
+                  "CHD": "SK***2p"
+                }
+              }
+            }
+          ],
+          "baggageTxt": {
+            "JFK-LHR": {
+              "ADT": "SK***2p",
+              "CHD": "SK***2p"
+            },
+            "LHR-JFK": {
+              "ADT": "SK***2p",
+              "CHD": "SK***2p"
+            }
+          },
+          "BrandInfo": [
+            {
+              "BrandName": "BUSINESS",
+              "BookingCode": "C",
+              "cabinCode": "C",
+              "seatsAvailable": 3,
+              "CabinName": "Business"
+            },
+            {
+              "BrandName": "BUSINESS",
+              "BookingCode": "C",
+              "cabinCode": "C",
+              "seatsAvailable": 3,
+              "CabinName": "Business"
+            },
+            {
+              "BrandName": "BUSINESS",
+              "BookingCode": "Z",
+              "cabinCode": "C",
+              "seatsAvailable": 9,
+              "CabinName": "Business"
+            },
+            {
+              "BrandName": "BUSINESS",
+              "BookingCode": "Z",
+              "cabinCode": "C",
+              "seatsAvailable": 9,
+              "CabinName": "Business"
+            }
+          ],
+          "Total_Fare": {
+            "BrandId": 0,
+            "base": 19077,
+            "AgtNet": 0,
+            "basecurr": "USD",
+            "markup": 0,
+            "comm": 0,
+            "gross": 19077,
+            "sellcurr": "USD",
+            "total_base": 26539.89,
+            "total": 26539.89,
+            "tax": 7462.89,
+            "taxcurr": "USD",
+            "Name": "BUSINESS"
+          }
+        },
+        {
+          "pricingArr": [
+            {
+              "passengers": 2,
+              "paxtype": "ADT",
+              "markup_id": 0,
+              "base": 7487,
+              "AgtNet": 0,
+              "gross": 7487,
+              "base_cur": "USD",
+              "sellcurr": "USD",
+              "total": 19949.26,
+              "tax": 2487.63,
+              "last_ticket_date": "2025-11-30",
+              "CabinClass": 2,
+              "BookingCode": "C",
+              "inMarkup": 0,
+              "cust_tot_spl_comm_amt": 0,
+              "baggage": {
+                "JFK-LHR": {
+                  "ADT": "SK***2p"
+                },
+                "LHR-JFK": {
+                  "ADT": "SK***2p"
+                }
+              }
+            },
+            {
+              "passengers": 1,
+              "paxtype": "CHD",
+              "markup_id": 0,
+              "base": 5615,
+              "AgtNet": 0,
+              "gross": 5615,
+              "base_cur": "USD",
+              "sellcurr": "USD",
+              "total": 8102.63,
+              "tax": 2487.63,
+              "last_ticket_date": "2025-11-30",
+              "CabinClass": 2,
+              "BookingCode": "C",
+              "inMarkup": 0,
+              "cust_tot_spl_comm_amt": 0,
+              "baggage": {
+                "JFK-LHR": {
+                  "CHD": "SK***2p"
+                },
+                "LHR-JFK": {
+                  "CHD": "SK***2p"
+                }
+              }
+            }
+          ],
+          "baggageTxt": {
+            "JFK-LHR": {
+              "ADT": "SK***2p",
+              "CHD": "SK***2p"
+            },
+            "LHR-JFK": {
+              "ADT": "SK***2p",
+              "CHD": "SK***2p"
+            }
+          },
+          "BrandInfo": [
+            {
+              "BrandName": "BUSINESS FLEX",
+              "BookingCode": "C",
+              "cabinCode": "C",
+              "seatsAvailable": 3,
+              "CabinName": "Business"
+            },
+            {
+              "BrandName": "BUSINESS FLEX",
+              "BookingCode": "C",
+              "cabinCode": "C",
+              "seatsAvailable": 3,
+              "CabinName": "Business"
+            },
+            {
+              "BrandName": "BUSINESS FLEX",
+              "BookingCode": "Z",
+              "cabinCode": "C",
+              "seatsAvailable": 9,
+              "CabinName": "Business"
+            },
+            {
+              "BrandName": "BUSINESS FLEX",
+              "BookingCode": "Z",
+              "cabinCode": "C",
+              "seatsAvailable": 9,
+              "CabinName": "Business"
+            }
+          ],
+          "Total_Fare": {
+            "BrandId": 0,
+            "base": 20589,
+            "AgtNet": 0,
+            "basecurr": "USD",
+            "markup": 0,
+            "comm": 0,
+            "gross": 20589,
+            "sellcurr": "USD",
+            "total_base": 28051.89,
+            "total": 28051.89,
+            "tax": 7462.89,
+            "taxcurr": "USD",
+            "Name": "BUSINESS FLEX"
+          }
+        }
+      ],
+      "sessionId": "f391b1938d2aaf05da74ba7c92628bba",
+      "bpc_request_id": 13223,
+      "psc_request_id": 54505609,
+      "gds": "X",
+      "ChooseSupplier": "",
+      "filetype": "publish",
+      "psw_result_id": 253810950,
+      "OptionDate": "2025-11-09"
+    }
+  }
+}

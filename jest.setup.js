@@ -7,8 +7,8 @@
 import '@testing-library/jest-dom';
 
 // Mock environment variables for tests
-process.env.VYSPA_API_URL = 'https://api.globehunters.com';
-process.env.VYSPA_API_VERSION = '1';
-process.env.VYSPA_USERNAME = 'RemBook';
-process.env.VYSPA_PASSWORD = 'GHR3mPa55';
-process.env.VYSPA_TOKEN = 'AE8C3HLS04NF7';
+process.env.VYSPA_API_URL = process.env.VYSPA_API_URL || '';
+process.env.VYSPA_API_VERSION = process.env.VYSPA_API_VERSION || '1';
+process.env.VYSPA_USERNAME = process.env.VYSPA_USERNAME || '';
+process.env.VYSPA_PASSWORD = process.env.VYSPA_PASSWORD || '';
+process.env.VYSPA_TOKEN = process.env.VYSPA_TOKEN || '';

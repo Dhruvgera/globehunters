@@ -10,6 +10,7 @@ import { FlightLegMobile } from "./flight-card/FlightLegMobile";
 import { FlightLegDesktop } from "./flight-card/FlightLegDesktop";
 import { FlightActions } from "./flight-card/FlightActions";
 import { TicketOptionsPanel } from "./flight-card/TicketOptionsPanel";
+import { usePriceCheck } from "@/hooks/usePriceCheck";
 
 interface FlightCardProps {
   flight: Flight;
@@ -26,6 +27,15 @@ export default function FlightCard({
   );
   const [showTicketOptions, setShowTicketOptions] = useState(false);
   const [showFlightInfo, setShowFlightInfo] = useState(false);
+
+  // Prefetch price check for this flight on intent (hover) to speed up modal/options
+  const { checkPrice, priceCheck } = usePriceCheck();
+  const prefetchOptions = () => {
+    if (flight.segmentResultId) {
+      checkPrice(String(flight.segmentResultId));
+    }
+  };
+  const priceCheckData = priceCheck;
 
   const handleSelectFlight = (
     fareType: "Eco Value" | "Eco Classic" | "Eco Flex"
@@ -63,15 +73,22 @@ export default function FlightCard({
         pricePerPerson={flight.pricePerPerson}
         showTicketOptions={showTicketOptions}
         onViewFlightInfo={() => setShowFlightInfo(!showFlightInfo)}
-        onToggleTicketOptions={() => setShowTicketOptions(!showTicketOptions)}
+        onToggleTicketOptions={() => {
+          // Ensure price options are loading before expanding
+          if (flight.segmentResultId) prefetchOptions();
+          setShowTicketOptions(!showTicketOptions);
+        }}
+        onPrefetchOptions={prefetchOptions}
       />
 
       {/* Expandable Ticket Options */}
-      {showTicketOptions && flight.ticketOptions && (
+      {showTicketOptions && (
         <TicketOptionsPanel
           ticketOptions={flight.ticketOptions}
+          priceOptions={priceCheckData?.priceOptions}
           currency={flight.currency}
-          onSelectFlight={handleSelectFlight}
+          onSelectFlight={handleSelectFlight as any}
+          onViewFlightInfo={() => setShowFlightInfo(true)}
         />
       )}
 

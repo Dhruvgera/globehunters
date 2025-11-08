@@ -4,3 +4,4 @@
  */
 
 export { searchFlights, getFlightDetails } from './searchFlights';
+export { checkPrice } from './checkPrice';

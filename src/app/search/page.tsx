@@ -131,48 +131,36 @@ function SearchPageContent() {
     getDateFromIndex
   } = useDatePrices(isInitialized ? effectiveSearchParams : null, actualMinPrice);
 
-  // Auto-prefetch all date prices in background with delay to allow UI to render first
+  // Auto-prefetch date prices in background; start early for better concurrency
   useEffect(() => {
-    // Only fetch after main search completes successfully
-    if (!loading && flights.length > 0 && actualMinPrice) {
-      // Add a 500ms delay to ensure main results render first
-      const timer = setTimeout(() => {
-        // Prefetch departure dates, prioritizing nearest to selected (center) index
-        const departureCenter = Math.floor(departureDates.length / 2);
-        const departureIndices = departureDates
-          .map((_, index) => index)
-          .filter(index => index !== departureCenter)
-          .sort((a, b) => Math.abs(a - departureCenter) - Math.abs(b - departureCenter));
-        
-        if (departureIndices.length > 0) {
-          console.log('🔄 Starting background fetch for departure dates');
-          fetchDatePricesBatch(departureIndices, 'departure').catch(err => {
-            console.error('Error in background departure date fetch:', err);
-          });
-        }
+    if (departureDates.length > 0) {
+      const departureCenter = Math.floor(departureDates.length / 2);
+      const departureIndices = departureDates
+        .map((_, index) => index)
+        .filter(index => index !== departureCenter)
+        .sort((a, b) => Math.abs(a - departureCenter) - Math.abs(b - departureCenter));
 
-        // Prefetch return dates if round trip - with additional delay
-        if (effectiveSearchParams.tripType === 'round-trip' && returnDates.length > 0) {
-          setTimeout(() => {
-            const returnCenter = Math.floor(returnDates.length / 2);
-            const returnIndices = returnDates
-              .map((_, index) => index)
-              .filter(index => index !== returnCenter) // Skip center/selected date
-              .sort((a, b) => Math.abs(a - returnCenter) - Math.abs(b - returnCenter));
-            
-            if (returnIndices.length > 0) {
-              console.log('🔄 Starting background fetch for return dates');
-              fetchDatePricesBatch(returnIndices, 'return').catch(err => {
-                console.error('Error in background return date fetch:', err);
-              });
-            }
-          }, 1000); // Additional 1s delay for return dates
-        }
-      }, 500); // 500ms delay before starting any background fetching
-
-      return () => clearTimeout(timer);
+      if (departureIndices.length > 0) {
+        fetchDatePricesBatch(departureIndices, 'departure').catch(err => {
+          console.error('Error in background departure date fetch:', err);
+        });
+      }
     }
-  }, [loading, flights.length, actualMinPrice, departureDates.length, returnDates.length, fetchDatePricesBatch, effectiveSearchParams.tripType]);
+
+    if (effectiveSearchParams.tripType === 'round-trip' && returnDates.length > 0) {
+      const returnCenter = Math.floor(returnDates.length / 2);
+      const returnIndices = returnDates
+        .map((_, index) => index)
+        .filter(index => index !== returnCenter)
+        .sort((a, b) => Math.abs(a - returnCenter) - Math.abs(b - returnCenter));
+
+      if (returnIndices.length > 0) {
+        fetchDatePricesBatch(returnIndices, 'return').catch(err => {
+          console.error('Error in background return date fetch:', err);
+        });
+      }
+    }
+  }, [departureDates.length, returnDates.length, fetchDatePricesBatch, effectiveSearchParams.tripType]);
 
   // Only use mock data if explicitly in error state and no real data
   const effectiveFlights = useMemo(() => {

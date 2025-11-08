@@ -2,11 +2,14 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import { TransformedPriceOption } from "@/types/priceCheck";
 
 interface PriceSummaryCardProps {
   flightFare: number;
   taxesAndFees: number;
   adults: number;
+  children?: number;
+  selectedUpgrade?: TransformedPriceOption | null;
   isSticky?: boolean;
 }
 
@@ -14,11 +17,13 @@ export function PriceSummaryCard({
   flightFare,
   taxesAndFees,
   adults,
+  children = 0,
+  selectedUpgrade,
   isSticky = true,
 }: PriceSummaryCardProps) {
   const t = useTranslations('booking.priceSummary');
   const [isExpanded, setIsExpanded] = useState(false);
-  const total = flightFare + taxesAndFees;
+  const total = selectedUpgrade ? selectedUpgrade.totalPrice : (flightFare * (adults + children)) + taxesAndFees;
 
   return (
     <div
@@ -44,26 +49,65 @@ export function PriceSummaryCard({
           isExpanded ? "flex" : "hidden lg:flex"
         }`}
       >
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-[#010D50]">
-            {t('traveler')}: {adults} {adults > 1 ? t('adults') : t('adult')}
-          </span>
-          <span className="text-sm font-medium text-[#010D50]">
-            £{total.toLocaleString()}
-          </span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-[#3A478A]">{t('flightFare')}</span>
-          <span className="text-sm text-[#3A478A]">
-            £{flightFare.toLocaleString()}
-          </span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-[#3A478A]">{t('taxesAndFees')}</span>
-          <span className="text-sm text-[#3A478A]">
-            £{taxesAndFees.toLocaleString()}
-          </span>
-        </div>
+        {selectedUpgrade ? (
+          <>
+            {/* Show passenger breakdown from price check */}
+            {selectedUpgrade.passengerBreakdown.map((pax, idx) => (
+              <div key={idx} className="flex items-center justify-between">
+                <span className="text-sm font-medium text-[#010D50]">
+                  {pax.count}x {pax.type === 'ADT' ? t('adult') : pax.type === 'CHD' ? 'Child' : 'Infant'}
+                </span>
+                <span className="text-sm font-medium text-[#010D50]">
+                  £{pax.totalPrice.toLocaleString()}
+                </span>
+              </div>
+            ))}
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-[#3A478A]">Base Fare</span>
+              <span className="text-sm text-[#3A478A]">
+                £{selectedUpgrade.baseFare.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-[#3A478A]">{t('taxesAndFees')}</span>
+              <span className="text-sm text-[#3A478A]">
+                £{selectedUpgrade.taxes.toLocaleString()}
+              </span>
+            </div>
+            {selectedUpgrade.atolFee > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-[#3A478A]">ATOL Fee</span>
+                <span className="text-sm text-[#3A478A]">
+                  £{selectedUpgrade.atolFee.toLocaleString()}
+                </span>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-[#010D50]">
+                {t('traveler')}: {adults} {adults > 1 ? t('adults') : t('adult')}
+                {children > 0 && `, ${children} Child${children > 1 ? 'ren' : ''}`}
+              </span>
+              <span className="text-sm font-medium text-[#010D50]">
+                £{total.toLocaleString()}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-[#3A478A]">{t('flightFare')}</span>
+              <span className="text-sm text-[#3A478A]">
+                £{(flightFare * (adults + children)).toLocaleString()}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-[#3A478A]">{t('taxesAndFees')}</span>
+              <span className="text-sm text-[#3A478A]">
+                £{taxesAndFees.toLocaleString()}
+              </span>
+            </div>
+          </>
+        )}
       </div>
 
       <div

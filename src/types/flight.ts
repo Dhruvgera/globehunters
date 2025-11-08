@@ -70,6 +70,8 @@ export interface Flight {
   refundableText?: string;
   hasBaggage?: boolean;
   meals?: boolean;
+  // Price check integration
+  segmentResultId?: string;    // Result_id from API for price check
 }
 
 export interface SearchParams {

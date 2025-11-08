@@ -11,10 +11,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const CONFIG = {
-  apiUrl: process.env.VYSPA_API_URL || 'https://api.globehunters.com',
+  apiUrl: process.env.VYSPA_API_URL || '',
   apiVersion: process.env.VYSPA_API_VERSION || '1',
-  username: process.env.VYSPA_USERNAME || 'FlightsUS',
-  password: process.env.VYSPA_PASSWORD || 'GHR3mPa55',
+  username: process.env.VYSPA_USERNAME || '',
+  password: process.env.VYSPA_PASSWORD || '',
 };
 
 function getAuthHeader() {

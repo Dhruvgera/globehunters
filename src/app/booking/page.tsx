@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
-import { useBookingStore, useSelectedFlight } from "@/store/bookingStore";
+import { useBookingStore, useSelectedFlight, useSelectedUpgrade, usePriceCheckData } from "@/store/bookingStore";
 import { useTranslations } from "next-intl";
 
 // Import new modular components
@@ -39,8 +39,10 @@ function BookingContent() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showFlightInfo, setShowFlightInfo] = useState(false);
 
-  // Get selected flight from Zustand store
+  // Get selected flight and upgrade from Zustand store
   const flight = useSelectedFlight();
+  const selectedUpgrade = useSelectedUpgrade();
+  const priceCheckData = usePriceCheckData();
 
   // Redirect to search if no flight selected
   useEffect(() => {
@@ -164,9 +166,11 @@ function BookingContent() {
 
             {/* Price Summary */}
             <PriceSummaryCard
-              flightFare={flight.pricePerPerson}
-              taxesAndFees={0}
-              adults={1}
+              flightFare={selectedUpgrade ? selectedUpgrade.pricePerPerson : flight.pricePerPerson}
+              taxesAndFees={selectedUpgrade ? selectedUpgrade.taxes : 0}
+              adults={selectedUpgrade ? selectedUpgrade.passengerBreakdown.filter(p => p.type === 'ADT').reduce((sum, p) => sum + p.count, 0) : 1}
+              children={selectedUpgrade ? selectedUpgrade.passengerBreakdown.filter(p => p.type === 'CHD').reduce((sum, p) => sum + p.count, 0) : 0}
+              selectedUpgrade={selectedUpgrade}
               isSticky={true}
             />
 

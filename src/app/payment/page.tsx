@@ -26,8 +26,10 @@ function PaymentContent() {
   const router = useRouter();
   const [showFlightInfo, setShowFlightInfo] = useState(false);
 
-  // Get selected flight from Zustand store
+  // Get selected flight and upgrade from Zustand store
   const flight = useSelectedFlight();
+  const selectedUpgrade = useBookingStore((state) => state.selectedUpgradeOption);
+  const priceCheckData = useBookingStore((state) => state.priceCheckData);
 
   // Get and set protection plan and baggage from/to Zustand store
   const addOns = useBookingStore((state) => state.addOns);
@@ -49,12 +51,12 @@ function PaymentContent() {
     return null;
   }
 
-  // Price calculation
-  const baseFare = 94353;
+  // Price calculation - Use real pricing from selected upgrade or flight
+  const baseFare = selectedUpgrade ? selectedUpgrade.totalPrice : (flight.price || 0);
   const protectionPlanPrices = {
-    basic: 8623.68,
-    premium: 10779.60,
-    all: 12935.52,
+    basic: baseFare * 0.05, // 5% of base fare
+    premium: baseFare * 0.08, // 8% of base fare
+    all: baseFare * 0.10, // 10% of base fare
   };
   const baggagePrice = PRICING_CONFIG.baggagePrice;
   const discountPercent = PRICING_CONFIG.defaultDiscount;
@@ -72,32 +74,32 @@ function PaymentContent() {
       ? "Premium"
       : "All Included";
 
-  // Flight data for summary cards
+  // Flight data for summary cards - Use real flight data
   const outboundLeg = {
-    from: "London",
-    to: "Lagos",
-    fromCode: "LGW",
-    toCode: "LOS",
-    departureTime: "16:40",
-    arrivalTime: "05:50",
-    date: "Sun, 9 Oct",
-    duration: "13h 10m",
-    stops: "1 Stop",
-    airline: "Royal Air Maroc",
+    from: flight.outbound.departureAirport.city,
+    to: flight.outbound.arrivalAirport.city,
+    fromCode: flight.outbound.departureAirport.code,
+    toCode: flight.outbound.arrivalAirport.code,
+    departureTime: flight.outbound.departureTime,
+    arrivalTime: flight.outbound.arrivalTime,
+    date: flight.outbound.date,
+    duration: flight.outbound.totalJourneyTime || flight.outbound.duration,
+    stops: flight.outbound.stopDetails || `${flight.outbound.stops} Stop${flight.outbound.stops !== 1 ? 's' : ''}`,
+    airline: flight.airline.name,
   };
 
-  const inboundLeg = {
-    from: "Lagos",
-    to: "London",
-    fromCode: "LOS",
-    toCode: "LGW",
-    departureTime: "05:50",
-    arrivalTime: "16:40",
-    date: "Wed, 12 Oct",
-    duration: "13h 10m",
-    stops: "1 Stop",
-    airline: "Royal Air Maroc",
-  };
+  const inboundLeg = flight.inbound ? {
+    from: flight.inbound.departureAirport.city,
+    to: flight.inbound.arrivalAirport.city,
+    fromCode: flight.inbound.departureAirport.code,
+    toCode: flight.inbound.arrivalAirport.code,
+    departureTime: flight.inbound.departureTime,
+    arrivalTime: flight.inbound.arrivalTime,
+    date: flight.inbound.date,
+    duration: flight.inbound.totalJourneyTime || flight.inbound.duration,
+    stops: flight.inbound.stopDetails || `${flight.inbound.stops} Stop${flight.inbound.stops !== 1 ? 's' : ''}`,
+    airline: flight.airline.name,
+  } : null;
 
   return (
     <div className="min-h-screen bg-white">
@@ -126,11 +128,13 @@ function PaymentContent() {
                 passengers={`1 ${t('adult')}`}
                 onViewDetails={() => setShowFlightInfo(true)}
               />
-              <FlightSummaryCard
-                leg={inboundLeg}
-                passengers={`1 ${t('adult')}`}
-                onViewDetails={() => setShowFlightInfo(true)}
-              />
+              {inboundLeg && (
+                <FlightSummaryCard
+                  leg={inboundLeg}
+                  passengers={`1 ${t('adult')}`}
+                  onViewDetails={() => setShowFlightInfo(true)}
+                />
+              )}
             </div>
 
             {/* Baggage Allowance Section */}

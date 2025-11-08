@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { X, Check, Info, Clock, Briefcase, Package, ShoppingBag, XCircle as XIcon, Plane, MapPin, UtensilsCrossed } from "lucide-react";
+import { X, Check, Info, Clock, Briefcase, Package, ShoppingBag, XCircle as XIcon, Plane, MapPin, UtensilsCrossed, AlertTriangle, Loader2 } from "lucide-react";
 import Image from "next/image";
 import {
   Dialog,
@@ -15,6 +15,8 @@ import { Flight } from "@/types/flight";
 import { useTranslations } from "next-intl";
 import { formatPrice } from "@/lib/currency";
 import { useBookingStore } from "@/store/bookingStore";
+import { usePriceCheck } from "@/hooks/usePriceCheck";
+import { TransformedPriceOption } from "@/types/priceCheck";
 
 interface FlightInfoModalProps {
   flight: Flight;
@@ -30,27 +32,80 @@ export default function FlightInfoModal({
   const t = useTranslations('flightInfo');
   const router = useRouter();
   const setSelectedFlight = useBookingStore((state) => state.setSelectedFlight);
+  const setSelectedUpgrade = useBookingStore((state) => state.setSelectedUpgrade);
+  const setPriceCheckData = useBookingStore((state) => state.setPriceCheckData);
   const [imgError, setImgError] = useState(false);
   const [selectedLeg, setSelectedLeg] = useState<"outbound" | "inbound">(
     "outbound"
   );
-  const [selectedFareType, setSelectedFareType] = useState<
-    "value" | "classic" | "flex"
-  >("classic");
+  const [selectedUpgradeOption, setSelectedUpgradeOption] = useState<TransformedPriceOption | null>(null);
+
+  // Price check integration
+  const { priceCheck, isLoading, error, checkPrice, clearError } = usePriceCheck();
 
   const currentLeg =
     selectedLeg === "outbound" ? flight.outbound : flight.inbound;
 
-  const handleBookNow = () => {
-    // Map selectedFareType to the store's fare type format
-    const fareTypeMap = {
-      value: 'Eco Value',
-      classic: 'Eco Classic',
-      flex: 'Eco Flex',
-    } as const;
+  // Trigger price check when modal opens - run immediately, don't wait for other requests
+  useEffect(() => {
+    if (open && flight.segmentResultId) {
+      checkPrice(flight.segmentResultId);
+    }
+  }, [open, flight.segmentResultId, checkPrice]);
 
-    // Save flight to booking store
-    setSelectedFlight(flight, fareTypeMap[selectedFareType]);
+  // Clear error when modal closes
+  useEffect(() => {
+    if (!open) {
+      clearError();
+      setSelectedUpgradeOption(null);
+    }
+  }, [open, clearError]);
+
+  // Set default selected option when price check loads
+  useEffect(() => {
+    if (priceCheck && priceCheck.priceOptions.length > 0 && !selectedUpgradeOption) {
+      setSelectedUpgradeOption(priceCheck.priceOptions[0]);
+    }
+  }, [priceCheck, selectedUpgradeOption]);
+
+  function prettifyCabinName(name: string) {
+    if (!name) return '';
+    // Insert space before capital letters, handle known concatenations
+    const map: Record<string, string> = {
+      PremiumEconomy: 'Premium Economy',
+    };
+    if (map[name]) return map[name];
+    return name.replace(/([a-z])([A-Z])/g, '$1 $2');
+  }
+
+  function normalizeBaggageLabel(label?: string): string {
+    if (!label) return '';
+    const code = String(label).trim();
+    const match = code.match(/(\d+)p/i);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num === 0) return 'Cabin bag only';
+      if (num === 1) return '1 piece';
+      return `${num} pieces`;
+    }
+    if (code.endsWith('***')) return 'Cabin bag only';
+    return label;
+  }
+
+  const handleBookNow = () => {
+    if (selectedUpgradeOption) {
+      // Save selected upgrade to store
+      setSelectedUpgrade(selectedUpgradeOption);
+      // Save flight with selected cabin class
+      setSelectedFlight(flight, selectedUpgradeOption.cabinClassDisplay);
+      // Save price check data
+      if (priceCheck) {
+        setPriceCheckData(priceCheck);
+      }
+    } else {
+      // Fallback to original flight price
+      setSelectedFlight(flight, 'Economy');
+    }
     
     // Navigate to booking page
     router.push('/booking');
@@ -335,7 +390,7 @@ export default function FlightInfoModal({
                         <div className="flex items-start gap-2">
                           <Package className="w-5 h-5 text-[#010D50] shrink-0" />
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-xs font-medium text-[#010D50]">{formatBaggageText()}</span>
+                            <span className="text-xs font-medium text-[#010D50]">{normalizeBaggageLabel(formatBaggageText())}</span>
                             <span className="text-xs text-[#3A478A]">{t('baggage.checkedDesc')}</span>
                           </div>
                         </div>
@@ -401,53 +456,85 @@ export default function FlightInfoModal({
             )}
           </div>
 
-          {/* Fare Type Selector (only if options exist) */}
-          {flight.ticketOptions && flight.ticketOptions.length > 0 && (
+          {/* Price Check Loading State */}
+          {isLoading && (
+            <div className="flex flex-col gap-3 items-center justify-center py-8">
+              <Loader2 className="w-8 h-8 animate-spin text-[#3754ED]" />
+              <p className="text-sm text-[#3A478A]">Loading fare options...</p>
+            </div>
+          )}
+
+          {/* Price Check Error State */}
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-red-900">{error.userMessage}</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => flight.segmentResultId && checkPrice(flight.segmentResultId)}
+                  className="mt-3"
+                >
+                  Try Again
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* (chips rendered once below within Fare Details section) */}
+
+          {/* Fare Details Section (Dynamic from Price Check) */}
+          {priceCheck && priceCheck.priceOptions.length > 0 && selectedUpgradeOption && (
           <div className="flex flex-col gap-5 sm:gap-6">
-            <div className="flex items-center gap-3 overflow-x-auto no-scrollbar py-1">
-              <Button
-                variant={selectedFareType === "value" ? "default" : "outline"}
-                className={`${
-                  selectedFareType === "value"
-                    ? "bg-[#3754ED] text-white hover:bg-[#2A3FB8]"
-                    : "bg-[#F5F7FF] text-[#010D50] border-0 hover:bg-[#E0E7FF]"
-                } rounded-full px-4 py-2.5 h-auto text-sm font-semibold leading-normal`}
-                onClick={() => setSelectedFareType("value")}
-              >
-                Eco Value
-              </Button>
-              <Button
-                variant={selectedFareType === "classic" ? "default" : "outline"}
-                className={`${
-                  selectedFareType === "classic"
-                    ? "bg-[#3754ED] text-white hover:bg-[#2A3FB8]"
-                    : "bg-[#F5F7FF] text-[#010D50] border-0 hover:bg-[#E0E7FF]"
-                } rounded-full px-4 py-2.5 h-auto text-sm font-semibold leading-normal`}
-                onClick={() => setSelectedFareType("classic")}
-              >
-                Eco Classic
-              </Button>
-              <Button
-                variant={selectedFareType === "flex" ? "default" : "outline"}
-                className={`${
-                  selectedFareType === "flex"
-                    ? "bg-[#3754ED] text-white hover:bg-[#2A3FB8]"
-                    : "bg-[#F5F7FF] text-[#010D50] border-0 hover:bg-[#E0E7FF]"
-                } rounded-full px-4 py-2.5 h-auto text-sm font-semibold leading-normal`}
-                onClick={() => setSelectedFareType("flex")}
-              >
-                Eco Flex
-              </Button>
+            <div className="flex flex-wrap items-center gap-2 py-1">
+              {priceCheck.priceOptions.map((option) => (
+                <Button
+                  key={option.id}
+                  variant={selectedUpgradeOption?.id === option.id ? "default" : "outline"}
+                  className={`${
+                    selectedUpgradeOption?.id === option.id
+                      ? "bg-[#3754ED] text-white hover:bg-[#2A3FB8]"
+                      : "bg-[#F5F7FF] text-[#010D50] border-0 hover:bg-[#E0E7FF]"
+                  } rounded-full px-4 py-2.5 h-auto text-sm font-semibold leading-normal whitespace-nowrap`}
+                  onClick={() => setSelectedUpgradeOption(option)}
+                >
+                  {prettifyCabinName(option.cabinClassDisplay)}
+                  {option.isUpgrade && option.priceDifference && (
+                    <span className="ml-2 text-xs opacity-80">
+                      +{formatPrice(option.priceDifference, option.currency)}
+                    </span>
+                  )}
+                </Button>
+              ))}
             </div>
 
             {/* Fare Details */}
             <div className="flex flex-col md:flex-row items-stretch gap-3">
-                {/* Baggage Section */}
+                {/* Baggage Section - From Selected Option */}
                 <div className="flex-1 bg-[#F5F7FF] rounded-xl p-3 sm:p-4 flex flex-col gap-4 sm:gap-6 min-w-0">
                   <span className="text-sm font-semibold text-[#010D50]">
                     Baggage
                   </span>
                   <div className="flex flex-col gap-3">
+                    {/* Baggage from API */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-3 flex-1 min-w-0">
+                        <Package className="w-5 h-5 sm:w-6 sm:h-6 text-[#010D50] shrink-0 mt-0.5" />
+                        <div className="flex flex-col gap-0.5 min-w-0">
+                          <span className="text-xs sm:text-sm font-medium text-[#010D50]">
+                            {selectedUpgradeOption.baggage.description}
+                          </span>
+                          {selectedUpgradeOption.baggage.details && (
+                            <span className="text-xs sm:text-sm text-[#3A478A] break-words">
+                              {selectedUpgradeOption.baggage.details.substring(0, 100)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
+                    </div>
+
                     {/* Personal Item */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -473,23 +560,7 @@ export default function FlightInfoModal({
                             1 carry-on bag
                           </span>
                           <span className="text-xs sm:text-sm text-[#3A478A]">
-                            Max weight 10 kg
-                          </span>
-                        </div>
-                      </div>
-                      <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
-                    </div>
-
-                    {/* Checked Bags */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <Package className="w-5 h-5 sm:w-6 sm:h-6 text-[#010D50] shrink-0 mt-0.5" />
-                        <div className="flex flex-col gap-0.5 min-w-0">
-                          <span className="text-xs sm:text-sm font-medium text-[#010D50]">
-                            2 checked bags
-                          </span>
-                          <span className="text-xs sm:text-sm text-[#3A478A]">
-                            Max weight 23 kg
+                            Standard size restrictions apply
                           </span>
                         </div>
                       </div>
@@ -559,12 +630,22 @@ export default function FlightInfoModal({
 
         {/* Footer */}
         <div className="sticky bottom-0 z-20 bg-white rounded-xl px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-3 border border-[#EEF0F7] shadow-[0_-8px_24px_-12px_rgba(2,6,23,0.35)]">
-          <span className="text-sm sm:text-lg font-medium text-[#3754ED] whitespace-nowrap">
-            {formatPrice(flight.pricePerPerson, flight.currency)} <span className="hidden sm:inline">/per person</span>
-          </span>
+          <div className="flex flex-col gap-1">
+            <span className="text-sm sm:text-lg font-medium text-[#3754ED] whitespace-nowrap">
+              {selectedUpgradeOption 
+                ? formatPrice(selectedUpgradeOption.totalPrice, selectedUpgradeOption.currency)
+                : formatPrice(flight.price, flight.currency)}
+            </span>
+            <span className="text-xs text-[#3A478A]">
+              {selectedUpgradeOption
+                ? `${formatPrice(selectedUpgradeOption.pricePerPerson, selectedUpgradeOption.currency)} per person`
+                : `${formatPrice(flight.pricePerPerson, flight.currency)} per person`}
+            </span>
+          </div>
           <Button 
             onClick={handleBookNow}
-            className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-full px-4 sm:px-5 py-2 h-auto gap-1 text-sm font-bold shrink-0"
+            disabled={!selectedUpgradeOption && !flight.price}
+            className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-full px-4 sm:px-5 py-2 h-auto gap-1 text-sm font-bold shrink-0 disabled:opacity-50"
           >
             Book
             <svg

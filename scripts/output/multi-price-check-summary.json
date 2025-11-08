@@ -1,0 +1,113 @@
+{
+  "generatedAt": "2025-11-08T17:32:45.903Z",
+  "summary": [
+    {
+      "segmentId": 253810950,
+      "options": 7,
+      "cabins": [
+        "4",
+        "3",
+        "2"
+      ],
+      "brands": [
+        "LIGHT",
+        "STANDARD",
+        "FLEX",
+        "PREMIUM",
+        "PREMIUM FLEX",
+        "BUSINESS",
+        "BUSINESS FLEX"
+      ]
+    },
+    {
+      "segmentId": 253810959,
+      "options": 7,
+      "cabins": [
+        "4",
+        "3",
+        "2"
+      ],
+      "brands": [
+        "LIGHT",
+        "STANDARD",
+        "FLEX",
+        "PREMIUM",
+        "PREMIUM FLEX",
+        "BUSINESS",
+        "BUSINESS FLEX"
+      ]
+    },
+    {
+      "segmentId": 253810967,
+      "options": 7,
+      "cabins": [
+        "4",
+        "3",
+        "2"
+      ],
+      "brands": [
+        "LIGHT",
+        "STANDARD",
+        "FLEX",
+        "PREMIUM",
+        "PREMIUM FLEX",
+        "BUSINESS",
+        "BUSINESS FLEX"
+      ]
+    },
+    {
+      "segmentId": 253810975,
+      "options": 7,
+      "cabins": [
+        "4",
+        "3",
+        "2"
+      ],
+      "brands": [
+        "LIGHT",
+        "STANDARD",
+        "FLEX",
+        "PREMIUM",
+        "PREMIUM FLEX",
+        "BUSINESS",
+        "BUSINESS FLEX"
+      ]
+    },
+    {
+      "segmentId": 253810982,
+      "options": 7,
+      "cabins": [
+        "4",
+        "3",
+        "2"
+      ],
+      "brands": [
+        "LIGHT",
+        "STANDARD",
+        "FLEX",
+        "PREMIUM",
+        "PREMIUM FLEX",
+        "BUSINESS",
+        "BUSINESS FLEX"
+      ]
+    },
+    {
+      "segmentId": 253810988,
+      "options": 7,
+      "cabins": [
+        "4",
+        "3",
+        "2"
+      ],
+      "brands": [
+        "LIGHT",
+        "STANDARD",
+        "FLEX",
+        "PREMIUM",
+        "PREMIUM FLEX",
+        "BUSINESS",
+        "BUSINESS FLEX"
+      ]
+    }
+  ]
+}

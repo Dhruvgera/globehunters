@@ -11,6 +11,7 @@ interface FlightActionsProps {
   showTicketOptions: boolean;
   onViewFlightInfo: () => void;
   onToggleTicketOptions: () => void;
+  onPrefetchOptions?: () => void;
 }
 
 export function FlightActions({
@@ -19,6 +20,7 @@ export function FlightActions({
   showTicketOptions,
   onViewFlightInfo,
   onToggleTicketOptions,
+  onPrefetchOptions,
 }: FlightActionsProps) {
   const t = useTranslations('search.flights');
   return (
@@ -32,6 +34,7 @@ export function FlightActions({
           variant="ghost"
           className="bg-[rgba(55,84,237,0.12)] hover:bg-[rgba(55,84,237,0.2)] text-[#3754ED] rounded-full px-4 py-2 h-auto text-xs font-medium"
           onClick={onViewFlightInfo}
+          onMouseEnter={onPrefetchOptions}
         >
           {t('viewFlightInfo')}
         </Button>
@@ -39,6 +42,7 @@ export function FlightActions({
           variant="outline"
           className="rounded-lg px-6 py-2 h-auto text-xs font-medium border-none hover:bg-gray-100"
           onClick={onToggleTicketOptions}
+          onMouseEnter={onPrefetchOptions}
         >
           {t('ticketOptions')}
           {showTicketOptions ? (

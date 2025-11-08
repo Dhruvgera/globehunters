@@ -162,6 +162,8 @@ function transformResult(result: VyspaResult): Flight | null {
       : (typeof (firstFlight as any).refundable === 'boolean' ? (firstFlight as any).refundable : null),
     refundableText: (firstFlight as any).refundable_text,
     hasBaggage,
+    // Store segment result ID for price check
+    segmentResultId: result.Result_id,
   };
 
   return flight;

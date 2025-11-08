@@ -8,6 +8,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { Flight, SearchParams } from '@/types/flight';
 import { Passenger, AddOns, BookingResponse } from '@/types/booking';
 import { PaymentDetails } from '@/types/payment';
+import { PriceCheckResult, TransformedPriceOption } from '@/types/priceCheck';
 
 interface BookingState {
   // Search state
@@ -16,8 +17,12 @@ interface BookingState {
 
   // Selected flight
   selectedFlight: Flight | null;
-  selectedFareType: 'Eco Value' | 'Eco Classic' | 'Eco Flex';
-  setSelectedFlight: (flight: Flight, fareType?: 'Eco Value' | 'Eco Classic' | 'Eco Flex') => void;
+  selectedFareType: string;
+  selectedUpgradeOption: TransformedPriceOption | null;
+  priceCheckData: PriceCheckResult | null;
+  setSelectedFlight: (flight: Flight, fareType?: string) => void;
+  setSelectedUpgrade: (option: TransformedPriceOption) => void;
+  setPriceCheckData: (data: PriceCheckResult | null) => void;
   clearSelectedFlight: () => void;
 
   // Passengers
@@ -57,7 +62,9 @@ interface BookingState {
 const initialState = {
   searchParams: null,
   selectedFlight: null,
-  selectedFareType: 'Eco Classic' as const,
+  selectedFareType: 'Economy',
+  selectedUpgradeOption: null,
+  priceCheckData: null,
   passengers: [],
   contactEmail: '',
   contactPhone: '',
@@ -79,17 +86,28 @@ export const useBookingStore = create<BookingState>()(
       setSearchParams: (params) => set({ searchParams: params }),
 
       // Selected flight
-      setSelectedFlight: (flight, fareType = 'Eco Classic') =>
+      setSelectedFlight: (flight, fareType = 'Economy') =>
         set({
           selectedFlight: flight,
           selectedFareType: fareType,
           currentStep: 'booking',
         }),
 
+      setSelectedUpgrade: (option) =>
+        set({
+          selectedUpgradeOption: option,
+          selectedFareType: option.cabinClassDisplay,
+        }),
+
+      setPriceCheckData: (data) =>
+        set({ priceCheckData: data }),
+
       clearSelectedFlight: () =>
         set({
           selectedFlight: null,
-          selectedFareType: 'Eco Classic',
+          selectedFareType: 'Economy',
+          selectedUpgradeOption: null,
+          priceCheckData: null,
         }),
 
       // Passengers
@@ -158,6 +176,8 @@ export const useBookingStore = create<BookingState>()(
         searchParams: state.searchParams,
         selectedFlight: state.selectedFlight,
         selectedFareType: state.selectedFareType,
+        selectedUpgradeOption: state.selectedUpgradeOption,
+        priceCheckData: state.priceCheckData,
         passengers: state.passengers,
         contactEmail: state.contactEmail,
         contactPhone: state.contactPhone,
@@ -174,6 +194,8 @@ export const useBookingStore = create<BookingState>()(
  * Selectors for commonly used derived state
  */
 export const useSelectedFlight = () => useBookingStore((state) => state.selectedFlight);
+export const useSelectedUpgrade = () => useBookingStore((state) => state.selectedUpgradeOption);
+export const usePriceCheckData = () => useBookingStore((state) => state.priceCheckData);
 export const usePassengers = () => useBookingStore((state) => state.passengers);
 export const useAddOns = () => useBookingStore((state) => state.addOns);
 export const useBooking = () => useBookingStore((state) => state.booking);
