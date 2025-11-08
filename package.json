@@ -10,7 +10,9 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:api": "node scripts/test-vyspa-api.mjs"
+    "test:api": "node scripts/test-vyspa-api.mjs",
+    "test:api:gh": "node scripts/test-globehunters-api.mjs",
+    "test:api:gh:airports": "node scripts/test-globehunters-airports.mjs"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",

@@ -128,10 +128,8 @@ export function validateVyspaConfig(): ValidationResult {
   if (!VYSPA_CONFIG.credentials.password) {
     errors.push('VYSPA_PASSWORD is not configured');
   }
-
-  if (!VYSPA_CONFIG.credentials.token) {
-    errors.push('VYSPA_TOKEN is not configured');
-  }
+  // Token is optional for the Globehunters REST v4 endpoint using Basic auth
+  // Keeping it non-mandatory to support both legacy Vyspa and new GH API
 
   return {
     valid: errors.length === 0,

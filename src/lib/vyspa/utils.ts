@@ -93,21 +93,28 @@ export function parsePriceValue(value: any, fallback: number = 0.0): number {
 
 /**
  * Format time from HHMM to HH:MM
- * @param time Time string in HHMM format (e.g., "1330")
- * @returns Time string in HH:MM format (e.g., "13:30")
+ * Accepts number or string, tolerates already formatted values
+ * @param time Time in HHMM or HH:MM
+ * @returns Time string in HH:MM format
  */
-export function formatTime(time: string): string {
-  if (!time) return '';
-  
+export function formatTime(time: string | number | null | undefined): string {
+  if (time === null || time === undefined || time === '') {
+    return '';
+  }
+  let str = String(time).trim();
+  if (str === '') return '';
   // Already formatted
-  if (time.includes(':')) return time;
-  
-  // Ensure 4 digits
-  const paddedTime = time.padStart(4, '0');
-  
-  if (paddedTime.length !== 4) return time;
-  
-  return `${paddedTime.substring(0, 2)}:${paddedTime.substring(2, 4)}`;
+  if (str.includes(':')) return str;
+  // Keep only digits
+  str = str.replace(/\D/g, '');
+  if (str.length === 0) return '';
+  // Normalize to 4 digits (HHMM)
+  if (str.length > 4) {
+    // Use the last 4 digits to preserve minutes
+    str = str.slice(-4);
+  }
+  const padded = str.padStart(4, '0');
+  return `${padded.substring(0, 2)}:${padded.substring(2, 4)}`;
 }
 
 /**

@@ -5,6 +5,7 @@
 
 export const VYSPA_CONFIG = {
   apiUrl: process.env.VYSPA_API_URL || '',
+  apiVersion: process.env.VYSPA_API_VERSION || '1',
   credentials: {
     username: process.env.VYSPA_USERNAME || '',
     password: process.env.VYSPA_PASSWORD || '',

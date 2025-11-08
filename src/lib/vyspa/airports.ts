@@ -85,27 +85,29 @@ function transformVyspaAirport(item: VyspaAirportResponse): Airport | null {
  * Fetch airports from Vyspa API
  * @returns Array of airports
  */
-export async function fetchAirportsFromVyspa(): Promise<Airport[]> {
-  console.log('🛫 Fetching airports from Vyspa API...');
-  
-  const formData = new URLSearchParams({
-    username: VYSPA_CONFIG.credentials.username,
-    password: VYSPA_CONFIG.credentials.password,
-    token: VYSPA_CONFIG.credentials.token,
-    method: 'get_airports',
-    params: '[]', // Empty array to get all airports
-  });
-
+export async function fetchAirportsFromVyspa(query?: string): Promise<Airport[]> {
+  console.log('🛫 Fetching airports from GH API...');
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+  // Build Basic auth and endpoint URL
+  const base = VYSPA_CONFIG.apiUrl.replace(/\/+$/, '');
+  const path = query && query.trim().length > 0
+    ? `/rest/v4/get_airports/${encodeURIComponent(query.trim())}`
+    : `/rest/v4/get_airports`;
+  const url = `${base}${path}`;
+  const basicAuth = Buffer
+    .from(`${VYSPA_CONFIG.credentials.username}:${VYSPA_CONFIG.credentials.password}`)
+    .toString('base64');
 
   try {
-    const response = await fetch(VYSPA_CONFIG.apiUrl, {
-      method: 'POST',
+    const response = await fetch(url, {
+      method: 'GET',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${basicAuth}`,
+        'Api-Version': VYSPA_CONFIG.apiVersion,
       },
-      body: formData.toString(),
       signal: controller.signal,
     });
 

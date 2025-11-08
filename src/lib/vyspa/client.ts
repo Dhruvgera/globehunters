@@ -71,15 +71,6 @@ export async function searchFlightsVyspa(
     direct_flight_only: directOnly,
   }];
 
-  // Prepare form data for POST request
-  const formData = new URLSearchParams({
-    username: VYSPA_CONFIG.credentials.username,
-    password: VYSPA_CONFIG.credentials.password,
-    token: VYSPA_CONFIG.credentials.token,
-    method: VYSPA_CONFIG.defaults.method,
-    params: JSON.stringify(vyspaParams),
-  });
-
   console.log('🔍 Vyspa API Request:', {
     url: VYSPA_CONFIG.apiUrl,
     params: vyspaParams[0],
@@ -93,12 +84,21 @@ export async function searchFlightsVyspa(
       controller.abort();
     }, VYSPA_CONFIG.defaults.timeout);
 
-    const response = await fetch(VYSPA_CONFIG.apiUrl, {
+    // Build Basic auth header and flights endpoint URL from base
+    const basicAuth = Buffer.from(
+      `${VYSPA_CONFIG.credentials.username}:${VYSPA_CONFIG.credentials.password}`
+    ).toString('base64');
+    const base = VYSPA_CONFIG.apiUrl.replace(/\/+$/, '');
+    const flightsUrl = `${base}/rest/v4/flights_availability_search/`;
+
+    const response = await fetch(flightsUrl, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${basicAuth}`,
+        'Api-Version': VYSPA_CONFIG.apiVersion,
       },
-      body: formData.toString(),
+      body: JSON.stringify(vyspaParams),
       signal: controller.signal,
     });
 
