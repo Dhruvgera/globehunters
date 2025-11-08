@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useTranslations } from "next-intl";
+import { formatPrice } from "@/lib/currency";
 
 interface TicketOption {
   type: string;
@@ -49,8 +50,7 @@ export function TicketOptionsPanel({
               <div className="flex flex-col gap-1">
                 <span className="text-xs text-[#010D50]">{option.type}</span>
                 <span className="text-lg font-medium text-[#010D50]">
-                  {currency}
-                  {option.price}
+                  {formatPrice(option.price, currency)}
                 </span>
               </div>
             </div>

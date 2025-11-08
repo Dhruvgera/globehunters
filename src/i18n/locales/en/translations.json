@@ -154,6 +154,21 @@
       "perPerson": "/per person",
       "from": "From"
     },
+    "states": {
+      "loading": {
+        "title": "Searching for flights...",
+        "message": "Please wait while we find the best options for you"
+      },
+      "error": {
+        "title": "Search Error",
+        "tryAgain": "Try Again"
+      },
+      "noResults": {
+        "title": "No Flights Found",
+        "message": "We couldn't find any flights for your search. Try adjusting your dates or destinations.",
+        "newSearch": "New Search"
+      }
+    },
     "datePicker": {
       "selectDates": "Select dates",
       "departure": "Departure Date",
@@ -162,6 +177,18 @@
     },
     "location": {
       "placeholder": "Country, city or airport"
+    },
+    "airport": {
+      "placeholder": "Search by city or code",
+      "noResults": "No airports found",
+      "loading": "Loading airports...",
+      "error": "Unable to load airports",
+      "popularTitle": "Popular Airports",
+      "recentTitle": "Recent Searches"
+    },
+    "dateSelector": {
+      "departureDate": "Departure Date",
+      "returnDate": "Return Date"
     }
   },
   "booking": {

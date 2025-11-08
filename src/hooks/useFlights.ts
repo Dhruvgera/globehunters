@@ -57,7 +57,19 @@ export function useFlights(
     if (enabled && searchParams) {
       fetchFlights();
     }
-  }, [searchParams, enabled, fetchFlights]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    searchParams?.from,
+    searchParams?.to,
+    searchParams?.departureDate?.getTime(),
+    searchParams?.returnDate?.getTime(),
+    searchParams?.passengers?.adults,
+    searchParams?.passengers?.children,
+    searchParams?.passengers?.infants,
+    searchParams?.class,
+    searchParams?.tripType,
+    enabled
+  ]);
 
   return {
     flights,

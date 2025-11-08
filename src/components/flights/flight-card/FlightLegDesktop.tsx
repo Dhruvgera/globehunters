@@ -29,7 +29,7 @@ export function FlightLegDesktop({ leg }: FlightLegDesktopProps) {
           {leg.departureTime}
         </span>
         <span className="text-sm font-medium text-[#010D50]">
-          {leg.departureAirport.code} - {leg.departureAirport.city}
+          {leg.departureAirport.code}
         </span>
       </div>
 
@@ -56,7 +56,7 @@ export function FlightLegDesktop({ leg }: FlightLegDesktopProps) {
           {leg.arrivalTime}
         </span>
         <span className="text-sm font-medium text-[#010D50]">
-          {leg.arrivalAirport.code} - {leg.arrivalAirport.city}
+          {leg.arrivalAirport.code}
         </span>
       </div>
     </div>

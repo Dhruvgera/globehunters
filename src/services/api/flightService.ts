@@ -8,6 +8,8 @@ import { API_CONFIG } from '@/config/api';
 import { Flight, SearchParams } from '@/types/flight';
 import { ApiResponse } from '@/types/api';
 import { mockFlights, mockDatePrices, mockAirlines, mockAirports } from '@/data/mockFlights';
+import { searchFlights as searchFlightsAction } from '@/actions/flights';
+import type { FlightSearchRequest } from '@/types/vyspa';
 
 export interface DatePrice {
   date: string;
@@ -56,36 +58,59 @@ export interface FlightPricing {
 
 class FlightService {
   /**
-   * Search for flights
-   * TODO: Replace mock data with actual API call
+   * Search for flights using Vyspa API via server action
    */
   async searchFlights(params: SearchParams): Promise<FlightSearchResponse> {
     try {
-      // TODO: Uncomment when API is ready
-      // const response = await apiClient.post<ApiResponse<FlightSearchResponse>>(
-      //   API_CONFIG.endpoints.flights.search,
-      //   params
-      // );
-      // return response.data;
+      // Convert SearchParams to FlightSearchRequest format
+      const vyspaParams: FlightSearchRequest = {
+        origin1: params.from,
+        destinationid: params.to,
+        fr: this.formatDate(params.departureDate),
+        to: params.returnDate ? this.formatDate(params.returnDate) : undefined,
+        adt1: String(params.passengers.adults),
+        chd1: String(params.passengers.children),
+        inf1: String(params.passengers.infants || 0),
+        ow: params.tripType === 'one-way' ? '1' : '0',
+        dir: '0', // TODO: Add direct flights filter to UI
+        cl: this.mapCabinClass(params.class),
+      };
 
-      // Mock implementation - no delay for development
-      // await new Promise(resolve => setTimeout(resolve, 800));
+      // Call server action
+      const response = await searchFlightsAction(vyspaParams);
 
+      // Add mock date prices for now (Vyspa doesn't provide this)
       return {
-        flights: mockFlights,
-        filters: {
-          airlines: mockAirlines,
-          departureAirports: mockAirports.departure,
-          arrivalAirports: mockAirports.arrival,
-          minPrice: 400,
-          maxPrice: 1200,
-        },
+        ...response,
         datePrices: mockDatePrices,
       };
     } catch (error) {
       console.error('Error searching flights:', error);
       throw error;
     }
+  }
+
+  /**
+   * Format Date object to DD/MM/YYYY string
+   */
+  private formatDate(date: Date): string {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+
+  /**
+   * Map cabin class to Vyspa format
+   */
+  private mapCabinClass(cabinClass: string): string {
+    const classMap: Record<string, string> = {
+      'Economy': '1',
+      'Premium Economy': '2',
+      'Business': '3',
+      'First': '4',
+    };
+    return classMap[cabinClass] || '1';
   }
 
   /**

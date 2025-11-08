@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useSearchForm } from "@/hooks/useSearchForm";
 import { TripTypeSelector } from "./search-bar/TripTypeSelector";
 import { PassengersSelector } from "./search-bar/PassengersSelector";
-import { LocationInput } from "./search-bar/LocationInput";
+import { AirportAutocomplete } from "./search-bar/AirportAutocomplete";
 import { SwapLocationsButton } from "./search-bar/SwapLocationsButton";
 import { DateSelector } from "./search-bar/DateSelector";
 import { SearchButton } from "./search-bar/SearchButton";
@@ -36,7 +36,20 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
     getSearchParams,
   } = useSearchForm();
 
+  // Validation: Check if all required fields are filled
+  const isSearchValid = () => {
+    return (
+      from !== null &&         // Origin selected
+      to !== null &&           // Destination selected
+      departureDate !== undefined && // Departure date selected
+      (tripType === 'one-way' || returnDate !== undefined) // Return date if round-trip
+    );
+  };
+
   const handleSearch = () => {
+    if (!isSearchValid()) {
+      return; // Don't search if validation fails
+    }
     const params = new URLSearchParams(getSearchParams());
     router.push(`/search?${params.toString()}`);
   };
@@ -60,9 +73,9 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
 
       {/* Main Search Row */}
       <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
-        <LocationInput value={from} onChange={setFrom} />
+        <AirportAutocomplete value={from} onChange={setFrom} />
         <SwapLocationsButton onSwap={swapLocations} />
-        <LocationInput value={to} onChange={setTo} />
+        <AirportAutocomplete value={to} onChange={setTo} />
         <DateSelector
           tripType={tripType}
           departureDate={departureDate}
@@ -72,7 +85,7 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
           isOpen={isDatePickerOpen}
           onOpenChange={setIsDatePickerOpen}
         />
-        <SearchButton onClick={handleSearch} />
+        <SearchButton onClick={handleSearch} disabled={!isSearchValid()} />
       </div>
     </div>
   );

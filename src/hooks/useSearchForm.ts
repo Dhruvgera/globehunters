@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import type { Airport } from "@/types/airport";
+import { useBookingStore } from "@/store/bookingStore";
 
 type TripType = "round-trip" | "one-way" | "multi-city";
 
@@ -9,9 +11,11 @@ interface Passengers {
 }
 
 export function useSearchForm() {
+  const searchParamsFromStore = useBookingStore((state) => state.searchParams);
+  
   const [tripType, setTripType] = useState<TripType>("round-trip");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  const [from, setFrom] = useState<Airport | null>(null);
+  const [to, setTo] = useState<Airport | null>(null);
   const [departureDate, setDepartureDate] = useState<Date>();
   const [returnDate, setReturnDate] = useState<Date>();
   const [passengers, setPassengers] = useState<Passengers>({
@@ -21,6 +25,44 @@ export function useSearchForm() {
   });
   const [travelClass, setTravelClass] = useState("Economy");
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  
+  // Sync with store on mount (for page refresh)
+  useEffect(() => {
+    if (searchParamsFromStore) {
+      // Create Airport objects from codes (minimal info, will be enriched by autocomplete)
+      if (searchParamsFromStore.from) {
+        setFrom({ 
+          code: searchParamsFromStore.from, 
+          city: searchParamsFromStore.from, 
+          country: '', 
+          countryCode: '' 
+        });
+      }
+      if (searchParamsFromStore.to) {
+        setTo({ 
+          code: searchParamsFromStore.to, 
+          city: searchParamsFromStore.to, 
+          country: '', 
+          countryCode: '' 
+        });
+      }
+      if (searchParamsFromStore.departureDate) {
+        setDepartureDate(searchParamsFromStore.departureDate);
+      }
+      if (searchParamsFromStore.returnDate) {
+        setReturnDate(searchParamsFromStore.returnDate);
+      }
+      if (searchParamsFromStore.passengers) {
+        setPassengers(searchParamsFromStore.passengers);
+      }
+      if (searchParamsFromStore.class) {
+        setTravelClass(searchParamsFromStore.class);
+      }
+      if (searchParamsFromStore.tripType) {
+        setTripType(searchParamsFromStore.tripType as TripType);
+      }
+    }
+  }, []); // Only on mount
 
   // Auto-close date picker when dates are selected
   useEffect(() => {
@@ -49,8 +91,8 @@ export function useSearchForm() {
 
   const getSearchParams = () => {
     return {
-      from,
-      to,
+      from: from?.code || "",
+      to: to?.code || "",
       departureDate: departureDate?.toISOString() || "",
       returnDate: returnDate?.toISOString() || "",
       adults: passengers.adults.toString(),

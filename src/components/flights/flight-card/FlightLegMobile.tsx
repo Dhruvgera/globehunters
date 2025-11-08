@@ -33,9 +33,11 @@ export function FlightLegMobile({ leg }: FlightLegMobileProps) {
           <div className="text-sm font-medium text-[#010D50] leading-5">
             {leg.departureAirport.code}
           </div>
-          <div className="text-[11px] text-[#5A6184] leading-4 truncate">
-            {leg.departureAirport.city}
-          </div>
+          {leg.departureAirport.city !== leg.departureAirport.code && (
+            <div className="text-[11px] text-[#5A6184] leading-4 truncate">
+              {leg.departureAirport.city}
+            </div>
+          )}
         </div>
         <div className="flex-1 flex flex-col items-center justify-center">
           <div className="flex items-center w-full">
@@ -55,9 +57,11 @@ export function FlightLegMobile({ leg }: FlightLegMobileProps) {
           <div className="text-sm font-medium text-[#010D50] leading-5">
             {leg.arrivalAirport.code}
           </div>
-          <div className="text-[11px] text-[#5A6184] leading-4 truncate">
-            {leg.arrivalAirport.city}
-          </div>
+          {leg.arrivalAirport.city !== leg.arrivalAirport.code && (
+            <div className="text-[11px] text-[#5A6184] leading-4 truncate">
+              {leg.arrivalAirport.city}
+            </div>
+          )}
         </div>
       </div>
     </div>

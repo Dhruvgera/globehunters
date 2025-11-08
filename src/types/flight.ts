@@ -34,6 +34,8 @@ export interface Flight {
   price: number;
   pricePerPerson: number;
   currency: string;
+  originalPrice?: number;      // Price before currency conversion
+  originalCurrency?: string;   // Original currency from API
   ticketOptions?: TicketOption[];
   webRef?: string;
 }

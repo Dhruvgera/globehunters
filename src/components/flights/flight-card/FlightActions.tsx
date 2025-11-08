@@ -3,6 +3,7 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTranslations } from "next-intl";
+import { formatPrice } from "@/lib/currency";
 
 interface FlightActionsProps {
   currency: string;
@@ -23,8 +24,7 @@ export function FlightActions({
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
       <span className="text-lg font-medium text-[#010D50]">
-        {currency}
-        {pricePerPerson} {t('perPerson')}
+        {formatPrice(pricePerPerson, currency)} {t('perPerson')}
       </span>
 
       <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
