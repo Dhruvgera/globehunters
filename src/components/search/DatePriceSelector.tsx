@@ -88,21 +88,19 @@ function DateSlider({
 
   useEffect(() => {
     const el = dateStripRef.current;
-    if (!el) return;
+    const selectedButton = dateRefs.current[selectedIndex];
     
-    // Use setTimeout to ensure DOM has settled
+    if (!el || !selectedButton) return;
+    
+    // Use setTimeout to ensure DOM has settled and layout is complete
     const timeoutId = setTimeout(() => {
-      const child = el.children[selectedIndex] as HTMLElement | undefined;
-      if (child) {
-        // Calculate the position to center the selected item
-        const childCenter = child.offsetLeft + (child.offsetWidth / 2);
-        const containerCenter = el.clientWidth / 2;
-        const scrollPosition = childCenter - containerCenter;
-        
-        // Scroll to center the selected item within its container
-        el.scrollTo({ left: Math.max(0, scrollPosition), behavior: "smooth" });
-      }
-    }, 100);
+      // Use scrollIntoView with center alignment for more reliable centering
+      selectedButton.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "center"
+      });
+    }, 150);
     
     return () => clearTimeout(timeoutId);
   }, [selectedIndex, dates.length]);
