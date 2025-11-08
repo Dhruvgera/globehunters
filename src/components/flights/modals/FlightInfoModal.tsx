@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Flight } from "@/types/flight";
 import { useTranslations } from "next-intl";
 import { formatPrice } from "@/lib/currency";
+import { useBookingStore } from "@/store/bookingStore";
 
 interface FlightInfoModalProps {
   flight: Flight;
@@ -28,16 +29,32 @@ export default function FlightInfoModal({
 }: FlightInfoModalProps) {
   const t = useTranslations('flightInfo');
   const router = useRouter();
+  const setSelectedFlight = useBookingStore((state) => state.setSelectedFlight);
   const [imgError, setImgError] = useState(false);
   const [selectedLeg, setSelectedLeg] = useState<"outbound" | "inbound">(
     "outbound"
   );
   const [selectedFareType, setSelectedFareType] = useState<
     "value" | "classic" | "flex"
-  >("value");
+  >("classic");
 
   const currentLeg =
     selectedLeg === "outbound" ? flight.outbound : flight.inbound;
+
+  const handleBookNow = () => {
+    // Map selectedFareType to the store's fare type format
+    const fareTypeMap = {
+      value: 'Eco Value',
+      classic: 'Eco Classic',
+      flex: 'Eco Flex',
+    } as const;
+
+    // Save flight to booking store
+    setSelectedFlight(flight, fareTypeMap[selectedFareType]);
+    
+    // Navigate to booking page
+    router.push('/booking');
+  };
 
   function cabinClassName(code?: string) {
     if (!code) return undefined;
@@ -546,7 +563,7 @@ export default function FlightInfoModal({
             {formatPrice(flight.pricePerPerson, flight.currency)} <span className="hidden sm:inline">/per person</span>
           </span>
           <Button 
-            onClick={() => router.push("/booking")}
+            onClick={handleBookNow}
             className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-full px-4 sm:px-5 py-2 h-auto gap-1 text-sm font-bold shrink-0"
           >
             Book

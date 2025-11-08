@@ -54,32 +54,32 @@ function BookingContent() {
     return null;
   }
 
-  // Mock flight leg data (in real app, this would come from the flight object)
+  // Extract flight leg data from the selected flight
   const outboundLeg = {
-    from: "London",
-    to: "Lagos",
-    fromCode: "LGW",
-    toCode: "LOS",
-    departureTime: "16:40",
-    arrivalTime: "05:50",
-    date: "Sun, 9 Oct",
-    duration: "13h 10m",
-    stops: "1 Stop",
-    airline: "Royal Air Maroc",
+    from: flight.outbound.departureAirport.city,
+    to: flight.outbound.arrivalAirport.city,
+    fromCode: flight.outbound.departureAirport.code,
+    toCode: flight.outbound.arrivalAirport.code,
+    departureTime: flight.outbound.departureTime,
+    arrivalTime: flight.outbound.arrivalTime,
+    date: flight.outbound.date,
+    duration: flight.outbound.totalJourneyTime || flight.outbound.duration,
+    stops: flight.outbound.stopDetails || `${flight.outbound.stops} Stop${flight.outbound.stops !== 1 ? 's' : ''}`,
+    airline: flight.airline.name,
   };
 
-  const inboundLeg = {
-    from: "Lagos",
-    to: "London",
-    fromCode: "LOS",
-    toCode: "LGW",
-    departureTime: "05:50",
-    arrivalTime: "16:40",
-    date: "Wed, 12 Oct",
-    duration: "13h 10m",
-    stops: "1 Stop",
-    airline: "Royal Air Maroc",
-  };
+  const inboundLeg = flight.inbound ? {
+    from: flight.inbound.departureAirport.city,
+    to: flight.inbound.arrivalAirport.city,
+    fromCode: flight.inbound.departureAirport.code,
+    toCode: flight.inbound.arrivalAirport.code,
+    departureTime: flight.inbound.departureTime,
+    arrivalTime: flight.inbound.arrivalTime,
+    date: flight.inbound.date,
+    duration: flight.inbound.totalJourneyTime || flight.inbound.duration,
+    stops: flight.inbound.stopDetails || `${flight.inbound.stops} Stop${flight.inbound.stops !== 1 ? 's' : ''}`,
+    airline: flight.airline.name,
+  } : null;
 
   return (
     <div className="min-h-screen bg-white">
@@ -135,11 +135,13 @@ function BookingContent() {
                 passengers={`1 ${t('flightSummary.passenger')}`}
                 onViewDetails={() => setShowFlightInfo(true)}
               />
-              <FlightSummaryCard
-                leg={inboundLeg}
-                passengers={`1 ${t('flightSummary.passenger')}`}
-                onViewDetails={() => setShowFlightInfo(true)}
-              />
+              {inboundLeg && (
+                <FlightSummaryCard
+                  leg={inboundLeg}
+                  passengers={`1 ${t('flightSummary.passenger')}`}
+                  onViewDetails={() => setShowFlightInfo(true)}
+                />
+              )}
             </div>
 
             {/* Passenger Details Form */}
@@ -162,8 +164,8 @@ function BookingContent() {
 
             {/* Price Summary */}
             <PriceSummaryCard
-              flightFare={45995}
-              taxesAndFees={48358}
+              flightFare={flight.pricePerPerson}
+              taxesAndFees={0}
               adults={1}
               isSticky={true}
             />
