@@ -20,6 +20,7 @@ class FlightCache {
 
   /**
    * Generate cache key from search parameters
+   * Uses date-only format (YYYY-MM-DD) to avoid timezone issues
    */
   private getCacheKey(params: SearchParams): string {
     const {
@@ -32,8 +33,16 @@ class FlightCache {
       tripType,
     } = params;
 
-    const depDate = departureDate.toISOString().split('T')[0];
-    const retDate = returnDate ? returnDate.toISOString().split('T')[0] : 'none';
+    // Format dates as YYYY-MM-DD using local date (not UTC)
+    const formatDate = (date: Date): string => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    const depDate = formatDate(departureDate);
+    const retDate = returnDate ? formatDate(returnDate) : 'none';
 
     return `${from}-${to}-${depDate}-${retDate}-${passengers.adults}-${passengers.children}-${passengers.infants}-${travelClass}-${tripType}`;
   }

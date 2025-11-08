@@ -90,11 +90,20 @@ export function useSearchForm() {
   };
 
   const getSearchParams = () => {
+    // Helper to format date as YYYY-MM-DD (date-only, no timezone issues)
+    const formatDateForURL = (date: Date | undefined): string => {
+      if (!date) return "";
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
     return {
       from: from?.code || "",
       to: to?.code || "",
-      departureDate: departureDate?.toISOString() || "",
-      returnDate: returnDate?.toISOString() || "",
+      departureDate: formatDateForURL(departureDate),
+      returnDate: formatDateForURL(returnDate),
       adults: passengers.adults.toString(),
       children: passengers.children.toString(),
       infants: passengers.infants.toString(),

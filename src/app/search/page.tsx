@@ -47,6 +47,13 @@ function SearchPageContent() {
   const prevLoadingRef = useRef(false);
   const [isDateChanging, setIsDateChanging] = useState(false);
   
+  // Helper to parse date string (YYYY-MM-DD) as local date
+  const parseDateFromURL = (dateStr: string): Date => {
+    // Parse YYYY-MM-DD as local date at midnight (not UTC)
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
   // Parse URL parameters and set in store on mount
   useEffect(() => {
     const from = urlParams.get('from');
@@ -63,8 +70,8 @@ function SearchPageContent() {
       const params: SearchParams = {
         from: from,
         to: to,
-        departureDate: new Date(departureDate),
-        returnDate: returnDate ? new Date(returnDate) : undefined,
+        departureDate: parseDateFromURL(departureDate),
+        returnDate: returnDate ? parseDateFromURL(returnDate) : undefined,
         passengers: {
           adults: parseInt(adults || '1'),
           children: parseInt(children || '0'),
