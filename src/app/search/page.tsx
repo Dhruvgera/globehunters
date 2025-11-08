@@ -170,11 +170,24 @@ function SearchPageContent() {
     // Get the actual date object
     const selectedDate = getDateFromIndex(index, 'departure');
     if (selectedDate) {
-      // Update search params with new departure date
-      // This will trigger useDatePrices to regenerate dates centered around the new date
+      // Check if we need to adjust return date (for round trips)
+      let updatedReturnDate = effectiveSearchParams.returnDate;
+      
+      if (effectiveSearchParams.tripType === 'round-trip' && updatedReturnDate) {
+        // Ensure return date is not before departure date
+        if (updatedReturnDate < selectedDate) {
+          // Set return date to be at least 1 day after departure
+          updatedReturnDate = new Date(selectedDate);
+          updatedReturnDate.setDate(updatedReturnDate.getDate() + 1);
+          console.log('⚠️  Return date adjusted to be after departure date');
+        }
+      }
+      
+      // Update search params with new departure date (and adjusted return date if needed)
       const updatedParams: SearchParams = {
         ...effectiveSearchParams,
         departureDate: selectedDate,
+        returnDate: updatedReturnDate,
       };
       setStoreSearchParams(updatedParams);
       
@@ -188,8 +201,13 @@ function SearchPageContent() {
     // Get the actual date object
     const selectedDate = getDateFromIndex(index, 'return');
     if (selectedDate) {
+      // Validate that return date is not before departure date
+      if (selectedDate < effectiveSearchParams.departureDate) {
+        console.warn('⚠️  Cannot select return date before departure date');
+        return; // Don't allow selection
+      }
+      
       // Update search params with new return date
-      // This will trigger useDatePrices to regenerate dates centered around the new date
       const updatedParams: SearchParams = {
         ...effectiveSearchParams,
         returnDate: selectedDate,
@@ -318,21 +336,32 @@ function SearchPageContent() {
 
       {/* Date Price Selector - Always show when not in error state */}
       {!error && departureDates.length > 0 && (
-        <DatePriceSelector
-          departureDates={departureDates}
-          returnDates={effectiveSearchParams.tripType === 'round-trip' ? returnDates : undefined}
-          selectedDepartureIndex={selectedDepartureDateIndex}
-          selectedReturnIndex={selectedReturnDateIndex}
-          onSelectDepartureDate={handleSelectDepartureDate}
-          onSelectReturnDate={effectiveSearchParams.tripType === 'round-trip' ? handleSelectReturnDate : undefined}
-          currency="GBP"
-          loadingIndices={loadingIndices}
-          onDateInView={handleDateInView}
-        />
+        <div className="relative">
+          {/* Subtle loading indicator when changing dates (but we already have flights) */}
+          {loading && flights.length > 0 && (
+            <div className="absolute top-2 right-4 z-10">
+              <div className="flex items-center gap-2 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full border border-blue-200 text-xs">
+                <div className="animate-spin rounded-full h-3 w-3 border-b border-blue-600"></div>
+                <span>Updating...</span>
+              </div>
+            </div>
+          )}
+          <DatePriceSelector
+            departureDates={departureDates}
+            returnDates={effectiveSearchParams.tripType === 'round-trip' ? returnDates : undefined}
+            selectedDepartureIndex={selectedDepartureDateIndex}
+            selectedReturnIndex={selectedReturnDateIndex}
+            onSelectDepartureDate={handleSelectDepartureDate}
+            onSelectReturnDate={effectiveSearchParams.tripType === 'round-trip' ? handleSelectReturnDate : undefined}
+            currency="GBP"
+            loadingIndices={loadingIndices}
+            onDateInView={handleDateInView}
+          />
+        </div>
       )}
 
-      {/* Loading State */}
-      {(!isInitialized || loading || !hasAttemptedFetch) && (
+      {/* Loading State - Show when no flights loaded yet */}
+      {(!isInitialized || (loading && flights.length === 0)) && (
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
           <div className="flex flex-col items-center justify-center gap-4">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -436,7 +465,7 @@ function SearchPageContent() {
       />
       }
       {/* Main Content - Show when we have flights */}
-      {!loading && !error && flights.length > 0 && filteredFlights.length > 0 && (
+      {!error && flights.length > 0 && filteredFlights.length > 0 && (
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-8">
           <div className="flex flex-col lg:flex-row gap-4">
             {/* Filters Sidebar - Desktop Only */}

@@ -17,8 +17,16 @@ interface UseDatePricesReturn {
   getDateFromIndex: (index: number, type: 'departure' | 'return') => Date | null;
 }
 
+interface DatePriceCacheEntry {
+  date: string;
+  price: number | null;
+  hasData: boolean;
+  loading: boolean;
+  error: boolean;
+}
+
 interface DatePriceCache {
-  [key: string]: DatePrice;
+  [key: string]: DatePriceCacheEntry;
 }
 
 export function useDatePrices(
@@ -47,7 +55,7 @@ export function useDatePrices(
     returnDatesRef.current = returnDates;
   }, [returnDates]);
 
-  // Generate date array around selected date
+  // Generate date array around selected date (±3 days = 7 total)
   const generateDateRange = useCallback((baseDate: Date, count: number = 7): Date[] => {
     const dates: Date[] = [];
     const centerIndex = Math.floor(count / 2);
@@ -88,10 +96,19 @@ export function useDatePrices(
     const dateObj = dateObjects[index];
     const cacheKey = `${type}-${dateStr}`;
 
-    // Check cache first
-    if (cacheRef.current[cacheKey]) {
+    // Check cache first - if already has data or error, skip
+    if (cacheRef.current[cacheKey]?.hasData || cacheRef.current[cacheKey]?.error) {
       return;
     }
+
+    // Mark as loading in cache
+    cacheRef.current[cacheKey] = {
+      date: dateStr,
+      price: null,
+      hasData: false,
+      loading: true,
+      error: false,
+    };
 
     setLoadingIndices(prev => new Set([...prev, index]));
 
@@ -106,7 +123,7 @@ export function useDatePrices(
       const response = await flightService.searchFlights(modifiedParams);
       
       // Find minimum price from results
-      let minPrice = basePrice || 649; // Fallback if no results
+      let minPrice: number | null = null;
       if (response.flights && response.flights.length > 0) {
         const minFlight = response.flights.reduce((min, flight) => 
           flight.pricePerPerson < min.pricePerPerson ? flight : min
@@ -114,13 +131,19 @@ export function useDatePrices(
         minPrice = Math.round(minFlight.pricePerPerson);
       }
 
-      const updatedDate: DatePrice = {
+      // Update cache with success
+      cacheRef.current[cacheKey] = {
         date: dateStr,
         price: minPrice,
+        hasData: true,
+        loading: false,
+        error: false,
       };
 
-      // Update cache
-      cacheRef.current[cacheKey] = updatedDate;
+      const updatedDate: DatePrice = {
+        date: dateStr,
+        price: minPrice || basePrice || 649,
+      };
 
       // Update state using functional updates to avoid stale closures
       if (type === 'departure') {
@@ -142,6 +165,14 @@ export function useDatePrices(
       }
     } catch (err) {
       console.error('Error fetching date price:', err);
+      // Mark as error in cache
+      cacheRef.current[cacheKey] = {
+        date: dateStr,
+        price: null,
+        hasData: false,
+        loading: false,
+        error: true,
+      };
     } finally {
       setLoadingIndices(prev => {
         const newSet = new Set(prev);
@@ -151,36 +182,48 @@ export function useDatePrices(
     }
   }, [searchParams, basePrice]);
 
-  // Fetch prices for multiple dates in parallel (much faster!)
+  // Fetch prices for multiple dates with staggered delays (travcart-style with 500ms delays)
   const fetchDatePricesBatch = useCallback(async (indices: number[], type: 'departure' | 'return') => {
     if (!searchParams || indices.length === 0) return;
 
     const dates = type === 'departure' ? departureDatesRef.current : returnDatesRef.current;
     const dateObjects = type === 'departure' ? departureDateObjectsRef.current : returnDateObjectsRef.current;
 
-    // Filter out dates that are already cached or currently loading
+    // Filter out dates that are already cached, have errors, or are currently loading
     const indicesToFetch = indices.filter(index => {
       if (!dates[index] || !dateObjects[index]) return false;
       const dateStr = dates[index].date;
       const cacheKey = `${type}-${dateStr}`;
-      return !cacheRef.current[cacheKey] && !loadingIndices.has(index);
+      const cacheEntry = cacheRef.current[cacheKey];
+      return !cacheEntry?.hasData && !cacheEntry?.error && !loadingIndices.has(index);
     });
 
     if (indicesToFetch.length === 0) return;
 
-    // Mark all as loading
-    setLoadingIndices(prev => {
-      const newSet = new Set(prev);
-      indicesToFetch.forEach(idx => newSet.add(idx));
-      return newSet;
-    });
+    console.log(`[useDatePrices] Queueing ${indicesToFetch.length} ${type} dates for staggered fetch`);
 
-    try {
-      // Fetch all dates in parallel using Promise.all
-      const fetchPromises = indicesToFetch.map(async (index) => {
+    // Staggered fetching with 500ms delays (like travcart)
+    indicesToFetch.forEach((index, arrayIndex) => {
+      setTimeout(async () => {
         const dateObj = dateObjects[index];
         const dateStr = dates[index].date;
         const cacheKey = `${type}-${dateStr}`;
+
+        // Double-check cache before fetching
+        if (cacheRef.current[cacheKey]?.hasData || cacheRef.current[cacheKey]?.error) {
+          return;
+        }
+
+        // Mark as loading
+        cacheRef.current[cacheKey] = {
+          date: dateStr,
+          price: null,
+          hasData: false,
+          loading: true,
+          error: false,
+        };
+
+        setLoadingIndices(prev => new Set([...prev, index]));
 
         try {
           // Create modified search params for this specific date
@@ -193,7 +236,7 @@ export function useDatePrices(
           const response = await flightService.searchFlights(modifiedParams);
           
           // Find minimum price from results
-          let minPrice = basePrice || 649;
+          let minPrice: number | null = null;
           if (response.flights && response.flights.length > 0) {
             const minFlight = response.flights.reduce((min, flight) => 
               flight.pricePerPerson < min.pricePerPerson ? flight : min
@@ -201,70 +244,59 @@ export function useDatePrices(
             minPrice = Math.round(minFlight.pricePerPerson);
           }
 
-          return { index, dateStr, price: minPrice, cacheKey };
-        } catch (err) {
-          console.error(`Error fetching price for date ${dateStr}:`, err);
-          return null;
-        }
-      });
+          // Update cache with success
+          cacheRef.current[cacheKey] = {
+            date: dateStr,
+            price: minPrice,
+            hasData: true,
+            loading: false,
+            error: false,
+          };
 
-      // Wait for all fetches to complete
-      const results = await Promise.all(fetchPromises);
+          const updatedDate: DatePrice = {
+            date: dateStr,
+            price: minPrice || basePrice || 649,
+          };
 
-      // Update all successful results at once
-      const validResults = results.filter(r => r !== null);
-      
-      if (validResults.length > 0) {
-        // Cache all results
-        validResults.forEach(result => {
-          if (result) {
-            cacheRef.current[result.cacheKey] = {
-              date: result.dateStr,
-              price: result.price
-            };
+          // Update state
+          if (type === 'departure') {
+            setDepartureDates(prev => {
+              const newDates = [...prev];
+              if (newDates[index]) {
+                newDates[index] = updatedDate;
+              }
+              return newDates;
+            });
+          } else {
+            setReturnDates(prev => {
+              const newDates = [...prev];
+              if (newDates[index]) {
+                newDates[index] = updatedDate;
+              }
+              return newDates;
+            });
           }
-        });
-
-        // Update state for all fetched dates
-        if (type === 'departure') {
-          setDepartureDates(prev => {
-            const newDates = [...prev];
-            validResults.forEach(result => {
-              if (result && newDates[result.index]) {
-                newDates[result.index] = {
-                  date: result.dateStr,
-                  price: result.price
-                };
-              }
-            });
-            return newDates;
-          });
-        } else {
-          setReturnDates(prev => {
-            const newDates = [...prev];
-            validResults.forEach(result => {
-              if (result && newDates[result.index]) {
-                newDates[result.index] = {
-                  date: result.dateStr,
-                  price: result.price
-                };
-              }
-            });
-            return newDates;
+        } catch (err) {
+          console.error(`Error fetching price for ${type} date ${dateStr}:`, err);
+          
+          // Mark as error in cache
+          cacheRef.current[cacheKey] = {
+            date: dateStr,
+            price: null,
+            hasData: false,
+            loading: false,
+            error: true,
+          };
+        } finally {
+          setLoadingIndices(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(index);
+            return newSet;
           });
         }
-      }
-    } catch (err) {
-      console.error('Error in batch fetch:', err);
-    } finally {
-      // Remove loading state for all indices
-      setLoadingIndices(prev => {
-        const newSet = new Set(prev);
-        indicesToFetch.forEach(idx => newSet.delete(idx));
-        return newSet;
-      });
-    }
-  }, [searchParams, basePrice, loadingIndices]);
+      }, arrayIndex * 500); // 500ms delay between each request
+    });
+  }, [searchParams, basePrice]);
 
   // Initialize dates based on search params
   useEffect(() => {
@@ -280,7 +312,7 @@ export function useDatePrices(
     setError(null);
 
     try {
-      // Generate departure dates
+      // Generate departure dates (7 days: ±3 from selected)
       const departureDateRange = generateDateRange(searchParams.departureDate, 7);
       departureDateObjectsRef.current = departureDateRange;
       
@@ -289,8 +321,9 @@ export function useDatePrices(
         const cacheKey = getCacheKey(date, 'departure');
         
         // Check if we have cached price
-        if (cacheRef.current[cacheKey]) {
-          return cacheRef.current[cacheKey];
+        const cachedEntry = cacheRef.current[cacheKey];
+        if (cachedEntry?.hasData && cachedEntry.price !== null) {
+          return { date: dateStr, price: cachedEntry.price };
         }
         
         // For the currently selected date (middle index), use actual price from search results
@@ -299,7 +332,13 @@ export function useDatePrices(
         if (isSelectedDate && basePrice) {
           // Selected date: Use actual price and mark as loaded to prevent fetching
           const actualDatePrice = { date: dateStr, price: Math.round(basePrice) };
-          cacheRef.current[cacheKey] = actualDatePrice; // Cache it
+          cacheRef.current[cacheKey] = {
+            date: dateStr,
+            price: Math.round(basePrice),
+            hasData: true,
+            loading: false,
+            error: false,
+          };
           return actualDatePrice;
         }
         
@@ -310,7 +349,7 @@ export function useDatePrices(
 
       setDepartureDates(departureDatePrices);
 
-      // Generate return dates if round trip
+      // Generate return dates if round trip (7 days: ±3 from selected)
       if (searchParams.tripType === 'round-trip' && searchParams.returnDate) {
         const returnDateRange = generateDateRange(searchParams.returnDate, 7);
         returnDateObjectsRef.current = returnDateRange;
@@ -319,8 +358,9 @@ export function useDatePrices(
           const dateStr = formatDateDisplay(date);
           const cacheKey = getCacheKey(date, 'return');
           
-          if (cacheRef.current[cacheKey]) {
-            return cacheRef.current[cacheKey];
+          const cachedEntry = cacheRef.current[cacheKey];
+          if (cachedEntry?.hasData && cachedEntry.price !== null) {
+            return { date: dateStr, price: cachedEntry.price };
           }
           
           // For the currently selected date (middle index), use actual price from search results
@@ -329,7 +369,13 @@ export function useDatePrices(
           if (isSelectedDate && basePrice) {
             // Selected date: Use actual price and mark as loaded to prevent fetching
             const actualDatePrice = { date: dateStr, price: Math.round(basePrice) };
-            cacheRef.current[cacheKey] = actualDatePrice; // Cache it
+            cacheRef.current[cacheKey] = {
+              date: dateStr,
+              price: Math.round(basePrice),
+              hasData: true,
+              loading: false,
+              error: false,
+            };
             return actualDatePrice;
           }
           
