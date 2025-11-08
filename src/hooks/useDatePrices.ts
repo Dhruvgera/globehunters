@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { SearchParams } from '@/types/flight';
 import { flightService, DatePrice } from '@/services/api/flightService';
+import { flightCache } from '@/lib/cache/flightCache';
 
 // Normalize date to midnight for safe comparisons
 function normalizeDate(date: Date): Date {
@@ -166,8 +167,17 @@ export function useDatePrices(
         [type === 'departure' ? 'departureDate' : 'returnDate']: dateObj
       };
 
-      // Fetch actual flights for this date
-      const response = await flightService.searchFlights(modifiedParams);
+      // Check global cache first to avoid redundant API calls
+      let response = flightCache.get(modifiedParams);
+      
+      if (!response) {
+        // Fetch actual flights for this date if not cached
+        response = await flightService.searchFlights(modifiedParams);
+        // Store complete response in global cache for later use
+        flightCache.set(modifiedParams, response);
+      } else {
+        console.log(`[useDatePrices] Using cached data for ${type} date ${candidate.toISOString().slice(0,10)}`);
+      }
       
       // Find minimum price from results
       let minPrice: number | null = null;
@@ -285,7 +295,7 @@ export function useDatePrices(
       if (dist > maxDistance) maxDistance = dist;
     }
 
-    const MAX_CONCURRENCY = 6;
+    const MAX_CONCURRENCY = 3; // Reduced from 6 to 3 to avoid overwhelming server
     const runGroupWithConcurrency = async (groupIndices: number[]) => {
       if (!groupIndices || groupIndices.length === 0) return;
       let cursor = 0;

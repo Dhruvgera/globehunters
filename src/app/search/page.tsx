@@ -124,32 +124,46 @@ function SearchPageContent() {
     getDateFromIndex
   } = useDatePrices(isInitialized ? effectiveSearchParams : null, actualMinPrice);
 
-  // Auto-prefetch all date prices in parallel once main search completes
+  // Auto-prefetch all date prices in background with delay to allow UI to render first
   useEffect(() => {
+    // Only fetch after main search completes successfully
     if (!loading && flights.length > 0 && actualMinPrice) {
-      // Prefetch departure dates, prioritizing nearest to selected (center) index
-      const departureCenter = Math.floor(departureDates.length / 2);
-      const departureIndices = departureDates
-        .map((_, index) => index)
-        .filter(index => index !== departureCenter)
-        .sort((a, b) => Math.abs(a - departureCenter) - Math.abs(b - departureCenter));
-      
-      if (departureIndices.length > 0) {
-        fetchDatePricesBatch(departureIndices, 'departure');
-      }
-
-      // Prefetch all return dates if round trip
-      if (effectiveSearchParams.tripType === 'round-trip' && returnDates.length > 0) {
-        const returnCenter = Math.floor(returnDates.length / 2);
-        const returnIndices = returnDates
+      // Add a 500ms delay to ensure main results render first
+      const timer = setTimeout(() => {
+        // Prefetch departure dates, prioritizing nearest to selected (center) index
+        const departureCenter = Math.floor(departureDates.length / 2);
+        const departureIndices = departureDates
           .map((_, index) => index)
-          .filter(index => index !== returnCenter) // Skip center/selected date
-          .sort((a, b) => Math.abs(a - returnCenter) - Math.abs(b - returnCenter));
+          .filter(index => index !== departureCenter)
+          .sort((a, b) => Math.abs(a - departureCenter) - Math.abs(b - departureCenter));
         
-        if (returnIndices.length > 0) {
-          fetchDatePricesBatch(returnIndices, 'return');
+        if (departureIndices.length > 0) {
+          console.log('🔄 Starting background fetch for departure dates');
+          fetchDatePricesBatch(departureIndices, 'departure').catch(err => {
+            console.error('Error in background departure date fetch:', err);
+          });
         }
-      }
+
+        // Prefetch return dates if round trip - with additional delay
+        if (effectiveSearchParams.tripType === 'round-trip' && returnDates.length > 0) {
+          setTimeout(() => {
+            const returnCenter = Math.floor(returnDates.length / 2);
+            const returnIndices = returnDates
+              .map((_, index) => index)
+              .filter(index => index !== returnCenter) // Skip center/selected date
+              .sort((a, b) => Math.abs(a - returnCenter) - Math.abs(b - returnCenter));
+            
+            if (returnIndices.length > 0) {
+              console.log('🔄 Starting background fetch for return dates');
+              fetchDatePricesBatch(returnIndices, 'return').catch(err => {
+                console.error('Error in background return date fetch:', err);
+              });
+            }
+          }, 1000); // Additional 1s delay for return dates
+        }
+      }, 500); // 500ms delay before starting any background fetching
+
+      return () => clearTimeout(timer);
     }
   }, [loading, flights.length, actualMinPrice, departureDates.length, returnDates.length, fetchDatePricesBatch, effectiveSearchParams.tripType]);
 
@@ -214,7 +228,9 @@ function SearchPageContent() {
       setStoreSearchParams(updatedParams);
       
       // Reset to middle index since date range will re-center around selected date
-      setSelectedDepartureDateIndex(3);
+      // With 7 dates (±3), middle index is 3
+      const middleIndex = Math.floor(departureDates.length / 2);
+      setSelectedDepartureDateIndex(middleIndex);
     }
   };
 
@@ -239,7 +255,9 @@ function SearchPageContent() {
       setStoreSearchParams(updatedParams);
       
       // Reset to middle index since date range will re-center around selected date
-      setSelectedReturnDateIndex(3);
+      // With 7 dates (±3), middle index is 3
+      const middleIndex = Math.floor(returnDates.length / 2);
+      setSelectedReturnDateIndex(middleIndex);
     }
   };
 
@@ -260,6 +278,7 @@ function SearchPageContent() {
   // UI state
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [displayedFlightsCount, setDisplayedFlightsCount] = useState(5);
+  // Initialize to middle index (3 for 7-date range: ±3 days)
   const [selectedDepartureDateIndex, setSelectedDepartureDateIndex] = useState<number>(3);
   const [selectedReturnDateIndex, setSelectedReturnDateIndex] = useState<number>(3);
   const { expandedFilters, toggleFilter } = useFilterExpansion();

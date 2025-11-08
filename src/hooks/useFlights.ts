@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Flight, SearchParams } from '@/types/flight';
 import { flightService, FlightSearchResponse } from '@/services/api/flightService';
+import { flightCache } from '@/lib/cache/flightCache';
 
 interface UseFlightsOptions {
   enabled?: boolean; // Whether to automatically fetch on mount
@@ -36,11 +37,31 @@ export function useFlights(
       return;
     }
 
+    // Always set loading to true first to show UI update
     setLoading(true);
     setError(null);
 
+    // Check cache first
+    const cachedData = flightCache.get(searchParams);
+    if (cachedData) {
+      console.log('🚀 Using cached flight data - no API call needed!');
+      // Use setTimeout to ensure loading state shows briefly (prevents UI flickering)
+      setTimeout(() => {
+        setFlights(cachedData.flights);
+        setFilters(cachedData.filters);
+        setDatePrices(cachedData.datePrices);
+        setLoading(false);
+      }, 100); // 100ms delay to show transition
+      return;
+    }
+
     try {
+      console.log('🌐 Fetching fresh flight data from API...');
       const response = await flightService.searchFlights(searchParams);
+      
+      // Store in cache for future use
+      flightCache.set(searchParams, response);
+      
       setFlights(response.flights);
       setFilters(response.filters);
       setDatePrices(response.datePrices);
