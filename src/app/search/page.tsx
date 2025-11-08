@@ -92,14 +92,49 @@ function SearchPageContent() {
     }
   }, [isInitialized, loading, hasAttemptedFetch]);
 
+  // Calculate actual minimum price from flights for current dates
+  const actualMinPrice = useMemo(() => {
+    if (flights.length === 0) return null;
+    const minFlight = flights.reduce((min, flight) => 
+      flight.pricePerPerson < min.pricePerPerson ? flight : min
+    , flights[0]);
+    return minFlight.pricePerPerson;
+  }, [flights]);
+
   // Fetch date prices with background loading and lazy fetching
   const { 
     departureDates, 
     returnDates, 
     loadingIndices, 
     fetchDatePrice,
+    fetchDatePricesBatch,
     getDateFromIndex
-  } = useDatePrices(isInitialized ? effectiveSearchParams : null);
+  } = useDatePrices(isInitialized ? effectiveSearchParams : null, actualMinPrice);
+
+  // Auto-prefetch all date prices in parallel once main search completes
+  useEffect(() => {
+    if (!loading && flights.length > 0 && actualMinPrice) {
+      // Prefetch all departure dates (excluding selected center one - index 3)
+      const departureIndices = departureDates
+        .map((_, index) => index)
+        .filter(index => index !== 3); // Skip center/selected date
+      
+      if (departureIndices.length > 0) {
+        fetchDatePricesBatch(departureIndices, 'departure');
+      }
+
+      // Prefetch all return dates if round trip
+      if (effectiveSearchParams.tripType === 'round-trip' && returnDates.length > 0) {
+        const returnIndices = returnDates
+          .map((_, index) => index)
+          .filter(index => index !== 3); // Skip center/selected date
+        
+        if (returnIndices.length > 0) {
+          fetchDatePricesBatch(returnIndices, 'return');
+        }
+      }
+    }
+  }, [loading, flights.length, actualMinPrice, departureDates.length, returnDates.length, fetchDatePricesBatch, effectiveSearchParams.tripType]);
 
   // Only use mock data if explicitly in error state and no real data
   const effectiveFlights = useMemo(() => {

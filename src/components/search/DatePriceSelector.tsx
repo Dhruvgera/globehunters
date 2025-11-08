@@ -127,7 +127,8 @@ function DateSlider({
         >
           {dates.map((datePrice, index) => {
             const active = index === selectedIndex;
-            const isLoading = loadingIndices.has(index);
+            // Never show loading for the selected date - we already have that data
+            const isLoading = !active && loadingIndices.has(index);
             return (
               <button
                 type="button"
@@ -151,7 +152,9 @@ function DateSlider({
                   {isLoading ? (
                     <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin text-[#3754ED]" />
                   ) : (
-                    <span className="text-xs sm:text-sm font-medium text-[#010D50]">
+                    <span className={`text-xs sm:text-sm font-medium ${
+                      active ? 'text-[#3754ED]' : 'text-[#010D50]'
+                    }`}>
                       {formatPrice(datePrice.price, currency)}
                     </span>
                   )}

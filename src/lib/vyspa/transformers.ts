@@ -148,7 +148,7 @@ function transformResult(result: VyspaResult): Flight | null {
     inbound: inbound,
     price: Math.round(totalPrice),
     pricePerPerson: Math.round(pricePerPerson),
-    currency: getCurrencySymbol(result.currency_code),
+    currency: result.currency_code.toUpperCase(), // Store code, not symbol
     webRef: result.Result_id,
   };
 

@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Flight } from "@/types/flight";
 import { useTranslations } from "next-intl";
+import { formatPrice } from "@/lib/currency";
 
 interface FlightInfoModalProps {
   flight: Flight;
@@ -453,8 +454,7 @@ export default function FlightInfoModal({
         {/* Footer */}
         <div className="sticky bottom-0 z-20 bg-white rounded-xl px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-3 border border-[#EEF0F7] shadow-[0_-8px_24px_-12px_rgba(2,6,23,0.35)]">
           <span className="text-sm sm:text-lg font-medium text-[#3754ED] whitespace-nowrap">
-            {flight.currency}
-            {flight.pricePerPerson} <span className="hidden sm:inline">/per person</span>
+            {formatPrice(flight.pricePerPerson, flight.currency)} <span className="hidden sm:inline">/per person</span>
           </span>
           <Button 
             onClick={() => router.push("/booking")}

@@ -128,6 +128,24 @@ async function convertFlightCurrencies(
       targetCurrency
     );
 
+    // Convert price per person
+    const convertedPricePerPerson = await convertCurrencyAmount(
+      flight.pricePerPerson,
+      originalCurrency,
+      targetCurrency
+    );
+
+    // Convert ticket options if they exist
+    let convertedTicketOptions = flight.ticketOptions;
+    if (flight.ticketOptions && flight.ticketOptions.length > 0) {
+      convertedTicketOptions = await Promise.all(
+        flight.ticketOptions.map(async (option) => ({
+          ...option,
+          price: await convertCurrencyAmount(option.price, originalCurrency, targetCurrency),
+        }))
+      );
+    }
+
     console.log(
       `💱 Flight ${flight.id}: ${originalCurrency} ${flight.price} → ${targetCurrency} ${convertedPrice}`
     );
@@ -136,6 +154,8 @@ async function convertFlightCurrencies(
     convertedFlights.push({
       ...flight,
       price: convertedPrice,
+      pricePerPerson: convertedPricePerPerson,
+      ticketOptions: convertedTicketOptions,
       currency: targetCurrency,
       originalPrice: flight.price,
       originalCurrency,
