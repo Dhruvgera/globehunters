@@ -116,7 +116,7 @@ async function convertFlightCurrencies(
     
     // Skip if already in target currency
     if (originalCurrency === targetCurrency) {
-      console.log(`✅ Flight ${flight.id}: Already in ${targetCurrency}`);
+      //console.log(`✅ Flight ${flight.id}: Already in ${targetCurrency}`);
       convertedFlights.push(flight);
       continue;
     }
@@ -146,9 +146,9 @@ async function convertFlightCurrencies(
       );
     }
 
-    console.log(
-      `💱 Flight ${flight.id}: ${originalCurrency} ${flight.price} → ${targetCurrency} ${convertedPrice}`
-    );
+   // console.log(
+   //   `💱 Flight ${flight.id}: ${originalCurrency} ${flight.price} → ${targetCurrency} ${convertedPrice}`
+   // );
 
     // Update flight with converted price
     convertedFlights.push({

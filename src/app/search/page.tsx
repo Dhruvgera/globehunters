@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense, useMemo, useEffect } from "react";
+import { useState, Suspense, useMemo, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import Navbar from "@/components/navigation/Navbar";
@@ -44,6 +44,7 @@ function SearchPageContent() {
   const storeSearchParams = useBookingStore((state) => state.searchParams);
   const [isInitialized, setIsInitialized] = useState(false);
   const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
+  const prevLoadingRef = useRef(false);
   
   // Parse URL parameters and set in store on mount
   useEffect(() => {
@@ -85,12 +86,13 @@ function SearchPageContent() {
     { enabled: isInitialized }
   );
 
-  // Track when the first fetch completes
+  // Mark first attempt only after a loading cycle completes (prevents early "no results" / empty flash)
   useEffect(() => {
-    if (isInitialized && !loading && !hasAttemptedFetch) {
+    if (prevLoadingRef.current && !loading) {
       setHasAttemptedFetch(true);
     }
-  }, [isInitialized, loading, hasAttemptedFetch]);
+    prevLoadingRef.current = loading;
+  }, [loading]);
 
   // Calculate actual minimum price from flights for current dates
   const actualMinPrice = useMemo(() => {
@@ -114,10 +116,12 @@ function SearchPageContent() {
   // Auto-prefetch all date prices in parallel once main search completes
   useEffect(() => {
     if (!loading && flights.length > 0 && actualMinPrice) {
-      // Prefetch all departure dates (excluding selected center one - index 3)
+      // Prefetch departure dates, prioritizing nearest to selected (center) index
+      const departureCenter = Math.floor(departureDates.length / 2);
       const departureIndices = departureDates
         .map((_, index) => index)
-        .filter(index => index !== 3); // Skip center/selected date
+        .filter(index => index !== departureCenter)
+        .sort((a, b) => Math.abs(a - departureCenter) - Math.abs(b - departureCenter));
       
       if (departureIndices.length > 0) {
         fetchDatePricesBatch(departureIndices, 'departure');
@@ -125,9 +129,11 @@ function SearchPageContent() {
 
       // Prefetch all return dates if round trip
       if (effectiveSearchParams.tripType === 'round-trip' && returnDates.length > 0) {
+        const returnCenter = Math.floor(returnDates.length / 2);
         const returnIndices = returnDates
           .map((_, index) => index)
-          .filter(index => index !== 3); // Skip center/selected date
+          .filter(index => index !== returnCenter) // Skip center/selected date
+          .sort((a, b) => Math.abs(a - returnCenter) - Math.abs(b - returnCenter));
         
         if (returnIndices.length > 0) {
           fetchDatePricesBatch(returnIndices, 'return');
@@ -360,8 +366,8 @@ function SearchPageContent() {
         </div>
       )}
 
-      {/* Loading State - Show when no flights loaded yet */}
-      {(!isInitialized || (loading && flights.length === 0)) && (
+      {/* Loading State - Show during bootstrap and while first fetch is pending */}
+      {(!isInitialized || (loading && flights.length === 0) || (isInitialized && !loading && flights.length === 0 && !hasAttemptedFetch)) && (
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
           <div className="flex flex-col items-center justify-center gap-4">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>

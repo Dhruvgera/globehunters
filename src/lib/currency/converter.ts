@@ -33,7 +33,7 @@ const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 async function getExchangeRates(): Promise<Record<string, number>> {
   // Check cache
   if (rateCache && (Date.now() - rateCache.timestamp) < rateCache.ttl) {
-    console.log('💱 Using cached exchange rates');
+    //console.log('💱 Using cached exchange rates');
     return rateCache.rates;
   }
 
