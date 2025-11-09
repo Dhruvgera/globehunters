@@ -76,11 +76,13 @@ export function DateSelector({
             endDate={returnDate}
             onStartDateChange={onDepartureDateChange}
             onEndDateChange={onReturnDateChange}
+            onDone={() => onOpenChange(false)}
           />
         ) : (
           <DatePicker
             startDate={departureDate}
             onStartDateChange={onDepartureDateChange}
+            onDone={() => onOpenChange(false)}
           />
         )}
       </PopoverContent>

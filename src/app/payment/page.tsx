@@ -30,6 +30,7 @@ function PaymentContent() {
   const flight = useSelectedFlight();
   const selectedUpgrade = useBookingStore((state) => state.selectedUpgradeOption);
   const priceCheckData = useBookingStore((state) => state.priceCheckData);
+  const storeSearchParams = useBookingStore((state) => state.searchParams);
 
   // Get and set protection plan and baggage from/to Zustand store
   const addOns = useBookingStore((state) => state.addOns);
@@ -86,6 +87,7 @@ function PaymentContent() {
     duration: flight.outbound.totalJourneyTime || flight.outbound.duration,
     stops: flight.outbound.stopDetails || `${flight.outbound.stops} Stop${flight.outbound.stops !== 1 ? 's' : ''}`,
     airline: flight.airline.name,
+    airlineCode: flight.airline.code,
   };
 
   const inboundLeg = flight.inbound ? {
@@ -99,7 +101,27 @@ function PaymentContent() {
     duration: flight.inbound.totalJourneyTime || flight.inbound.duration,
     stops: flight.inbound.stopDetails || `${flight.inbound.stops} Stop${flight.inbound.stops !== 1 ? 's' : ''}`,
     airline: flight.airline.name,
+    airlineCode: flight.airline.code,
   } : null;
+
+  const passengerLabel = (() => {
+    if (selectedUpgrade?.passengerBreakdown?.length) {
+      const adt = selectedUpgrade.passengerBreakdown.find(p => p.type === 'ADT')?.count || 0;
+      const chd = selectedUpgrade.passengerBreakdown.find(p => p.type === 'CHD')?.count || 0;
+      const inf = selectedUpgrade.passengerBreakdown.find(p => p.type === 'INF')?.count || 0;
+      const parts: string[] = [];
+      if (adt) parts.push(`${adt} ${t('adult')}${adt > 1 ? 's' : ''}`);
+      if (chd) parts.push(`${chd} Child${chd > 1 ? 'ren' : ''}`);
+      if (inf) parts.push(`${inf} Infant${inf > 1 ? 's' : ''}`);
+      return parts.join(", ");
+    }
+    const counts = storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 };
+    const parts: string[] = [];
+    if (counts.adults) parts.push(`${counts.adults} ${t('adult')}${counts.adults > 1 ? 's' : ''}`);
+    if (counts.children) parts.push(`${counts.children} Child${counts.children > 1 ? 'ren' : ''}`);
+    if (counts.infants) parts.push(`${counts.infants} Infant${counts.infants > 1 ? 's' : ''}`);
+    return parts.join(", ");
+  })();
 
   return (
     <div className="min-h-screen bg-white">
@@ -125,13 +147,13 @@ function PaymentContent() {
             <div className="flex flex-col gap-3">
               <FlightSummaryCard
                 leg={outboundLeg}
-                passengers={`1 ${t('adult')}`}
+                passengers={passengerLabel || `1 ${t('adult')}`}
                 onViewDetails={() => setShowFlightInfo(true)}
               />
               {inboundLeg && (
                 <FlightSummaryCard
                   leg={inboundLeg}
-                  passengers={`1 ${t('adult')}`}
+                  passengers={passengerLabel || `1 ${t('adult')}`}
                   onViewDetails={() => setShowFlightInfo(true)}
                 />
               )}
@@ -141,6 +163,7 @@ function PaymentContent() {
             <BaggageSection
               additionalBaggage={additionalBaggage}
               onUpdateBaggage={setAdditionalBaggage}
+              baggageDescription={selectedUpgrade?.baggage?.description}
             />
 
             {/* iAssure Protection Plan */}

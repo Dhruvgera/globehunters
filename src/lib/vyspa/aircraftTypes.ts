@@ -129,3 +129,4 @@ export function getAircraftName(code: string | number | null | undefined): strin
   return AIRCRAFT_TYPE_MAP[codeStr] || codeStr;
 }
 
+

@@ -64,25 +64,6 @@ export function useSearchForm() {
     }
   }, []); // Only on mount
 
-  // Auto-close date picker when dates are selected
-  useEffect(() => {
-    if (
-      tripType === "round-trip" &&
-      returnDate &&
-      departureDate &&
-      isDatePickerOpen
-    ) {
-      setTimeout(() => setIsDatePickerOpen(false), 200);
-    }
-    if (
-      (tripType === "one-way" || tripType === "multi-city") &&
-      departureDate &&
-      isDatePickerOpen
-    ) {
-      setTimeout(() => setIsDatePickerOpen(false), 200);
-    }
-  }, [returnDate, departureDate, tripType, isDatePickerOpen]);
-
   const swapLocations = () => {
     const temp = from;
     setFrom(to);

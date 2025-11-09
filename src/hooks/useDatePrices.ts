@@ -93,6 +93,8 @@ export function useDatePrices(
   // Fetch price for a specific date
   const fetchDatePrice = useCallback(async (index: number, type: 'departure' | 'return') => {
     if (!searchParams) return;
+    // If we've been aborted (route changed/unmounted), do not start new work
+    if (abortControllerRef.current?.signal.aborted) return;
 
     // Use refs to get current dates without causing re-renders
     const dates = type === 'departure' ? departureDatesRef.current : returnDatesRef.current;
@@ -161,6 +163,8 @@ export function useDatePrices(
     setLoadingIndices(prev => new Set([...prev, index]));
 
     try {
+      // Bail out early if this request is no longer relevant
+      if (abortControllerRef.current?.signal.aborted) return;
       // Create modified search params for this specific date
       const modifiedParams = {
         ...searchParams,
@@ -171,6 +175,7 @@ export function useDatePrices(
       let response = flightCache.get(modifiedParams);
       
       if (!response) {
+        if (abortControllerRef.current?.signal.aborted) return;
         // Fetch actual flights for this date if not cached
         response = await flightService.searchFlights(modifiedParams);
         // Store complete response in global cache for later use
@@ -179,6 +184,7 @@ export function useDatePrices(
         console.log(`[useDatePrices] Using cached data for ${type} date ${candidate.toISOString().slice(0,10)}`);
       }
       
+      if (abortControllerRef.current?.signal.aborted) return;
       // Find minimum price from results
       let minPrice: number | null = null;
       if (response.flights && response.flights.length > 0) {
@@ -244,6 +250,7 @@ export function useDatePrices(
   // Fetch prices for multiple dates with controlled concurrency (prioritize nearest first)
   const fetchDatePricesBatch = useCallback(async (indices: number[], type: 'departure' | 'return') => {
     if (!searchParams || indices.length === 0) return;
+    if (abortControllerRef.current?.signal.aborted) return;
 
     const dates = type === 'departure' ? departureDatesRef.current : returnDatesRef.current;
     const dateObjects = type === 'departure' ? departureDateObjectsRef.current : returnDateObjectsRef.current;
@@ -298,8 +305,10 @@ export function useDatePrices(
     const MAX_CONCURRENCY = 3; // Reduced from 6 to 3 to avoid overwhelming server
     const runGroupWithConcurrency = async (groupIndices: number[]) => {
       if (!groupIndices || groupIndices.length === 0) return;
+      if (abortControllerRef.current?.signal.aborted) return;
       let cursor = 0;
       const fetchOne = async () => {
+        if (abortControllerRef.current?.signal.aborted) return;
         const myIndex = cursor++;
         if (myIndex >= groupIndices.length) return;
         const idx = groupIndices[myIndex];
@@ -316,6 +325,7 @@ export function useDatePrices(
 
     // Process distance groups in ascending order: 1, 2, 3...
     for (let dist = 1; dist <= maxDistance; dist++) {
+      if (abortControllerRef.current?.signal.aborted) return;
       const group = distanceGroups[dist];
       if (!group || group.length === 0) continue;
       // Keep the two sides interleaved in a stable manner

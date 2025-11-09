@@ -11,13 +11,14 @@ import { useTranslations } from "next-intl";
 import { BookingHeader } from "@/components/booking/BookingHeader";
 import { AlertBanner } from "@/components/booking/AlertBanner";
 import { FlightSummaryCard } from "@/components/booking/FlightSummaryCard";
-import { PassengerDetailsInline } from "@/components/booking/PassengerDetailsInline";
+import PassengerFormsSection from "@/components/booking/PassengerFormsSection";
 import { TermsAndConditions } from "@/components/booking/TermsAndConditions";
 import { PriceSummaryCard } from "@/components/booking/PriceSummaryCard";
 import { CustomerReviewsCard } from "@/components/booking/CustomerReviewsCard";
 import { WebRefCard } from "@/components/booking/WebRefCard";
 import UpgradeOptionsModal from "@/components/flights/modals/UpgradeOptionsModal";
 import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
+import { usePriceCheck } from "@/hooks/usePriceCheck";
 
 // Mock reviews data
 const mockReviews = [
@@ -43,6 +44,9 @@ function BookingContent() {
   const flight = useSelectedFlight();
   const selectedUpgrade = useSelectedUpgrade();
   const priceCheckData = usePriceCheckData();
+  const storeSearchParams = useBookingStore((s) => s.searchParams);
+  const setPriceCheckData = useBookingStore((s) => s.setPriceCheckData);
+  const { checkPrice, priceCheck } = usePriceCheck();
 
   // Redirect to search if no flight selected
   useEffect(() => {
@@ -50,6 +54,18 @@ function BookingContent() {
       router.push("/search");
     }
   }, [flight, router]);
+
+  // Prefetch price check for booking if missing
+  useEffect(() => {
+    if (flight?.segmentResultId && !priceCheckData) {
+      checkPrice(String(flight.segmentResultId));
+    }
+  }, [flight?.segmentResultId, priceCheckData, checkPrice]);
+  useEffect(() => {
+    if (priceCheck) {
+      setPriceCheckData(priceCheck);
+    }
+  }, [priceCheck, setPriceCheckData]);
 
   // Show loading state while redirecting
   if (!flight) {
@@ -68,6 +84,7 @@ function BookingContent() {
     duration: flight.outbound.totalJourneyTime || flight.outbound.duration,
     stops: flight.outbound.stopDetails || `${flight.outbound.stops} Stop${flight.outbound.stops !== 1 ? 's' : ''}`,
     airline: flight.airline.name,
+    airlineCode: flight.airline.code,
   };
 
   const inboundLeg = flight.inbound ? {
@@ -81,7 +98,28 @@ function BookingContent() {
     duration: flight.inbound.totalJourneyTime || flight.inbound.duration,
     stops: flight.inbound.stopDetails || `${flight.inbound.stops} Stop${flight.inbound.stops !== 1 ? 's' : ''}`,
     airline: flight.airline.name,
+    airlineCode: flight.airline.code,
   } : null;
+
+  const passengerLabel = (() => {
+    // Prefer selected upgrade breakdown; fallback to searched passengers
+    if (selectedUpgrade?.passengerBreakdown?.length) {
+      const adt = selectedUpgrade.passengerBreakdown.find(p => p.type === 'ADT')?.count || 0;
+      const chd = selectedUpgrade.passengerBreakdown.find(p => p.type === 'CHD')?.count || 0;
+      const inf = selectedUpgrade.passengerBreakdown.find(p => p.type === 'INF')?.count || 0;
+      const parts = [];
+      if (adt) parts.push(`${adt} Adult${adt > 1 ? 's' : ''}`);
+      if (chd) parts.push(`${chd} Child${chd > 1 ? 'ren' : ''}`);
+      if (inf) parts.push(`${inf} Infant${inf > 1 ? 's' : ''}`);
+      return parts.join(", ");
+    }
+    const counts = storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 };
+    const parts = [];
+    if (counts.adults) parts.push(`${counts.adults} Adult${counts.adults > 1 ? 's' : ''}`);
+    if (counts.children) parts.push(`${counts.children} Child${counts.children > 1 ? 'ren' : ''}`);
+    if (counts.infants) parts.push(`${counts.infants} Infant${counts.infants > 1 ? 's' : ''}`);
+    return parts.join(", ");
+  })();
 
   return (
     <div className="min-h-screen bg-white">
@@ -134,20 +172,20 @@ function BookingContent() {
             <div className="flex flex-col gap-3">
               <FlightSummaryCard
                 leg={outboundLeg}
-                passengers={`1 ${t('flightSummary.passenger')}`}
+                passengers={passengerLabel || `1 ${t('flightSummary.passenger')}`}
                 onViewDetails={() => setShowFlightInfo(true)}
               />
               {inboundLeg && (
                 <FlightSummaryCard
                   leg={inboundLeg}
-                  passengers={`1 ${t('flightSummary.passenger')}`}
+                  passengers={passengerLabel || `1 ${t('flightSummary.passenger')}`}
                   onViewDetails={() => setShowFlightInfo(true)}
                 />
               )}
             </div>
 
             {/* Passenger Details Form */}
-            <PassengerDetailsInline passengerCount={2} />
+            <PassengerFormsSection />
 
             {/* Terms & Conditions */}
             <TermsAndConditions

@@ -37,84 +37,43 @@ export function PriceSummaryCard({
         </span>
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="lg:hidden text-[#3754ED] text-sm font-medium"
+          className="lg:hidden text-[#3754ED] text-sm font-medium hidden"
         >
           {isExpanded ? t('hideDetails') : t('showDetails')}
         </button>
       </div>
 
-      {/* Breakdown - Hidden on mobile unless expanded, always visible on desktop */}
-      <div
-        className={`flex-col gap-2 ${
-          isExpanded ? "flex" : "hidden lg:flex"
-        }`}
-      >
-        {selectedUpgrade ? (
-          <>
-            {/* Show passenger breakdown from price check */}
-            {selectedUpgrade.passengerBreakdown.map((pax, idx) => (
-              <div key={idx} className="flex items-center justify-between">
-                <span className="text-sm font-medium text-[#010D50]">
-                  {pax.count}x {pax.type === 'ADT' ? t('adult') : pax.type === 'CHD' ? 'Child' : 'Infant'}
-                </span>
-                <span className="text-sm font-medium text-[#010D50]">
-                  £{pax.totalPrice.toLocaleString()}
-                </span>
-              </div>
-            ))}
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-[#3A478A]">Base Fare</span>
-              <span className="text-sm text-[#3A478A]">
-                £{selectedUpgrade.baseFare.toLocaleString()}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-[#3A478A]">{t('taxesAndFees')}</span>
-              <span className="text-sm text-[#3A478A]">
-                £{selectedUpgrade.taxes.toLocaleString()}
-              </span>
-            </div>
-            {selectedUpgrade.atolFee > 0 && (
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-[#3A478A]">ATOL Fee</span>
-                <span className="text-sm text-[#3A478A]">
-                  £{selectedUpgrade.atolFee.toLocaleString()}
-                </span>
-              </div>
-            )}
-          </>
-        ) : (
-          <>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-[#010D50]">
-                {t('traveler')}: {adults} {adults > 1 ? t('adults') : t('adult')}
-                {children > 0 && `, ${children} Child${children > 1 ? 'ren' : ''}`}
-              </span>
-              <span className="text-sm font-medium text-[#010D50]">
-                £{total.toLocaleString()}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-[#3A478A]">{t('flightFare')}</span>
-              <span className="text-sm text-[#3A478A]">
-                £{(flightFare * (adults + children)).toLocaleString()}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-[#3A478A]">{t('taxesAndFees')}</span>
-              <span className="text-sm text-[#3A478A]">
-                £{taxesAndFees.toLocaleString()}
-              </span>
-            </div>
-          </>
-        )}
-      </div>
+      {/* Breakdown hidden by design - show only Trip Total */}
+      {false && (
+        <div
+          className={`flex-col gap-2 ${
+            isExpanded ? "flex" : "hidden lg:flex"
+          }`}
+        >
+          {selectedUpgrade ? (
+            <>
+              {selectedUpgrade.passengerBreakdown.map((pax, idx) => (
+                <div key={idx} className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-[#010D50]">
+                    {pax.count}x {pax.type === 'ADT' ? t('adult') : pax.type === 'CHD' ? 'Child' : 'Infant'}
+                  </span>
+                  <span className="text-sm font-medium text-[#010D50]">
+                    £{pax.totalPrice.toLocaleString()}
+                  </span>
+                </div>
+              ))}
+            </>
+          ) : null}
+        </div>
+      )}
 
-      <div
-        className={`border-t border-[#DFE0E4] ${
-          isExpanded ? "block" : "hidden lg:block"
-        }`}
-      />
+      {false && (
+        <div
+          className={`border-t border-[#DFE0E4] ${
+            isExpanded ? "block" : "hidden lg:block"
+          }`}
+        />
+      )}
 
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-[#010D50]">

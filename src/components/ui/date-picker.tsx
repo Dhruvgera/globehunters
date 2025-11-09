@@ -10,6 +10,7 @@ interface DatePickerProps {
   endDate?: Date;
   onStartDateChange?: (date: Date | undefined) => void;
   onEndDateChange?: (date: Date | undefined) => void;
+  onDone?: () => void;
   className?: string;
 }
 
@@ -175,6 +176,7 @@ export function DatePicker({
   endDate,
   onStartDateChange,
   onEndDateChange,
+  onDone,
   className,
 }: DatePickerProps) {
   const today = new Date();
@@ -237,28 +239,43 @@ export function DatePicker({
   };
 
   return (
-    <div className={cn("flex flex-col md:flex-row gap-6 p-4", className)}>
-      <MonthCalendar
-        year={startYear}
-        month={startMonth}
-        onMonthChange={handleStartMonthChange}
-        selectedStart={startDate}
-        selectedEnd={endDate}
-        onDateSelect={handleStartDateSelect}
-        label="Start date*"
-        isStartCalendar={true}
-      />
-      {onEndDateChange && (
+    <div className={cn("p-4", className)}>
+      <div className="flex flex-col md:flex-row gap-6">
         <MonthCalendar
-          year={endYear}
-          month={endMonth}
-          onMonthChange={handleEndMonthChange}
+          year={startYear}
+          month={startMonth}
+          onMonthChange={handleStartMonthChange}
           selectedStart={startDate}
           selectedEnd={endDate}
-          onDateSelect={handleEndDateSelect}
-          label="End date*"
-          isStartCalendar={false}
+          onDateSelect={handleStartDateSelect}
+          label="Start date*"
+          isStartCalendar={true}
         />
+        {onEndDateChange && (
+          <MonthCalendar
+            year={endYear}
+            month={endMonth}
+            onMonthChange={handleEndMonthChange}
+            selectedStart={startDate}
+            selectedEnd={endDate}
+            onDateSelect={handleEndDateSelect}
+            label="End date*"
+            isStartCalendar={false}
+          />
+        )}
+      </div>
+
+      {/* Done Button */}
+      {onDone && (
+        <div className="flex justify-center pt-3 border-t border-[#DFE0E4] mt-4">
+          <Button
+            onClick={onDone}
+            size="sm"
+            className="bg-[#3754ED] hover:bg-[#2942D1] text-white rounded-full px-4 py-1.5 h-auto text-xs font-medium"
+          >
+            Done
+          </Button>
+        </div>
       )}
     </div>
   );

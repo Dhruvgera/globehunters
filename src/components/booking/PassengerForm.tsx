@@ -21,6 +21,7 @@ interface PassengerFormProps {
   onSave: (passenger: Passenger) => void;
   onCancel?: () => void;
   showPassportFields?: boolean;
+  disabled?: boolean;
 }
 
 export function PassengerForm({
@@ -29,6 +30,7 @@ export function PassengerForm({
   onSave,
   onCancel,
   showPassportFields = false,
+  disabled = false,
 }: PassengerFormProps) {
   const t = useTranslations('booking.passengerDetails');
   
@@ -83,6 +85,7 @@ export function PassengerForm({
             <Select
               value={formData.title}
               onValueChange={(value) => handleChange("title", value)}
+              disabled={disabled}
             >
               <SelectTrigger id={`title-${passengerIndex}`}>
                 <SelectValue placeholder={t('selectTitle')} />
@@ -110,6 +113,7 @@ export function PassengerForm({
               onChange={(e) => handleChange("firstName", e.target.value)}
               placeholder={t('firstName')}
               className={errors.firstName ? "border-red-500" : ""}
+              disabled={disabled}
             />
             {errors.firstName && (
               <p className="text-xs text-red-600">{errors.firstName}</p>
@@ -126,6 +130,7 @@ export function PassengerForm({
               onChange={(e) => handleChange("lastName", e.target.value)}
               placeholder={t('lastName')}
               className={errors.lastName ? "border-red-500" : ""}
+              disabled={disabled}
             />
             {errors.lastName && (
               <p className="text-xs text-red-600">{errors.lastName}</p>
@@ -141,6 +146,7 @@ export function PassengerForm({
               value={formData.dateOfBirth}
               onChange={(e) => handleChange("dateOfBirth", e.target.value)}
               className={errors.dateOfBirth ? "border-red-500" : ""}
+              disabled={disabled}
             />
             {errors.dateOfBirth && (
               <p className="text-xs text-red-600">{errors.dateOfBirth}</p>
@@ -157,6 +163,7 @@ export function PassengerForm({
               onChange={(e) => handleChange("email", e.target.value)}
               placeholder={t('emailPlaceholder')}
               className={errors.email ? "border-red-500" : ""}
+              disabled={disabled}
             />
             {errors.email && (
               <p className="text-xs text-red-600">{errors.email}</p>
@@ -173,6 +180,7 @@ export function PassengerForm({
               onChange={(e) => handleChange("phone", e.target.value)}
               placeholder={t('phonePlaceholder')}
               className={errors.phone ? "border-red-500" : ""}
+              disabled={disabled}
             />
             {errors.phone && (
               <p className="text-xs text-red-600">{errors.phone}</p>
@@ -202,6 +210,7 @@ export function PassengerForm({
                   }
                   placeholder="A1234567"
                   className={errors.passportNumber ? "border-red-500" : ""}
+                  disabled={disabled}
                 />
                 {errors.passportNumber && (
                   <p className="text-xs text-red-600">
@@ -223,6 +232,7 @@ export function PassengerForm({
                     handleChange("passportExpiry", e.target.value)
                   }
                   className={errors.passportExpiry ? "border-red-500" : ""}
+                  disabled={disabled}
                 />
                 {errors.passportExpiry && (
                   <p className="text-xs text-red-600">
@@ -243,6 +253,7 @@ export function PassengerForm({
                   onChange={(e) => handleChange("nationality", e.target.value)}
                   placeholder="United States"
                   className={errors.nationality ? "border-red-500" : ""}
+                  disabled={disabled}
                 />
                 {errors.nationality && (
                   <p className="text-xs text-red-600">{errors.nationality}</p>
@@ -261,16 +272,19 @@ export function PassengerForm({
             variant="outline"
             onClick={onCancel}
             className="rounded-full px-6 py-2 h-auto text-sm font-medium"
+            disabled={disabled}
           >
             {t('cancel')}
           </Button>
         )}
-        <Button
-          type="submit"
-          className="bg-[#3754ED] hover:bg-[#2942D1] text-white rounded-full px-6 py-2 h-auto text-sm font-medium"
-        >
-          {t('save')}
-        </Button>
+        {!disabled && (
+          <Button
+            type="submit"
+            className="bg-[#3754ED] hover:bg-[#2942D1] text-white rounded-full px-6 py-2 h-auto text-sm font-medium"
+          >
+            {t('save')}
+          </Button>
+        )}
       </div>
     </form>
   );

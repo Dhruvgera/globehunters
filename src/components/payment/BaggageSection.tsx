@@ -8,13 +8,17 @@ import { BaggageCounter } from "./baggage/BaggageCounter";
 interface BaggageSectionProps {
   additionalBaggage: number;
   onUpdateBaggage: (count: number) => void;
+  baggageDescription?: string;
 }
 
 export function BaggageSection({
   additionalBaggage,
   onUpdateBaggage,
+  baggageDescription,
 }: BaggageSectionProps) {
   const t = useTranslations('payment.baggage');
+
+  const hasCheckedIncluded = !!baggageDescription && !/^no$|^none$/i.test(baggageDescription.trim());
 
   return (
     <div className="bg-white border border-[#DFE0E4] rounded-xl p-3 flex flex-col gap-6">
@@ -54,8 +58,8 @@ export function BaggageSection({
         <BaggageItem
           icon={Package}
           title={t('checkedBags')}
-          description={t('checkedBagsDesc')}
-          included={false}
+          description={baggageDescription || t('checkedBagsDesc')}
+          included={hasCheckedIncluded}
           includedText={t('included')}
           notIncludedText={t('notIncluded')}
         />
