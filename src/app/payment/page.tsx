@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
 import { useBookingStore, useSelectedFlight } from "@/store/bookingStore";
-import { PRICING_CONFIG } from "@/config/constants";
+import { PRICING_CONFIG, CONTACT_INFO } from "@/config/constants";
 import { useTranslations } from "next-intl";
 
 // Import new modular components
@@ -37,7 +37,7 @@ function PaymentContent() {
   const setProtectionPlan = useBookingStore((state) => state.setProtectionPlan);
   const setAdditionalBaggage = useBookingStore((state) => state.setAdditionalBaggage);
 
-  const protectionPlan = addOns.protectionPlan || 'premium';
+  const protectionPlan = addOns.protectionPlan;
   const additionalBaggage = addOns.additionalBaggage;
 
   // Redirect to search if no flight selected
@@ -53,6 +53,7 @@ function PaymentContent() {
   }
 
   // Price calculation - Use real pricing from selected upgrade or flight
+  const currency = selectedUpgrade ? selectedUpgrade.currency : flight.currency;
   const baseFare = selectedUpgrade ? selectedUpgrade.totalPrice : (flight.price || 0);
   const protectionPlanPrices = {
     basic: baseFare * 0.05, // 5% of base fare
@@ -60,9 +61,9 @@ function PaymentContent() {
     all: baseFare * 0.10, // 10% of base fare
   };
   const baggagePrice = PRICING_CONFIG.baggagePrice;
-  const discountPercent = PRICING_CONFIG.defaultDiscount;
+  const discountPercent = 0; // No automatic discount unless applied explicitly
 
-  const protectionPlanCost = protectionPlanPrices[protectionPlan];
+  const protectionPlanCost = protectionPlan ? protectionPlanPrices[protectionPlan] : 0;
   const baggageCost = additionalBaggage * baggagePrice;
   const subtotal = baseFare + protectionPlanCost + baggageCost;
   const discountAmount = subtotal * discountPercent;
@@ -73,7 +74,9 @@ function PaymentContent() {
       ? "Basic"
       : protectionPlan === "premium"
       ? "Premium"
-      : "All Included";
+      : protectionPlan === "all"
+      ? "All Included"
+      : "None";
 
   // Flight data for summary cards - Use real flight data
   const outboundLeg = {
@@ -122,6 +125,7 @@ function PaymentContent() {
     if (counts.infants) parts.push(`${counts.infants} Infant${counts.infants > 1 ? 's' : ''}`);
     return parts.join(", ");
   })();
+  const cabinLabel = selectedUpgrade?.cabinClassDisplay || useBookingStore((s) => s.selectedFareType) || 'Economy';
 
   return (
     <div className="min-h-screen bg-white">
@@ -136,8 +140,8 @@ function PaymentContent() {
         <div className="flex flex-col lg:flex-row gap-4">
           {/* Web Ref Card - Mobile Only */}
           <WebRefCard
-            refNumber="IN-649707636"
-            phoneNumber="020 4502 2984"
+            refNumber={flight.webRef || (priceCheckData?.sessionInfo?.sessionId || '—')}
+            phoneNumber={CONTACT_INFO.phone}
             isMobile={true}
           />
 
@@ -149,12 +153,14 @@ function PaymentContent() {
                 leg={outboundLeg}
                 passengers={passengerLabel || `1 ${t('adult')}`}
                 onViewDetails={() => setShowFlightInfo(true)}
+                cabinLabel={cabinLabel}
               />
               {inboundLeg && (
                 <FlightSummaryCard
                   leg={inboundLeg}
                   passengers={passengerLabel || `1 ${t('adult')}`}
                   onViewDetails={() => setShowFlightInfo(true)}
+                  cabinLabel={cabinLabel}
                 />
               )}
             </div>
@@ -163,7 +169,12 @@ function PaymentContent() {
             <BaggageSection
               additionalBaggage={additionalBaggage}
               onUpdateBaggage={setAdditionalBaggage}
-              baggageDescription={selectedUpgrade?.baggage?.description}
+              baggageDescription={
+                selectedUpgrade?.baggage?.description ||
+                (flight.outbound.segmentBaggageQuantity && flight.outbound.segmentBaggageUnit
+                  ? `${flight.outbound.segmentBaggageQuantity} ${flight.outbound.segmentBaggageUnit}`
+                  : flight.outbound.segmentBaggage || flight.baggage || undefined)
+              }
             />
 
             {/* iAssure Protection Plan */}
@@ -201,8 +212,8 @@ function PaymentContent() {
           <div className="w-full lg:w-[482px] flex flex-col gap-4">
             {/* Web Ref Card - Desktop Only */}
             <WebRefCard
-              refNumber="IN-649707636"
-              phoneNumber="020 4502 2984"
+            refNumber={flight.webRef || (priceCheckData?.sessionInfo?.sessionId || '—')}
+            phoneNumber={CONTACT_INFO.phone}
               isMobile={false}
             />
 
@@ -217,6 +228,7 @@ function PaymentContent() {
               discountAmount={discountAmount}
               tripTotal={tripTotal}
               isSticky={true}
+              currency={currency}
             />
           </div>
         </div>

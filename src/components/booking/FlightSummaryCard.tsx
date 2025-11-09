@@ -24,12 +24,14 @@ interface FlightSummaryCardProps {
   leg: FlightLeg;
   passengers: string;
   onViewDetails: () => void;
+  cabinLabel?: string;
 }
 
 export function FlightSummaryCard({
   leg,
   passengers,
   onViewDetails,
+  cabinLabel,
 }: FlightSummaryCardProps) {
   const t = useTranslations('booking.flightSummary');
   const [imgError, setImgError] = useState(false);
@@ -66,7 +68,7 @@ export function FlightSummaryCard({
         </div>
         {/* Desktop: passengers and cabin */}
         <div className="hidden lg:flex items-center gap-3 text-sm text-[#010D50]">
-          <span>{t('economy')}</span>
+          <span>{cabinLabel || t('economy')}</span>
           <div className="w-1 h-1 rounded-full bg-[#010D50]" />
           <span>{passengers}</span>
         </div>

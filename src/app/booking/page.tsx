@@ -120,6 +120,7 @@ function BookingContent() {
     if (counts.infants) parts.push(`${counts.infants} Infant${counts.infants > 1 ? 's' : ''}`);
     return parts.join(", ");
   })();
+  const cabinLabel = selectedUpgrade?.cabinClassDisplay || useBookingStore((s) => s.selectedFareType) || 'Economy';
 
   return (
     <div className="min-h-screen bg-white">
@@ -174,12 +175,14 @@ function BookingContent() {
                 leg={outboundLeg}
                 passengers={passengerLabel || `1 ${t('flightSummary.passenger')}`}
                 onViewDetails={() => setShowFlightInfo(true)}
+                cabinLabel={cabinLabel}
               />
               {inboundLeg && (
                 <FlightSummaryCard
                   leg={inboundLeg}
                   passengers={passengerLabel || `1 ${t('flightSummary.passenger')}`}
                   onViewDetails={() => setShowFlightInfo(true)}
+                  cabinLabel={cabinLabel}
                 />
               )}
             </div>

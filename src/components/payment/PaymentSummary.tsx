@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import { formatPrice } from "@/lib/currency";
 
 interface PaymentSummaryProps {
   baseFare: number;
@@ -13,6 +14,7 @@ interface PaymentSummaryProps {
   discountAmount: number;
   tripTotal: number;
   isSticky?: boolean;
+  currency: string;
 }
 
 export function PaymentSummary({
@@ -25,6 +27,7 @@ export function PaymentSummary({
   discountAmount,
   tripTotal,
   isSticky = true,
+  currency,
 }: PaymentSummaryProps) {
   const t = useTranslations('payment');
   const [isExpanded, setIsExpanded] = useState(false);
@@ -58,7 +61,7 @@ export function PaymentSummary({
                 {t('traveler')}: 1 {t('adult')}
               </span>
               <span className="text-sm font-medium text-[#010D50]">
-                ₹{baseFare.toLocaleString("en-IN")}
+                {formatPrice(baseFare, currency)}
               </span>
             </div>
           </div>
@@ -74,11 +77,7 @@ export function PaymentSummary({
               iAssure Protection Plan ({protectionPlanName})
             </span>
             <span className="text-sm text-[#3A478A]">
-              ₹
-              {protectionPlanCost.toLocaleString("en-IN", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
+              {formatPrice(protectionPlanCost, currency)}
             </span>
           </div>
 
@@ -93,7 +92,7 @@ export function PaymentSummary({
               {t('additionalBaggage')} ({baggageCount} {t('bags')})
             </span>
             <span className="text-sm text-[#3A478A]">
-              ₹{baggageCost.toLocaleString("en-IN")}
+              {formatPrice(baggageCost, currency)}
             </span>
           </div>
 
@@ -108,11 +107,7 @@ export function PaymentSummary({
               {t('discountCode')} (-{discountPercent * 100}%)
             </span>
             <span className="text-sm text-[#3A478A]">
-              -₹
-              {discountAmount.toLocaleString("en-IN", {
-                minimumFractionDigits: 1,
-                maximumFractionDigits: 1,
-              })}
+              -{formatPrice(discountAmount, currency)}
             </span>
           </div>
 
@@ -127,11 +122,7 @@ export function PaymentSummary({
           {t('tripTotal')}
         </span>
         <span className="text-sm font-semibold text-[#010D50]">
-          ₹
-          {tripTotal.toLocaleString("en-IN", {
-            minimumFractionDigits: 1,
-            maximumFractionDigits: 1,
-          })}
+          {formatPrice(tripTotal, currency)}
         </span>
       </div>
     </div>
