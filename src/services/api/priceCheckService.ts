@@ -4,6 +4,7 @@
  */
 
 import { VYSPA_CONFIG } from '@/config/vyspa';
+import { convertCurrency, getTargetCurrency } from '@/lib/currency';
 import type {
   PriceCheckRequest,
   PriceCheckResponse,
@@ -113,7 +114,7 @@ export async function checkPrice(
     }
 
     // Transform response to UI model
-    return transformPriceCheckResponse(data);
+    return await transformPriceCheckResponse(data);
 
   } catch (error: any) {
     console.error('❌ Price Check API error:', error);
@@ -169,13 +170,15 @@ export async function checkPrice(
 /**
  * Transform API response to UI model
  */
-export function transformPriceCheckResponse(
+export async function transformPriceCheckResponse(
   response: PriceCheckResponse
-): PriceCheckResult {
+): Promise<PriceCheckResult> {
   try {
     const pc = response.priceCheck;
     const flightResult = pc.flight_data?.result?.FlightPswResult;
     const flightSegments = pc.flight_data?.flights || [];
+    const sourceCurrency = (flightResult?.iso_currency_code || 'USD').toUpperCase();
+    const targetCurrency = getTargetCurrency().toUpperCase();
 
     if (!flightResult) {
       throw createPriceCheckError(
@@ -234,7 +237,7 @@ export function transformPriceCheckResponse(
     try {
       priceOptions = extractUpgradeOptions(
         pc.price_data || [],
-        flightResult.iso_currency_code || 'USD'
+        sourceCurrency
       );
     } catch (priceError) {
       console.error('Error extracting upgrade options:', priceError);
@@ -246,7 +249,7 @@ export function transformPriceCheckResponse(
         bookingCode: '',
         totalPrice: parseFloat(flightResult.total_fare || '0'),
         pricePerPerson: parseFloat(flightResult.total_fare || '0'),
-        currency: flightResult.iso_currency_code || 'USD',
+        currency: sourceCurrency,
         baseFare: parseFloat(flightResult.base_fare || '0'),
         taxes: parseFloat(flightResult.tax || '0'),
         markup: parseFloat(flightResult.markupAmt || '0'),
@@ -267,6 +270,53 @@ export function transformPriceCheckResponse(
         isUpgrade: false,
         priceDifference: undefined,
       }];
+    }
+
+    // Normalize currency: convert all price amounts to target currency for display consistency
+    if (priceOptions.length > 0 && sourceCurrency !== targetCurrency) {
+      const converted = await Promise.all(
+        priceOptions.map(async (opt) => {
+          const totalPrice = await convertCurrency(opt.totalPrice, sourceCurrency, targetCurrency);
+          const pricePerPerson = await convertCurrency(opt.pricePerPerson, sourceCurrency, targetCurrency);
+          const baseFare = await convertCurrency(opt.baseFare, sourceCurrency, targetCurrency);
+          const taxes = await convertCurrency(opt.taxes, sourceCurrency, targetCurrency);
+          const markup = await convertCurrency(opt.markup, sourceCurrency, targetCurrency);
+          const commission = await convertCurrency(opt.commission, sourceCurrency, targetCurrency);
+          const atolFee = await convertCurrency(opt.atolFee, sourceCurrency, targetCurrency);
+          const passengerBreakdown = await Promise.all(
+            opt.passengerBreakdown.map(async (p) => ({
+              ...p,
+              basePrice: await convertCurrency(p.basePrice, sourceCurrency, targetCurrency),
+              totalPrice: await convertCurrency(p.totalPrice, sourceCurrency, targetCurrency),
+              taxesPerPerson: await convertCurrency(p.taxesPerPerson, sourceCurrency, targetCurrency),
+            }))
+          );
+          return {
+            ...opt,
+            totalPrice,
+            pricePerPerson,
+            baseFare,
+            taxes,
+            markup,
+            commission,
+            atolFee,
+            passengerBreakdown,
+            currency: targetCurrency,
+          };
+        })
+      );
+      priceOptions = converted;
+    }
+
+    // Ensure options are sorted by total price and upgrade flags are accurate
+    if (priceOptions.length > 1) {
+      priceOptions = [...priceOptions].sort((a, b) => a.totalPrice - b.totalPrice);
+      const baseTotal = priceOptions[0].totalPrice;
+      priceOptions = priceOptions.map((opt, idx) => ({
+        ...opt,
+        isUpgrade: idx > 0 && opt.totalPrice > baseTotal,
+        priceDifference: idx > 0 ? opt.totalPrice - baseTotal : undefined,
+      }));
     }
 
     // Session info for booking
@@ -307,9 +357,22 @@ export function extractUpgradeOptions(
     return [];
   }
 
-  const basePrice = parseFloat(priceData[0].Total_Fare?.total || '0');
-  
-  return priceData.map((option, index) => transformPriceOption(option, index, basePrice, currency));
+  // Determine true base price as the cheapest total in the set
+  const totals = priceData.map((pd) => parseFloat(pd.Total_Fare?.total || '0')).filter((n) => !Number.isNaN(n) && n >= 0);
+  const basePrice = totals.length ? Math.min(...totals) : parseFloat(priceData[0].Total_Fare?.total || '0');
+
+  const options = priceData.map((option, index) => transformPriceOption(option, index, basePrice, currency));
+
+  // Sort by total price ascending
+  const sorted = [...options].sort((a, b) => a.totalPrice - b.totalPrice);
+  const cheapest = sorted[0]?.totalPrice ?? basePrice;
+
+  // Recompute upgrade flags/differences based on cheapest option
+  return sorted.map((opt, idx) => ({
+    ...opt,
+    isUpgrade: idx > 0 && opt.totalPrice > cheapest,
+    priceDifference: idx > 0 ? opt.totalPrice - cheapest : undefined,
+  }));
 }
 
 /**

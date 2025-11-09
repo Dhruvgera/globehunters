@@ -114,7 +114,7 @@ export async function checkPrice(
     }
 
     // Transform response to UI model
-    const result = transformPriceCheckResponse(data);
+    const result = await transformPriceCheckResponse(data);
     
     console.log('✅ Server Action: Price check successful:', {
       priceOptions: result.priceOptions.length,
