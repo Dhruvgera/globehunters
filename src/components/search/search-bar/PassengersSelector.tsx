@@ -29,8 +29,40 @@ export function PassengersSelector({
   onTravelClassChange,
 }: PassengersSelectorProps) {
   const t = useTranslations('search.passengers');
+  const tPrice = useTranslations('booking.priceSummary');
+
   const totalPassengers =
     passengers.adults + passengers.children + passengers.infants;
+
+  const summaryLabel = (() => {
+    const parts: string[] = [];
+    if (passengers.adults > 0) {
+      parts.push(
+        `${passengers.adults} ${
+          passengers.adults === 1 ? tPrice('adult') : tPrice('adults')
+        }`
+      );
+    }
+    if (passengers.children > 0) {
+      parts.push(
+        `${passengers.children} ${
+          passengers.children === 1 ? tPrice('child') : tPrice('children')
+        }`
+      );
+    }
+    if (passengers.infants > 0) {
+      parts.push(
+        `${passengers.infants} ${
+          passengers.infants === 1 ? tPrice('infant') : tPrice('infants')
+        }`
+      );
+    }
+    // Fallback to adults if somehow all are 0
+    if (parts.length === 0) {
+      return `1 ${tPrice('adult')}`;
+    }
+    return parts.join(', ');
+  })();
 
   const updatePassengers = (
     type: keyof Passengers,
@@ -52,7 +84,7 @@ export function PassengersSelector({
         >
           <Users className="w-5 h-5 text-[#010D50]" />
           <span className="text-sm font-medium text-[#010D50]">
-            {totalPassengers} {totalPassengers > 1 ? t('adultPlural') : t('adultSingular')}, {travelClass}
+            {summaryLabel}, {travelClass}
           </span>
           <ChevronDown className="w-5 h-5 text-[#010D50]" />
         </Button>

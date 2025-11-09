@@ -59,6 +59,21 @@ export async function searchFlightsVyspa(
   const children = parseInt(params.chd1 || '0', 10);
   const directOnly = params.dir === '1' ? '1' : '0';
 
+  // Map numeric cabin class (1-4) to Vyspa letter codes (M/W/C/F)
+  const mapCabinClass = (code?: string): string | undefined => {
+    if (!code) return undefined;
+    switch (String(code)) {
+      case '1': return 'M'; // Economy
+      case '2': return 'W'; // Premium Economy
+      case '3': return 'C'; // Business
+      case '4': return 'F'; // First
+      default: return undefined;
+    }
+  };
+
+  const infants = parseInt(params.inf1 || '0', 10);
+  const cabinLetter = mapCabinClass(params.cl);
+
   const vyspaParams: VyspaSearchParams[] = [{
     version: VYSPA_CONFIG.defaults.version,
     departure_airport: params.origin1.toUpperCase(),
@@ -69,6 +84,9 @@ export async function searchFlightsVyspa(
     children: String(children),
     child_ages: generateChildAges(children),
     direct_flight_only: directOnly,
+    ...(infants > 0 ? { infants: String(infants) } : {}),
+    ...(cabinLetter ? { cabin_class: cabinLetter } : {}),
+    ...(cabinLetter && returnDate ? { inbound_cabin_class: cabinLetter } : {}),
   }];
 
   console.log('🔍 Vyspa API Request:', {

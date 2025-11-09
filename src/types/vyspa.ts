@@ -20,6 +20,19 @@ export interface VyspaSearchParams {
   children: string;
   child_ages: string[];
   direct_flight_only: '0' | '1';
+  /**
+   * Number of infants (API expects string digits)
+   */
+  infants?: string;
+  /**
+   * One-letter cabin class code for outbound flight:
+   * M - Economy, W - Premium, C - Business, F - First
+   */
+  cabin_class?: string;
+  /**
+   * One-letter cabin class code for inbound flight (round trips)
+   */
+  inbound_cabin_class?: string;
 }
 
 /**
