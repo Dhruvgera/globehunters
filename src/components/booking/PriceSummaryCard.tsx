@@ -3,27 +3,24 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { TransformedPriceOption } from "@/types/priceCheck";
+import { formatPrice } from "@/lib/currency";
 
 interface PriceSummaryCardProps {
-  flightFare: number;
-  taxesAndFees: number;
-  adults: number;
-  children?: number;
+  baseTripTotal: number;
   selectedUpgrade?: TransformedPriceOption | null;
   isSticky?: boolean;
+  currency: string;
 }
 
 export function PriceSummaryCard({
-  flightFare,
-  taxesAndFees,
-  adults,
-  children = 0,
+  baseTripTotal,
   selectedUpgrade,
   isSticky = true,
+  currency,
 }: PriceSummaryCardProps) {
   const t = useTranslations('booking.priceSummary');
   const [isExpanded, setIsExpanded] = useState(false);
-  const total = selectedUpgrade ? selectedUpgrade.totalPrice : (flightFare * (adults + children)) + taxesAndFees;
+  const total = selectedUpgrade ? selectedUpgrade.totalPrice : baseTripTotal;
 
   return (
     <div
@@ -52,7 +49,7 @@ export function PriceSummaryCard({
         >
           {selectedUpgrade ? (
             <>
-              {selectedUpgrade.passengerBreakdown.map((pax, idx) => (
+              {selectedUpgrade!.passengerBreakdown.map((pax, idx) => (
                 <div key={idx} className="flex items-center justify-between">
                   <span className="text-sm font-medium text-[#010D50]">
                     {pax.count}x {pax.type === 'ADT' ? t('adult') : pax.type === 'CHD' ? 'Child' : 'Infant'}
@@ -80,7 +77,7 @@ export function PriceSummaryCard({
           {t('tripTotal')}
         </span>
         <span className="text-sm font-semibold text-[#010D50]">
-          £{total.toLocaleString()}.00
+          {formatPrice(total, currency)}
         </span>
       </div>
     </div>

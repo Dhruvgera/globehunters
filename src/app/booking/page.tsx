@@ -204,12 +204,10 @@ function BookingContent() {
 
             {/* Price Summary */}
             <PriceSummaryCard
-              flightFare={selectedUpgrade ? selectedUpgrade.pricePerPerson : flight.pricePerPerson}
-              taxesAndFees={selectedUpgrade ? selectedUpgrade.taxes : 0}
-              adults={selectedUpgrade ? selectedUpgrade.passengerBreakdown.filter(p => p.type === 'ADT').reduce((sum, p) => sum + p.count, 0) : 1}
-              children={selectedUpgrade ? selectedUpgrade.passengerBreakdown.filter(p => p.type === 'CHD').reduce((sum, p) => sum + p.count, 0) : 0}
+              baseTripTotal={selectedUpgrade ? selectedUpgrade.totalPrice : flight.price}
               selectedUpgrade={selectedUpgrade}
               isSticky={true}
+              currency={selectedUpgrade ? selectedUpgrade.currency : flight.currency}
             />
 
             {/* Customer Reviews */}
