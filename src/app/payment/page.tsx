@@ -65,18 +65,19 @@ function PaymentContent() {
   const baggagePrice = PRICING_CONFIG.baggagePrice;
   const discountPercent = 0; // No automatic discount unless applied explicitly
 
-  const protectionPlanCost = protectionPlan ? protectionPlanPrices[protectionPlan] : 0;
+  const normalizedProtectionPlan = protectionPlan ?? "basic";
+  const protectionPlanCost = protectionPlanPrices[normalizedProtectionPlan];
   const baggageCost = additionalBaggage * baggagePrice;
   const subtotal = baseFare + protectionPlanCost + baggageCost;
   const discountAmount = subtotal * discountPercent;
   const tripTotal = subtotal - discountAmount;
 
   const protectionPlanName =
-    protectionPlan === "basic"
+    normalizedProtectionPlan === "basic"
       ? "Basic"
-      : protectionPlan === "premium"
+      : normalizedProtectionPlan === "premium"
       ? "Premium"
-      : protectionPlan === "all"
+      : normalizedProtectionPlan === "all"
       ? "All Included"
       : "None";
 
@@ -181,7 +182,7 @@ function PaymentContent() {
 
             {/* iAssure Protection Plan */}
             <ProtectionPlanSection
-              selectedPlan={protectionPlan}
+            selectedPlan={normalizedProtectionPlan}
               onSelectPlan={setProtectionPlan}
             />
 

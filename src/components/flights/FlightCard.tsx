@@ -72,7 +72,6 @@ export default function FlightCard({
         currency={flight.currency}
         pricePerPerson={flight.pricePerPerson}
         showTicketOptions={showTicketOptions}
-        isLoadingPriceCheck={isLoading}
         onViewFlightInfo={() => setShowFlightInfo(!showFlightInfo)}
         onToggleTicketOptions={() => {
           // Ensure price options are loading before expanding
@@ -99,7 +98,6 @@ export default function FlightCard({
         flight={flight}
         open={showFlightInfo}
         onOpenChange={setShowFlightInfo}
-        preloadedPriceCheck={priceCheckData}
       />
     </div>
   );
