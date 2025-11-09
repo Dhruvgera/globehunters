@@ -188,27 +188,23 @@ function SearchPageContent() {
     };
   }, [apiFilters, loading]);
   
-  // Ensure price range defaults to full inclusive range when filters are available
-  const hasInitializedPriceRangeRef = useRef(false);
+  // Initialize/adjust price range when real API filters arrive or bounds change
   useEffect(() => {
-    if (!hasInitializedPriceRangeRef.current && effectiveFilters?.minPrice != null && effectiveFilters?.maxPrice != null) {
+    if (apiFilters?.minPrice != null && apiFilters?.maxPrice != null) {
       setFilterState((prev) => {
-        // If user hasn't changed from initial placeholder or current range is outside available bounds, reset to full range
         const isPlaceholder = prev.priceRange[0] === 0 && prev.priceRange[1] === 2000;
-        const outOfBounds =
-          prev.priceRange[0] > effectiveFilters.minPrice ||
-          prev.priceRange[1] < effectiveFilters.maxPrice;
-        if (isPlaceholder || outOfBounds) {
+        const outOfBoundsLower = prev.priceRange[0] < apiFilters.minPrice;
+        const outOfBoundsUpper = prev.priceRange[1] > apiFilters.maxPrice;
+        if (isPlaceholder || outOfBoundsLower || outOfBoundsUpper) {
           return {
             ...prev,
-            priceRange: [effectiveFilters.minPrice, effectiveFilters.maxPrice],
+            priceRange: [apiFilters.minPrice, apiFilters.maxPrice],
           };
         }
         return prev;
       });
-      hasInitializedPriceRangeRef.current = true;
     }
-  }, [effectiveFilters]);
+  }, [apiFilters?.minPrice, apiFilters?.maxPrice]);
   
   // Handler for when a date comes into view
   const handleDateInView = (index: number, type: 'departure' | 'return') => {
