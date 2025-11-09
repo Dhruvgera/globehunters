@@ -289,50 +289,9 @@ export function useDatePrices(
     });
 
     if (indicesToFetch.length === 0) return;
-
-    // Group indices by distance from the selected (center) index to fetch in waves:
-    // First ±1, then ±2, then ±3, etc.
-    const centerIndex = Math.floor(dates.length / 2);
-    const distanceGroups: Record<number, number[]> = {};
-    let maxDistance = 0;
-    for (const idx of indicesToFetch) {
-      const dist = Math.abs(idx - centerIndex);
-      if (!distanceGroups[dist]) distanceGroups[dist] = [];
-      distanceGroups[dist].push(idx);
-      if (dist > maxDistance) maxDistance = dist;
-    }
-
-    const MAX_CONCURRENCY = 3; // Reduced from 6 to 3 to avoid overwhelming server
-    const runGroupWithConcurrency = async (groupIndices: number[]) => {
-      if (!groupIndices || groupIndices.length === 0) return;
-      if (abortControllerRef.current?.signal.aborted) return;
-      let cursor = 0;
-      const fetchOne = async () => {
-        if (abortControllerRef.current?.signal.aborted) return;
-        const myIndex = cursor++;
-        if (myIndex >= groupIndices.length) return;
-        const idx = groupIndices[myIndex];
-        await fetchDatePrice(idx, type);
-        return fetchOne();
-      };
-      const workerCount = Math.min(MAX_CONCURRENCY, groupIndices.length);
-      const workers: Promise<void>[] = [];
-      for (let i = 0; i < workerCount; i++) {
-        workers.push(fetchOne());
-      }
-      await Promise.allSettled(workers);
-    };
-
-    // Process distance groups in ascending order: 1, 2, 3...
-    for (let dist = 1; dist <= maxDistance; dist++) {
-      if (abortControllerRef.current?.signal.aborted) return;
-      const group = distanceGroups[dist];
-      if (!group || group.length === 0) continue;
-      // Keep the two sides interleaved in a stable manner
-      const sortedWithinGroup = [...group].sort((a, b) => a - b);
-      console.log(`[useDatePrices] WAVE dist=${dist} ${type} indices=${JSON.stringify(sortedWithinGroup)}`);
-      await runGroupWithConcurrency(sortedWithinGroup);
-    }
+    // Fire all date fetches in full parallel with no artificial limits
+    const tasks = indicesToFetch.map((idx) => fetchDatePrice(idx, type));
+    await Promise.allSettled(tasks);
   }, [searchParams, basePrice]);
 
   // Initialize dates based on search params
