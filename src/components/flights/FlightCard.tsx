@@ -29,7 +29,7 @@ export default function FlightCard({
   const [showFlightInfo, setShowFlightInfo] = useState(false);
 
   // Prefetch price check for this flight on intent (hover) to speed up modal/options
-  const { checkPrice, priceCheck } = usePriceCheck();
+  const { checkPrice, priceCheck, isLoading } = usePriceCheck();
   const prefetchOptions = () => {
     if (flight.segmentResultId) {
       checkPrice(String(flight.segmentResultId));
@@ -72,6 +72,7 @@ export default function FlightCard({
         currency={flight.currency}
         pricePerPerson={flight.pricePerPerson}
         showTicketOptions={showTicketOptions}
+        isLoadingPriceCheck={isLoading}
         onViewFlightInfo={() => setShowFlightInfo(!showFlightInfo)}
         onToggleTicketOptions={() => {
           // Ensure price options are loading before expanding
@@ -87,6 +88,7 @@ export default function FlightCard({
           ticketOptions={flight.ticketOptions}
           priceOptions={priceCheckData?.priceOptions}
           currency={flight.currency}
+          isLoading={isLoading}
           onSelectFlight={handleSelectFlight as any}
           onViewFlightInfo={() => setShowFlightInfo(true)}
         />
@@ -97,6 +99,7 @@ export default function FlightCard({
         flight={flight}
         open={showFlightInfo}
         onOpenChange={setShowFlightInfo}
+        preloadedPriceCheck={priceCheckData}
       />
     </div>
   );
