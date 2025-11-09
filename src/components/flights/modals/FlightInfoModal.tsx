@@ -22,12 +22,14 @@ interface FlightInfoModalProps {
   flight: Flight;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  stayOnCurrentPage?: boolean;
 }
 
 export default function FlightInfoModal({
   flight,
   open,
   onOpenChange,
+  stayOnCurrentPage = false,
 }: FlightInfoModalProps) {
   const t = useTranslations('flightInfo');
   const router = useRouter();
@@ -106,7 +108,12 @@ export default function FlightInfoModal({
       // Fallback to original flight price
       setSelectedFlight(flight, 'Economy');
     }
-    
+
+    if (stayOnCurrentPage) {
+      onOpenChange(false);
+      return;
+    }
+
     // Navigate to booking page
     router.push('/booking');
   };

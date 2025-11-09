@@ -12,9 +12,10 @@ import { useTranslations } from "next-intl";
 interface PaymentFormProps {
   onSubmit: (cardDetails: CardDetails, billingAddress: BillingAddress) => void;
   loading?: boolean;
+  onValidityChange?: (valid: boolean) => void;
 }
 
-export function PaymentForm({ onSubmit, loading = false }: PaymentFormProps) {
+export function PaymentForm({ onSubmit, loading = false, onValidityChange }: PaymentFormProps) {
   const t = useTranslations('payment.form');
   
   const [cardDetails, setCardDetails] = useState<Partial<CardDetails>>({
@@ -35,6 +36,18 @@ export function PaymentForm({ onSubmit, loading = false }: PaymentFormProps) {
   });
 
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
+
+  // Derived validity
+  const isValid = (() => {
+    const cardErrors = validatePaymentCard(cardDetails as CardDetails);
+    const addressErrors = validateBillingAddress(billingAddress as BillingAddress);
+    return !hasErrors({ ...cardErrors, ...addressErrors });
+  })();
+
+  // Notify parent when validity changes
+  useState(() => {
+    onValidityChange?.(isValid);
+  });
 
   const handleCardChange = (field: keyof CardDetails, value: string) => {
     // Format card number with spaces
@@ -273,7 +286,7 @@ export function PaymentForm({ onSubmit, loading = false }: PaymentFormProps) {
       {/* Submit Button */}
       <Button
         type="submit"
-        disabled={loading}
+        disabled={loading || !isValid}
         className="w-full bg-[#3754ED] hover:bg-[#2942D1] text-white rounded-full px-6 py-3 h-auto text-base font-semibold flex items-center justify-center gap-2"
       >
         <Lock className="w-5 h-5" />
