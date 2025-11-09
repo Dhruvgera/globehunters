@@ -4,7 +4,6 @@
  */
 
 import { useState, useCallback, useRef } from 'react';
-import { checkPrice as checkPriceApi } from '@/actions/flights/checkPrice';
 import type { PriceCheckResult, PriceCheckError } from '@/types/priceCheck';
 
 interface UsePriceCheckReturn {
@@ -102,7 +101,24 @@ export function usePriceCheck(): UsePriceCheckReturn {
     console.log('🔍 Fetching price check for', segmentId);
 
     try {
-      const result = await checkPriceApi(segmentId);
+      const res = await fetch('/api/price-check', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ segmentResultId: segmentId }),
+      });
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        const message = errJson?.message || `HTTP ${res.status} ${res.statusText}`;
+        throw {
+          type: errJson?.type || 'API_ERROR',
+          message,
+          userMessage: errJson?.userMessage || 'Unable to check price. Please try again.',
+          details: errJson?.details,
+        };
+      }
+      const result: PriceCheckResult = await res.json();
       
       // Only update if this is still the current request
       if (currentRequestRef.current === segmentId) {

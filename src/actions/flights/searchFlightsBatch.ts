@@ -74,6 +74,7 @@ export async function searchFlightsBatch(items: BatchSearchItem[]): Promise<Batc
         };
       }
 
+      // Call Vyspa API directly
       const vyspaResponse = await searchFlightsVyspa(vyspaParams);
       if (vyspaResponse.error) {
         return {

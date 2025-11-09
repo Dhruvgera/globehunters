@@ -8,6 +8,10 @@ import { flightService, DatePrice } from '@/services/api/flightService';
 import { flightCache } from '@/lib/cache/flightCache';
 import { searchFlightsBatch as searchFlightsBatchAction } from '@/actions/flights/searchFlightsBatch';
 
+// Staggering strategy for background date fetching
+const DATE_SLIDER_STAGGER_MS = Number(process.env.NEXT_PUBLIC_DATE_SLIDER_STAGGER_MS || 500);
+const DATE_SLIDER_CHUNK_SIZE = Number(process.env.NEXT_PUBLIC_DATE_SLIDER_CHUNK_SIZE || 2);
+
 // Normalize date to midnight for safe comparisons
 function normalizeDate(date: Date): Date {
   const d = new Date(date);
@@ -177,10 +181,25 @@ export function useDatePrices(
       
       if (!response) {
         if (abortControllerRef.current?.signal.aborted) return;
-        // Fetch actual flights for this date if not cached
-        response = await flightService.searchFlights(modifiedParams);
-        // Store complete response in global cache for later use
-        flightCache.set(modifiedParams, response);
+        // Use low-priority batch action even for single date to avoid blocking critical actions
+        const singleBatch = [{
+          key: cacheKey,
+          type,
+          params: modifiedParams,
+        }] as any;
+        const results = await searchFlightsBatchAction(singleBatch);
+        const res = results?.[0];
+        if (res?.success) {
+          response = res.response as any;
+          try {
+            // Store complete response in global cache for later use
+            if (response) {
+              flightCache.set(modifiedParams, response as any);
+            }
+          } catch {}
+        } else {
+          throw new Error(res?.error || 'Single date fetch failed');
+        }
       } else {
         console.log(`[useDatePrices] Using cached data for ${type} date ${candidate.toISOString().slice(0,10)}`);
       }
@@ -188,6 +207,9 @@ export function useDatePrices(
       if (abortControllerRef.current?.signal.aborted) return;
       // Find minimum price from results
       let minPrice: number | null = null;
+      if (!response) {
+        throw new Error('No response data for single date fetch');
+      }
       if (response.flights && response.flights.length > 0) {
         const minFlight = response.flights.reduce((min, flight) => 
           flight.pricePerPerson < min.pricePerPerson ? flight : min
@@ -248,7 +270,7 @@ export function useDatePrices(
     }
   }, [searchParams, basePrice]);
 
-  // Fetch prices for multiple dates with controlled concurrency (prioritize nearest first)
+  // Fetch prices for multiple dates with controlled concurrency (prioritize nearest first, staggered)
   const fetchDatePricesBatch = useCallback(async (indices: number[], type: 'departure' | 'return') => {
     if (!searchParams || indices.length === 0) return;
     if (abortControllerRef.current?.signal.aborted) return;
@@ -257,7 +279,7 @@ export function useDatePrices(
     const dateObjects = type === 'departure' ? departureDateObjectsRef.current : returnDateObjectsRef.current;
 
     // Filter out dates that are already cached, have errors, or are currently loading
-    const indicesToFetch = indices.filter(index => {
+    let indicesToFetch = indices.filter(index => {
       if (!dates[index] || !dateObjects[index]) return false;
       const dateStr = dates[index].date;
       const dateObj = dateObjects[index];
@@ -290,110 +312,134 @@ export function useDatePrices(
     });
 
     if (indicesToFetch.length === 0) return;
-    // Build batch payload for server action
-    const batchItems = indicesToFetch.map((index) => {
-      const dateStr = dates[index].date;
-      const dateObj = dateObjects[index];
-      const cacheKey = getCacheKey(dateObj, type);
-      const modifiedParams = {
-        ...searchParams,
-        [type === 'departure' ? 'departureDate' : 'returnDate']: dateObj
-      };
-      // Mark as loading in cache and UI
-      cacheRef.current[cacheKey] = {
-        date: dateStr,
-        price: null,
-        hasData: false,
-        loading: true,
-        error: false,
-      };
-      return {
-        key: cacheKey,
-        type,
-        params: modifiedParams,
-      };
-    });
-    setLoadingIndices(prev => new Set([...prev, ...indicesToFetch]));
 
-    try {
-      const results = await searchFlightsBatchAction(batchItems as any);
+    // Prioritize indices closest to the selected date (center index)
+    const centerIndex = Math.floor(dates.length / 2);
+    indicesToFetch = [...indicesToFetch].sort((a, b) => {
+      const da = Math.abs(a - centerIndex);
+      const db = Math.abs(b - centerIndex);
+      return da - db;
+    });
+
+    // Helper: sleep
+    const sleep = (ms: number) => new Promise(res => setTimeout(res, ms));
+
+    // Chunk the work to avoid hogging concurrency
+    for (let start = 0; start < indicesToFetch.length; start += DATE_SLIDER_CHUNK_SIZE) {
       if (abortControllerRef.current?.signal.aborted) return;
 
-      for (const res of results) {
-        // Find the index back from the key
-        const key = res.key;
-        const isDeparture = res.type === 'departure';
-        const arrDates = isDeparture ? departureDatesRef.current : returnDatesRef.current;
-        const dateObjectsArr = isDeparture ? departureDateObjectsRef.current : returnDateObjectsRef.current;
-        // Locate index by matching ISO date in key
-        let idx = -1;
-        for (let i = 0; i < dateObjectsArr.length; i++) {
-          const k = getCacheKey(dateObjectsArr[i], res.type);
-          if (k === key) { idx = i; break; }
-        }
-        if (idx === -1) continue;
-        const dateStr = arrDates[idx]?.date;
-        if (!dateStr) continue;
+      const chunk = indicesToFetch.slice(start, start + DATE_SLIDER_CHUNK_SIZE);
 
-        if (res.success) {
-          // Populate global flight cache with full response for this date
-          if (res.response) {
-            const modifiedParams = {
-              ...searchParams,
-              [isDeparture ? 'departureDate' : 'returnDate']: dateObjectsArr[idx]
+      // Build batch payload for server action (for this chunk only)
+      const batchItems = chunk.map((index) => {
+        const dateStr = dates[index].date;
+        const dateObj = dateObjects[index];
+        const cacheKey = getCacheKey(dateObj, type);
+        const modifiedParams = {
+          ...searchParams,
+          [type === 'departure' ? 'departureDate' : 'returnDate']: dateObj
+        };
+        // Mark as loading in cache and UI
+        cacheRef.current[cacheKey] = {
+          date: dateStr,
+          price: null,
+          hasData: false,
+          loading: true,
+          error: false,
+        };
+        return {
+          key: cacheKey,
+          type,
+          params: modifiedParams,
+        };
+      });
+      setLoadingIndices(prev => new Set([...prev, ...chunk]));
+
+      try {
+        const results = await searchFlightsBatchAction(batchItems as any);
+        if (abortControllerRef.current?.signal.aborted) return;
+
+        for (const res of results) {
+          // Find the index back from the key
+          const key = res.key;
+          const isDeparture = res.type === 'departure';
+          const arrDates = isDeparture ? departureDatesRef.current : returnDatesRef.current;
+          const dateObjectsArr = isDeparture ? departureDateObjectsRef.current : returnDateObjectsRef.current;
+          // Locate index by matching ISO date in key
+          let idx = -1;
+          for (let i = 0; i < dateObjectsArr.length; i++) {
+            const k = getCacheKey(dateObjectsArr[i], res.type);
+            if (k === key) { idx = i; break; }
+          }
+          if (idx === -1) continue;
+          const dateStr = arrDates[idx]?.date;
+          if (!dateStr) continue;
+
+          if (res.success) {
+            // Populate global flight cache with full response for this date
+            if (res.response) {
+              const modifiedParams = {
+                ...searchParams,
+                [isDeparture ? 'departureDate' : 'returnDate']: dateObjectsArr[idx]
+              };
+              try {
+                flightCache.set(modifiedParams, res.response as any);
+              } catch {}
+            }
+
+            cacheRef.current[key] = {
+              date: dateStr,
+              price: res.minPrice,
+              hasData: true,
+              loading: false,
+              error: false,
             };
-            try {
-              flightCache.set(modifiedParams, res.response as any);
-            } catch {}
-          }
-
-          cacheRef.current[key] = {
-            date: dateStr,
-            price: res.minPrice,
-            hasData: true,
-            loading: false,
-            error: false,
-          };
-          const updated: DatePrice = {
-            date: dateStr,
-            price: (res.minPrice ?? basePrice ?? 649) as number,
-          };
-          if (isDeparture) {
-            setDepartureDates(prev => {
-              const next = [...prev];
-              if (next[idx]) next[idx] = updated;
-              return next;
-            });
+            const updated: DatePrice = {
+              date: dateStr,
+              price: (res.minPrice ?? basePrice ?? 649) as number,
+            };
+            if (isDeparture) {
+              setDepartureDates(prev => {
+                const next = [...prev];
+                if (next[idx]) next[idx] = updated;
+                return next;
+              });
+            } else {
+              setReturnDates(prev => {
+                const next = [...prev];
+                if (next[idx]) next[idx] = updated;
+                return next;
+              });
+            }
           } else {
-            setReturnDates(prev => {
-              const next = [...prev];
-              if (next[idx]) next[idx] = updated;
-              return next;
-            });
+            cacheRef.current[key] = {
+              date: dateStr,
+              price: null,
+              hasData: false,
+              loading: false,
+              error: true,
+            };
           }
-        } else {
-          cacheRef.current[key] = {
-            date: dateStr,
-            price: null,
-            hasData: false,
-            loading: false,
-            error: true,
-          };
+          setLoadingIndices(prev => {
+            const next = new Set(prev);
+            next.delete(idx);
+            return next;
+          });
         }
+      } catch (err) {
+        console.error('Error in batch date fetch:', err);
+        // On failure, clear loading flags for only this chunk
         setLoadingIndices(prev => {
           const next = new Set(prev);
-          next.delete(idx);
+          chunk.forEach(i => next.delete(i));
           return next;
         });
       }
-    } catch (err) {
-      console.error('Error in batch date fetch:', err);
-      // On failure, clear loading flags for indices
-      setLoadingIndices(prev => {
-        const next = new Set(prev);
-        indicesToFetch.forEach(i => next.delete(i));
-        return next;
-      });
+
+      // Stagger next chunk to free up capacity for critical actions
+      if (start + DATE_SLIDER_CHUNK_SIZE < indicesToFetch.length) {
+        await sleep(DATE_SLIDER_STAGGER_MS);
+      }
     }
   }, [searchParams, basePrice]);
 
