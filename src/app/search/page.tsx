@@ -12,6 +12,9 @@ import { filterFlights, sortFlights } from "@/utils/flightFilter";
 import { FilterState, SearchParams } from "@/types/flight";
 import { mockFlights, mockDatePrices, mockAirlines, mockAirports } from "@/data/mockFlights";
 import { useFilterExpansion } from "@/hooks/useFilterExpansion";
+import { useIdleTimer } from "@/hooks/useIdleTimer";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ErrorMessage } from "@/components/ui/error-message";
 
 // Import new modular components
 import { SearchHeader } from "@/components/search/SearchHeader";
@@ -46,6 +49,7 @@ function SearchPageContent() {
   const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
   const prevLoadingRef = useRef(false);
   const [isDateChanging, setIsDateChanging] = useState(false);
+  const [fareExpiredOpen, setFareExpiredOpen] = useState(false);
   
   // Helper to parse date string (YYYY-MM-DD) as local date
   const parseDateFromURL = (dateStr: string): Date => {
@@ -398,6 +402,12 @@ function SearchPageContent() {
     setDisplayedFlightsCount((prev) => Math.min(prev + 5, filteredFlights.length));
   };
 
+  // Inactivity: 30 minutes -> show fare expired popup
+  useIdleTimer({
+    timeoutMs: 30 * 60 * 1000,
+    onIdle: () => setFareExpiredOpen(true),
+  });
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
@@ -573,6 +583,18 @@ function SearchPageContent() {
       )}
 
       <Footer />
+      {/* Fare Expired Popup */}
+      <Dialog open={fareExpiredOpen} onOpenChange={setFareExpiredOpen}>
+        <DialogContent className="max-w-[min(100vw-24px,560px)] p-0 [&>button]:hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Fare expired</DialogTitle>
+          </DialogHeader>
+          <ErrorMessage
+            title="Your Fare Have Expired"
+            message="Please refresh your search to get the latest availability and prices."
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

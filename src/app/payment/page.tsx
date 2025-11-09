@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
 import { ChevronLeft } from "lucide-react";
@@ -11,6 +11,9 @@ import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
 import { useBookingStore, useSelectedFlight } from "@/store/bookingStore";
 import { PRICING_CONFIG, CONTACT_INFO } from "@/config/constants";
 import { useTranslations } from "next-intl";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ErrorMessage } from "@/components/ui/error-message";
+import { usePayment } from "@/hooks/usePayment";
 
 // Import new modular components
 import { PaymentHeader } from "@/components/payment/PaymentHeader";
@@ -24,9 +27,13 @@ import { PaymentForm } from "@/components/payment/PaymentForm";
 function PaymentContent() {
   const t = useTranslations('payment');
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showFlightInfo, setShowFlightInfo] = useState(false);
   const [isPaymentValid, setIsPaymentValid] = useState(false);
   const [paymentTermsAccepted, setPaymentTermsAccepted] = useState(false);
+  const [sessionExpiredOpen, setSessionExpiredOpen] = useState(false);
+  const [paymentErrorOpen, setPaymentErrorOpen] = useState(false);
+  const [paymentErrorMessage, setPaymentErrorMessage] = useState<string>('');
 
   // Get selected flight and upgrade from Zustand store
   const flight = useSelectedFlight();
@@ -42,12 +49,44 @@ function PaymentContent() {
   const protectionPlan = addOns.protectionPlan;
   const additionalBaggage = addOns.additionalBaggage;
 
+  const { processPayment } = usePayment();
+
+  // Affiliate detection (Skyscanner copy if aff present and matches)
+  const aff = searchParams?.get('aff') || '';
+  const isSkyscanner = (() => {
+    const a = (aff || '').toLowerCase();
+    return a.startsWith('sk') || a.includes('skyscanner');
+  })();
+
   // Redirect to search if no flight selected
   useEffect(() => {
     if (!flight) {
       router.push('/search');
     }
   }, [flight, router]);
+
+  // Track session start for 60-min refresh expiry
+  useEffect(() => {
+    const key = 'paymentSessionStart';
+    const existed = sessionStorage.getItem(key);
+    const now = Date.now();
+    if (!existed) {
+      sessionStorage.setItem(key, String(now));
+      sessionStorage.setItem('paymentVisited', '1');
+      return;
+    }
+    const startedAt = parseInt(existed, 10);
+    const elapsed = now - startedAt;
+    const visitedBefore = sessionStorage.getItem('paymentVisited') === '1';
+    // Detect reload if possible
+    const nav = (performance.getEntriesByType('navigation') as PerformanceNavigationTiming[])[0];
+    const isReload = nav ? nav.type === 'reload' : false;
+    if (visitedBefore && isReload && elapsed > 60 * 60 * 1000) {
+      setSessionExpiredOpen(true);
+    }
+    // Keep visited flag
+    sessionStorage.setItem('paymentVisited', '1');
+  }, []);
 
   // Show loading state while redirecting
   if (!flight) {
@@ -129,6 +168,8 @@ function PaymentContent() {
     return parts.join(", ");
   })();
   const cabinLabel = selectedUpgrade?.cabinClassDisplay || useBookingStore((s) => s.selectedFareType) || 'Economy';
+  const refNumber = flight.webRef || (priceCheckData?.sessionInfo?.sessionId || '—');
+  const orderId = refNumber;
 
   return (
     <div className="min-h-screen bg-white">
@@ -187,9 +228,42 @@ function PaymentContent() {
             />
 
             {/* Payment Details Form */}
-            <PaymentForm onSubmit={(card, address) => {
-              // Handle payment submission
-              console.log('Payment submitted', { card, address });
+            <PaymentForm onSubmit={async (card, address) => {
+              // Block duplicate payment attempts if already processed
+              const completedOrderId = sessionStorage.getItem('paymentCompletedOrderId');
+              if (completedOrderId) {
+                setPaymentErrorMessage(`This order has already been processed, please call on ${CONTACT_INFO.phone} quoting your reference number ${completedOrderId}. Please DO NOT book alternative travel arrangements as this may result in a duplicate booking - charges will apply.`);
+                setPaymentErrorOpen(true);
+                return;
+              }
+              try {
+                const resp = await processPayment({
+                  bookingId: orderId,
+                  paymentDetails: {
+                    method: 'credit_card',
+                    cardNumber: card.cardNumber!,
+                    expiryMonth: card.expiryMonth!,
+                    expiryYear: card.expiryYear!,
+                    cvv: card.cvv!,
+                    cardholderName: card.cardholderName!,
+                    billingAddress: address as any,
+                  } as any,
+                } as any);
+                if (resp && resp.paymentId) {
+                  // Mark as completed to prevent double charging
+                  sessionStorage.setItem('paymentCompletedOrderId', orderId);
+                  // Navigate to confirmation (placeholder)
+                  // router.push('/payment-completed');
+                }
+              } catch (e) {
+                // Show affiliate-specific copy
+                if (isSkyscanner) {
+                  setPaymentErrorMessage(`There has been a problem processing your order (${orderId}), and no payment has been charged from your card. Please check that all the card details are correct and try again`);
+                } else {
+                  setPaymentErrorMessage(`There has been a problem processing your booking, please check that all the card details are correct and then try again. If you still encounter a problem, please call on 1800 226 817 quoting your reference number ${orderId}.\n\nPlease DO NOT book alternative travel arrangements as this may result in a duplicate booking - charges will apply`);
+                }
+                setPaymentErrorOpen(true);
+              }
             }} onValidityChange={setIsPaymentValid} />
 
             {/* Terms and Complete Booking */}
@@ -244,6 +318,32 @@ function PaymentContent() {
         onOpenChange={setShowFlightInfo}
         stayOnCurrentPage={true}
       />
+
+      {/* 60-min refresh expiry */}
+      <Dialog open={sessionExpiredOpen} onOpenChange={setSessionExpiredOpen}>
+        <DialogContent className="max-w-[min(100vw-24px,560px)] p-0 [&>button]:hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Session expired</DialogTitle>
+          </DialogHeader>
+          <ErrorMessage
+            title="Your session has expired"
+            message="Your session has been expired, please go Home for new search."
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Payment error dialog (affiliate-based) */}
+      <Dialog open={paymentErrorOpen} onOpenChange={setPaymentErrorOpen}>
+        <DialogContent className="max-w-[min(100vw-24px,640px)] p-0 [&>button]:hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Payment error</DialogTitle>
+          </DialogHeader>
+          <ErrorMessage
+            title="Payment Error"
+            message={paymentErrorMessage}
+          />
+        </DialogContent>
+      </Dialog>
 
       <Footer />
     </div>

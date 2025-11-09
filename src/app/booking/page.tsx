@@ -6,6 +6,9 @@ import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
 import { useBookingStore, useSelectedFlight, useSelectedUpgrade, usePriceCheckData } from "@/store/bookingStore";
 import { useTranslations } from "next-intl";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ErrorMessage } from "@/components/ui/error-message";
+import { useIdleTimer } from "@/hooks/useIdleTimer";
 
 // Import new modular components
 import { BookingHeader } from "@/components/booking/BookingHeader";
@@ -39,6 +42,7 @@ function BookingContent() {
   const router = useRouter();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showFlightInfo, setShowFlightInfo] = useState(false);
+  const [idleTimeoutOpen, setIdleTimeoutOpen] = useState(false);
 
   // Get selected flight and upgrade from Zustand store
   const flight = useSelectedFlight();
@@ -66,6 +70,12 @@ function BookingContent() {
       setPriceCheckData(priceCheck);
     }
   }, [priceCheck, setPriceCheckData]);
+
+  // Inactivity: 20 minutes on passenger page
+  useIdleTimer({
+    timeoutMs: 20 * 60 * 1000,
+    onIdle: () => setIdleTimeoutOpen(true),
+  });
 
   // Show loading state while redirecting
   if (!flight) {
@@ -234,7 +244,20 @@ function BookingContent() {
         flight={flight}
         open={showFlightInfo}
         onOpenChange={setShowFlightInfo}
+        stayOnCurrentPage={true}
       />
+      {/* Idle timeout popup */}
+      <Dialog open={idleTimeoutOpen} onOpenChange={setIdleTimeoutOpen}>
+        <DialogContent className="max-w-[min(100vw-24px,560px)] p-0 [&>button]:hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Session timed out</DialogTitle>
+          </DialogHeader>
+          <ErrorMessage
+            title="Your session timed out"
+            message="Your session timed out because you were idle for too long."
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

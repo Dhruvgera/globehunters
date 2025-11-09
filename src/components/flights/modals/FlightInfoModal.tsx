@@ -17,6 +17,7 @@ import { formatPrice } from "@/lib/currency";
 import { useBookingStore } from "@/store/bookingStore";
 import { usePriceCheck } from "@/hooks/usePriceCheck";
 import { TransformedPriceOption } from "@/types/priceCheck";
+import { ErrorMessage } from "@/components/ui/error-message";
 
 interface FlightInfoModalProps {
   flight: Flight;
@@ -37,11 +38,14 @@ export default function FlightInfoModal({
   const setSelectedUpgrade = useBookingStore((state) => state.setSelectedUpgrade);
   const setPriceCheckData = useBookingStore((state) => state.setPriceCheckData);
   const selectedUpgradeInStore = useBookingStore((state) => state.selectedUpgradeOption);
+  const passengersInStore = useBookingStore((state) => state.passengers);
   const [imgError, setImgError] = useState(false);
   const [selectedLeg, setSelectedLeg] = useState<"outbound" | "inbound">(
     "outbound"
   );
   const [selectedUpgradeOption, setSelectedUpgradeOption] = useState<TransformedPriceOption | null>(null);
+  const [availabilityErrorOpen, setAvailabilityErrorOpen] = useState(false);
+  const [returnWarnOpen, setReturnWarnOpen] = useState(false);
 
   // Price check integration
   const { priceCheck, isLoading, error, checkPrice, clearError } = usePriceCheck();
@@ -66,22 +70,22 @@ export default function FlightInfoModal({
 
   // Set default selected option when price check loads
   useEffect(() => {
-    if (priceCheck && priceCheck.priceOptions.length > 0) {
-      // Prefer persisted selection from store if available
-      if (selectedUpgradeInStore) {
-        const match =
-          priceCheck.priceOptions.find((o) => o.id === selectedUpgradeInStore.id) ||
-          priceCheck.priceOptions.find((o) => o.cabinClassDisplay === selectedUpgradeInStore.cabinClassDisplay);
-        if (match) {
-          setSelectedUpgradeOption(match);
-          return;
-        }
-      }
-      // Otherwise, keep existing local selection or default to first
-      if (!selectedUpgradeOption) {
-        setSelectedUpgradeOption(priceCheck.priceOptions[0]);
+    if (!priceCheck || priceCheck.priceOptions.length === 0) return;
+    // If user has already selected an option locally, do not override
+    if (selectedUpgradeOption) return;
+
+    // Prefer persisted selection from store if available
+    if (selectedUpgradeInStore) {
+      const match =
+        priceCheck.priceOptions.find((o) => o.id === selectedUpgradeInStore.id) ||
+        priceCheck.priceOptions.find((o) => o.cabinClassDisplay === selectedUpgradeInStore.cabinClassDisplay);
+      if (match) {
+        setSelectedUpgradeOption(match);
+        return;
       }
     }
+    // Otherwise default to first option
+    setSelectedUpgradeOption(priceCheck.priceOptions[0]);
   }, [priceCheck, selectedUpgradeOption, selectedUpgradeInStore]);
 
   function prettifyCabinName(name: string) {
@@ -109,6 +113,14 @@ export default function FlightInfoModal({
   }
 
   const handleBookNow = () => {
+    // Guard: availability not available -> show specific error
+    if (
+      (priceCheck && priceCheck.priceOptions.length === 0) ||
+      (error && error.type) // any API error while checking availability
+    ) {
+      setAvailabilityErrorOpen(true);
+      return;
+    }
     if (selectedUpgradeOption) {
       // Save selected upgrade to store
       setSelectedUpgrade(selectedUpgradeOption);
@@ -180,6 +192,7 @@ export default function FlightInfoModal({
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[min(100vw-24px,960px)] max-w-full max-h-[90vh] overflow-y-auto overflow-x-clip p-4 sm:p-6 gap-6 sm:gap-8 [&>button]:hidden bg-white rounded-3xl border-0 box-border">
         <DialogHeader className="sr-only">
@@ -216,7 +229,13 @@ export default function FlightInfoModal({
                         ? "bg-[#E0E7FF] text-[#010D50] hover:bg-[#D0D7EF]"
                         : "bg-[#F6F6F6] text-[#3754ED] border-[#3754ED] hover:bg-[#EEEEEE]"
                     } rounded-full px-3 sm:px-4 py-2.5 h-auto text-xs sm:text-sm font-medium whitespace-nowrap shrink-0 leading-normal`}
-                    onClick={() => setSelectedLeg("inbound")}
+                    onClick={() => {
+                      // If user already filled some passenger data on booking page, warn when viewing return
+                      if (passengersInStore && passengersInStore.length > 0) {
+                        setReturnWarnOpen(true);
+                      }
+                      setSelectedLeg("inbound");
+                    }}
                   >
                     <span className="hidden sm:inline">
                       {flight.inbound.departureAirport.city} -{" "}
@@ -688,6 +707,31 @@ export default function FlightInfoModal({
         </div>
       </DialogContent>
     </Dialog>
+    {/* Availability Error Popup */}
+    <Dialog open={availabilityErrorOpen} onOpenChange={setAvailabilityErrorOpen}>
+      <DialogContent className="max-w-[min(100vw-24px,560px)] p-0 [&>button]:hidden">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Limited availability</DialogTitle>
+        </DialogHeader>
+        <ErrorMessage
+          title="Limited Availability"
+          message="Sorry, the flight you selected has limited availability. Please select an alternative flight or call us on 1822222 where a sales agent will help with your booking."
+        />
+      </DialogContent>
+    </Dialog>
+    {/* Return tab warning (passenger page context) */}
+    <Dialog open={returnWarnOpen} onOpenChange={setReturnWarnOpen}>
+      <DialogContent className="max-w-[min(100vw-24px,560px)] p-0 [&>button]:hidden">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Booking warning</DialogTitle>
+        </DialogHeader>
+        <ErrorMessage
+          title="Warning"
+          message="There is a problem with your booking. Please try again."
+        />
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 
