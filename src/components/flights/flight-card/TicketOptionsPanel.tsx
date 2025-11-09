@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useTranslations } from "next-intl";
 import { formatPrice } from "@/lib/currency";
 import type { TransformedPriceOption } from "@/types/priceCheck";
+import { useBookingStore } from "@/store/bookingStore";
 
 interface TicketOption {
   type: string;
@@ -36,6 +37,7 @@ export function TicketOptionsPanel({
   onViewFlightInfo,
 }: TicketOptionsPanelProps) {
   const t = useTranslations("search.flights");
+  const setSelectedUpgrade = useBookingStore((s) => s.setSelectedUpgrade);
 
   const hasApiOptions = priceOptions && priceOptions.length > 0;
 
@@ -74,6 +76,11 @@ export function TicketOptionsPanel({
                 className="bg-[#F5F7FF] text-[#010D50] border-0 hover:bg-[#E0E7FF] rounded-full px-4 py-2.5 h-auto text-sm font-semibold leading-normal whitespace-nowrap"
                 onClick={() => {
                   if (hasApiOptions && onViewFlightInfo) {
+                    // Persist selected upgrade before opening details
+                    const selected = priceOptions.find((p) => p.id === chip.id);
+                    if (selected) {
+                      setSelectedUpgrade(selected);
+                    }
                     onViewFlightInfo();
                   } else if (onSelectFlight) {
                     onSelectFlight(chip.label);

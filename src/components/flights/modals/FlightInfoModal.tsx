@@ -36,6 +36,7 @@ export default function FlightInfoModal({
   const setSelectedFlight = useBookingStore((state) => state.setSelectedFlight);
   const setSelectedUpgrade = useBookingStore((state) => state.setSelectedUpgrade);
   const setPriceCheckData = useBookingStore((state) => state.setPriceCheckData);
+  const selectedUpgradeInStore = useBookingStore((state) => state.selectedUpgradeOption);
   const [imgError, setImgError] = useState(false);
   const [selectedLeg, setSelectedLeg] = useState<"outbound" | "inbound">(
     "outbound"
@@ -65,10 +66,23 @@ export default function FlightInfoModal({
 
   // Set default selected option when price check loads
   useEffect(() => {
-    if (priceCheck && priceCheck.priceOptions.length > 0 && !selectedUpgradeOption) {
-      setSelectedUpgradeOption(priceCheck.priceOptions[0]);
+    if (priceCheck && priceCheck.priceOptions.length > 0) {
+      // Prefer persisted selection from store if available
+      if (selectedUpgradeInStore) {
+        const match =
+          priceCheck.priceOptions.find((o) => o.id === selectedUpgradeInStore.id) ||
+          priceCheck.priceOptions.find((o) => o.cabinClassDisplay === selectedUpgradeInStore.cabinClassDisplay);
+        if (match) {
+          setSelectedUpgradeOption(match);
+          return;
+        }
+      }
+      // Otherwise, keep existing local selection or default to first
+      if (!selectedUpgradeOption) {
+        setSelectedUpgradeOption(priceCheck.priceOptions[0]);
+      }
     }
-  }, [priceCheck, selectedUpgradeOption]);
+  }, [priceCheck, selectedUpgradeOption, selectedUpgradeInStore]);
 
   function prettifyCabinName(name: string) {
     if (!name) return '';

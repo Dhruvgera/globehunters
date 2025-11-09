@@ -188,6 +188,28 @@ function SearchPageContent() {
     };
   }, [apiFilters, loading]);
   
+  // Ensure price range defaults to full inclusive range when filters are available
+  const hasInitializedPriceRangeRef = useRef(false);
+  useEffect(() => {
+    if (!hasInitializedPriceRangeRef.current && effectiveFilters?.minPrice != null && effectiveFilters?.maxPrice != null) {
+      setFilterState((prev) => {
+        // If user hasn't changed from initial placeholder or current range is outside available bounds, reset to full range
+        const isPlaceholder = prev.priceRange[0] === 0 && prev.priceRange[1] === 2000;
+        const outOfBounds =
+          prev.priceRange[0] > effectiveFilters.minPrice ||
+          prev.priceRange[1] < effectiveFilters.maxPrice;
+        if (isPlaceholder || outOfBounds) {
+          return {
+            ...prev,
+            priceRange: [effectiveFilters.minPrice, effectiveFilters.maxPrice],
+          };
+        }
+        return prev;
+      });
+      hasInitializedPriceRangeRef.current = true;
+    }
+  }, [effectiveFilters]);
+  
   // Handler for when a date comes into view
   const handleDateInView = (index: number, type: 'departure' | 'return') => {
     // Fetch date price when it comes into view
@@ -472,7 +494,8 @@ function SearchPageContent() {
               onClick={() => {
                 setFilterState({
                   stops: [0, 1, 2],
-                  priceRange: [0, 2000],
+                    // Reset price range to full inclusive range based on current filters
+                    priceRange: [effectiveFilters.minPrice, effectiveFilters.maxPrice],
                   departureTimeOutbound: [0, 24],
                   departureTimeInbound: [0, 24],
                   journeyTimeOutbound: [0, 35],
