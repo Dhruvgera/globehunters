@@ -353,7 +353,8 @@ export function extractUpgradeOptions(
   priceData: PriceData[],
   currency: string
 ): TransformedPriceOption[] {
-  if (!priceData || priceData.length === 0) {
+  // Guard against non-array payloads from API
+  if (!Array.isArray(priceData) || priceData.length === 0) {
     return [];
   }
 

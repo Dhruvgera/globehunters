@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { SearchParams } from '@/types/flight';
 import { flightService, DatePrice } from '@/services/api/flightService';
 import { flightCache } from '@/lib/cache/flightCache';
+import { searchFlightsBatch as searchFlightsBatchAction } from '@/actions/flights/searchFlightsBatch';
 
 // Normalize date to midnight for safe comparisons
 function normalizeDate(date: Date): Date {
@@ -289,9 +290,111 @@ export function useDatePrices(
     });
 
     if (indicesToFetch.length === 0) return;
-    // Fire all date fetches in full parallel with no artificial limits
-    const tasks = indicesToFetch.map((idx) => fetchDatePrice(idx, type));
-    await Promise.allSettled(tasks);
+    // Build batch payload for server action
+    const batchItems = indicesToFetch.map((index) => {
+      const dateStr = dates[index].date;
+      const dateObj = dateObjects[index];
+      const cacheKey = getCacheKey(dateObj, type);
+      const modifiedParams = {
+        ...searchParams,
+        [type === 'departure' ? 'departureDate' : 'returnDate']: dateObj
+      };
+      // Mark as loading in cache and UI
+      cacheRef.current[cacheKey] = {
+        date: dateStr,
+        price: null,
+        hasData: false,
+        loading: true,
+        error: false,
+      };
+      return {
+        key: cacheKey,
+        type,
+        params: modifiedParams,
+      };
+    });
+    setLoadingIndices(prev => new Set([...prev, ...indicesToFetch]));
+
+    try {
+      const results = await searchFlightsBatchAction(batchItems as any);
+      if (abortControllerRef.current?.signal.aborted) return;
+
+      for (const res of results) {
+        // Find the index back from the key
+        const key = res.key;
+        const isDeparture = res.type === 'departure';
+        const arrDates = isDeparture ? departureDatesRef.current : returnDatesRef.current;
+        const dateObjectsArr = isDeparture ? departureDateObjectsRef.current : returnDateObjectsRef.current;
+        // Locate index by matching ISO date in key
+        let idx = -1;
+        for (let i = 0; i < dateObjectsArr.length; i++) {
+          const k = getCacheKey(dateObjectsArr[i], res.type);
+          if (k === key) { idx = i; break; }
+        }
+        if (idx === -1) continue;
+        const dateStr = arrDates[idx]?.date;
+        if (!dateStr) continue;
+
+        if (res.success) {
+          // Populate global flight cache with full response for this date
+          if (res.response) {
+            const modifiedParams = {
+              ...searchParams,
+              [isDeparture ? 'departureDate' : 'returnDate']: dateObjectsArr[idx]
+            };
+            try {
+              flightCache.set(modifiedParams, res.response as any);
+            } catch {}
+          }
+
+          cacheRef.current[key] = {
+            date: dateStr,
+            price: res.minPrice,
+            hasData: true,
+            loading: false,
+            error: false,
+          };
+          const updated: DatePrice = {
+            date: dateStr,
+            price: (res.minPrice ?? basePrice ?? 649) as number,
+          };
+          if (isDeparture) {
+            setDepartureDates(prev => {
+              const next = [...prev];
+              if (next[idx]) next[idx] = updated;
+              return next;
+            });
+          } else {
+            setReturnDates(prev => {
+              const next = [...prev];
+              if (next[idx]) next[idx] = updated;
+              return next;
+            });
+          }
+        } else {
+          cacheRef.current[key] = {
+            date: dateStr,
+            price: null,
+            hasData: false,
+            loading: false,
+            error: true,
+          };
+        }
+        setLoadingIndices(prev => {
+          const next = new Set(prev);
+          next.delete(idx);
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error('Error in batch date fetch:', err);
+      // On failure, clear loading flags for indices
+      setLoadingIndices(prev => {
+        const next = new Set(prev);
+        indicesToFetch.forEach(i => next.delete(i));
+        return next;
+      });
+    }
   }, [searchParams, basePrice]);
 
   // Initialize dates based on search params
