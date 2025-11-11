@@ -19,7 +19,7 @@ export function FilterSection({
     <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
       <button
         onClick={onToggle}
-        className="flex items-center justify-between w-full"
+        className="flex items-center justify-between w-full cursor-pointer"
       >
         <span className="text-sm font-semibold text-[#010D50]">{title}</span>
         <ChevronDown

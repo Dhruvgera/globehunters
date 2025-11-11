@@ -113,7 +113,10 @@ export default function FlightInfoModal({
   }
 
   const handleBookNow = () => {
-    // Guard: availability not available -> show specific error
+    // COMMENTED OUT: Availability error check (dialog was disabled)
+    // If you need to re-enable availability checking, uncomment this block
+    // and uncomment the availability error dialog below
+    /*
     if (
       (priceCheck && priceCheck.priceOptions.length === 0) ||
       (error && error.type) // any API error while checking availability
@@ -121,6 +124,8 @@ export default function FlightInfoModal({
       setAvailabilityErrorOpen(true);
       return;
     }
+    */
+
     if (selectedUpgradeOption) {
       // Save selected upgrade to store
       setSelectedUpgrade(selectedUpgradeOption);
@@ -708,6 +713,7 @@ export default function FlightInfoModal({
       </DialogContent>
     </Dialog>
     {/* Availability Error Popup */}
+    {/* COMMENTED OUT: Limited Availability Error Dialog
     <Dialog open={availabilityErrorOpen} onOpenChange={setAvailabilityErrorOpen}>
       <DialogContent className="max-w-[min(100vw-24px,560px)] p-0 [&>button]:hidden">
         <DialogHeader className="sr-only">
@@ -719,6 +725,7 @@ export default function FlightInfoModal({
         />
       </DialogContent>
     </Dialog>
+    */}
     {/* Return tab warning (passenger page context) */}
     <Dialog open={returnWarnOpen} onOpenChange={setReturnWarnOpen}>
       <DialogContent className="max-w-[min(100vw-24px,560px)] p-0 [&>button]:hidden">

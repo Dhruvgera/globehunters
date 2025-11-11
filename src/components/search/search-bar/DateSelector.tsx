@@ -67,7 +67,7 @@ export function DateSelector({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-auto p-0 bg-white border shadow-lg"
+        className="w-auto p-0 bg-white border shadow-lg max-w-[calc(100vw-16px)]"
         align="start"
       >
         {tripType === "round-trip" ? (

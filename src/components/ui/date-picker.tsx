@@ -90,40 +90,40 @@ function MonthCalendar({
   today.setHours(0, 0, 0, 0);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2 md:gap-3 min-w-0">
       {/* Label */}
-      <div className="text-sm font-medium text-[#010D50]">{label}</div>
+      <div className="text-xs md:text-sm font-medium text-[#010D50]">{label}</div>
 
       {/* Month Navigation */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-1 md:mb-2">
         <Button
           variant="ghost"
           size="icon"
           onClick={() => onMonthChange(-1)}
-          className="h-8 w-8 rounded-full hover:bg-[#F5F7FF]"
+          className="h-7 w-7 md:h-8 md:w-8 rounded-full hover:bg-[#F5F7FF] flex-shrink-0"
         >
-          <ChevronLeft className="h-4 w-4" />
+          <ChevronLeft className="h-3 w-3 md:h-4 md:w-4" />
         </Button>
-        <div className="text-sm font-semibold text-[#010D50]">
+        <div className="text-xs md:text-sm font-semibold text-[#010D50] truncate px-1">
           {MONTHS[month]} {year}
         </div>
         <Button
           variant="ghost"
           size="icon"
           onClick={() => onMonthChange(1)}
-          className="h-8 w-8 rounded-full hover:bg-[#F5F7FF]"
+          className="h-7 w-7 md:h-8 md:w-8 rounded-full hover:bg-[#F5F7FF] flex-shrink-0"
         >
-          <ChevronRight className="h-4 w-4" />
+          <ChevronRight className="h-3 w-3 md:h-4 md:w-4" />
         </Button>
       </div>
 
       {/* Calendar Grid */}
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-0.5 md:gap-1 min-w-0">
         {/* Day Headers */}
         {DAYS.map((day) => (
           <div
             key={day}
-            className="text-center text-xs font-medium text-[#3A478A] py-2"
+            className="text-center text-[10px] md:text-xs font-medium text-[#3A478A] py-1 md:py-2"
           >
             {day}
           </div>
@@ -153,7 +153,7 @@ function MonthCalendar({
               }}
               disabled={isPast || !isCurrentMonth}
               className={cn(
-                "aspect-square flex items-center justify-center text-sm rounded-lg transition-colors relative",
+                "aspect-square flex items-center justify-center text-[10px] md:text-sm rounded-md md:rounded-lg transition-colors relative w-full max-w-[36px] md:max-w-[40px] p-1 md:p-2",
                 isCurrentMonth ? "text-[#010D50]" : "text-[#D3D3D3]",
                 !isPast && isCurrentMonth && "hover:bg-[#F5F7FF] cursor-pointer",
                 isPast && "opacity-40 cursor-not-allowed",
@@ -239,8 +239,8 @@ export function DatePicker({
   };
 
   return (
-    <div className={cn("p-4", className)}>
-      <div className="flex flex-col md:flex-row gap-6">
+    <div className={cn("p-2 md:p-4 max-w-full overflow-hidden", className)}>
+      <div className="flex flex-col md:flex-row gap-3 md:gap-6">
         <MonthCalendar
           year={startYear}
           month={startMonth}
@@ -267,11 +267,11 @@ export function DatePicker({
 
       {/* Done Button */}
       {onDone && (
-        <div className="flex justify-center pt-3 border-t border-[#DFE0E4] mt-4">
+        <div className="flex justify-center pt-2 md:pt-3 border-t border-[#DFE0E4] mt-3 md:mt-4">
           <Button
             onClick={onDone}
             size="sm"
-            className="bg-[#3754ED] hover:bg-[#2942D1] text-white rounded-full px-4 py-1.5 h-auto text-xs font-medium"
+            className="bg-[#3754ED] hover:bg-[#2942D1] text-white rounded-full px-6 md:px-8 py-2 h-auto text-xs md:text-sm font-medium"
           >
             Done
           </Button>
