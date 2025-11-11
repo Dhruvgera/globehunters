@@ -2,7 +2,7 @@
   "status": 200,
   "headers": {
     "server": "nginx/1.20.1",
-    "date": "Sun, 09 Nov 2025 09:24:24 GMT",
+    "date": "Sun, 09 Nov 2025 11:09:29 GMT",
     "content-type": "application/json",
     "transfer-encoding": "chunked",
     "connection": "keep-alive",
@@ -10,7 +10,7 @@
     "cache-control": "no-store, no-cache, must-revalidate",
     "pragma": "no-cache",
     "set-cookie": [
-      "PHPSESSID=352cc0ce1480175d58fa6bc225b6b9aa; path=/",
+      "PHPSESSID=31001a42afd2c03ae2e1b57d8d24b0c1; path=/",
       "loggedIn=1; path=/"
     ],
     "vary": "Accept-Encoding",
@@ -24,9 +24,674 @@
       "fareCat": "",
       "cofirmFolder": "",
       "fold_no": "",
+      "flight_data": {
+        "result": {
+          "FlightPswResult": {
+            "id": 324917006,
+            "psc_request_id": 55102278,
+            "Origin": "JFK",
+            "Destination": "LHR",
+            "base_fare": 211,
+            "tax": 510.13,
+            "total_fare": 721.13,
+            "iso_currency_code": "USD",
+            "fare_type": "",
+            "pax_type_count": 1,
+            "last_ticket_date": "2025-11-12",
+            "ticket_advisory": "",
+            "flight_count": 100,
+            "trip_count": 2,
+            "created": "2025-11-09 10:49:20",
+            "folder_id": "",
+            "sent_to_folder": 0,
+            "updated": "2025-11-09 10:49:20",
+            "FareCat": "PU",
+            "Designator": "",
+            "gds": "X",
+            "markupAmt": 0,
+            "CommissionAmount": 0,
+            "segment1_elapse_flying_time": 410,
+            "segment1_majority_carrier": "AA",
+            "segment2_elapse_flying_time": 825,
+            "segment2_majority_carrier": "AY",
+            "segment3_elapse_flying_time": "",
+            "segment3_majority_carrier": "",
+            "validating_carrier": "AY",
+            "segment4_elapse_flying_time": "",
+            "segment4_majority_carrier": "",
+            "segment5_elapse_flying_time": "",
+            "segment5_majority_carrier": "",
+            "segment6_elapse_flying_time": "",
+            "segment6_majority_carrier": "",
+            "isLowest": 0,
+            "itinerary_id": "",
+            "search_session_id": 1,
+            "config_id": "",
+            "avlSeats": 9,
+            "refundable": 2,
+            "module_id": 207,
+            "account_code": ""
+          },
+          "FlightPublished": {
+            "id": 55102278,
+            "session_id": "",
+            "departure_date": "2025-12-02",
+            "return_date": "2025-12-10",
+            "departure_airport_id": "JFK",
+            "arrival_airport_id": "LHR",
+            "departure_time": "0001-2359",
+            "arrival_time": "0001-2359",
+            "ticket_type": 2,
+            "adults": 1,
+            "children": 0,
+            "seniors": 0,
+            "misc_pax_num": 0,
+            "misc_pax_type": "",
+            "airline_preference": "",
+            "airlines": "",
+            "cabin_class": "",
+            "cabin2_class": "",
+            "cabin3_class": "",
+            "cabin4_class": "",
+            "cabin5_class": "",
+            "cabin6_class": "",
+            "number_of_alternates": 80,
+            "direct_flight_only": 0,
+            "exclude_penalty_fares": 0,
+            "use_direct_access": 0,
+            "include_multi_airports": 0,
+            "online_connections_only": 0,
+            "psc_request": "",
+            "psw_response": "",
+            "psw_results": 294,
+            "staff_id": "",
+            "status": "success",
+            "created": "2025-11-09 10:49:19",
+            "modified": "2025-11-09 10:49:22",
+            "arrival2_airport_id": "",
+            "arrival3_airport_id": "",
+            "calendar_search": 0,
+            "departure2_airport_id": "",
+            "departure2_date": "",
+            "departure3_airport_id": "",
+            "departure3_date": "",
+            "exclude_connection": "",
+            "exclude_intracity_connection": 0,
+            "infants": 0,
+            "only_it_fares": 0,
+            "fares_indicator": "",
+            "outbound_time_qualifier": "",
+            "return_time_qualifier": "",
+            "via1_airport_id": "",
+            "child_ages": "",
+            "infant_seats": "",
+            "searchSourceId": 13,
+            "branchSearched": "",
+            "arrival4_airport_id": "",
+            "departure4_airport_id": "",
+            "departure4_date": "",
+            "arrival5_airport_id": "",
+            "departure5_airport_id": "",
+            "departure5_date": "",
+            "arrival6_airport_id": "",
+            "departure6_airport_id": "",
+            "departure6_date": "",
+            "error_message": "",
+            "searched_fare_types": "",
+            "selected_gds": "",
+            "trip_ninja_search": 0
+          }
+        },
+        "flights": [
+          {
+            "FlightPswFlightnew": {
+              "id": 16190425,
+              "key": "SMTWTFS-104-19",
+              "link_indicator": "Seamless",
+              "airline_code": "AY",
+              "flight_number": 3774,
+              "fare_class": "",
+              "distance": 3452,
+              "travel_time": 410,
+              "flight_date": "02Dec",
+              "flight_day": "Tue",
+              "departure_terminal": 8,
+              "arrival_terminal": 3,
+              "departure_airport": "JFK",
+              "arrival_airport": "LHR",
+              "departure_date": "2025-12-02",
+              "arrival_date": "2025-12-03",
+              "departure_time": 2150,
+              "arrival_time": 940,
+              "day_change_indicator": "",
+              "dep_arr_date_diff": "",
+              "aircraft_type": "77W",
+              "meal_type": "",
+              "number_stops": 0,
+              "etk_eligible": 1,
+              "code_share_info": "",
+              "operating_carrier": "AA",
+              "segment_old": 0,
+              "segment": 0,
+              "created": "2025-11-07 07:51:52"
+            },
+            "Link": {
+              "is_connection": 0,
+              "FareBasis": "OLN0C2M5",
+              "CabinClass": "Y",
+              "Baggage": "1p",
+              "fare_class": "O",
+              "FareRuleKey": "",
+              "FareInfoRef": "",
+              "segment": 1,
+              "is_tripninja": 0,
+              "tripninja_ids": ""
+            }
+          },
+          {
+            "FlightPswFlightnew": {
+              "id": 14802775,
+              "key": "***W***-1332-9",
+              "link_indicator": "Seamless",
+              "airline_code": "AY",
+              "flight_number": 1332,
+              "fare_class": "",
+              "distance": 1151,
+              "travel_time": 175,
+              "flight_date": "10Dec",
+              "flight_day": "Wed",
+              "departure_terminal": 3,
+              "arrival_terminal": "",
+              "departure_airport": "LHR",
+              "arrival_airport": "HEL",
+              "departure_date": "2025-12-10",
+              "arrival_date": "2025-12-10",
+              "departure_time": 1020,
+              "arrival_time": 1515,
+              "day_change_indicator": "",
+              "dep_arr_date_diff": "",
+              "aircraft_type": 359,
+              "meal_type": "",
+              "number_stops": 0,
+              "etk_eligible": 1,
+              "code_share_info": "",
+              "operating_carrier": "AY",
+              "segment_old": 0,
+              "segment": 0,
+              "created": "2025-11-01 09:30:42"
+            },
+            "Link": {
+              "is_connection": 0,
+              "FareBasis": "OLN0C2M5",
+              "CabinClass": "Y",
+              "Baggage": "1p",
+              "fare_class": "O",
+              "FareRuleKey": "",
+              "FareInfoRef": "",
+              "segment": 2,
+              "is_tripninja": 0,
+              "tripninja_ids": ""
+            }
+          },
+          {
+            "FlightPswFlightnew": {
+              "id": 16454978,
+              "key": "***W***-15-22",
+              "link_indicator": "Seamless",
+              "airline_code": "AY",
+              "flight_number": 15,
+              "fare_class": "",
+              "distance": 4117,
+              "travel_time": 545,
+              "flight_date": "10Dec",
+              "flight_day": "Wed",
+              "departure_terminal": "",
+              "arrival_terminal": 8,
+              "departure_airport": "HEL",
+              "arrival_airport": "JFK",
+              "departure_date": "2025-12-10",
+              "arrival_date": "2025-12-10",
+              "departure_time": 1700,
+              "arrival_time": 1905,
+              "day_change_indicator": "",
+              "dep_arr_date_diff": "",
+              "aircraft_type": 359,
+              "meal_type": "",
+              "number_stops": 0,
+              "etk_eligible": 1,
+              "code_share_info": "",
+              "operating_carrier": "AY",
+              "segment_old": 0,
+              "segment": 0,
+              "created": "2025-11-07 13:43:01"
+            },
+            "Link": {
+              "is_connection": 0,
+              "FareBasis": "OLN0C2M5",
+              "CabinClass": "Y",
+              "Baggage": "1p",
+              "fare_class": "O",
+              "FareRuleKey": "",
+              "FareInfoRef": "",
+              "segment": 2,
+              "is_tripninja": 0,
+              "tripninja_ids": ""
+            }
+          }
+        ],
+        "passengers": [
+          {
+            "FlightPswPassenger": {
+              "id": 572864576,
+              "psw_result_id": 324917006,
+              "pax_type": "ADT",
+              "num_pax": 1,
+              "base_fare": 211,
+              "total_fare": 721.13,
+              "tax": 510.13,
+              "markupAmt": 0,
+              "CommissionAmount": 0,
+              "markup_id": 0,
+              "ob_route": "",
+              "ob_airline_code": "",
+              "ob_fare_type": "PU",
+              "ob_fare_basis_code": "OLN0C2M5",
+              "ib_route": "",
+              "ib_airline_code": "",
+              "ib_fare_type": "PU",
+              "ib_fare_basis_code": "OLN0C2M5",
+              "created": "2025-11-09 10:49:20",
+              "stop3_fare_basis_code": "",
+              "stop3_fare_type": ""
+            }
+          }
+        ]
+      },
+      "price_data": {
+        "0": {
+          "pricingArr": [
+            {
+              "passengers": 1,
+              "paxtype": "ADT",
+              "markup_id": 0,
+              "base": 211,
+              "AgtNet": 0,
+              "gross": 211,
+              "base_cur": "USD",
+              "sellcurr": "USD",
+              "total": 721.13,
+              "tax": 510.13,
+              "last_ticket_date": "2025-11-12",
+              "CabinClass": 4,
+              "BookingCode": "O",
+              "inMarkup": 0,
+              "cust_tot_spl_comm_amt": 0,
+              "baggage": {
+                "JFK-LHR": {
+                  "ADT": "AY***1p"
+                },
+                "LHR-JFK": {
+                  "ADT": "AY***1p"
+                }
+              }
+            }
+          ],
+          "baggageTxt": {
+            "JFK-LHR": {
+              "ADT": "AY***1p"
+            },
+            "LHR-JFK": {
+              "ADT": "AY***1p"
+            }
+          },
+          "BrandInfo": [
+            {
+              "BrandName": "ECONOMY CLASSIC",
+              "BookingCode": "O",
+              "cabinCode": "Y",
+              "seatsAvailable": 7,
+              "CabinName": "Economy"
+            },
+            {
+              "BrandName": "ECONOMY CLASSIC",
+              "BookingCode": "O",
+              "cabinCode": "Y",
+              "seatsAvailable": 9,
+              "CabinName": "Economy"
+            },
+            {
+              "BrandName": "ECONOMY CLASSIC",
+              "BookingCode": "O",
+              "cabinCode": "Y",
+              "seatsAvailable": 9,
+              "CabinName": "Economy"
+            }
+          ],
+          "Total_Fare": {
+            "BrandId": 0,
+            "base": 211,
+            "AgtNet": 0,
+            "basecurr": "USD",
+            "markup": 0,
+            "comm": 0,
+            "gross": 211,
+            "sellcurr": "USD",
+            "total_base": 721.13,
+            "total": 721.13,
+            "tax": 510.13,
+            "taxcurr": "USD",
+            "Name": "ECONOMY CLASSIC"
+          }
+        },
+        "3": {
+          "pricingArr": [
+            {
+              "passengers": 1,
+              "paxtype": "ADT",
+              "markup_id": 0,
+              "base": 447,
+              "AgtNet": 0,
+              "gross": 447,
+              "base_cur": "USD",
+              "sellcurr": "USD",
+              "total": 957.13,
+              "tax": 510.13,
+              "last_ticket_date": "2025-11-12",
+              "CabinClass": 4,
+              "BookingCode": "O",
+              "inMarkup": 0,
+              "cust_tot_spl_comm_amt": 0,
+              "baggage": {
+                "JFK-LHR": {
+                  "ADT": "AY***1p"
+                },
+                "LHR-JFK": {
+                  "ADT": "AY***1p"
+                }
+              }
+            }
+          ],
+          "baggageTxt": {
+            "JFK-LHR": {
+              "ADT": "AY***1p"
+            },
+            "LHR-JFK": {
+              "ADT": "AY***1p"
+            }
+          },
+          "BrandInfo": [
+            {
+              "BrandName": "ECONOMY FLEX",
+              "BookingCode": "O",
+              "cabinCode": "Y",
+              "seatsAvailable": 7,
+              "CabinName": "Economy"
+            },
+            {
+              "BrandName": "ECONOMY FLEX",
+              "BookingCode": "O",
+              "cabinCode": "Y",
+              "seatsAvailable": 9,
+              "CabinName": "Economy"
+            },
+            {
+              "BrandName": "ECONOMY FLEX",
+              "BookingCode": "O",
+              "cabinCode": "Y",
+              "seatsAvailable": 9,
+              "CabinName": "Economy"
+            }
+          ],
+          "Total_Fare": {
+            "BrandId": 0,
+            "base": 447,
+            "AgtNet": 0,
+            "basecurr": "USD",
+            "markup": 0,
+            "comm": 0,
+            "gross": 447,
+            "sellcurr": "USD",
+            "total_base": 957.13,
+            "total": 957.13,
+            "tax": 510.13,
+            "taxcurr": "USD",
+            "Name": "ECONOMY FLEX"
+          }
+        },
+        "6": {
+          "pricingArr": [
+            {
+              "passengers": 1,
+              "paxtype": "ADT",
+              "markup_id": 0,
+              "base": 2059,
+              "AgtNet": 0,
+              "gross": 2059,
+              "base_cur": "USD",
+              "sellcurr": "USD",
+              "total": 2998.13,
+              "tax": 939.13,
+              "last_ticket_date": "2025-11-12",
+              "CabinClass": 3,
+              "BookingCode": "E",
+              "inMarkup": 0,
+              "cust_tot_spl_comm_amt": 0,
+              "baggage": {
+                "JFK-LHR": {
+                  "ADT": "AY***2p"
+                },
+                "LHR-JFK": {
+                  "ADT": "AY***2p"
+                }
+              }
+            }
+          ],
+          "baggageTxt": {
+            "JFK-LHR": {
+              "ADT": "AY***2p"
+            },
+            "LHR-JFK": {
+              "ADT": "AY***2p"
+            }
+          },
+          "BrandInfo": [
+            {
+              "BrandName": "PREMIUM ECONOMY CLASSIC",
+              "BookingCode": "E",
+              "cabinCode": "S",
+              "seatsAvailable": 7,
+              "CabinName": "PremiumEconomy"
+            },
+            {
+              "BrandName": "PREMIUM ECONOMY CLASSIC",
+              "BookingCode": "H",
+              "cabinCode": "Y",
+              "seatsAvailable": 9,
+              "CabinName": "Economy"
+            },
+            {
+              "BrandName": "PREMIUM ECONOMY CLASSIC",
+              "BookingCode": "T",
+              "cabinCode": "S",
+              "seatsAvailable": 9,
+              "CabinName": "PremiumEconomy"
+            }
+          ],
+          "Total_Fare": {
+            "BrandId": 0,
+            "base": 2059,
+            "AgtNet": 0,
+            "basecurr": "USD",
+            "markup": 0,
+            "comm": 0,
+            "gross": 2059,
+            "sellcurr": "USD",
+            "total_base": 2998.13,
+            "total": 2998.13,
+            "tax": 939.13,
+            "taxcurr": "USD",
+            "Name": "PREMIUM ECONOMY CLASSIC"
+          }
+        },
+        "7": {
+          "pricingArr": [
+            {
+              "passengers": 1,
+              "paxtype": "ADT",
+              "markup_id": 0,
+              "base": 1219,
+              "AgtNet": 0,
+              "gross": 1219,
+              "base_cur": "USD",
+              "sellcurr": "USD",
+              "total": 2158.13,
+              "tax": 939.13,
+              "last_ticket_date": "2025-11-12",
+              "CabinClass": 3,
+              "BookingCode": "E",
+              "inMarkup": 0,
+              "cust_tot_spl_comm_amt": 0,
+              "baggage": {
+                "JFK-LHR": {
+                  "ADT": "AY***2p"
+                },
+                "LHR-JFK": {
+                  "ADT": "AY***2p"
+                }
+              }
+            }
+          ],
+          "baggageTxt": {
+            "JFK-LHR": {
+              "ADT": "AY***2p"
+            },
+            "LHR-JFK": {
+              "ADT": "AY***2p"
+            }
+          },
+          "BrandInfo": [
+            {
+              "BrandName": "PREMIUM ECONOMY FLEX",
+              "BookingCode": "E",
+              "cabinCode": "S",
+              "seatsAvailable": 7,
+              "CabinName": "PremiumEconomy"
+            },
+            {
+              "BrandName": "PREMIUM ECONOMY FLEX",
+              "BookingCode": "H",
+              "cabinCode": "Y",
+              "seatsAvailable": 9,
+              "CabinName": "Economy"
+            },
+            {
+              "BrandName": "PREMIUM ECONOMY FLEX",
+              "BookingCode": "T",
+              "cabinCode": "S",
+              "seatsAvailable": 9,
+              "CabinName": "PremiumEconomy"
+            }
+          ],
+          "Total_Fare": {
+            "BrandId": 0,
+            "base": 1219,
+            "AgtNet": 0,
+            "basecurr": "USD",
+            "markup": 0,
+            "comm": 0,
+            "gross": 1219,
+            "sellcurr": "USD",
+            "total_base": 2158.13,
+            "total": 2158.13,
+            "tax": 939.13,
+            "taxcurr": "USD",
+            "Name": "PREMIUM ECONOMY FLEX"
+          }
+        },
+        "11": {
+          "pricingArr": [
+            {
+              "passengers": 1,
+              "paxtype": "ADT",
+              "markup_id": 0,
+              "base": 1365,
+              "AgtNet": 0,
+              "gross": 1365,
+              "base_cur": "USD",
+              "sellcurr": "USD",
+              "total": 3870.13,
+              "tax": 2505.13,
+              "last_ticket_date": "2025-11-12",
+              "CabinClass": 2,
+              "BookingCode": "I",
+              "inMarkup": 0,
+              "cust_tot_spl_comm_amt": 0,
+              "baggage": {
+                "JFK-LHR": {
+                  "ADT": "AY***2p"
+                },
+                "LHR-JFK": {
+                  "ADT": "AY***2p"
+                }
+              }
+            }
+          ],
+          "baggageTxt": {
+            "JFK-LHR": {
+              "ADT": "AY***2p"
+            },
+            "LHR-JFK": {
+              "ADT": "AY***2p"
+            }
+          },
+          "BrandInfo": [
+            {
+              "BrandName": "BUSINESS CLASSIC",
+              "BookingCode": "I",
+              "cabinCode": "C",
+              "seatsAvailable": 7,
+              "CabinName": "Business"
+            },
+            {
+              "BrandName": "BUSINESS CLASSIC",
+              "BookingCode": "I",
+              "cabinCode": "C",
+              "seatsAvailable": 1,
+              "CabinName": "Business"
+            },
+            {
+              "BrandName": "BUSINESS CLASSIC",
+              "BookingCode": "I",
+              "cabinCode": "C",
+              "seatsAvailable": 1,
+              "CabinName": "Business"
+            }
+          ],
+          "Total_Fare": {
+            "BrandId": 0,
+            "base": 1365,
+            "AgtNet": 0,
+            "basecurr": "USD",
+            "markup": 0,
+            "comm": 0,
+            "gross": 1365,
+            "sellcurr": "USD",
+            "total_base": 3870.13,
+            "total": 3870.13,
+            "tax": 2505.13,
+            "taxcurr": "USD",
+            "Name": "BUSINESS CLASSIC"
+          }
+        }
+      },
+      "sessionId": "31001a42afd2c03ae2e1b57d8d24b0c1",
+      "bpc_request_id": 13388,
+      "psc_request_id": 55102278,
+      "gds": "X",
       "ChooseSupplier": "",
       "filetype": "publish",
-      "psw_result_id": 630977135
+      "psw_result_id": 324917006,
+      "OptionDate": "2025-11-10"
     }
   }
 }
