@@ -3,11 +3,18 @@
  * Contains all configuration constants for Vyspa flight search API
  */
 
+import { getApiUsername } from '@/lib/utils/domainMapping';
+
 export const VYSPA_CONFIG = {
   apiUrl: process.env.VYSPA_API_URL || '',
   apiVersion: process.env.VYSPA_API_VERSION || '1',
   credentials: {
-    username: process.env.VYSPA_USERNAME || '',
+    // Username is determined by domain mapping (FlightsUK for .co.uk, FlightsUS for .com)
+    // Falls back to env var if domain mapping returns empty
+    get username(): string {
+      const domainUsername = getApiUsername();
+      return domainUsername || process.env.VYSPA_USERNAME || '';
+    },
     password: process.env.VYSPA_PASSWORD || '',
     token: process.env.VYSPA_TOKEN || '',
   },

@@ -6,7 +6,8 @@
 import type { FlightSearchRequest } from '@/types/vyspa';
 import type { FlightSearchResponse } from '@/services/api/flightService';
 import type { Flight } from '@/types/flight';
-import { convertCurrency as convertCurrencyAmount, getTargetCurrency } from '@/lib/currency/converter';
+// COMMENTED OUT: Using API-returned currency directly (FlightsUK returns GBP, FlightsUS returns USD)
+// import { convertCurrency as convertCurrencyAmount, getTargetCurrency } from '@/lib/currency/converter';
 
 /**
  * Apply business rules to flight search results
@@ -25,8 +26,9 @@ export async function applyBusinessRules(
   let flights = [...data.flights];
   
   // Determine target currency
-  const targetCcy = targetCurrency || getTargetCurrency();
-  console.log(`💱 Target currency: ${targetCcy}`);
+  // COMMENTED OUT: Using API-returned currency directly (FlightsUK returns GBP, FlightsUS returns USD)
+  // const targetCcy = targetCurrency || getTargetCurrency();
+  // console.log(`💱 Target currency: ${targetCcy}`);
 
   // 1. Apply direct flights only filter
   if (params.dir === '1') {
@@ -37,7 +39,8 @@ export async function applyBusinessRules(
   flights = removeDuplicateFlights(flights);
   
   // 3. Convert currency for all flights
-  flights = await convertFlightCurrencies(flights, targetCcy);
+  // COMMENTED OUT: Using API-returned currency directly (FlightsUK returns GBP, FlightsUS returns USD)
+  // flights = await convertFlightCurrencies(flights, targetCcy);
 
   // 4. Sort flights by price (cheapest first)
   flights = sortFlightsByPrice(flights);
@@ -104,66 +107,67 @@ function generateFlightKey(flight: Flight): string {
 
 /**
  * Convert all flight prices to target currency
+ * COMMENTED OUT: Using API-returned currency directly (FlightsUK returns GBP, FlightsUS returns USD)
  */
-async function convertFlightCurrencies(
-  flights: Flight[],
-  targetCurrency: string
-): Promise<Flight[]> {
-  const convertedFlights: Flight[] = [];
+// async function convertFlightCurrencies(
+//   flights: Flight[],
+//   targetCurrency: string
+// ): Promise<Flight[]> {
+//   const convertedFlights: Flight[] = [];
 
-  for (const flight of flights) {
-    const originalCurrency = flight.currency;
+//   for (const flight of flights) {
+//     const originalCurrency = flight.currency;
     
-    // Skip if already in target currency
-    if (originalCurrency === targetCurrency) {
-      //console.log(`✅ Flight ${flight.id}: Already in ${targetCurrency}`);
-      convertedFlights.push(flight);
-      continue;
-    }
+//     // Skip if already in target currency
+//     if (originalCurrency === targetCurrency) {
+//       //console.log(`✅ Flight ${flight.id}: Already in ${targetCurrency}`);
+//       convertedFlights.push(flight);
+//       continue;
+//     }
 
-    // Convert price
-    const convertedPrice = await convertCurrencyAmount(
-      flight.price,
-      originalCurrency,
-      targetCurrency
-    );
+//     // Convert price
+//     const convertedPrice = await convertCurrencyAmount(
+//       flight.price,
+//       originalCurrency,
+//       targetCurrency
+//     );
 
-    // Convert price per person
-    const convertedPricePerPerson = await convertCurrencyAmount(
-      flight.pricePerPerson,
-      originalCurrency,
-      targetCurrency
-    );
+//     // Convert price per person
+//     const convertedPricePerPerson = await convertCurrencyAmount(
+//       flight.pricePerPerson,
+//       originalCurrency,
+//       targetCurrency
+//     );
 
-    // Convert ticket options if they exist
-    let convertedTicketOptions = flight.ticketOptions;
-    if (flight.ticketOptions && flight.ticketOptions.length > 0) {
-      convertedTicketOptions = await Promise.all(
-        flight.ticketOptions.map(async (option) => ({
-          ...option,
-          price: await convertCurrencyAmount(option.price, originalCurrency, targetCurrency),
-        }))
-      );
-    }
+//     // Convert ticket options if they exist
+//     let convertedTicketOptions = flight.ticketOptions;
+//     if (flight.ticketOptions && flight.ticketOptions.length > 0) {
+//       convertedTicketOptions = await Promise.all(
+//         flight.ticketOptions.map(async (option) => ({
+//           ...option,
+//           price: await convertCurrencyAmount(option.price, originalCurrency, targetCurrency),
+//         }))
+//       );
+//     }
 
-   // console.log(
-   //   `💱 Flight ${flight.id}: ${originalCurrency} ${flight.price} → ${targetCurrency} ${convertedPrice}`
-   // );
+//    // console.log(
+//    //   `💱 Flight ${flight.id}: ${originalCurrency} ${flight.price} → ${targetCurrency} ${convertedPrice}`
+//    // );
 
-    // Update flight with converted price
-    convertedFlights.push({
-      ...flight,
-      price: convertedPrice,
-      pricePerPerson: convertedPricePerPerson,
-      ticketOptions: convertedTicketOptions,
-      currency: targetCurrency,
-      originalPrice: flight.price,
-      originalCurrency,
-    });
-  }
+//     // Update flight with converted price
+//     convertedFlights.push({
+//       ...flight,
+//       price: convertedPrice,
+//       pricePerPerson: convertedPricePerPerson,
+//       ticketOptions: convertedTicketOptions,
+//       currency: targetCurrency,
+//       originalPrice: flight.price,
+//       originalCurrency,
+//     });
+//   }
 
-  return convertedFlights;
-}
+//   return convertedFlights;
+// }
 
 /**
  * Sort flights by price (ascending)

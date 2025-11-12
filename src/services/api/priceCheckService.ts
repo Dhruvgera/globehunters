@@ -4,7 +4,8 @@
  */
 
 import { VYSPA_CONFIG } from '@/config/vyspa';
-import { convertCurrency, getTargetCurrency } from '@/lib/currency';
+// COMMENTED OUT: Currency conversion imports - using API-returned currency directly
+// import { convertCurrency, getTargetCurrency } from '@/lib/currency';
 import type {
   PriceCheckRequest,
   PriceCheckResponse,
@@ -178,7 +179,8 @@ export async function transformPriceCheckResponse(
     const flightResult = pc.flight_data?.result?.FlightPswResult;
     const flightSegments = pc.flight_data?.flights || [];
     const sourceCurrency = (flightResult?.iso_currency_code || 'USD').toUpperCase();
-    const targetCurrency = getTargetCurrency().toUpperCase();
+    // COMMENTED OUT: Using API-returned currency directly
+    // const targetCurrency = getTargetCurrency().toUpperCase();
 
     if (!flightResult) {
       throw createPriceCheckError(
@@ -273,40 +275,41 @@ export async function transformPriceCheckResponse(
     }
 
     // Normalize currency: convert all price amounts to target currency for display consistency
-    if (priceOptions.length > 0 && sourceCurrency !== targetCurrency) {
-      const converted = await Promise.all(
-        priceOptions.map(async (opt) => {
-          const totalPrice = await convertCurrency(opt.totalPrice, sourceCurrency, targetCurrency);
-          const pricePerPerson = await convertCurrency(opt.pricePerPerson, sourceCurrency, targetCurrency);
-          const baseFare = await convertCurrency(opt.baseFare, sourceCurrency, targetCurrency);
-          const taxes = await convertCurrency(opt.taxes, sourceCurrency, targetCurrency);
-          const markup = await convertCurrency(opt.markup, sourceCurrency, targetCurrency);
-          const commission = await convertCurrency(opt.commission, sourceCurrency, targetCurrency);
-          const atolFee = await convertCurrency(opt.atolFee, sourceCurrency, targetCurrency);
-          const passengerBreakdown = await Promise.all(
-            opt.passengerBreakdown.map(async (p) => ({
-              ...p,
-              basePrice: await convertCurrency(p.basePrice, sourceCurrency, targetCurrency),
-              totalPrice: await convertCurrency(p.totalPrice, sourceCurrency, targetCurrency),
-              taxesPerPerson: await convertCurrency(p.taxesPerPerson, sourceCurrency, targetCurrency),
-            }))
-          );
-          return {
-            ...opt,
-            totalPrice,
-            pricePerPerson,
-            baseFare,
-            taxes,
-            markup,
-            commission,
-            atolFee,
-            passengerBreakdown,
-            currency: targetCurrency,
-          };
-        })
-      );
-      priceOptions = converted;
-    }
+    // COMMENTED OUT: Using API-returned currency directly (FlightsUK returns GBP, FlightsUS returns USD)
+    // if (priceOptions.length > 0 && sourceCurrency !== targetCurrency) {
+    //   const converted = await Promise.all(
+    //     priceOptions.map(async (opt) => {
+    //       const totalPrice = await convertCurrency(opt.totalPrice, sourceCurrency, targetCurrency);
+    //       const pricePerPerson = await convertCurrency(opt.pricePerPerson, sourceCurrency, targetCurrency);
+    //       const baseFare = await convertCurrency(opt.baseFare, sourceCurrency, targetCurrency);
+    //       const taxes = await convertCurrency(opt.taxes, sourceCurrency, targetCurrency);
+    //       const markup = await convertCurrency(opt.markup, sourceCurrency, targetCurrency);
+    //       const commission = await convertCurrency(opt.commission, sourceCurrency, targetCurrency);
+    //       const atolFee = await convertCurrency(opt.atolFee, sourceCurrency, targetCurrency);
+    //       const passengerBreakdown = await Promise.all(
+    //         opt.passengerBreakdown.map(async (p) => ({
+    //           ...p,
+    //           basePrice: await convertCurrency(p.basePrice, sourceCurrency, targetCurrency),
+    //           totalPrice: await convertCurrency(p.totalPrice, sourceCurrency, targetCurrency),
+    //           taxesPerPerson: await convertCurrency(p.taxesPerPerson, sourceCurrency, targetCurrency),
+    //         }))
+    //       );
+    //       return {
+    //         ...opt,
+    //         totalPrice,
+    //         pricePerPerson,
+    //         baseFare,
+    //         taxes,
+    //         markup,
+    //         commission,
+    //         atolFee,
+    //         passengerBreakdown,
+    //         currency: targetCurrency,
+    //       };
+    //     })
+    //   );
+    //   priceOptions = converted;
+    // }
 
     // Ensure options are sorted by total price and upgrade flags are accurate
     if (priceOptions.length > 1) {
