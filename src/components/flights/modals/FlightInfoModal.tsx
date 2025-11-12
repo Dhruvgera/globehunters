@@ -199,9 +199,15 @@ export default function FlightInfoModal({
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[min(100vw-24px,960px)] max-w-full max-h-[90vh] overflow-y-auto overflow-x-clip p-4 sm:p-6 gap-6 sm:gap-8 [&>button]:hidden bg-white rounded-3xl border-0 box-border">
+      <DialogContent 
+        className="w-[min(100vw-24px,960px)] max-w-full max-h-[90vh] overflow-y-auto overflow-x-clip p-4 sm:p-6 gap-6 sm:gap-8 [&>button]:hidden bg-white rounded-3xl border-0 box-border"
+        aria-describedby="flight-details-description"
+      >
         <DialogHeader className="sr-only">
           <DialogTitle>{t('modal.title')}</DialogTitle>
+          <p id="flight-details-description" className="sr-only">
+            View detailed flight information including departure and arrival times, baggage allowance, and fare options
+          </p>
         </DialogHeader>
         {/* Header with Flight Leg Selector */}
         <div className="flex flex-col gap-4">
@@ -673,43 +679,45 @@ export default function FlightInfoModal({
           </div>
           )}
 
-        {/* Footer */}
-        <div className="sticky bottom-0 z-20 bg-white rounded-xl px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-3 border border-[#EEF0F7] shadow-[0_-8px_24px_-12px_rgba(2,6,23,0.35)]">
-          <div className="flex flex-col gap-1">
-            <span className="text-sm sm:text-lg font-medium text-[#3754ED] whitespace-nowrap">
-              {selectedUpgradeOption 
-                ? formatPrice(selectedUpgradeOption.totalPrice, selectedUpgradeOption.currency)
-                : formatPrice(flight.price, flight.currency)}
-            </span>
-            <span className="text-xs text-[#3A478A]">
-              {selectedUpgradeOption
-                ? `${formatPrice(selectedUpgradeOption.pricePerPerson, selectedUpgradeOption.currency)} per person`
-                : `${formatPrice(flight.pricePerPerson, flight.currency)} per person`}
-            </span>
-          </div>
-          <Button 
-            onClick={handleBookNow}
-            disabled={!selectedUpgradeOption && !flight.price}
-            className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-full px-4 sm:px-5 py-2 h-auto gap-1 text-sm font-bold shrink-0 disabled:opacity-50"
-          >
-            Book
-            <svg
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              className="text-white sm:w-6 sm:h-6"
+        {/* Footer - Only show on search/results pages, not on payment page */}
+        {!stayOnCurrentPage && (
+          <div className="sticky bottom-0 z-20 bg-white rounded-xl px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-3 border border-[#EEF0F7] shadow-[0_-8px_24px_-12px_rgba(2,6,23,0.35)]">
+            <div className="flex flex-col gap-1">
+              <span className="text-sm sm:text-lg font-medium text-[#3754ED] whitespace-nowrap">
+                {selectedUpgradeOption 
+                  ? formatPrice(selectedUpgradeOption.totalPrice, selectedUpgradeOption.currency)
+                  : formatPrice(flight.price, flight.currency)}
+              </span>
+              <span className="text-xs text-[#3A478A]">
+                {selectedUpgradeOption
+                  ? `${formatPrice(selectedUpgradeOption.pricePerPerson, selectedUpgradeOption.currency)} per person`
+                  : `${formatPrice(flight.pricePerPerson, flight.currency)} per person`}
+              </span>
+            </div>
+            <Button 
+              onClick={handleBookNow}
+              disabled={!selectedUpgradeOption && !flight.price}
+              className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-full px-4 sm:px-5 py-2 h-auto gap-1 text-sm font-bold shrink-0 disabled:opacity-50"
             >
-              <path
-                d="M8.43 6.43L13.57 12L8.43 17.57"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </Button>
-        </div>
+              Book
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                className="text-white sm:w-6 sm:h-6"
+              >
+                <path
+                  d="M8.43 6.43L13.57 12L8.43 17.57"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
     {/* Availability Error Popup */}
@@ -727,17 +735,23 @@ export default function FlightInfoModal({
     </Dialog>
     */}
     {/* Return tab warning (passenger page context) */}
-    <Dialog open={returnWarnOpen} onOpenChange={setReturnWarnOpen}>
-      <DialogContent className="max-w-[min(100vw-24px,560px)] p-0 [&>button]:hidden">
+    {/* <Dialog open={returnWarnOpen} onOpenChange={setReturnWarnOpen}>
+      <DialogContent 
+        className="max-w-[min(100vw-24px,560px)] p-0 [&>button]:hidden"
+        aria-describedby="booking-warning-description"
+      >
         <DialogHeader className="sr-only">
           <DialogTitle>Booking warning</DialogTitle>
+          <p id="booking-warning-description" className="sr-only">
+            Warning dialog about booking issues
+          </p>
         </DialogHeader>
         <ErrorMessage
           title="Warning"
           message="There is a problem with your booking. Please try again."
         />
       </DialogContent>
-    </Dialog>
+    </Dialog> */}
     </>
   );
 }
