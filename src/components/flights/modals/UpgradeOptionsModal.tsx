@@ -19,119 +19,6 @@ interface UpgradeOptionsModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const fareOptions = [
-  {
-    id: "value",
-    name: "Eco Value",
-    price: "$48.00",
-    features: [
-      {
-        icon: "personal_bag",
-        title: "1 personal item",
-        description: "Fits under the seat in front of you",
-      },
-      {
-        icon: "luggage",
-        title: "1 carry-on bag",
-        description: "Max weight 10 kg",
-      },
-      {
-        icon: "checked_bags",
-        title: "2 checked bags",
-        description: "Max weight 23 kg",
-      },
-      {
-        icon: "non_refundable",
-        title: "Non-Refundable",
-        description: "Ticket can't be refunded",
-      },
-      {
-        icon: "no_changes",
-        title: "Changes not allowed",
-        description: "Flights can't be changed after booking",
-      },
-      {
-        icon: "seat_choice",
-        title: "Seat choice for free",
-        description: "Choose your desired seat for free",
-      },
-    ],
-  },
-  {
-    id: "classic",
-    name: "Eco Classic",
-    price: "$68.00",
-    features: [
-      {
-        icon: "personal_bag",
-        title: "1 personal item",
-        description: "Fits under the seat in front of you",
-      },
-      {
-        icon: "luggage",
-        title: "1 carry-on bag",
-        description: "Max weight 10 kg",
-      },
-      {
-        icon: "checked_bags",
-        title: "2 checked bags",
-        description: "Max weight 23 kg",
-      },
-      {
-        icon: "non_refundable",
-        title: "Non-Refundable",
-        description: "Ticket can't be refunded",
-      },
-      {
-        icon: "no_changes",
-        title: "Changes not allowed",
-        description: "Flights can't be changed after booking",
-      },
-      {
-        icon: "seat_choice",
-        title: "Seat choice for free",
-        description: "Choose your desired seat for free",
-      },
-    ],
-  },
-  {
-    id: "flex",
-    name: "Eco Flex",
-    price: "$88.00",
-    features: [
-      {
-        icon: "personal_bag",
-        title: "1 personal item",
-        description: "Fits under the seat in front of you",
-      },
-      {
-        icon: "luggage",
-        title: "1 carry-on bag",
-        description: "Max weight 10 kg",
-      },
-      {
-        icon: "checked_bags",
-        title: "2 checked bags",
-        description: "Max weight 23 kg",
-      },
-      {
-        icon: "non_refundable",
-        title: "Non-Refundable",
-        description: "Ticket can't be refunded",
-      },
-      {
-        icon: "no_changes",
-        title: "Changes not allowed",
-        description: "Flights can't be changed after booking",
-      },
-      {
-        icon: "seat_choice",
-        title: "Seat choice for free",
-        description: "Choose your desired seat for free",
-      },
-    ],
-  },
-];
 
 export default function UpgradeOptionsModal({
   open,
@@ -165,20 +52,18 @@ export default function UpgradeOptionsModal({
       Info;
   }
 
-  // Choose defaults when API options are available
-  const fares = hasApiOptions
-    ? apiOptions.map((o) => ({
-        id: o.id,
-        name: o.cabinClassDisplay,
-        // show incremental difference if upgrade, else total price
-        price: o.isUpgrade && o.priceDifference
-          ? `+${formatPrice(o.priceDifference, o.currency)}`
-          : formatPrice(o.totalPrice, o.currency),
-        baggageDesc: o.baggage?.description,
-        baggageDetails: o.baggage?.details,
-        _raw: o,
-      }))
-    : fareOptions;
+  // Map API options to fare display format
+  const fares = apiOptions.map((o) => ({
+    id: o.id,
+    name: o.cabinClassDisplay,
+    // show incremental difference if upgrade, else total price
+    price: o.isUpgrade && o.priceDifference
+      ? `+${formatPrice(o.priceDifference, o.currency)}`
+      : formatPrice(o.totalPrice, o.currency),
+    baggageDesc: o.baggage?.description,
+    baggageDetails: o.baggage?.details,
+    _raw: o,
+  }));
 
   // Initialize selected/highlighted when opening with API data
   useEffect(() => {
@@ -207,7 +92,21 @@ export default function UpgradeOptionsModal({
           <span className="sr-only">{t('close')}</span>
         </button>
 
+        {/* No upgrade options available */}
+        {!hasApiOptions && (
+          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+            <Info className="w-12 h-12 text-[#3754ED] mb-4" />
+            <h3 className="text-lg font-semibold text-[#010D50] mb-2">
+              No Upgrade Options Available
+            </h3>
+            <p className="text-sm text-[#3A478A] max-w-md">
+              There are no cabin upgrade options available for this flight at the moment. You can proceed with your current selection.
+            </p>
+          </div>
+        )}
+
         {/* Fare Options */}
+        {hasApiOptions && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 pb-4 px-1">
           {fares.map((fare) => (
             <div
@@ -308,25 +207,7 @@ export default function UpgradeOptionsModal({
                           );
                         });
                       }
-                      // Fallback to demo features when API not available
-                      return ((fare as any).features || []).map((feature: any, index: number) => {
-                        const IconComponent = mapIcon(feature.icon);
-                        return (
-                          <div key={index} className="flex items-start gap-2 sm:gap-3">
-                            <IconComponent className="w-4 h-4 sm:w-6 sm:h-6 text-[#010D50] shrink-0 mt-0.5" />
-                            <div className="flex flex-col gap-0.5 sm:gap-1">
-                              <span className="text-xs sm:text-sm font-medium text-[#010D50]">
-                                {feature.title}
-                              </span>
-                              {feature.description && (
-                                <span className="text-xs sm:text-sm text-[#3A478A]">
-                                  {feature.description}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      });
+                      return null;
                     })()}
                   </div>
                 </div>
@@ -334,8 +215,10 @@ export default function UpgradeOptionsModal({
             </div>
           ))}
         </div>
+        )}
 
         {/* Navigation */}
+        {hasApiOptions && (
         <div className="flex items-center justify-between">
           <button className="w-8 h-8 rounded-full border border-[#DFE0E4] bg-white flex items-center justify-center hover:bg-gray-50">
             <ChevronLeft className="w-5 h-5 text-[#010D50]" />
@@ -369,6 +252,7 @@ export default function UpgradeOptionsModal({
             <ChevronRight className="w-5 h-5" />
           </Button>
         </div>
+        )}
       </DialogContent>
     </Dialog>
   );

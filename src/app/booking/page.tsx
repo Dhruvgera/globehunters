@@ -203,6 +203,7 @@ function BookingContent() {
             {/* Terms & Conditions */}
             <TermsAndConditions
               onUpgradeClick={() => setShowUpgradeModal(true)}
+              hasUpgradeOptions={priceCheckData?.priceOptions && priceCheckData.priceOptions.length > 1}
             />
           </div>
 
