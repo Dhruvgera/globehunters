@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Flight } from "@/types/flight";
+import { Flight, FlightSegment } from "@/types/flight";
 import { useTranslations } from "next-intl";
 import { formatPrice } from "@/lib/currency";
 import { useBookingStore } from "@/store/bookingStore";
@@ -50,8 +50,8 @@ export default function FlightInfoModal({
 
   const journeySegments = flight.segments && flight.segments.length > 0
     ? flight.segments
-    : [flight.outbound, ...(flight.inbound ? [flight.inbound] as typeof flight.segments : [])].filter(
-        (seg): seg is NonNullable<typeof flight.segments>[number] => !!seg
+    : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])].filter(
+        (seg): seg is FlightSegment => !!seg
       );
 
   const normalizedIndex =
