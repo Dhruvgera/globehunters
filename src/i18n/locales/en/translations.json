@@ -466,9 +466,9 @@
       "personalItem": "1 personal item",
       "personalItemDesc": "Fits under seat",
       "carryOn": "1 carry-on bag",
-      "carryOnDesc": "Max 10kg",
-      "checked": "2 checked bags",
-      "checkedDesc": "Max 23kg each",
+      "carryOnDesc": "Standard size restrictions apply",
+      "checked": "Checked baggage",
+      "checkedDesc": "As per fare conditions",
       "alert": {
         "title": "Baggage Alert: Re-Check Required",
         "message": "Due to airline or flight changes during your stop, you MUST collect your checked luggage and re-check it with the connecting airline. Always confirm your baggage tag instructions upon arrival at your layover city."

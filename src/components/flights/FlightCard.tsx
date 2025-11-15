@@ -44,8 +44,29 @@ export default function FlightCard({
     router.push("/booking");
   };
 
+  // Debug mode - show module_id and Result_id when enabled
+  const isDebugMode = process.env.NEXT_PUBLIC_DEBUG_FLIGHT_IDS === 'true';
+
   return (
     <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+      {/* Debug Info */}
+      {isDebugMode && (flight.segmentResultId || flight.moduleId) && (
+        <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs font-mono space-y-1">
+          {flight.moduleId && (
+            <div className="flex gap-2">
+              <span className="font-semibold text-yellow-800">module_id:</span>
+              <span className="text-yellow-900">{flight.moduleId}</span>
+            </div>
+          )}
+          {flight.segmentResultId && (
+            <div className="flex gap-2">
+              <span className="font-semibold text-yellow-800">Result_id:</span>
+              <span className="text-yellow-900">{flight.segmentResultId}</span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Flight Details */}
       <div className="flex flex-col gap-4">
         {/* Airline Header */}

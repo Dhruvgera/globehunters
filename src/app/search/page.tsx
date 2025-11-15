@@ -58,6 +58,14 @@ function SearchPageContent() {
     return new Date(year, month - 1, day);
   };
 
+  const parseTravelClassFromURL = (value: string | null): SearchParams['class'] => {
+    const allowed: SearchParams['class'][] = ['Economy', 'Premium Economy', 'Business', 'First'];
+    if (value && (allowed as string[]).includes(value)) {
+      return value as SearchParams['class'];
+    }
+    return 'Economy';
+  };
+
   // Parse URL parameters and set in store on mount
   useEffect(() => {
     const from = urlParams.get('from');
@@ -68,9 +76,57 @@ function SearchPageContent() {
     const children = urlParams.get('children');
     const infants = urlParams.get('infants');
     const travelClass = urlParams.get('class');
-    const tripType = urlParams.get('tripType');
+    const tripType = urlParams.get('tripType') as SearchParams['tripType'] | null;
 
-    if (from && to && departureDate) {
+    if (tripType === 'multi-city') {
+      const segments: SearchParams['segments'] = [];
+
+      // Support both from/to/departureDate and from1/to1/departureDate1 for first leg
+      const firstFrom = urlParams.get('from1') || from;
+      const firstTo = urlParams.get('to1') || to;
+      const firstDeparture = urlParams.get('departureDate1') || departureDate;
+
+      if (firstFrom && firstTo && firstDeparture) {
+        segments.push({
+          from: firstFrom,
+          to: firstTo,
+          departureDate: parseDateFromURL(firstDeparture),
+        });
+      }
+
+      // Parse additional legs up to 6
+      for (let i = 2; i <= 6; i++) {
+        const segFrom = urlParams.get(`from${i}`);
+        const segTo = urlParams.get(`to${i}`);
+        const segDate = urlParams.get(`departureDate${i}`);
+        if (segFrom && segTo && segDate) {
+          segments.push({
+            from: segFrom,
+            to: segTo,
+            departureDate: parseDateFromURL(segDate),
+          });
+        }
+      }
+
+      if (segments.length > 0) {
+        const first = segments[0];
+        const params: SearchParams = {
+          from: first.from,
+          to: first.to,
+          departureDate: first.departureDate,
+          // For multi-city we rely on per-leg dates, not a single returnDate
+          passengers: {
+            adults: parseInt(adults || '1'),
+            children: parseInt(children || '0'),
+            infants: parseInt(infants || '0'),
+          },
+          class: parseTravelClassFromURL(travelClass),
+          tripType: 'multi-city',
+          segments,
+        };
+        setStoreSearchParams(params);
+      }
+    } else if (from && to && departureDate) {
       const params: SearchParams = {
         from: from,
         to: to,
@@ -81,8 +137,8 @@ function SearchPageContent() {
           children: parseInt(children || '0'),
           infants: parseInt(infants || '0'),
         },
-        class: (travelClass as any) || 'Economy',
-        tripType: (tripType as any) || 'round-trip',
+        class: parseTravelClassFromURL(travelClass),
+        tripType: (tripType as SearchParams['tripType']) || 'round-trip',
       };
       setStoreSearchParams(params);
     }

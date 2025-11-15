@@ -19,11 +19,8 @@ export interface VyspaSearchParams {
   adults: string;
   children: string;
   child_ages: string[];
+  infants: string; // Required: Number of infants (API expects string digits)
   direct_flight_only: '0' | '1';
-  /**
-   * Number of infants (API expects string digits)
-   */
-  infants?: string;
   /**
    * One-letter cabin class code for outbound flight:
    * M - Economy, W - Premium, C - Business, F - First
@@ -33,6 +30,39 @@ export interface VyspaSearchParams {
    * One-letter cabin class code for inbound flight (round trips)
    */
   inbound_cabin_class?: string;
+
+  // --------------------------------------------------------------------------
+  // Multi-city extensions: additional segments (up to 6 total)
+  // These map directly to the REST v4 flights_availability_search parameters.
+  // --------------------------------------------------------------------------
+  departure2_airport?: string;
+  arrival2_airport?: string;
+  departure2_date?: string;
+  cabin2_class?: string;
+
+  departure3_airport?: string;
+  arrival3_airport?: string;
+  departure3_date?: string;
+  cabin3_class?: string;
+
+  departure4_airport?: string;
+  arrival4_airport?: string;
+  departure4_date?: string;
+  cabin4_class?: string;
+
+  departure5_airport?: string;
+  arrival5_airport?: string;
+  departure5_date?: string;
+  cabin5_class?: string;
+
+  departure6_airport?: string;
+  arrival6_airport?: string;
+  departure6_date?: string;
+  cabin6_class?: string;
+
+  // Optional pagination and filtering
+  limit?: number; // Maximum number of results to return
+  page?: number; // Page number for paginated results
 }
 
 /**
@@ -62,6 +92,27 @@ export interface FlightSearchRequest {
   cl: string; // cabin class
   aff?: string; // affiliate code (optional)
   cip?: string; // client IP (optional)
+
+  // --------------------------------------------------------------------------
+  // Multi-city extensions: additional legs (up to 6 total)
+  // These are converted into departureN_/arrivalN_/departureN_date fields.
+  // Dates are in DD/MM/YYYY format, consistent with `fr`.
+  // --------------------------------------------------------------------------
+  origin2?: string;
+  destination2?: string;
+  fr2?: string;
+  origin3?: string;
+  destination3?: string;
+  fr3?: string;
+  origin4?: string;
+  destination4?: string;
+  fr4?: string;
+  origin5?: string;
+  destination5?: string;
+  fr5?: string;
+  origin6?: string;
+  destination6?: string;
+  fr6?: string;
 }
 
 // ============================================================================

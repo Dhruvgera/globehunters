@@ -74,20 +74,74 @@ export async function searchFlightsVyspa(
   const infants = parseInt(params.inf1 || '0', 10);
   const cabinLetter = mapCabinClass(params.cl);
 
-  const vyspaParams: VyspaSearchParams[] = [{
+  const baseParams: VyspaSearchParams = {
     version: VYSPA_CONFIG.defaults.version,
     departure_airport: params.origin1.toUpperCase(),
     arrival_airport: params.destinationid.toUpperCase(),
     departure_date: departureDate,
-    return_date: returnDate,
+    ...(returnDate ? { return_date: returnDate } : {}), // Only include return_date if present
     adults: String(adults),
     children: String(children),
     child_ages: generateChildAges(children),
+    infants: String(infants), // Always include infants (required by API)
     direct_flight_only: directOnly,
-    ...(infants > 0 ? { infants: String(infants) } : {}),
     ...(cabinLetter ? { cabin_class: cabinLetter } : {}),
     ...(cabinLetter && returnDate ? { inbound_cabin_class: cabinLetter } : {}),
-  }];
+  };
+
+  // Multi-city: map additional originN/destinationN/frN into departureN_/arrivalN_/departureN_date
+  const applyLeg = (
+    index: number,
+    origin?: string,
+    destination?: string,
+    legFr?: string
+  ) => {
+    if (!origin || !destination || !legFr) return;
+    const depDate = convertDateFormat(legFr);
+    const upperOrigin = origin.toUpperCase();
+    const upperDestination = destination.toUpperCase();
+
+    switch (index) {
+      case 2:
+        baseParams.departure2_airport = upperOrigin;
+        baseParams.arrival2_airport = upperDestination;
+        baseParams.departure2_date = depDate;
+        if (cabinLetter) baseParams.cabin2_class = cabinLetter;
+        break;
+      case 3:
+        baseParams.departure3_airport = upperOrigin;
+        baseParams.arrival3_airport = upperDestination;
+        baseParams.departure3_date = depDate;
+        if (cabinLetter) baseParams.cabin3_class = cabinLetter;
+        break;
+      case 4:
+        baseParams.departure4_airport = upperOrigin;
+        baseParams.arrival4_airport = upperDestination;
+        baseParams.departure4_date = depDate;
+        if (cabinLetter) baseParams.cabin4_class = cabinLetter;
+        break;
+      case 5:
+        baseParams.departure5_airport = upperOrigin;
+        baseParams.arrival5_airport = upperDestination;
+        baseParams.departure5_date = depDate;
+        if (cabinLetter) baseParams.cabin5_class = cabinLetter;
+        break;
+      case 6:
+        baseParams.departure6_airport = upperOrigin;
+        baseParams.arrival6_airport = upperDestination;
+        baseParams.departure6_date = depDate;
+        if (cabinLetter) baseParams.cabin6_class = cabinLetter;
+        break;
+    }
+  };
+
+  applyLeg(2, params.origin2, params.destination2, params.fr2);
+  applyLeg(3, params.origin3, params.destination3, params.fr3);
+  applyLeg(4, params.origin4, params.destination4, params.fr4);
+  applyLeg(5, params.origin5, params.destination5, params.fr5);
+  applyLeg(6, params.origin6, params.destination6, params.fr6);
+
+  const vyspaParams: VyspaSearchParams[] = [baseParams];
 
   console.log('🔍 Vyspa API Request:', {
     url: VYSPA_CONFIG.apiUrl,

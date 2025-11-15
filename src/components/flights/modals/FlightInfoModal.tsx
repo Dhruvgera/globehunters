@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { X, Check, Info, Clock, Briefcase, Package, ShoppingBag, XCircle as XIcon, Plane, MapPin, UtensilsCrossed, AlertTriangle, Loader2 } from "lucide-react";
+import { X, Check, Info, Clock, Briefcase, Package, ShoppingBag, XCircle as XIcon, Plane, MapPin, UtensilsCrossed, Loader2 } from "lucide-react";
 import Image from "next/image";
 import {
   Dialog,
@@ -40,9 +40,7 @@ export default function FlightInfoModal({
   const selectedUpgradeInStore = useBookingStore((state) => state.selectedUpgradeOption);
   const passengersInStore = useBookingStore((state) => state.passengers);
   const [imgError, setImgError] = useState(false);
-  const [selectedLeg, setSelectedLeg] = useState<"outbound" | "inbound">(
-    "outbound"
-  );
+  const [selectedLegIndex, setSelectedLegIndex] = useState(0);
   const [selectedUpgradeOption, setSelectedUpgradeOption] = useState<TransformedPriceOption | null>(null);
   const [availabilityErrorOpen, setAvailabilityErrorOpen] = useState(false);
   const [returnWarnOpen, setReturnWarnOpen] = useState(false);
@@ -50,8 +48,18 @@ export default function FlightInfoModal({
   // Price check integration
   const { priceCheck, isLoading, error, checkPrice, clearError } = usePriceCheck();
 
-  const currentLeg =
-    selectedLeg === "outbound" ? flight.outbound : flight.inbound;
+  const journeySegments = flight.segments && flight.segments.length > 0
+    ? flight.segments
+    : [flight.outbound, ...(flight.inbound ? [flight.inbound] as typeof flight.segments : [])].filter(
+        (seg): seg is NonNullable<typeof flight.segments>[number] => !!seg
+      );
+
+  const normalizedIndex =
+    selectedLegIndex >= 0 && selectedLegIndex < journeySegments.length
+      ? selectedLegIndex
+      : 0;
+
+  const currentLeg = journeySegments[normalizedIndex];
 
   // Trigger price check when modal opens - run immediately, don't wait for other requests
   useEffect(() => {
@@ -196,6 +204,26 @@ export default function FlightInfoModal({
     return '';
   }
 
+  function getBaggageDetails(): string {
+    // Get the baggage unit to determine what details to show
+    if (hasSegmentBaggage()) {
+      const unit = currentLeg?.segmentBaggageUnit;
+      if (unit) {
+        const u = String(unit).toLowerCase();
+        // If it's pieces, show "Consult airline policy"
+        if (u === 'p' || u === 'pc') {
+          return 'Consult airline policy';
+        }
+        // If it's kg, don't show additional text as the weight is already in the main display
+        if (u === 'k' || u === 'kg') {
+          return '';
+        }
+      }
+    }
+    // Default: show nothing
+    return '';
+  }
+
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -212,51 +240,32 @@ export default function FlightInfoModal({
         {/* Header with Flight Leg Selector */}
         <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-3">
-              {/* Flight Leg Tabs */}
+              {/* Flight Leg Tabs (supports multi-city) */}
               <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 flex-1">
-                <Button
-                  variant={selectedLeg === "outbound" ? "default" : "outline"}
-                  className={`${
-                    selectedLeg === "outbound"
-                      ? "bg-[#E0E7FF] text-[#010D50] hover:bg-[#D0D7EF]"
-                      : "bg-[#F6F6F6] text-[#3754ED] border-[#3754ED] hover:bg-[#EEEEEE]"
-                  } rounded-full px-3 sm:px-4 py-2.5 h-auto text-xs sm:text-sm font-medium whitespace-nowrap shrink-0 leading-normal`}
-                  onClick={() => setSelectedLeg("outbound")}
-                >
-                  <span className="hidden sm:inline">
-                    {flight.outbound.departureAirport.city} -{" "}
-                    {flight.outbound.arrivalAirport.city} -{" "}
-                    {flight.outbound.date}
-                  </span>
-                  <span className="sm:hidden">
-                    {flight.outbound.departureAirport.code} - {flight.outbound.arrivalAirport.code}
-                  </span>
-                </Button>
-                {flight.inbound && (
+                {journeySegments.map((seg, index) => (
                   <Button
-                    variant={selectedLeg === "inbound" ? "default" : "outline"}
+                    key={`${seg.departureAirport.code}-${seg.arrivalAirport.code}-${index}`}
+                    variant={normalizedIndex === index ? "default" : "outline"}
                     className={`${
-                      selectedLeg === "inbound"
+                      normalizedIndex === index
                         ? "bg-[#E0E7FF] text-[#010D50] hover:bg-[#D0D7EF]"
                         : "bg-[#F6F6F6] text-[#3754ED] border-[#3754ED] hover:bg-[#EEEEEE]"
                     } rounded-full px-3 sm:px-4 py-2.5 h-auto text-xs sm:text-sm font-medium whitespace-nowrap shrink-0 leading-normal`}
                     onClick={() => {
-                      // If user already filled some passenger data on booking page, warn when viewing return
-                      if (passengersInStore && passengersInStore.length > 0) {
+                      if (index > 0 && passengersInStore && passengersInStore.length > 0) {
                         setReturnWarnOpen(true);
                       }
-                      setSelectedLeg("inbound");
+                      setSelectedLegIndex(index);
                     }}
                   >
                     <span className="hidden sm:inline">
-                      {flight.inbound.departureAirport.city} -{" "}
-                      {flight.inbound.arrivalAirport.city} - {flight.inbound.date}
+                      {seg.departureAirport.city} - {seg.arrivalAirport.city} - {seg.date}
                     </span>
                     <span className="sm:hidden">
-                      {flight.inbound.departureAirport.code} - {flight.inbound.arrivalAirport.code}
+                      {seg.departureAirport.code} - {seg.arrivalAirport.code}
                     </span>
                   </Button>
-                )}
+                ))}
               </div>
 
               {/* Close Button */}
@@ -276,7 +285,7 @@ export default function FlightInfoModal({
                 {/* Flight Header */}
                 <div className="flex flex-col gap-2">
                   <span className="text-sm text-[#3A478A]">
-                    {selectedLeg === "outbound" ? "Flight 1 of 2" : "Flight 2 of 2"}
+                    {`Flight ${normalizedIndex + 1} of ${journeySegments.length}`}
                   </span>
 
                   {/* Flight Card */}
@@ -442,7 +451,9 @@ export default function FlightInfoModal({
                           <Package className="w-5 h-5 text-[#010D50] shrink-0" />
                           <div className="flex flex-col gap-0.5">
                             <span className="text-xs font-medium text-[#010D50]">{normalizeBaggageLabel(formatBaggageText())}</span>
-                            <span className="text-xs text-[#3A478A]">{t('baggage.checkedDesc')}</span>
+                            {getBaggageDetails() && (
+                              <span className="text-xs text-[#3A478A]">{getBaggageDetails()}</span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -515,23 +526,7 @@ export default function FlightInfoModal({
             </div>
           )}
 
-          {/* Price Check Error State */}
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-red-900">{error.userMessage}</p>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => flight.segmentResultId && checkPrice(flight.segmentResultId)}
-                  className="mt-3"
-                >
-                  Try Again
-                </Button>
-              </div>
-            </div>
-          )}
+          {/* Price check is only for optional upgrades - no error display needed */}
 
           {/* (chips rendered once below within Fare Details section) */}
 

@@ -113,9 +113,10 @@ function transformResult(result: VyspaResult): Flight | null {
 
   const pricePerPerson = totalPrice / totalPassengers;
 
-  // Get segments (outbound and optionally inbound)
-  const outboundSegment = result.Segments[0];
-  const inboundSegment = result.Segments[1] || null;
+  // Get segments (outbound, inbound, and optionally additional multi-city legs)
+  const vyspaSegments = result.Segments || [];
+  const outboundSegment = vyspaSegments[0];
+  const inboundSegment = vyspaSegments[1] || null;
 
   if (!outboundSegment) {
     console.warn('Skipping flight without outbound segment:', result.Result_id);
@@ -135,13 +136,12 @@ function transformResult(result: VyspaResult): Flight | null {
     logo: `/airlines/${firstFlight.airline_code.toLowerCase()}.png`,
   };
 
-  // Transform outbound segment
+  // Transform outbound/inbound segments
   const outbound = transformSegmentToFlightSegment(outboundSegment);
+  const inbound = inboundSegment ? transformSegmentToFlightSegment(inboundSegment) : undefined;
 
-  // Transform inbound segment if exists
-  const inbound = inboundSegment 
-    ? transformSegmentToFlightSegment(inboundSegment)
-    : undefined;
+  // Transform all segments for multi-city support
+  const allSegments: FlightSegment[] = vyspaSegments.map(transformSegmentToFlightSegment);
 
   const hasBaggage =
     (firstFlight.Baggage && String(firstFlight.Baggage).toLowerCase() !== 'none') ||
@@ -152,6 +152,12 @@ function transformResult(result: VyspaResult): Flight | null {
     airline: airline,
     outbound: outbound,
     inbound: inbound,
+    segments: allSegments,
+    tripType: (() => {
+      if (allSegments.length <= 1) return 'one-way';
+      if (allSegments.length === 2) return 'round-trip';
+      return 'multi-city';
+    })(),
     price: Math.round(totalPrice),
     pricePerPerson: Math.round(pricePerPerson),
     currency: result.currency_code.toUpperCase(), // Store code, not symbol
@@ -164,6 +170,7 @@ function transformResult(result: VyspaResult): Flight | null {
     hasBaggage,
     // Store segment result ID for price check
     segmentResultId: result.Result_id,
+    moduleId: result.module_id,
   };
 
   return flight;

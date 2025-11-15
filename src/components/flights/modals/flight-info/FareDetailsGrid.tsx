@@ -23,15 +23,15 @@ export function FareDetailsGrid({ selectedFare }: FareDetailsGridProps) {
   const fareDetails: FareDetail[] = [
     {
       feature: t('checkedBaggage'),
-      value: "1 x 23kg",
-      classic: "2 x 23kg",
-      flex: "2 x 23kg",
+      value: "1 piece",
+      classic: "2 pieces",
+      flex: "2 pieces",
     },
     {
       feature: t('cabinBaggage'),
-      value: "1 x 7kg",
-      classic: "1 x 7kg",
-      flex: "1 x 7kg",
+      value: "1 piece",
+      classic: "1 piece",
+      flex: "1 piece",
     },
     {
       feature: t('seatSelection'),

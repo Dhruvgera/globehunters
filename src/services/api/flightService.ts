@@ -63,6 +63,11 @@ class FlightService {
 
   private makeCacheKey(params: SearchParams): string {
     const format = (d?: Date) => d ? this.formatDate(d) : '';
+    const segmentsPart = params.segments && params.segments.length
+      ? params.segments
+          .map(seg => [seg.from, seg.to, format(seg.departureDate)].join('>'))
+          .join('|')
+      : '';
     return [
       params.from,
       params.to,
@@ -72,7 +77,8 @@ class FlightService {
       params.passengers.children,
       params.passengers.infants || 0,
       params.class,
-      params.tripType
+      params.tripType,
+      segmentsPart
     ].join('|');
   }
 
@@ -105,18 +111,82 @@ class FlightService {
       }
 
       // Convert SearchParams to FlightSearchRequest format
+      // For multi-city, we still send a single flights_availability_search request
+      // but populate departureN_/arrivalN_/departureN_date fields for extra legs.
+      let origin1 = params.from;
+      let destinationid = params.to;
+      let fr = this.formatDate(params.departureDate);
+      let to = params.returnDate ? this.formatDate(params.returnDate) : undefined;
+      let ow: '0' | '1' = params.tripType === 'one-way' ? '1' : '0';
+
+      const multiCityExtras: Partial<FlightSearchRequest> = {};
+      if (params.tripType === 'multi-city' && params.segments && params.segments.length >= 2) {
+        const segments = params.segments;
+        // First leg goes into origin1/destinationid/fr
+        const first = segments[0];
+        origin1 = first.from;
+        destinationid = first.to;
+        fr = this.formatDate(first.departureDate);
+        to = undefined; // multi-city uses per-leg dates, not a single return
+        ow = '1';
+
+        // Subsequent legs go into origin2-6/destination2-6/fr2-6
+        // Segments array: [0, 1, 2, ...] maps to API: leg1, leg2, leg3, ...
+        // So segments[1] → origin2/destination2/fr2, etc.
+        for (let i = 1; i < segments.length && i < 6; i++) {
+          const seg = segments[i];
+          const legFr = this.formatDate(seg.departureDate);
+          const legIndex = i + 1; // API leg index: 2, 3, 4, 5, 6
+          
+          switch (legIndex) {
+            case 2:
+              multiCityExtras.origin2 = seg.from;
+              multiCityExtras.destination2 = seg.to;
+              multiCityExtras.fr2 = legFr;
+              break;
+            case 3:
+              multiCityExtras.origin3 = seg.from;
+              multiCityExtras.destination3 = seg.to;
+              multiCityExtras.fr3 = legFr;
+              break;
+            case 4:
+              multiCityExtras.origin4 = seg.from;
+              multiCityExtras.destination4 = seg.to;
+              multiCityExtras.fr4 = legFr;
+              break;
+            case 5:
+              multiCityExtras.origin5 = seg.from;
+              multiCityExtras.destination5 = seg.to;
+              multiCityExtras.fr5 = legFr;
+              break;
+            case 6:
+              multiCityExtras.origin6 = seg.from;
+              multiCityExtras.destination6 = seg.to;
+              multiCityExtras.fr6 = legFr;
+              break;
+          }
+        }
+      }
+
       const vyspaParams: FlightSearchRequest = {
-        origin1: params.from,
-        destinationid: params.to,
-        fr: this.formatDate(params.departureDate),
-        to: params.returnDate ? this.formatDate(params.returnDate) : undefined,
+        origin1,
+        destinationid,
+        fr,
+        to,
         adt1: String(params.passengers.adults),
         chd1: String(params.passengers.children),
         inf1: String(params.passengers.infants || 0),
-        ow: params.tripType === 'one-way' ? '1' : '0',
+        ow,
         dir: '0', // TODO: Add direct flights filter to UI
         cl: this.mapCabinClass(params.class),
+        ...multiCityExtras,
       };
+
+      console.log('🔍 Flight search request built:', {
+        tripType: params.tripType,
+        segmentCount: params.segments?.length || 1,
+        vyspaParams,
+      });
 
       // Call server action
       const response = await searchFlightsAction(vyspaParams);

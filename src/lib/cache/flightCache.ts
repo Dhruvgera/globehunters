@@ -31,6 +31,7 @@ class FlightCache {
       passengers,
       class: travelClass,
       tripType,
+      segments,
     } = params;
 
     // Format dates as YYYY-MM-DD using local date (not UTC)
@@ -44,7 +45,13 @@ class FlightCache {
     const depDate = formatDate(departureDate);
     const retDate = returnDate ? formatDate(returnDate) : 'none';
 
-    return `${from}-${to}-${depDate}-${retDate}-${passengers.adults}-${passengers.children}-${passengers.infants}-${travelClass}-${tripType}`;
+    const segmentsKey = segments && segments.length
+      ? segments
+          .map((seg) => `${seg.from}-${seg.to}-${formatDate(seg.departureDate)}`)
+          .join('|')
+      : 'none';
+
+    return `${from}-${to}-${depDate}-${retDate}-${passengers.adults}-${passengers.children}-${passengers.infants}-${travelClass}-${tripType}-${segmentsKey}`;
   }
 
   /**

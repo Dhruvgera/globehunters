@@ -10,6 +10,12 @@ interface Passengers {
   infants: number;
 }
 
+interface MultiCitySegmentState {
+  from: Airport | null;
+  to: Airport | null;
+  departureDate?: Date;
+}
+
 export function useSearchForm() {
   const searchParamsFromStore = useBookingStore((state) => state.searchParams);
   
@@ -25,32 +31,62 @@ export function useSearchForm() {
   });
   const [travelClass, setTravelClass] = useState("Economy");
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [multiCitySegments, setMultiCitySegments] = useState<MultiCitySegmentState[]>([
+    { from: null, to: null, departureDate: undefined },
+    { from: null, to: null, departureDate: undefined },
+  ]);
   
   // Sync with store on mount (for page refresh)
   useEffect(() => {
     if (searchParamsFromStore) {
-      // Create Airport objects from codes (minimal info, will be enriched by autocomplete)
-      if (searchParamsFromStore.from) {
-        setFrom({ 
-          code: searchParamsFromStore.from, 
-          city: searchParamsFromStore.from, 
-          country: '', 
-          countryCode: '' 
-        });
-      }
-      if (searchParamsFromStore.to) {
-        setTo({ 
-          code: searchParamsFromStore.to, 
-          city: searchParamsFromStore.to, 
-          country: '', 
-          countryCode: '' 
-        });
-      }
-      if (searchParamsFromStore.departureDate) {
-        setDepartureDate(searchParamsFromStore.departureDate);
-      }
-      if (searchParamsFromStore.returnDate) {
-        setReturnDate(searchParamsFromStore.returnDate);
+      const buildAirport = (code?: string | null): Airport | null => {
+        if (!code) return null;
+        return {
+          code,
+          city: code,
+          country: '',
+          countryCode: '',
+        };
+      };
+
+      if (searchParamsFromStore.tripType === 'multi-city' && searchParamsFromStore.segments?.length) {
+        const segmentsFromStore: MultiCitySegmentState[] = searchParamsFromStore.segments.map((seg) => ({
+          from: buildAirport(seg.from),
+          to: buildAirport(seg.to),
+          departureDate: seg.departureDate ? new Date(seg.departureDate) : undefined,
+        }));
+
+        // Ensure at least two rows for UX, similar to Skyscanner/Kayak
+        while (segmentsFromStore.length < 2) {
+          segmentsFromStore.push({ from: null, to: null, departureDate: undefined });
+        }
+
+        setMultiCitySegments(segmentsFromStore);
+
+        const first = segmentsFromStore[0];
+        setFrom(first?.from || null);
+        setTo(first?.to || null);
+        setDepartureDate(first?.departureDate);
+        setReturnDate(undefined);
+      } else {
+        // Create Airport objects from codes (minimal info, will be enriched by autocomplete)
+        if (searchParamsFromStore.from) {
+          setFrom(buildAirport(searchParamsFromStore.from));
+        }
+        if (searchParamsFromStore.to) {
+          setTo(buildAirport(searchParamsFromStore.to));
+        }
+        if (searchParamsFromStore.departureDate) {
+          setDepartureDate(searchParamsFromStore.departureDate);
+        }
+        if (searchParamsFromStore.returnDate) {
+          setReturnDate(searchParamsFromStore.returnDate);
+        }
+        // Reset multi-city rows to empty defaults when switching away
+        setMultiCitySegments([
+          { from: null, to: null, departureDate: undefined },
+          { from: null, to: null, departureDate: undefined },
+        ]);
       }
       if (searchParamsFromStore.passengers) {
         setPassengers(searchParamsFromStore.passengers);
@@ -70,6 +106,34 @@ export function useSearchForm() {
     setTo(temp);
   };
 
+  const addMultiCitySegment = () => {
+    setMultiCitySegments((prev) => {
+      if (prev.length >= 6) return prev; // API supports up to 6 segments
+      return [...prev, { from: null, to: null, departureDate: undefined }];
+    });
+  };
+
+  const removeMultiCitySegment = (index: number) => {
+    setMultiCitySegments((prev) => {
+      if (prev.length <= 2) return prev; // Keep at least two segments for UX
+      const next = [...prev];
+      next.splice(index, 1);
+      return next;
+    });
+  };
+
+  const updateMultiCitySegment = (
+    index: number,
+    updates: Partial<MultiCitySegmentState>
+  ) => {
+    setMultiCitySegments((prev) => {
+      const next = [...prev];
+      if (!next[index]) return prev;
+      next[index] = { ...next[index], ...updates };
+      return next;
+    });
+  };
+
   const getSearchParams = () => {
     // Helper to format date as YYYY-MM-DD (date-only, no timezone issues)
     const formatDateForURL = (date: Date | undefined): string => {
@@ -80,16 +144,50 @@ export function useSearchForm() {
       return `${year}-${month}-${day}`;
     };
 
-    return {
-      from: from?.code || "",
-      to: to?.code || "",
-      departureDate: formatDateForURL(departureDate),
-      returnDate: formatDateForURL(returnDate),
+    const common = {
       adults: passengers.adults.toString(),
       children: passengers.children.toString(),
       infants: passengers.infants.toString(),
       class: travelClass,
       tripType,
+    };
+
+    if (tripType === 'multi-city') {
+      // Build per-leg query parameters: from1/to1/departureDate1, from2/to2/departureDate2, etc.
+      const segmentsForUrl = multiCitySegments
+        .map((seg, index) => {
+          const fromCode = seg.from?.code || "";
+          const toCode = seg.to?.code || "";
+          const dep = formatDateForURL(seg.departureDate);
+          if (!fromCode || !toCode || !dep) return null;
+          const legIndex = index + 1;
+          return {
+            [`from${legIndex}`]: fromCode,
+            [`to${legIndex}`]: toCode,
+            [`departureDate${legIndex}`]: dep,
+          } as Record<string, string>;
+        })
+        .filter((entry): entry is Record<string, string> => entry !== null)
+        .reduce<Record<string, string>>((acc, cur) => ({ ...acc, ...cur }), {});
+
+      const firstLeg = multiCitySegments[0];
+
+      return {
+        from: firstLeg?.from?.code || from?.code || "",
+        to: firstLeg?.to?.code || to?.code || "",
+        departureDate: formatDateForURL(firstLeg?.departureDate || departureDate),
+        returnDate: "", // Multi-city uses per-leg dates, no single returnDate
+        ...common,
+        ...segmentsForUrl,
+      };
+    }
+
+    return {
+      from: from?.code || "",
+      to: to?.code || "",
+      departureDate: formatDateForURL(departureDate),
+      returnDate: formatDateForURL(returnDate),
+      ...common,
     };
   };
 
@@ -103,6 +201,7 @@ export function useSearchForm() {
     passengers,
     travelClass,
     isDatePickerOpen,
+    multiCitySegments,
     // Setters
     setTripType,
     setFrom,
@@ -112,6 +211,9 @@ export function useSearchForm() {
     setPassengers,
     setTravelClass,
     setIsDatePickerOpen,
+    addMultiCitySegment,
+    removeMultiCitySegment,
+    updateMultiCitySegment,
     // Helpers
     swapLocations,
     getSearchParams,

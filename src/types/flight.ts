@@ -57,6 +57,15 @@ export interface Flight {
   airline: Airline;
   outbound: FlightSegment;
   inbound?: FlightSegment;
+  /**
+   * Full list of journey segments (supports multi-city)
+   * For one-way/round-trip this will typically be [outbound] or [outbound, inbound].
+   */
+  segments?: FlightSegment[];
+  /**
+   * Trip type for this result. When omitted, infer from segments or presence of inbound.
+   */
+  tripType?: 'round-trip' | 'one-way' | 'multi-city';
   price: number;
   pricePerPerson: number;
   currency: string;
@@ -72,6 +81,13 @@ export interface Flight {
   meals?: boolean;
   // Price check integration
   segmentResultId?: string;    // Result_id from API for price check
+  moduleId?: string;           // module_id from API for debugging
+}
+
+export interface MultiCitySegmentSearch {
+  from: string;
+  to: string;
+  departureDate: Date;
 }
 
 export interface SearchParams {
@@ -86,6 +102,11 @@ export interface SearchParams {
   };
   class: 'Economy' | 'Premium Economy' | 'Business' | 'First';
   tripType: 'round-trip' | 'one-way' | 'multi-city';
+  /**
+   * Optional: Multi-city segments (used when tripType === 'multi-city')
+   * First segment should correspond to top-level from/to/departureDate.
+   */
+  segments?: MultiCitySegmentSearch[];
 }
 
 export interface FilterState {

@@ -82,34 +82,24 @@ function BookingContent() {
     return null;
   }
 
-  // Extract flight leg data from the selected flight
-  const outboundLeg = {
-    from: flight.outbound.departureAirport.city,
-    to: flight.outbound.arrivalAirport.city,
-    fromCode: flight.outbound.departureAirport.code,
-    toCode: flight.outbound.arrivalAirport.code,
-    departureTime: flight.outbound.departureTime,
-    arrivalTime: flight.outbound.arrivalTime,
-    date: flight.outbound.date,
-    duration: flight.outbound.totalJourneyTime || flight.outbound.duration,
-    stops: flight.outbound.stopDetails || `${flight.outbound.stops} Stop${flight.outbound.stops !== 1 ? 's' : ''}`,
-    airline: flight.airline.name,
-    airlineCode: flight.airline.code,
-  };
+  // Extract flight leg data from the selected flight (supports multi-city)
+  const journeySegments = flight.segments && flight.segments.length > 0
+    ? flight.segments
+    : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
 
-  const inboundLeg = flight.inbound ? {
-    from: flight.inbound.departureAirport.city,
-    to: flight.inbound.arrivalAirport.city,
-    fromCode: flight.inbound.departureAirport.code,
-    toCode: flight.inbound.arrivalAirport.code,
-    departureTime: flight.inbound.departureTime,
-    arrivalTime: flight.inbound.arrivalTime,
-    date: flight.inbound.date,
-    duration: flight.inbound.totalJourneyTime || flight.inbound.duration,
-    stops: flight.inbound.stopDetails || `${flight.inbound.stops} Stop${flight.inbound.stops !== 1 ? 's' : ''}`,
+  const summaryLegs = journeySegments.map((seg) => ({
+    from: seg.departureAirport.city,
+    to: seg.arrivalAirport.city,
+    fromCode: seg.departureAirport.code,
+    toCode: seg.arrivalAirport.code,
+    departureTime: seg.departureTime,
+    arrivalTime: seg.arrivalTime,
+    date: seg.date,
+    duration: seg.totalJourneyTime || seg.duration,
+    stops: seg.stopDetails || `${seg.stops} Stop${seg.stops !== 1 ? 's' : ''}`,
     airline: flight.airline.name,
     airlineCode: flight.airline.code,
-  } : null;
+  }));
 
   const passengerLabel = (() => {
     // Prefer selected upgrade breakdown; fallback to searched passengers
@@ -181,20 +171,15 @@ function BookingContent() {
 
             {/* Flight Summary Cards */}
             <div className="flex flex-col gap-3">
-              <FlightSummaryCard
-                leg={outboundLeg}
-                passengers={passengerLabel || `1 ${t('flightSummary.passenger')}`}
-                onViewDetails={() => setShowFlightInfo(true)}
-                cabinLabel={cabinLabel}
-              />
-              {inboundLeg && (
-                <FlightSummaryCard
-                  leg={inboundLeg}
-                  passengers={passengerLabel || `1 ${t('flightSummary.passenger')}`}
-                  onViewDetails={() => setShowFlightInfo(true)}
-                  cabinLabel={cabinLabel}
-                />
-              )}
+          {summaryLegs.map((leg, index) => (
+            <FlightSummaryCard
+              key={`${leg.fromCode}-${leg.toCode}-${index}`}
+              leg={leg}
+              passengers={passengerLabel || `1 ${t('flightSummary.passenger')}`}
+              onViewDetails={() => setShowFlightInfo(true)}
+              cabinLabel={cabinLabel}
+            />
+          ))}
             </div>
 
             {/* Passenger Details Form */}
