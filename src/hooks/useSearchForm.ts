@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Airport } from "@/types/airport";
 import { useBookingStore } from "@/store/bookingStore";
 
@@ -18,6 +18,7 @@ interface MultiCitySegmentState {
 
 export function useSearchForm() {
   const searchParamsFromStore = useBookingStore((state) => state.searchParams);
+  const hasInitializedRef = useRef(false);
   
   const [tripType, setTripType] = useState<TripType>("round-trip");
   const [from, setFrom] = useState<Airport | null>(null);
@@ -36,9 +37,12 @@ export function useSearchForm() {
     { from: null, to: null, departureDate: undefined },
   ]);
   
-  // Sync with store on mount (for page refresh)
+  // Sync with store when it changes (for page refresh scenario)
   useEffect(() => {
-    if (searchParamsFromStore) {
+    // Only initialize once when store has data
+    if (searchParamsFromStore && !hasInitializedRef.current) {
+      hasInitializedRef.current = true;
+      
       const buildAirport = (code?: string | null): Airport | null => {
         if (!code) return null;
         return {
@@ -98,7 +102,7 @@ export function useSearchForm() {
         setTripType(searchParamsFromStore.tripType as TripType);
       }
     }
-  }, []); // Only on mount
+  }, [searchParamsFromStore]); // React to store changes
 
   const swapLocations = () => {
     const temp = from;
