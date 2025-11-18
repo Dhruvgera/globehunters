@@ -90,6 +90,7 @@ export default function FlightCard({
 
       {/* Price and Actions */}
       <FlightActions
+        flight={flight}
         currency={flight.currency}
         pricePerPerson={flight.pricePerPerson}
         showTicketOptions={showTicketOptions}

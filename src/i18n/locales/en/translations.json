@@ -152,7 +152,14 @@
       "bookNow": "Book Now",
       "selectFlight": "Select this flight",
       "perPerson": "/per person",
-      "from": "From"
+      "from": "From",
+      "share": "Share",
+      "shareFlight": "Share this flight",
+      "shareVia": "Share via",
+      "whatsapp": "WhatsApp",
+      "email": "Email",
+      "copyLink": "Copy Link",
+      "linkCopied": "Link copied to clipboard!"
     },
     "states": {
       "loading": {

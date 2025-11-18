@@ -2,10 +2,13 @@
 
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ShareButton } from "@/components/ui/share-button";
 import { useTranslations } from "next-intl";
 import { formatPrice } from "@/lib/currency";
+import { Flight } from "@/types/flight";
 
 interface FlightActionsProps {
+  flight: Flight;
   currency: string;
   pricePerPerson: number;
   showTicketOptions: boolean;
@@ -15,6 +18,7 @@ interface FlightActionsProps {
 }
 
 export function FlightActions({
+  flight,
   currency,
   pricePerPerson,
   showTicketOptions,
@@ -29,7 +33,8 @@ export function FlightActions({
         {formatPrice(pricePerPerson, currency)} {t('perPerson')}
       </span>
 
-      <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <ShareButton flight={flight} />
         <Button
           variant="ghost"
           className="bg-[rgba(55,84,237,0.12)] hover:bg-[rgba(55,84,237,0.2)] text-[#3754ED] rounded-full px-4 py-2 h-auto text-xs font-medium"
