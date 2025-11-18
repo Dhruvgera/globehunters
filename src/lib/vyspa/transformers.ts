@@ -92,10 +92,27 @@ export function transformVyspaResponse(
  * Transform a single Vyspa result to Flight
  */
 function transformResult(result: VyspaResult): Flight | null {
-  const totalPrice = parsePriceValue(result.Total);
+  // Robust total price calculation
+  // Prefer Result.Total, but fall back to Total_fare/Breakdown totals when needed
+  let totalPrice = parsePriceValue(result.Total, 0);
+
   if (totalPrice === 0) {
-    console.warn('Skipping flight with zero price:', result.Result_id);
-    return null;
+    const anyResult: any = result as any;
+    const totalFareField = anyResult.Total_fare ?? anyResult.TotalFare;
+    const totalFareValue = parsePriceValue(totalFareField, 0);
+
+    const breakdownTotal = (result.Breakdown || []).reduce((sum, entry: any) => {
+      return sum + parsePriceValue(entry.total, 0);
+    }, 0);
+
+    const fallbackTotal = totalFareValue || breakdownTotal;
+    if (fallbackTotal > 0) {
+      totalPrice = fallbackTotal;
+    }
+  }
+
+  if (totalPrice === 0) {
+    console.warn('Flight has zero total price after fallbacks:', result.Result_id);
   }
 
   // Calculate total passengers
@@ -114,7 +131,9 @@ function transformResult(result: VyspaResult): Flight | null {
   const pricePerPerson = totalPrice / totalPassengers;
 
   // Get segments (outbound, inbound, and optionally additional multi-city legs)
-  const vyspaSegments = result.Segments || [];
+  // Normalize segments by splitting extremely long layovers into separate legs
+  const rawSegments = result.Segments || [];
+  const vyspaSegments = normalizeSegmentsByLayover(rawSegments);
   const outboundSegment = vyspaSegments[0];
   const inboundSegment = vyspaSegments[1] || null;
 
@@ -280,6 +299,97 @@ function transformSegmentToFlightSegment(segment: VyspaSegment): FlightSegment {
     segmentBaggage: firstFlight.Baggage,
     segmentBaggageQuantity: firstFlight.BaggageQuantity,
     segmentBaggageUnit: firstFlight.BaggageUnit,
+  };
+}
+
+/**
+ * Normalize Vyspa segments by splitting very long layovers into separate segments.
+ *
+ * Example: a single segment with LHR→JFK (day 1) and BOS→LAX (day 8) will be
+ * split into two logical segments so the UI can treat them as separate legs
+ * in multi-city flows.
+ */
+function normalizeSegmentsByLayover(segments: VyspaSegment[]): VyspaSegment[] {
+  const normalized: VyspaSegment[] = [];
+
+  for (const segment of segments) {
+    const splitSegments = splitSegmentByLongLayovers(segment);
+    normalized.push(...splitSegments);
+  }
+
+  return normalized;
+}
+
+/**
+ * Split a Vyspa segment into multiple segments when layovers exceed a threshold.
+ * This helps distinguish true multi-city stopovers (days between legs) from
+ * normal connections.
+ */
+function splitSegmentByLongLayovers(
+  segment: VyspaSegment,
+  maxLayoverMinutes: number = 24 * 60
+): VyspaSegment[] {
+  const flights = segment.Flights || [];
+  if (flights.length <= 1) {
+    return [segment];
+  }
+
+  const groups: VyspaFlight[][] = [];
+  let currentGroup: VyspaFlight[] = [flights[0]];
+
+  for (let i = 0; i < flights.length - 1; i++) {
+    const current = flights[i];
+    const next = flights[i + 1];
+
+    const layoverMinutes = calculateDuration(
+      current.arrival_date as any,
+      current.arrival_time as any,
+      next.departure_date as any,
+      next.departure_time as any
+    );
+
+    if (layoverMinutes > maxLayoverMinutes) {
+      groups.push(currentGroup);
+      currentGroup = [next];
+    } else {
+      currentGroup.push(next);
+    }
+  }
+
+  if (currentGroup.length > 0) {
+    groups.push(currentGroup);
+  }
+
+  // If we didn't actually split anything, return the original segment
+  if (groups.length === 1 && groups[0].length === flights.length) {
+    return [segment];
+  }
+
+  return groups.map(buildSegmentFromFlights);
+}
+
+/**
+ * Build a VyspaSegment from a group of flights.
+ */
+function buildSegmentFromFlights(flights: VyspaFlight[]): VyspaSegment {
+  const first = flights[0];
+  const last = flights[flights.length - 1];
+
+  const totalFlyingTime = flights.reduce((sum, flight) => {
+    const travelTime =
+      typeof flight.travel_time === 'number'
+        ? flight.travel_time
+        : parseIntSafe(flight.travel_time, 0);
+    return sum + travelTime;
+  }, 0);
+
+  const stops = Math.max(0, flights.length - 1);
+
+  return {
+    Route: `${first.departure_airport}${last.arrival_airport}`,
+    FlyingTime: totalFlyingTime,
+    Stops: stops,
+    Flights: flights,
   };
 }
 

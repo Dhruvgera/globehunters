@@ -235,7 +235,7 @@ export async function transformPriceCheckResponse(
     };
 
     // Extract price options (upgrade options) - handle safely
-    let priceOptions = [];
+    let priceOptions: TransformedPriceOption[] = [];
     try {
       priceOptions = extractUpgradeOptions(
         pc.price_data || [],
@@ -243,7 +243,16 @@ export async function transformPriceCheckResponse(
       );
     } catch (priceError) {
       console.error('Error extracting upgrade options:', priceError);
-      // Create a fallback option from the main flight result
+    }
+
+    // If API returns price_data but all totals are zero/missing, treat this as
+    // "no usable upgrade options" and fall back to the main flight result
+    const shouldFallbackToFlightResult =
+      !priceOptions.length ||
+      priceOptions.every((opt) => !opt.totalPrice || opt.totalPrice <= 0);
+
+    if (shouldFallbackToFlightResult) {
+      console.warn('Price check returned no usable price options, falling back to main flight total_fare');
       priceOptions = [{
         id: flightResult.id || 'fallback',
         cabinClass: 'Y',

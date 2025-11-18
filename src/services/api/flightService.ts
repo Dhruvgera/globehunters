@@ -191,9 +191,18 @@ class FlightService {
       // Call server action
       const response = await searchFlightsAction(vyspaParams);
 
+      // Override tripType on each flight using the original search params.
+      // This avoids inferring trip type from the number of segments returned
+      // by the API, which can be unreliable for multi-city searches.
+      const flightsWithTripType: Flight[] = response.flights.map((flight) => ({
+        ...flight,
+        tripType: params.tripType || flight.tripType,
+      }));
+
       // Add mock date prices for now (Vyspa doesn't provide this)
       const result: FlightSearchResponse = {
         ...response,
+        flights: flightsWithTripType,
         datePrices: mockDatePrices,
       };
       // 2) Save to cache
