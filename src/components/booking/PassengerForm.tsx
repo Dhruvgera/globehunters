@@ -22,6 +22,7 @@ interface PassengerFormProps {
   onCancel?: () => void;
   showPassportFields?: boolean;
   disabled?: boolean;
+  leadAddress?: { address?: string; postalCode?: string };
 }
 
 export function PassengerForm({
@@ -31,6 +32,7 @@ export function PassengerForm({
   onCancel,
   showPassportFields = false,
   disabled = false,
+  leadAddress,
 }: PassengerFormProps) {
   const t = useTranslations('booking.passengerDetails');
   
@@ -41,6 +43,8 @@ export function PassengerForm({
     dateOfBirth: initialData?.dateOfBirth || "",
     email: initialData?.email || "",
     phone: initialData?.phone || "",
+    address: initialData?.address || "",
+    postalCode: initialData?.postalCode || "",
     passportNumber: initialData?.passportNumber || "",
     passportExpiry: initialData?.passportExpiry || "",
     nationality: initialData?.nationality || "",
@@ -53,6 +57,22 @@ export function PassengerForm({
     // Clear error for this field when user starts typing
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));
+    }
+  };
+
+  const handleCopyAddressFromLead = () => {
+    if (!leadAddress) return;
+    setFormData((prev) => ({
+      ...prev,
+      address: leadAddress.address || '',
+      postalCode: leadAddress.postalCode || '',
+    }));
+    if (errors.address || errors.postalCode) {
+      setErrors((prev) => ({
+        ...prev,
+        address: undefined,
+        postalCode: undefined,
+      }));
     }
   };
 
@@ -184,6 +204,48 @@ export function PassengerForm({
             />
             {errors.phone && (
               <p className="text-xs text-red-600">{errors.phone}</p>
+            )}
+          </div>
+
+          {/* Address (used for booking folder) */}
+          <div className="space-y-2">
+            <Label htmlFor={`address-${passengerIndex}`}>Address</Label>
+            {leadAddress && passengerIndex > 0 && (
+              <button
+                type="button"
+                onClick={handleCopyAddressFromLead}
+                className="ml-2 text-xs text-[#3754ED] underline"
+                disabled={disabled}
+              >
+                {t('copyAddressFromLead')}
+              </button>
+            )}
+            <Input
+              id={`address-${passengerIndex}`}
+              type="text"
+              value={formData.address || ""}
+              onChange={(e) => handleChange("address", e.target.value)}
+              placeholder="1 Fish Street, Goring by Sea, West Sussex"
+              disabled={disabled}
+            />
+            {errors.address && (
+              <p className="text-xs text-red-600">{errors.address}</p>
+            )}
+          </div>
+
+          {/* Postcode (zip code) */}
+          <div className="space-y-2">
+            <Label htmlFor={`postalCode-${passengerIndex}`}>Postcode</Label>
+            <Input
+              id={`postalCode-${passengerIndex}`}
+              type="text"
+              value={formData.postalCode || ""}
+              onChange={(e) => handleChange("postalCode", e.target.value)}
+              placeholder="BN1 1NB"
+              disabled={disabled}
+            />
+            {errors.postalCode && (
+              <p className="text-xs text-red-600">{errors.postalCode}</p>
             )}
           </div>
         </div>

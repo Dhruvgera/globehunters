@@ -21,8 +21,13 @@ export function TermsAndConditions({
   const router = useRouter();
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [marketingConsent, setMarketingConsent] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const passengers = useBookingStore((s) => s.passengers);
   const searchParams = useBookingStore((s) => s.searchParams);
+  const selectedFlight = useBookingStore((s) => s.selectedFlight);
+  const selectedUpgradeOption = useBookingStore((s) => s.selectedUpgradeOption);
+  const priceCheckData = useBookingStore((s) => s.priceCheckData);
+  const setVyspaFolderInfo = useBookingStore((s) => s.setVyspaFolderInfo);
 
   const canProceedToPayment = (): boolean => {
     const counts = searchParams?.passengers || { adults: 1, children: 0, infants: 0 };
@@ -32,22 +37,79 @@ export function TermsAndConditions({
     for (let i = 0; i < required; i++) {
       const p = passengers[i];
       if (!p) return false;
-      if (!p.firstName || !p.lastName || !p.dateOfBirth || !p.email || !p.phone) {
+      if (!p.firstName || !p.lastName || !p.dateOfBirth || !p.email || !p.phone || !p.address || !p.postalCode) {
         return false;
       }
     }
     return true;
   };
 
-  const handleProceed = () => {
+  const handleProceed = async () => {
     if (!termsAccepted) return;
     if (!canProceedToPayment()) {
-      // Prevent navigation if passenger details incomplete
-      // Basic feedback; could be improved with inline UI
       alert('Please complete all passenger details before proceeding to payment.');
       return;
     }
-    router.push("/payment");
+
+    if (!selectedFlight || !priceCheckData) {
+      router.push("/payment");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      const currency = selectedUpgradeOption?.currency || selectedFlight.currency;
+      const pswResultId = priceCheckData.sessionInfo.pswResultId || selectedFlight.segmentResultId || '';
+      const destinationAirportCode = priceCheckData.flightDetails.destination || selectedFlight.outbound.arrivalAirport.code;
+      const departureDate = selectedFlight.outbound.date;
+      const fareSelectedPrice = selectedUpgradeOption ? selectedUpgradeOption.totalPrice : selectedFlight.price;
+
+      const response = await fetch('/api/vyspa/init-folder', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          passengers: passengers.map((p) => ({
+            title: p.title,
+            firstName: p.firstName,
+            middleName: p.middleName || '',
+            lastName: p.lastName,
+            dateOfBirth: p.dateOfBirth,
+            email: p.email,
+            phone: p.phone,
+            type: p.type,
+            address: p.address || '',
+            postalCode: p.postalCode || '',
+          })),
+          currency,
+          pswResultId,
+          destinationAirportCode,
+          departureDate,
+          fareSelectedPrice,
+        }),
+      });
+
+      const data: any = await response.json().catch(() => null);
+
+      if (data && data.folderNumber) {
+        setVyspaFolderInfo({
+          folderNumber: String(data.folderNumber),
+          customerId: data.customerId ?? null,
+          emailAddress: data.emailAddress ?? null,
+        });
+      }
+
+      if (!response.ok) {
+        alert('We were unable to fully set up your booking folder. You can still proceed to payment; please keep your reference number handy.');
+      }
+    } catch (error) {
+      alert('We were unable to set up your booking folder. You can still proceed to payment; please keep your reference number handy.');
+    } finally {
+      setIsSubmitting(false);
+      router.push("/payment");
+    }
   };
 
   return (
@@ -87,7 +149,7 @@ export function TermsAndConditions({
         )}
         <Button
           onClick={handleProceed}
-          disabled={!termsAccepted || !canProceedToPayment()}
+          disabled={!termsAccepted || !canProceedToPayment() || isSubmitting}
           className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-full px-5 py-2 h-auto text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {t('book')}

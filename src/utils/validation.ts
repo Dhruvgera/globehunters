@@ -203,6 +203,14 @@ export function validatePassenger(passenger: Passenger): PassengerFormErrors {
     errors.phone = 'Please enter a valid phone number';
   }
 
+  if (!passenger.address || passenger.address.trim().length < 5) {
+    errors.address = 'Please enter a valid address';
+  }
+
+  if (!passenger.postalCode || !validatePostalCode(passenger.postalCode)) {
+    errors.postalCode = 'Please enter a valid postal code';
+  }
+
   if (passenger.passportNumber && !validatePassport(passenger.passportNumber)) {
     errors.passportNumber = 'Please enter a valid passport number';
   }

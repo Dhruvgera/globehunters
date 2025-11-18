@@ -89,6 +89,7 @@ export default function PassengerFormsSection({
                 onSave={(p) => handleSave(idx, slot.type, p)}
                 showPassportFields={showPassportFields}
                 disabled={!!saved[idx]}
+                leadAddress={idx > 0 ? { address: passengers[0]?.address, postalCode: passengers[0]?.postalCode } : undefined}
               />
             </div>
           );

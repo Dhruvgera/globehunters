@@ -18,6 +18,8 @@ export interface Passenger {
   phone: string;
   type: PassengerType;
   // Optional fields for international travel
+  address?: string;
+  postalCode?: string;
   passportNumber?: string;
   passportExpiry?: string;
   nationality?: string;
@@ -127,6 +129,8 @@ export interface PassengerFormErrors {
   dateOfBirth?: string;
   email?: string;
   phone?: string;
+  address?: string;
+  postalCode?: string;
   passportNumber?: string;
   passportExpiry?: string;
 }

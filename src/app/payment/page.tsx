@@ -45,6 +45,7 @@ function PaymentContent() {
   const addOns = useBookingStore((state) => state.addOns);
   const setProtectionPlan = useBookingStore((state) => state.setProtectionPlan);
   const setAdditionalBaggage = useBookingStore((state) => state.setAdditionalBaggage);
+  const vyspaFolderNumber = useBookingStore((state) => state.vyspaFolderNumber);
 
   const protectionPlan = addOns.protectionPlan;
   const additionalBaggage = addOns.additionalBaggage;
@@ -158,7 +159,7 @@ function PaymentContent() {
     return parts.join(", ");
   })();
   const cabinLabel = selectedUpgrade?.cabinClassDisplay || useBookingStore((s) => s.selectedFareType) || 'Economy';
-  const refNumber = flight.webRef || (priceCheckData?.sessionInfo?.sessionId || '—');
+  const refNumber = vyspaFolderNumber || flight.webRef || (priceCheckData?.sessionInfo?.sessionId || '—');
   const orderId = refNumber;
 
   return (
@@ -174,7 +175,7 @@ function PaymentContent() {
         <div className="flex flex-col lg:flex-row gap-4">
           {/* Web Ref Card - Mobile Only */}
           <WebRefCard
-            refNumber={flight.webRef || (priceCheckData?.sessionInfo?.sessionId || '—')}
+            refNumber={refNumber}
             phoneNumber={CONTACT_INFO.phone}
             isMobile={true}
           />
@@ -274,7 +275,7 @@ function PaymentContent() {
           <div className="w-full lg:w-[482px] flex flex-col gap-4">
             {/* Web Ref Card - Desktop Only */}
             <WebRefCard
-            refNumber={flight.webRef || (priceCheckData?.sessionInfo?.sessionId || '—')}
+            refNumber={refNumber}
             phoneNumber={CONTACT_INFO.phone}
               isMobile={false}
             />

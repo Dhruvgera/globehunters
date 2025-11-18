@@ -47,6 +47,12 @@ interface BookingState {
   booking: BookingResponse | null;
   setBooking: (booking: BookingResponse) => void;
 
+  // Vyspa itinerary/folder information
+  vyspaFolderNumber: string | null;
+  vyspaCustomerId: number | null;
+  vyspaEmailAddress: string | null;
+  setVyspaFolderInfo: (info: { folderNumber: string; customerId?: number | null; emailAddress?: string | null }) => void;
+
   // Payment information
   paymentDetails: PaymentDetails | null;
   setPaymentDetails: (details: PaymentDetails) => void;
@@ -74,6 +80,9 @@ const initialState = {
   },
   booking: null,
   paymentDetails: null,
+  vyspaFolderNumber: null,
+  vyspaCustomerId: null,
+  vyspaEmailAddress: null,
   currentStep: 'search' as const,
 };
 
@@ -108,6 +117,9 @@ export const useBookingStore = create<BookingState>()(
           selectedFareType: 'Economy',
           selectedUpgradeOption: null,
           priceCheckData: null,
+          vyspaFolderNumber: null,
+          vyspaCustomerId: null,
+          vyspaEmailAddress: null,
         }),
 
       // Passengers
@@ -158,6 +170,14 @@ export const useBookingStore = create<BookingState>()(
           currentStep: 'payment',
         }),
 
+      // Vyspa folder info
+      setVyspaFolderInfo: (info) =>
+        set({
+          vyspaFolderNumber: info.folderNumber,
+          vyspaCustomerId: info.customerId ?? null,
+          vyspaEmailAddress: info.emailAddress ?? null,
+        }),
+
       // Payment
       setPaymentDetails: (details) =>
         set({ paymentDetails: details }),
@@ -183,6 +203,9 @@ export const useBookingStore = create<BookingState>()(
         contactPhone: state.contactPhone,
         addOns: state.addOns,
         booking: state.booking,
+        vyspaFolderNumber: state.vyspaFolderNumber,
+        vyspaCustomerId: state.vyspaCustomerId,
+        vyspaEmailAddress: state.vyspaEmailAddress,
         currentStep: state.currentStep,
         // Don't persist payment details for security
       }),
