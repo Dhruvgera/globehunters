@@ -9,11 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
 import { useBookingStore, useSelectedFlight } from "@/store/bookingStore";
-import { PRICING_CONFIG, CONTACT_INFO } from "@/config/constants";
+import { PRICING_CONFIG, CONTACT_INFO, IASSURE_PRICING } from "@/config/constants";
 import { useTranslations } from "next-intl";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ErrorMessage } from "@/components/ui/error-message";
 import { usePayment } from "@/hooks/usePayment";
+import { getRegion } from "@/lib/utils/domainMapping";
 
 // Import new modular components
 import { PaymentHeader } from "@/components/payment/PaymentHeader";
@@ -97,16 +98,38 @@ function PaymentContent() {
   // Price calculation - Use real pricing from selected upgrade or flight
   const currency = selectedUpgrade ? selectedUpgrade.currency : flight.currency;
   const baseFare = selectedUpgrade ? selectedUpgrade.totalPrice : (flight.price || 0);
+
+  // Determine region (UK vs Global) and pick appropriate iAssure pricing
+  const region = getRegion();
+  const isUK = region === "UK";
+
+  const protectionPlanPercentages = (() => {
+    // Fallback to global config if base fare is not available
+    if (!baseFare) {
+      return IASSURE_PRICING.global;
+    }
+
+    if (isUK) {
+      const slabs = IASSURE_PRICING.uk.slabs;
+      const matchingSlab = slabs.find((slab) => baseFare <= slab.max) || slabs[slabs.length - 1];
+      return matchingSlab;
+    }
+
+    return IASSURE_PRICING.global;
+  })();
+
   const protectionPlanPrices = {
-    basic: baseFare * 0.05, // 5% of base fare
-    premium: baseFare * 0.08, // 8% of base fare
-    all: baseFare * 0.10, // 10% of base fare
+    basic: baseFare * protectionPlanPercentages.basic,
+    premium: baseFare * protectionPlanPercentages.premium,
+    all: baseFare * protectionPlanPercentages.all,
   };
   const baggagePrice = PRICING_CONFIG.baggagePrice;
   const discountPercent = 0; // No automatic discount unless applied explicitly
 
-  const normalizedProtectionPlan = protectionPlan ?? "basic";
-  const protectionPlanCost = protectionPlanPrices[normalizedProtectionPlan];
+  const normalizedProtectionPlan = protectionPlan;
+  const protectionPlanCost = normalizedProtectionPlan
+    ? protectionPlanPrices[normalizedProtectionPlan]
+    : 0;
   const baggageCost = additionalBaggage * baggagePrice;
   const subtotal = baseFare + protectionPlanCost + baggageCost;
   const discountAmount = subtotal * discountPercent;
@@ -209,8 +232,10 @@ function PaymentContent() {
 
             {/* iAssure Protection Plan */}
             <ProtectionPlanSection
-            selectedPlan={normalizedProtectionPlan}
+              selectedPlan={normalizedProtectionPlan}
               onSelectPlan={setProtectionPlan}
+              planPrices={protectionPlanPrices}
+              currency={currency}
             />
 
             {/* Payment Details Form */}

@@ -11,7 +11,7 @@ interface ProtectionPlanTableProps {
   basicLabel: string;
   premiumLabel: string;
   allLabel: string;
-  selectedPlan: "basic" | "premium" | "all";
+  selectedPlan?: "basic" | "premium" | "all";
   onSelectPlan: (plan: "basic" | "premium" | "all") => void;
 }
 

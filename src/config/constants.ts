@@ -57,6 +57,30 @@ export const PRICING_CONFIG = {
   taxRate: 0.05,
 };
 
+// iAssure protection plan pricing configuration
+export const IASSURE_PRICING = {
+  // Global configuration (FlightsUS and other non-UK regions)
+  global: {
+    // Percentages of base fare
+    basic: 0.08, // 8%
+    premium: 0.10, // 10%
+    all: 0.12, // 12%
+  },
+  // UK-specific configuration with slabs by booking amount
+  uk: {
+    slabs: [
+      // 0 - 650
+      { max: 650, basic: 0.07, premium: 0.12, all: 0.22 },
+      // 651 - 999
+      { max: 999, basic: 0.06, premium: 0.11, all: 0.21 },
+      // 1000 - 1499
+      { max: 1499, basic: 0.05, premium: 0.09, all: 0.20 },
+      // 1500+
+      { max: Number.POSITIVE_INFINITY, basic: 0.04, premium: 0.08, all: 0.18 },
+    ],
+  },
+} as const;
+
 // Filter constraints
 export const FILTER_CONSTRAINTS = {
   maxPrice: 2000,

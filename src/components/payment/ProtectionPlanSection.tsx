@@ -3,20 +3,37 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useTranslations } from "next-intl";
+import { formatPrice } from "@/lib/currency";
 import { ProtectionPlanCard } from "./protection-plan/ProtectionPlanCard";
 import { ProtectionPlanTable } from "./protection-plan/ProtectionPlanTable";
 
 interface ProtectionPlanSectionProps {
-  selectedPlan: "basic" | "premium" | "all";
-  onSelectPlan: (plan: "basic" | "premium" | "all") => void;
+  selectedPlan?: "basic" | "premium" | "all";
+  onSelectPlan: (plan: "basic" | "premium" | "all" | undefined) => void;
+  planPrices: {
+    basic: number;
+    premium: number;
+    all: number;
+  };
+  currency: string;
 }
 
 export function ProtectionPlanSection({
   selectedPlan,
   onSelectPlan,
+  planPrices,
+  currency,
 }: ProtectionPlanSectionProps) {
   const t = useTranslations('payment.iAssure');
   const [isExpanded, setIsExpanded] = useState(false);
+
+  const handleTogglePlan = (plan: "basic" | "premium" | "all") => {
+    if (selectedPlan === plan) {
+      onSelectPlan(undefined);
+    } else {
+      onSelectPlan(plan);
+    }
+  };
 
   const basicFeatures = [
     t('features.support247'),
@@ -79,40 +96,40 @@ export function ProtectionPlanSection({
         <ProtectionPlanCard
           planType="basic"
           title={t('basic')}
-          price="₹8,623.68"
+          price={formatPrice(planPrices.basic, currency)}
           features={basicFeatures}
           isSelected={selectedPlan === "basic"}
-          onSelect={() => onSelectPlan("basic")}
+          onSelect={() => handleTogglePlan("basic")}
         />
         <ProtectionPlanCard
           planType="premium"
           title={t('premium')}
-          price="₹10,779.60"
+          price={formatPrice(planPrices.premium, currency)}
           features={premiumFeatures}
           isSelected={selectedPlan === "premium"}
-          onSelect={() => onSelectPlan("premium")}
+          onSelect={() => handleTogglePlan("premium")}
         />
         <ProtectionPlanCard
           planType="all"
           title={t('allIncluded')}
-          price="₹12,935.52"
+          price={formatPrice(planPrices.all, currency)}
           features={allFeatures}
           isSelected={selectedPlan === "all"}
-          onSelect={() => onSelectPlan("all")}
+          onSelect={() => handleTogglePlan("all")}
         />
       </div>
 
       {/* Desktop: Table layout */}
       <ProtectionPlanTable
         features={desktopFeatures}
-        basicPrice="₹8,623.68"
-        premiumPrice="₹10,779.60"
-        allPrice="₹12,935.52"
+        basicPrice={formatPrice(planPrices.basic, currency)}
+        premiumPrice={formatPrice(planPrices.premium, currency)}
+        allPrice={formatPrice(planPrices.all, currency)}
         basicLabel={t('basic')}
         premiumLabel={t('premium')}
         allLabel={t('allIncluded')}
         selectedPlan={selectedPlan}
-        onSelectPlan={onSelectPlan}
+        onSelectPlan={handleTogglePlan}
       />
     </div>
   );
