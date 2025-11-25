@@ -28,6 +28,7 @@ export function TermsAndConditions({
   const selectedUpgradeOption = useBookingStore((s) => s.selectedUpgradeOption);
   const priceCheckData = useBookingStore((s) => s.priceCheckData);
   const setVyspaFolderInfo = useBookingStore((s) => s.setVyspaFolderInfo);
+  const passengersSaved = useBookingStore((s) => s.passengersSaved);
 
   const canProceedToPayment = (): boolean => {
     const counts = searchParams?.passengers || { adults: 1, children: 0, infants: 0 };
@@ -46,12 +47,12 @@ export function TermsAndConditions({
 
   const handleProceed = async () => {
     if (!termsAccepted) return;
-    if (!canProceedToPayment()) {
+    if (!passengersSaved || !canProceedToPayment()) {
       alert('Please complete all passenger details before proceeding to payment.');
       return;
     }
 
-    if (!selectedFlight || !priceCheckData) {
+    if (!selectedFlight) {
       router.push("/payment");
       return;
     }
@@ -60,8 +61,13 @@ export function TermsAndConditions({
       setIsSubmitting(true);
 
       const currency = selectedUpgradeOption?.currency || selectedFlight.currency;
-      const pswResultId = priceCheckData.sessionInfo.pswResultId || selectedFlight.segmentResultId || '';
-      const destinationAirportCode = priceCheckData.flightDetails.destination || selectedFlight.outbound.arrivalAirport.code;
+      const pswResultId =
+        priceCheckData?.sessionInfo.pswResultId ||
+        selectedFlight.segmentResultId ||
+        '';
+      const destinationAirportCode =
+        priceCheckData?.flightDetails.destination ||
+        selectedFlight.outbound.arrivalAirport.code;
       const departureDate = selectedFlight.outbound.date;
       const fareSelectedPrice = selectedUpgradeOption ? selectedUpgradeOption.totalPrice : selectedFlight.price;
 
@@ -149,7 +155,7 @@ export function TermsAndConditions({
         )}
         <Button
           onClick={handleProceed}
-          disabled={!termsAccepted || !canProceedToPayment() || isSubmitting}
+          disabled={!termsAccepted || !passengersSaved || !canProceedToPayment() || isSubmitting}
           className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-full px-5 py-2 h-auto text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {t('book')}

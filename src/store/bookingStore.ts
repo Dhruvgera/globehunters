@@ -31,6 +31,8 @@ interface BookingState {
   updatePassenger: (index: number, passenger: Passenger) => void;
   removePassenger: (index: number) => void;
   clearPassengers: () => void;
+  passengersSaved: boolean;
+  setPassengersSaved: (saved: boolean) => void;
 
   // Contact information
   contactEmail: string;
@@ -72,6 +74,7 @@ const initialState = {
   selectedUpgradeOption: null,
   priceCheckData: null,
   passengers: [],
+  passengersSaved: false,
   contactEmail: '',
   contactPhone: '',
   addOns: {
@@ -140,6 +143,9 @@ export const useBookingStore = create<BookingState>()(
 
       clearPassengers: () => set({ passengers: [] }),
 
+      setPassengersSaved: (saved) =>
+        set({ passengersSaved: saved }),
+
       // Contact info
       setContactInfo: (email, phone) =>
         set({
@@ -199,6 +205,7 @@ export const useBookingStore = create<BookingState>()(
         selectedUpgradeOption: state.selectedUpgradeOption,
         priceCheckData: state.priceCheckData,
         passengers: state.passengers,
+        passengersSaved: state.passengersSaved,
         contactEmail: state.contactEmail,
         contactPhone: state.contactPhone,
         addOns: state.addOns,

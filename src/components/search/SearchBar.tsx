@@ -84,7 +84,11 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
     >
       {/* Top Row - Trip Type and Passengers */}
       <div className="flex flex-wrap items-center gap-4 sm:gap-6 mb-4">
-        <TripTypeSelector tripType={tripType} onTripTypeChange={setTripType} />
+        <TripTypeSelector 
+          tripType={tripType} 
+          onTripTypeChange={setTripType}
+          onRoundTripSelected={() => setIsDatePickerOpen(true)}
+        />
         <PassengersSelector
           passengers={passengers}
           travelClass={travelClass}

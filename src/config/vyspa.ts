@@ -8,6 +8,7 @@ import { getApiUsername } from '@/lib/utils/domainMapping';
 export const VYSPA_CONFIG = {
   apiUrl: process.env.VYSPA_API_URL || '',
   apiVersion: process.env.VYSPA_API_VERSION || '1',
+  branchCode: process.env.VYSPA_BRANCH_CODE || 'HQ',
   credentials: {
     // Username is determined by domain mapping (FlightsUK for .co.uk, FlightsUS for .com)
     // Falls back to env var if domain mapping returns empty

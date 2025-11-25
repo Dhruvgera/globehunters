@@ -226,6 +226,7 @@ function transformSegmentToFlightSegment(segment: VyspaSegment): FlightSegment {
 
   // Format date (convert YYYY-MM-DD to readable format)
   const date = formatDate(firstFlight.departure_date);
+  const arrivalDate = lastFlight.arrival_date ? formatDate(lastFlight.arrival_date) : undefined;
 
   // Get stop details
   const stops = segment.Stops || 0;
@@ -283,6 +284,7 @@ function transformSegmentToFlightSegment(segment: VyspaSegment): FlightSegment {
     departureAirport,
     arrivalAirport,
     date,
+    arrivalDate, // Arrival date (may differ from departure for long flights)
     duration, // Total flying time only
     totalJourneyTime, // Total time including layovers
     stops,

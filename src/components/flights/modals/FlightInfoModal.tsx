@@ -48,6 +48,8 @@ export default function FlightInfoModal({
   // Price check integration
   const { priceCheck, isLoading, error, checkPrice, clearError } = usePriceCheck();
 
+  const hasUpgradeOptions = !!(priceCheck && priceCheck.priceOptions && priceCheck.priceOptions.some((opt) => opt.isUpgrade));
+
   const journeySegments = flight.segments && flight.segments.length > 0
     ? flight.segments
     : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])].filter(
@@ -68,6 +70,29 @@ export default function FlightInfoModal({
     }
   }, [open, flight.segmentResultId, checkPrice]);
 
+  useEffect(() => {
+    if (!open) return;
+    console.log("[FlightInfoModal] State", {
+      flightId: flight.id,
+      segmentResultId: flight.segmentResultId,
+      isLoadingPriceCheck: isLoading,
+      hasPriceCheck: !!priceCheck,
+      priceCheckOptionCount: priceCheck?.priceOptions?.length ?? 0,
+      hasUpgradeOptions,
+      hasError: !!error,
+      errorType: error?.type,
+    });
+  }, [open, flight.id, flight.segmentResultId, isLoading, priceCheck, error, hasUpgradeOptions]);
+
+  useEffect(() => {
+    if (!open || !error) return;
+    console.warn("[FlightInfoModal] Price check error", {
+      flightId: flight.id,
+      segmentResultId: flight.segmentResultId,
+      error,
+    });
+  }, [open, error, flight.id, flight.segmentResultId]);
+
   // Clear error when modal closes
   useEffect(() => {
     if (!open) {
@@ -79,6 +104,12 @@ export default function FlightInfoModal({
   // Set default selected option when price check loads
   useEffect(() => {
     if (!priceCheck || priceCheck.priceOptions.length === 0) return;
+    if (!hasUpgradeOptions) {
+      console.log("[FlightInfoModal] Price check returned no upgrade options; using search price without upgrades.", {
+        optionCount: priceCheck.priceOptions.length,
+      });
+      return;
+    }
     // If user has already selected an option locally, do not override
     if (selectedUpgradeOption) return;
 
@@ -94,7 +125,7 @@ export default function FlightInfoModal({
     }
     // Otherwise default to first option
     setSelectedUpgradeOption(priceCheck.priceOptions[0]);
-  }, [priceCheck, selectedUpgradeOption, selectedUpgradeInStore]);
+  }, [priceCheck, selectedUpgradeOption, selectedUpgradeInStore, hasUpgradeOptions]);
 
   function prettifyCabinName(name: string) {
     if (!name) return '';
@@ -121,6 +152,13 @@ export default function FlightInfoModal({
   }
 
   const handleBookNow = () => {
+    console.log("[FlightInfoModal] handleBookNow", {
+      flightId: flight.id,
+      segmentResultId: flight.segmentResultId,
+      hasSelectedUpgradeOption: !!selectedUpgradeOption,
+      usingUpgrade: !!(selectedUpgradeOption && hasUpgradeOptions && selectedUpgradeOption.isUpgrade),
+      selectedUpgradeId: selectedUpgradeOption?.id,
+    });
     // COMMENTED OUT: Availability error check (dialog was disabled)
     // If you need to re-enable availability checking, uncomment this block
     // and uncomment the availability error dialog below
@@ -373,6 +411,7 @@ export default function FlightInfoModal({
                                   <div key={idx} className="flex items-center gap-1">
                                     <Plane className="w-3 sm:w-4 h-3 sm:h-4 text-[#3A478A] shrink-0" />
                                     <span className="text-xs sm:text-sm text-[#3A478A]">
+                                      {flight.carrierCode}{flight.flightNumber ? flight.flightNumber : ''}{' '}
                                       {flight.departureAirport} → {flight.arrivalAirport}: {flight.duration}
                                     </span>
                                   </div>
@@ -430,7 +469,7 @@ export default function FlightInfoModal({
                             {currentLeg.arrivalTime}
                           </span>
                           <span className="text-xs sm:text-sm font-medium text-[#3A478A] whitespace-nowrap">
-                            {currentLeg.date}
+                            {currentLeg.arrivalDate || currentLeg.date}
                           </span>
                         </div>
                       </div>

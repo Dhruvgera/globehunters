@@ -90,9 +90,10 @@ export function useDatePrices(
     return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]}`;
   }, []);
 
-  // Generate cache key
+  // Generate cache key - include class to avoid returning Economy prices when searching Business
   const getCacheKey = (date: Date, type: 'departure' | 'return'): string => {
-    return `${type}-${date.toISOString().split('T')[0]}`;
+    const travelClass = searchParams?.class || 'Economy';
+    return `${type}-${date.toISOString().split('T')[0]}-${travelClass}`;
   };
 
   // Fetch price for a specific date
@@ -446,6 +447,9 @@ export function useDatePrices(
       abortControllerRef.current.abort();
     }
     abortControllerRef.current = new AbortController();
+    
+    // Clear cache when class changes to fetch fresh prices for the new cabin class
+    cacheRef.current = {};
 
     setLoading(true);
     setError(null);
@@ -545,6 +549,7 @@ export function useDatePrices(
     searchParams?.departureDate?.getTime(), 
     searchParams?.returnDate?.getTime(), 
     searchParams?.tripType,
+    searchParams?.class,
     basePrice
   ]);
 

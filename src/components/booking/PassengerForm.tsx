@@ -91,6 +91,10 @@ export function PassengerForm({
     onSave(formData as Passenger);
   };
 
+  const handleEdit = () => {
+    onCancel?.();
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="bg-white border border-[#DFE0E4] rounded-xl p-6">
@@ -337,6 +341,16 @@ export function PassengerForm({
             disabled={disabled}
           >
             {t('cancel')}
+          </Button>
+        )}
+        {disabled && (
+          <Button
+            type="button"
+            variant="outline"
+            className="rounded-full px-6 py-2 h-auto text-sm font-medium"
+            onClick={handleEdit}
+          >
+            Edit
           </Button>
         )}
         {!disabled && (

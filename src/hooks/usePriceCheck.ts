@@ -25,6 +25,12 @@ const priceCheckCache = new Map<string, {
   ttl: number;
 }>();
 
+const priceCheckFailureCache = new Map<string, {
+  error: PriceCheckError;
+  timestamp: number;
+  ttl: number;
+}>();
+
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 /**
@@ -45,6 +51,17 @@ function getCachedPriceCheck(segmentId: string): PriceCheckResult | null {
   return cached.data;
 }
 
+function getCachedPriceCheckFailure(segmentId: string): PriceCheckError | null {
+  const cached = priceCheckFailureCache.get(segmentId);
+  if (!cached) return null;
+  const now = Date.now();
+  if (now - cached.timestamp > cached.ttl) {
+    priceCheckFailureCache.delete(segmentId);
+    return null;
+  }
+  return cached.error;
+}
+
 /**
  * Set cached price check data
  */
@@ -56,11 +73,20 @@ function setCachedPriceCheck(segmentId: string, data: PriceCheckResult): void {
   });
 }
 
+function setCachedPriceCheckFailure(segmentId: string, error: PriceCheckError): void {
+  priceCheckFailureCache.set(segmentId, {
+    error,
+    timestamp: Date.now(),
+    ttl: CACHE_TTL,
+  });
+}
+
 /**
  * Clear all cached data
  */
 function clearPriceCheckCache(): void {
   priceCheckCache.clear();
+  priceCheckFailureCache.clear();
 }
 
 /**
@@ -81,6 +107,14 @@ export function usePriceCheck(): UsePriceCheckReturn {
     // Don't make duplicate requests
     if (currentRequestRef.current === segmentId && isLoading) {
       console.log('⏩ Price check already in progress for', segmentId);
+      return;
+    }
+
+    const cachedFailure = getCachedPriceCheckFailure(segmentId);
+    if (cachedFailure) {
+      console.log('⏩ Skipping price check due to cached failure for', segmentId);
+      setError(cachedFailure);
+      setPriceCheck(null);
       return;
     }
 
@@ -139,10 +173,24 @@ export function usePriceCheck(): UsePriceCheckReturn {
         };
         
         setError(priceCheckError);
-        console.error('❌ Price check failed for', segmentId, {
-          error: priceCheckError,
-          originalError: err,
-        });
+        // Clear any previous price check data so the UI treats this as
+        // "no upgrade options available" and falls back to search pricing.
+        setPriceCheck(null);
+        // Cache this failure so we don't keep retrying a segment that is
+        // returning errors (e.g., repeated 502s) within the TTL window.
+        setCachedPriceCheckFailure(segmentId, priceCheckError);
+
+        const status = (priceCheckError.details && (priceCheckError.details as any).status) as number | undefined;
+        if (status === 502) {
+          console.warn('⚠️ Price check received 502 Bad Gateway for', segmentId, {
+            error: priceCheckError,
+          });
+        } else {
+          console.error('❌ Price check failed for', segmentId, {
+            error: priceCheckError,
+            originalError: err,
+          });
+        }
       }
     } finally {
       // Only update loading state if this is still the current request

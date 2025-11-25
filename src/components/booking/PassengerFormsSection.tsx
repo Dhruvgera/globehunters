@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { PassengerForm } from "./PassengerForm";
 import { useBookingStore } from "@/store/bookingStore";
@@ -18,6 +18,7 @@ export default function PassengerFormsSection({
   const passengers = useBookingStore((s) => s.passengers);
   const addPassenger = useBookingStore((s) => s.addPassenger);
   const updatePassenger = useBookingStore((s) => s.updatePassenger);
+  const setPassengersSaved = useBookingStore((s) => s.setPassengersSaved);
   const [saved, setSaved] = useState<Record<number, boolean>>({});
 
   // Build the required passenger slots from search parameters
@@ -53,8 +54,18 @@ export default function PassengerFormsSection({
       }
       addPassenger(passenger);
     }
-    setSaved((prev) => ({ ...prev, [slotIndex]: true }));
+    setSaved((prev) => {
+      const next = { ...prev, [slotIndex]: true };
+      const allSaved = requiredPassengers.every((_, idx) => next[idx]);
+      setPassengersSaved(allSaved);
+      return next;
+    });
   };
+
+  useEffect(() => {
+    setSaved({});
+    setPassengersSaved(false);
+  }, [searchParams, setPassengersSaved]);
 
   return (
     <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-6">
@@ -90,6 +101,13 @@ export default function PassengerFormsSection({
                 showPassportFields={showPassportFields}
                 disabled={!!saved[idx]}
                 leadAddress={idx > 0 ? { address: passengers[0]?.address, postalCode: passengers[0]?.postalCode } : undefined}
+                onCancel={() => {
+                  setSaved((prev) => {
+                    const next = { ...prev, [idx]: false };
+                    setPassengersSaved(false);
+                    return next;
+                  });
+                }}
               />
             </div>
           );
@@ -98,5 +116,3 @@ export default function PassengerFormsSection({
     </div>
   );
 }
-
-

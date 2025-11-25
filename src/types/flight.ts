@@ -20,6 +20,7 @@ export interface FlightSegment {
   departureAirport: Airport;
   arrivalAirport: Airport;
   date: string;
+  arrivalDate?: string; // Arrival date (may differ from departure for long flights)
   duration: string; // Total flying time (excluding layovers)
   totalJourneyTime?: string; // Total time including layovers
   stops: number;

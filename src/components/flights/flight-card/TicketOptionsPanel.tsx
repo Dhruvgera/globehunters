@@ -39,7 +39,7 @@ export function TicketOptionsPanel({
   const t = useTranslations("search.flights");
   const setSelectedUpgrade = useBookingStore((s) => s.setSelectedUpgrade);
 
-  const hasApiOptions = priceOptions && priceOptions.length > 0;
+  const hasApiOptions = !!(priceOptions && priceOptions.some((opt) => opt.isUpgrade));
 
   const chips = useMemo(() => {
     if (hasApiOptions) {

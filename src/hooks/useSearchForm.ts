@@ -19,6 +19,23 @@ interface MultiCitySegmentState {
 export function useSearchForm() {
   const searchParamsFromStore = useBookingStore((state) => state.searchParams);
   const hasInitializedRef = useRef(false);
+  const lastStoreVersionRef = useRef<string>('');
+  
+  // Generate a version key from store params to detect changes
+  const getStoreVersion = (params: typeof searchParamsFromStore) => {
+    if (!params) return '';
+    return JSON.stringify({
+      from: params.from,
+      to: params.to,
+      departureDate: params.departureDate?.getTime(),
+      returnDate: params.returnDate?.getTime(),
+      class: params.class,
+      tripType: params.tripType,
+      adults: params.passengers?.adults,
+      children: params.passengers?.children,
+      infants: params.passengers?.infants,
+    });
+  };
   
   const [tripType, setTripType] = useState<TripType>("round-trip");
   const [from, setFrom] = useState<Airport | null>(null);
@@ -39,9 +56,13 @@ export function useSearchForm() {
   
   // Sync with store when it changes (for page refresh scenario)
   useEffect(() => {
-    // Only initialize once when store has data
-    if (searchParamsFromStore && !hasInitializedRef.current) {
+    const currentVersion = getStoreVersion(searchParamsFromStore);
+    const hasVersionChanged = currentVersion !== lastStoreVersionRef.current;
+    
+    // Initialize or re-sync when store data changes
+    if (searchParamsFromStore && (!hasInitializedRef.current || hasVersionChanged)) {
       hasInitializedRef.current = true;
+      lastStoreVersionRef.current = currentVersion;
       
       const buildAirport = (code?: string | null): Airport | null => {
         if (!code) return null;
@@ -190,7 +211,8 @@ export function useSearchForm() {
       from: from?.code || "",
       to: to?.code || "",
       departureDate: formatDateForURL(departureDate),
-      returnDate: formatDateForURL(returnDate),
+      // For one-way trips, explicitly exclude return date to ensure fresh search
+      returnDate: tripType === 'one-way' ? "" : formatDateForURL(returnDate),
       ...common,
     };
   };

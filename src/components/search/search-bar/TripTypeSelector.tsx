@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ArrowLeftRight, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,13 +15,16 @@ type TripType = "round-trip" | "one-way" | "multi-city";
 interface TripTypeSelectorProps {
   tripType: TripType;
   onTripTypeChange: (type: TripType) => void;
+  onRoundTripSelected?: () => void; // Callback when switching to round-trip
 }
 
 export function TripTypeSelector({
   tripType,
   onTripTypeChange,
+  onRoundTripSelected,
 }: TripTypeSelectorProps) {
   const t = useTranslations('search.tripType');
+  const [isOpen, setIsOpen] = useState(false);
   
   const getTripTypeLabel = (type: TripType) => {
     switch (type) {
@@ -33,8 +37,22 @@ export function TripTypeSelector({
     }
   };
 
+  const handleSelect = (type: TripType) => {
+    const wasNotRoundTrip = tripType !== "round-trip";
+    onTripTypeChange(type);
+    setIsOpen(false); // Close the popover
+    
+    // If switching TO round-trip, trigger the callback to open date picker
+    if (type === "round-trip" && wasNotRoundTrip && onRoundTripSelected) {
+      // Small delay to allow the dropdown to close first
+      setTimeout(() => {
+        onRoundTripSelected();
+      }, 100);
+    }
+  };
+
   return (
-    <Popover>
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
@@ -52,21 +70,21 @@ export function TripTypeSelector({
           <Button
             variant="ghost"
             className="justify-start"
-            onClick={() => onTripTypeChange("round-trip")}
+            onClick={() => handleSelect("round-trip")}
           >
             {t('roundTrip')}
           </Button>
           <Button
             variant="ghost"
             className="justify-start"
-            onClick={() => onTripTypeChange("one-way")}
+            onClick={() => handleSelect("one-way")}
           >
             {t('oneWay')}
           </Button>
           <Button
             variant="ghost"
             className="justify-start"
-            onClick={() => onTripTypeChange("multi-city")}
+            onClick={() => handleSelect("multi-city")}
           >
             {t('multiCity')}
           </Button>
