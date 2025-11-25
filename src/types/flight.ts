@@ -12,6 +12,8 @@ export interface IndividualFlight {
   duration: string;
   flightNumber?: string;
   carrierCode?: string;
+  departureDate?: string; // Raw API date for debugging
+  arrivalDate?: string;   // Raw API date for debugging
 }
 
 export interface FlightSegment {

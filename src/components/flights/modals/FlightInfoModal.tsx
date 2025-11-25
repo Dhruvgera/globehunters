@@ -408,12 +408,20 @@ export default function FlightInfoModal({
                               <>
                                 {/* Individual Flight Times */}
                                 {currentLeg.individualFlights.map((flight, idx) => (
-                                  <div key={idx} className="flex items-center gap-1">
-                                    <Plane className="w-3 sm:w-4 h-3 sm:h-4 text-[#3A478A] shrink-0" />
-                                    <span className="text-xs sm:text-sm text-[#3A478A]">
-                                      {flight.carrierCode}{flight.flightNumber ? flight.flightNumber : ''}{' '}
-                                      {flight.departureAirport} → {flight.arrivalAirport}: {flight.duration}
-                                    </span>
+                                  <div key={idx} className="flex flex-col gap-0.5">
+                                    <div className="flex items-center gap-1">
+                                      <Plane className="w-3 sm:w-4 h-3 sm:h-4 text-[#3A478A] shrink-0" />
+                                      <span className="text-xs sm:text-sm text-[#3A478A]">
+                                        {flight.carrierCode}{flight.flightNumber ? flight.flightNumber : ''}{' '}
+                                        {flight.departureAirport} → {flight.arrivalAirport}: {flight.duration}
+                                      </span>
+                                    </div>
+                                    {/* Debug: Show raw API dates */}
+                                    {process.env.NEXT_PUBLIC_DEBUG_FLIGHT_DATES === 'true' && (
+                                      <div className="ml-4 text-[10px] font-mono text-orange-600 bg-orange-50 px-1 py-0.5 rounded w-fit">
+                                        API: dep={flight.departureDate} → arr={flight.arrivalDate}
+                                      </div>
+                                    )}
                                   </div>
                                 ))}
                                 {/* Total Journey Time */}

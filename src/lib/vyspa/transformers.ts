@@ -263,6 +263,8 @@ function transformSegmentToFlightSegment(segment: VyspaSegment): FlightSegment {
     duration: flight.travel_time ? formatDuration(parseIntSafe(flight.travel_time, 0)) : '',
     flightNumber: String(flight.flight_number || '').trim() || undefined,
     carrierCode: flight.airline_code,
+    departureDate: flight.departure_date, // Raw API date for debugging
+    arrivalDate: flight.arrival_date,     // Raw API date for debugging
   }));
 
   // Calculate total journey time (flying time + layovers)
