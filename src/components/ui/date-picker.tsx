@@ -136,8 +136,8 @@ function MonthCalendar({
           const isStart = isSameDay(date, selectedStart);
           const isEnd = isSameDay(date, selectedEnd);
           
-          // Only show as selected if it's the relevant date for this calendar
-          const isSelected = isStartCalendar ? isStart : isEnd;
+          // Highlight both start and end dates on both calendars
+          const isSelected = isStart || isEnd;
           
           // Only show range if both dates are selected
           const inRange = selectedStart && selectedEnd ? isInRange(date, selectedStart, selectedEnd) : false;
@@ -221,21 +221,33 @@ export function DatePicker({
     setEndYear(newYear);
   };
 
-  const handleStartDateSelect = (date: Date) => {
-    onStartDateChange?.(date);
-    // If end date is before start date, clear it
-    if (endDate && date > endDate) {
-      onEndDateChange?.(undefined);
+  // Unified date selection logic - works on both calendars like Skyscanner
+  const handleDateSelect = (date: Date) => {
+    // If no start date, set this as start date
+    if (!startDate) {
+      onStartDateChange?.(date);
+      return;
     }
-  };
 
-  const handleEndDateSelect = (date: Date) => {
-    // Only allow selecting end date if start date is set
-    if (startDate) {
-      if (date >= startDate) {
+    // If start date exists but no end date
+    if (!endDate) {
+      // If clicked date is before start date, make it the new start date
+      if (date < startDate) {
+        onStartDateChange?.(date);
+      } else if (isSameDay(date, startDate)) {
+        // Clicking same date clears it and sets as start again (no-op)
+        return;
+      } else {
+        // Date is after start date, set as end date
         onEndDateChange?.(date);
       }
+      return;
     }
+
+    // Both dates are already selected - start fresh with new selection
+    // Clicking any date resets and sets it as the new start date
+    onStartDateChange?.(date);
+    onEndDateChange?.(undefined);
   };
 
   return (
@@ -247,7 +259,7 @@ export function DatePicker({
           onMonthChange={handleStartMonthChange}
           selectedStart={startDate}
           selectedEnd={endDate}
-          onDateSelect={handleStartDateSelect}
+          onDateSelect={handleDateSelect}
           label="Start date*"
           isStartCalendar={true}
         />
@@ -258,7 +270,7 @@ export function DatePicker({
             onMonthChange={handleEndMonthChange}
             selectedStart={startDate}
             selectedEnd={endDate}
-            onDateSelect={handleEndDateSelect}
+            onDateSelect={handleDateSelect}
             label="End date*"
             isStartCalendar={false}
           />
