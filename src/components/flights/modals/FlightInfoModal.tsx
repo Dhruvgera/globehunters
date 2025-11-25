@@ -409,12 +409,20 @@ export default function FlightInfoModal({
                                 {/* Individual Flight Times */}
                                 {currentLeg.individualFlights.map((flight, idx) => (
                                   <div key={idx} className="flex flex-col gap-0.5">
-                                    <div className="flex items-center gap-1">
+                                    <div className="flex items-center gap-2">
                                       <Plane className="w-3 sm:w-4 h-3 sm:h-4 text-[#3A478A] shrink-0" />
-                                      <span className="text-xs sm:text-sm text-[#3A478A]">
-                                        {flight.carrierCode}{flight.flightNumber ? flight.flightNumber : ''}{' '}
-                                        {flight.departureAirport} → {flight.arrivalAirport}: {flight.duration}
-                                      </span>
+                                      <div className="flex items-center gap-2 flex-wrap text-xs sm:text-sm">
+                                        <span className="font-bold text-[#010D50]">
+                                          {flight.carrierCode}{flight.flightNumber}
+                                        </span>
+                                        <span className="text-[#3A478A]">
+                                          {flight.departureAirport} → {flight.arrivalAirport}
+                                        </span>
+                                        <span className="text-[#3A478A] opacity-50">•</span>
+                                        <span className="text-[#3A478A]">
+                                          {flight.duration}
+                                        </span>
+                                      </div>
                                     </div>
                                     {/* Debug: Show raw API dates */}
                                     {process.env.NEXT_PUBLIC_DEBUG_FLIGHT_DATES === 'true' && (
