@@ -314,8 +314,17 @@ export function DatePicker({
     setBaseYear(newYear);
   };
 
+  const isRangeMode = !!onEndDateChange;
+
   // Unified date selection logic - works on both calendars like Skyscanner
   const handleDateSelect = (date: Date) => {
+    // One-way mode: simply set the date
+    if (!isRangeMode) {
+      onStartDateChange?.(date);
+      return;
+    }
+
+    // Range mode (round-trip): handle start/end date selection
     // If no start date, set this as start date
     if (!startDate) {
       onStartDateChange?.(date);
@@ -341,8 +350,6 @@ export function DatePicker({
     onStartDateChange?.(date);
     onEndDateChange?.(undefined);
   };
-
-  const isRangeMode = !!onEndDateChange;
 
   return (
     <div className={cn("p-3 lg:p-4 bg-white rounded-2xl w-full max-w-[580px]", className)}>
