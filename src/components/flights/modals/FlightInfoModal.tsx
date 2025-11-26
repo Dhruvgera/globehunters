@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { X, Check, Info, Clock, Briefcase, Package, ShoppingBag, XCircle as XIcon, Plane, MapPin, UtensilsCrossed, Loader2 } from "lucide-react";
+import { X, Check, Info, Clock, Briefcase, Package, ShoppingBag, XCircle as XIcon, Plane, MapPin, UtensilsCrossed, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import Image from "next/image";
 import {
   Dialog,
@@ -18,6 +18,28 @@ import { useBookingStore } from "@/store/bookingStore";
 import { usePriceCheck } from "@/hooks/usePriceCheck";
 import { TransformedPriceOption } from "@/types/priceCheck";
 import { ErrorMessage } from "@/components/ui/error-message";
+
+/** Debug component to display raw API response */
+function RawResponseDebug({ rawResponse, title }: { rawResponse: any; title: string }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
+  return (
+    <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center gap-2 text-sm font-semibold text-yellow-800 w-full"
+      >
+        {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        <span>🔧 {title}</span>
+      </button>
+      {isExpanded && (
+        <pre className="mt-2 p-2 bg-yellow-100 rounded text-xs text-yellow-900 overflow-auto max-h-80 whitespace-pre-wrap break-all">
+          {JSON.stringify(rawResponse, null, 2)}
+        </pre>
+      )}
+    </div>
+  );
+}
 
 interface FlightInfoModalProps {
   flight: Flight;
@@ -81,6 +103,8 @@ export default function FlightInfoModal({
       hasUpgradeOptions,
       hasError: !!error,
       errorType: error?.type,
+      refundable: priceCheck?.flightDetails?.refundable,
+      flightDetails: priceCheck?.flightDetails,
     });
   }, [open, flight.id, flight.segmentResultId, isLoading, priceCheck, error, hasUpgradeOptions]);
 
@@ -129,11 +153,22 @@ export default function FlightInfoModal({
 
   function prettifyCabinName(name: string) {
     if (!name) return '';
-    // Insert space before capital letters, handle known concatenations
+    // Handle known concatenations
     const map: Record<string, string> = {
       PremiumEconomy: 'Premium Economy',
     };
     if (map[name]) return map[name];
+    
+    // If it's all uppercase (like "ECONOMY LIGHT" or "PREMIUM"), convert to Title Case
+    if (name === name.toUpperCase()) {
+      return name
+        .toLowerCase()
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    }
+    
+    // Insert space before capital letters for camelCase
     return name.replace(/([a-z])([A-Z])/g, '$1 $2');
   }
 
@@ -676,23 +711,29 @@ export default function FlightInfoModal({
                     Flexibility
                   </span>
                   <div className="flex flex-col gap-3">
-                    {/* Non-Refundable */}
+                    {/* Refundable Status - Dynamic from API */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <XIcon className="w-5 h-5 sm:w-6 sm:h-6 text-[#010D50] shrink-0 mt-0.5" />
+                        {priceCheck?.flightDetails?.refundable ? (
+                          <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0 mt-0.5" />
+                        ) : (
+                          <XIcon className="w-5 h-5 sm:w-6 sm:h-6 text-[#010D50] shrink-0 mt-0.5" />
+                        )}
                         <div className="flex flex-col gap-0.5 min-w-0">
                           <span className="text-xs sm:text-sm font-medium text-[#010D50]">
-                            Non-Refundable
+                            {priceCheck?.flightDetails?.refundable ? 'Refundable' : 'Non-Refundable'}
                           </span>
                           <span className="text-xs sm:text-sm text-[#3A478A] break-words">
-                            Ticket can&apos;t be refunded
+                            {priceCheck?.flightDetails?.refundable 
+                              ? 'Ticket can be refunded (fees may apply)' 
+                              : 'Ticket can\'t be refunded'}
                           </span>
                         </div>
                       </div>
                       <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
                     </div>
 
-                    {/* Changes */}
+                    {/* Changes - depends on fare type */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-start gap-3 flex-1 min-w-0">
                         <XIcon className="w-5 h-5 sm:w-6 sm:h-6 text-[#010D50] shrink-0 mt-0.5" />
@@ -727,6 +768,11 @@ export default function FlightInfoModal({
                 </div>
               </div>
           </div>
+          )}
+
+          {/* Debug: Raw Price Check Response */}
+          {process.env.NEXT_PUBLIC_DEBUG_FLIGHT_IDS === 'true' && priceCheck?.rawResponse && (
+            <RawResponseDebug rawResponse={priceCheck.rawResponse} title="Price Check Raw Response" />
           )}
 
         {/* Footer - Only show on search/results pages, not on payment page */}

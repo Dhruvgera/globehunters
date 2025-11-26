@@ -112,6 +112,7 @@ export default function FlightCard({
           isLoading={isLoading}
           onSelectFlight={handleSelectFlight as any}
           onViewFlightInfo={() => setShowFlightInfo(true)}
+          rawResponse={priceCheckData?.rawResponse}
         />
       )}
 

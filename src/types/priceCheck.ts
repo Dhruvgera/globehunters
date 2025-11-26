@@ -383,6 +383,8 @@ export interface TransformedPriceOption {
 export interface PriceCheckResult {
   success: boolean;
   message?: string;
+  /** Raw API response for debugging (only included when NEXT_PUBLIC_DEBUG_FLIGHT_IDS=true) */
+  rawResponse?: PriceCheckResponse;
   flightDetails: {
     id: string;
     origin: string;

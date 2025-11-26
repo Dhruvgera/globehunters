@@ -198,7 +198,16 @@ export async function transformPriceCheckResponse(
       destination: flightResult.Destination || '',
       validatingCarrier: flightResult.validating_carrier || '',
       lastTicketDate: flightResult.last_ticket_date || '',
-      refundable: flightResult.refundable === '1',
+      refundable: (() => {
+        const isRefundable = String(flightResult.refundable) === '1';
+        console.log('[PriceCheck] refundable value:', {
+          raw: flightResult.refundable,
+          type: typeof flightResult.refundable,
+          asString: String(flightResult.refundable),
+          result: isRefundable
+        });
+        return isRefundable;
+      })(),
       availableSeats: flightResult.avlSeats || 'Limited',
       segments: flightSegments.map((seg) => {
         try {
@@ -420,8 +429,9 @@ function transformPriceOption(
     option.BrandInfo?.[0]?.cabinCode ||
     'Y';
   
-  // Map cabin class code
-  const cabinClassDisplay = option.BrandInfo?.[0]?.CabinName || 
+  // Use brand name (e.g., "ECONOMY LIGHT") for display, fallback to cabin name
+  const cabinClassDisplay = brandName || 
+    option.BrandInfo?.[0]?.CabinName || 
     mapCabinClassCode(cabinClassCode);
   
   // Get booking code - prefer explicit fields, do NOT override with brand name

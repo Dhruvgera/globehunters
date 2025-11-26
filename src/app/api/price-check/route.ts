@@ -83,6 +83,12 @@ export async function POST(req: Request) {
 		}
 
 		const result: PriceCheckResult = await transformPriceCheckResponse(data);
+		
+		// Include raw response in debug mode
+		if (process.env.NEXT_PUBLIC_DEBUG_FLIGHT_IDS === 'true') {
+			result.rawResponse = data;
+		}
+		
 		return NextResponse.json(result, { status: 200 });
 	} catch (error: any) {
 		if (error?.name === 'AbortError') {
