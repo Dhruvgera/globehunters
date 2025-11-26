@@ -10,10 +10,21 @@ import { Passenger, AddOns, BookingResponse } from '@/types/booking';
 import { PaymentDetails } from '@/types/payment';
 import { PriceCheckResult, TransformedPriceOption } from '@/types/priceCheck';
 
+interface AffiliateData {
+  code: string;
+  id?: number;
+  name?: string;
+  phone?: string;
+}
+
 interface BookingState {
   // Search state
   searchParams: SearchParams | null;
   setSearchParams: (params: SearchParams) => void;
+
+  // Affiliate data
+  affiliateData: AffiliateData | null;
+  setAffiliateData: (data: AffiliateData | null) => void;
 
   // Selected flight
   selectedFlight: Flight | null;
@@ -69,6 +80,7 @@ interface BookingState {
 
 const initialState = {
   searchParams: null,
+  affiliateData: null,
   selectedFlight: null,
   selectedFareType: 'Economy',
   selectedUpgradeOption: null,
@@ -96,6 +108,9 @@ export const useBookingStore = create<BookingState>()(
 
       // Search params
       setSearchParams: (params) => set({ searchParams: params }),
+
+      // Affiliate data
+      setAffiliateData: (data) => set({ affiliateData: data }),
 
       // Selected flight
       setSelectedFlight: (flight, fareType = 'Economy') =>
@@ -200,6 +215,7 @@ export const useBookingStore = create<BookingState>()(
       // Only persist certain fields
       partialize: (state) => ({
         searchParams: state.searchParams,
+        affiliateData: state.affiliateData,
         selectedFlight: state.selectedFlight,
         selectedFareType: state.selectedFareType,
         selectedUpgradeOption: state.selectedUpgradeOption,
@@ -230,3 +246,4 @@ export const usePassengers = () => useBookingStore((state) => state.passengers);
 export const useAddOns = () => useBookingStore((state) => state.addOns);
 export const useBooking = () => useBookingStore((state) => state.booking);
 export const useCurrentStep = () => useBookingStore((state) => state.currentStep);
+export const useAffiliateData = () => useBookingStore((state) => state.affiliateData);

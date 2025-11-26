@@ -6,6 +6,7 @@ import SmoothScrolling from "@/components/animations/SmoothScrolling";
 import RouteTransitions from "@/components/animations/RouteTransitions";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, defaultLocale } from "@/i18n/config";
+import { AffiliateProvider } from "@/lib/AffiliateContext";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -28,10 +29,12 @@ export default async function RootLayout({
     <html lang={defaultLocale}>
       <body className={`${inter.className} antialiased`}>
         <NextIntlClientProvider locale={defaultLocale} messages={messages}>
-          <SmoothScrolling />
-          <RouteTransitions>
-            {children}
-          </RouteTransitions>
+          <AffiliateProvider>
+            <SmoothScrolling />
+            <RouteTransitions>
+              {children}
+            </RouteTransitions>
+          </AffiliateProvider>
         </NextIntlClientProvider>
       </body>
     </html>

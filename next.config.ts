@@ -17,6 +17,15 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Rewrite legacy URLs to Next.js routes
+  async rewrites() {
+    return [
+      {
+        source: '/FlightSearch.htm',
+        destination: '/FlightSearch',
+      },
+    ];
+  },
 };
 
 export default withNextIntl(nextConfig);

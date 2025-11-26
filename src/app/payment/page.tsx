@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
 import { useBookingStore, useSelectedFlight } from "@/store/bookingStore";
-import { PRICING_CONFIG, CONTACT_INFO, IASSURE_PRICING } from "@/config/constants";
+import { PRICING_CONFIG, IASSURE_PRICING } from "@/config/constants";
+import { useAffiliatePhone } from "@/lib/AffiliateContext";
 import { useTranslations } from "next-intl";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ErrorMessage } from "@/components/ui/error-message";
@@ -52,6 +53,9 @@ function PaymentContent() {
   const additionalBaggage = addOns.additionalBaggage;
 
   const { processPayment } = usePayment();
+  
+  // Get affiliate phone number
+  const { phoneNumber: affiliatePhone } = useAffiliatePhone();
 
   // Affiliate detection (Skyscanner copy if aff present and matches)
   const aff = searchParams?.get('aff') || '';
@@ -199,7 +203,7 @@ function PaymentContent() {
           {/* Web Ref Card - Mobile Only */}
           <WebRefCard
             refNumber={refNumber}
-            phoneNumber={CONTACT_INFO.phone}
+            phoneNumber={affiliatePhone}
             isMobile={true}
           />
 
@@ -243,7 +247,7 @@ function PaymentContent() {
               // Block duplicate payment attempts if already processed
               const completedOrderId = sessionStorage.getItem('paymentCompletedOrderId');
               if (completedOrderId) {
-                setPaymentErrorMessage(`This order has already been processed, please call on ${CONTACT_INFO.phone} quoting your reference number ${completedOrderId}. Please DO NOT book alternative travel arrangements as this may result in a duplicate booking - charges will apply.`);
+                setPaymentErrorMessage(`This order has already been processed, please call on ${affiliatePhone} quoting your reference number ${completedOrderId}. Please DO NOT book alternative travel arrangements as this may result in a duplicate booking - charges will apply.`);
                 setPaymentErrorOpen(true);
                 return;
               }
@@ -301,7 +305,7 @@ function PaymentContent() {
             {/* Web Ref Card - Desktop Only */}
             <WebRefCard
             refNumber={refNumber}
-            phoneNumber={CONTACT_INFO.phone}
+            phoneNumber={affiliatePhone}
               isMobile={false}
             />
 

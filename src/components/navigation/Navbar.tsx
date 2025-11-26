@@ -5,10 +5,12 @@ import Image from "next/image";
 import { useState } from "react";
 import { Phone, Menu, X } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useAffiliatePhone } from "@/lib/AffiliateContext";
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const t = useTranslations('common.navigation');
+  const { phoneNumber } = useAffiliatePhone();
 
   return (
     <nav className="w-full border-b bg-white sticky top-0 z-50 overflow-x-clip">
@@ -56,7 +58,7 @@ export default function Navbar() {
           {/* Phone Number */}
           <div className="flex items-center gap-3">
             <a
-              href="tel:02045022984"
+              href={`tel:${phoneNumber.replace(/\s/g, '')}`}
               className="hidden sm:flex items-center gap-2 bg-[rgba(55,84,237,0.12)] rounded-[40px] px-4 py-2"
             >
               <div className="w-9 h-9 rounded-full bg-[#0B229E] flex items-center justify-center">
@@ -67,7 +69,7 @@ export default function Navbar() {
                   {t('phone.label')}
                 </span>
                 <span className="text-[#010D50] text-sm font-bold">
-                  {t('phone.number')}
+                  {phoneNumber}
                 </span>
               </div>
             </a>
@@ -75,7 +77,7 @@ export default function Navbar() {
             {/* Mobile actions */}
             <div className="flex items-center md:hidden gap-2">
               <a
-                href="tel:02045022984"
+                href={`tel:${phoneNumber.replace(/\s/g, '')}`}
                 aria-label={t('phone.ariaLabel')}
                 className="w-9 h-9 rounded-full bg-[#0B229E] flex items-center justify-center"
               >

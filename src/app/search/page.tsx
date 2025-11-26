@@ -15,6 +15,7 @@ import { useFilterExpansion } from "@/hooks/useFilterExpansion";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ErrorMessage } from "@/components/ui/error-message";
+import { useAffiliate } from "@/lib/AffiliateContext";
 
 // Import new modular components
 import { SearchHeader } from "@/components/search/SearchHeader";
@@ -45,11 +46,21 @@ function SearchPageContent() {
   const urlParams = useSearchParams();
   const setStoreSearchParams = useBookingStore((state) => state.setSearchParams);
   const storeSearchParams = useBookingStore((state) => state.searchParams);
+  const { setAffiliateCode } = useAffiliate();
   const [isInitialized, setIsInitialized] = useState(false);
   const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
   const prevLoadingRef = useRef(false);
   const [isDateChanging, setIsDateChanging] = useState(false);
   const [fareExpiredOpen, setFareExpiredOpen] = useState(false);
+
+  // Handle affiliate code from URL
+  useEffect(() => {
+    const affCode = urlParams.get('aff');
+    if (affCode) {
+      setAffiliateCode(affCode);
+      console.log('Affiliate code detected in search URL:', affCode);
+    }
+  }, [urlParams, setAffiliateCode]);
   
   // Helper to parse date string (YYYY-MM-DD) as local date
   const parseDateFromURL = (dateStr: string): Date => {

@@ -9,6 +9,7 @@ import { useTranslations } from "next-intl";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ErrorMessage } from "@/components/ui/error-message";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
+import { useAffiliatePhone } from "@/lib/AffiliateContext";
 
 // Import new modular components
 import { BookingHeader } from "@/components/booking/BookingHeader";
@@ -51,6 +52,9 @@ function BookingContent() {
   const storeSearchParams = useBookingStore((s) => s.searchParams);
   const setPriceCheckData = useBookingStore((s) => s.setPriceCheckData);
   const { checkPrice, priceCheck } = usePriceCheck();
+  
+  // Get affiliate phone number
+  const { phoneNumber: affiliatePhone } = useAffiliatePhone();
 
   // Redirect to search if no flight selected
   useEffect(() => {
@@ -136,7 +140,7 @@ function BookingContent() {
           {/* Web Ref Card - Mobile Only (shown at top) */}
           <WebRefCard
             refNumber="IN-649707636"
-            phoneNumber="020 4502 2984"
+            phoneNumber={affiliatePhone}
             isMobile={true}
           />
 
@@ -197,7 +201,7 @@ function BookingContent() {
             {/* Web Ref Card - Desktop Only */}
             <WebRefCard
               refNumber="IN-649707636"
-              phoneNumber="020 4502 2984"
+              phoneNumber={affiliatePhone}
               isMobile={false}
             />
 
