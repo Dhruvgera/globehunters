@@ -274,9 +274,20 @@ export function DatePicker({
 }: DatePickerProps) {
   const today = new Date();
   
+  // Initialize to the selected start date's month if available, otherwise use today
+  const initialDate = startDate || today;
+  
   // Skyscanner-style: unified navigation - both months move together
-  const [baseMonth, setBaseMonth] = React.useState(today.getMonth());
-  const [baseYear, setBaseYear] = React.useState(today.getFullYear());
+  const [baseMonth, setBaseMonth] = React.useState(initialDate.getMonth());
+  const [baseYear, setBaseYear] = React.useState(initialDate.getFullYear());
+  
+  // Sync to selected date's month when startDate changes (e.g., when picker reopens with a selection)
+  React.useEffect(() => {
+    if (startDate) {
+      setBaseMonth(startDate.getMonth());
+      setBaseYear(startDate.getFullYear());
+    }
+  }, [startDate?.getTime()]); // Use getTime() to properly detect date changes
   
   // Calculate second month (always baseMonth + 1)
   const secondMonth = baseMonth === 11 ? 0 : baseMonth + 1;

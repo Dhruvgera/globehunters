@@ -45,12 +45,23 @@ export function formatDuration(minutes: number): string {
 
 /**
  * Check if flight matches stop filter
+ * Uses maximum stops across all legs - a flight is "direct" only if ALL legs are direct
+ * "1 stop" means the worst leg has at most 1 stop, etc.
  */
 function matchesStops(flight: Flight, selectedStops: number[]): boolean {
   if (selectedStops.length === 0) {
     return true;
   }
-  return selectedStops.includes(flight.outbound.stops);
+  
+  // Get the maximum stops across all legs
+  const outboundStops = flight.outbound.stops;
+  const inboundStops = flight.inbound?.stops ?? 0;
+  const maxStops = Math.max(outboundStops, inboundStops);
+  
+  // Cap at 2 for "2+ stops" category
+  const stopsCategory = Math.min(maxStops, 2);
+  
+  return selectedStops.includes(stopsCategory);
 }
 
 /**
@@ -289,13 +300,21 @@ export function getUniqueArrivalAirports(flights: Flight[]): string[] {
 
 /**
  * Count flights by number of stops
+ * For round-trip flights, uses the maximum stops between outbound and inbound
+ * so that a flight only counts as "direct" if BOTH legs are direct
  */
 export function countByStops(flights: Flight[]): Record<number, number> {
   const counts: Record<number, number> = { 0: 0, 1: 0, 2: 0 };
 
   flights.forEach(flight => {
-    const stops = flight.outbound.stops;
-    counts[stops] = (counts[stops] || 0) + 1;
+    // For round-trip, take the max stops (so a flight is only "direct" if both legs are direct)
+    const outboundStops = flight.outbound.stops;
+    const inboundStops = flight.inbound?.stops ?? 0;
+    const maxStops = Math.max(outboundStops, inboundStops);
+    
+    // Cap at 2+ for the filter categories
+    const stopsCategory = Math.min(maxStops, 2);
+    counts[stopsCategory] = (counts[stopsCategory] || 0) + 1;
   });
 
   return counts;

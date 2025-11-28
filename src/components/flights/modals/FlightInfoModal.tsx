@@ -219,6 +219,10 @@ export default function FlightInfoModal({
     } else {
       // Fallback to original flight price
       setSelectedFlight(flight, 'Economy');
+      // Still save price check data if available (for any flight details)
+      if (priceCheck) {
+        setPriceCheckData(priceCheck);
+      }
     }
 
     if (stayOnCurrentPage) {
@@ -452,6 +456,10 @@ export default function FlightInfoModal({
                                         </span>
                                         <span className="text-[#3A478A]">
                                           {flight.departureAirport} → {flight.arrivalAirport}
+                                        </span>
+                                        <span className="text-[#3A478A] opacity-50">•</span>
+                                        <span className="text-[#010D50] font-medium">
+                                          {flight.departureTime} - {flight.arrivalTime}
                                         </span>
                                         <span className="text-[#3A478A] opacity-50">•</span>
                                         <span className="text-[#3A478A]">
@@ -792,10 +800,10 @@ export default function FlightInfoModal({
             </div>
             <Button 
               onClick={handleBookNow}
-              disabled={!selectedUpgradeOption && !flight.price}
+              disabled={!flight.price && !selectedUpgradeOption}
               className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-full px-4 sm:px-5 py-2 h-auto gap-1 text-sm font-bold shrink-0 disabled:opacity-50"
             >
-              Book
+              {isLoading ? 'Book' : (priceCheck && priceCheck.priceOptions.length === 0 ? 'Book Now' : 'Book')}
               <svg
                 width="20"
                 height="20"
