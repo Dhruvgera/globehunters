@@ -725,12 +725,16 @@ export default function FlightInfoModal({
                         <RotateCcw className="w-5 h-5 sm:w-6 sm:h-6 text-[#010D50] shrink-0 mt-0.5" />
                         <div className="flex flex-col gap-0.5 min-w-0">
                           <span className="text-xs sm:text-sm font-medium text-[#010D50]">
-                            {priceCheck?.flightDetails?.refundable ? 'Refundable' : 'Non-Refundable'}
+                            {priceCheck?.flightDetails?.refundableStatus === 'fully-refundable' 
+                              ? 'Fully Refundable'
+                              : priceCheck?.flightDetails?.refundableStatus === 'refundable-with-penalty'
+                              ? 'Refundable with Penalty'
+                              : priceCheck?.flightDetails?.refundable 
+                              ? 'Refundable' 
+                              : 'Non-Refundable'}
                           </span>
                           <span className="text-xs sm:text-sm text-[#3A478A] break-words">
-                            {priceCheck?.flightDetails?.refundable 
-                              ? 'Ticket can be refunded (fees may apply)' 
-                              : 'Ticket can\'t be refunded'}
+                            {priceCheck?.flightDetails?.refundableText || 'Ticket can\'t be refunded'}
                           </span>
                         </div>
                       </div>

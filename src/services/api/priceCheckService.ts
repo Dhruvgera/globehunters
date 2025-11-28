@@ -223,15 +223,44 @@ export async function transformPriceCheckResponse(
       destination: flightResult.Destination || '',
       validatingCarrier: flightResult.validating_carrier || '',
       lastTicketDate: flightResult.last_ticket_date || '',
-      refundable: (() => {
-        const isRefundable = String(flightResult.refundable) === '1';
+      // Refundable codes: 1=Refundable, 2=Non-Refundable, 3=RefundableWithPenalty, 4=FullyRefundable
+      ...(() => {
+        const refundCode = parseInt(String(flightResult.refundable), 10);
         console.log('[PriceCheck] refundable value:', {
           raw: flightResult.refundable,
-          type: typeof flightResult.refundable,
-          asString: String(flightResult.refundable),
-          result: isRefundable
+          code: refundCode
         });
-        return isRefundable;
+        
+        // Map code to status and text
+        let refundableStatus: 'non-refundable' | 'refundable' | 'refundable-with-penalty' | 'fully-refundable';
+        let refundableText: string;
+        let refundable: boolean;
+        
+        switch (refundCode) {
+          case 1:
+            refundableStatus = 'refundable';
+            refundableText = 'Ticket can be refunded (fees may apply)';
+            refundable = true;
+            break;
+          case 3:
+            refundableStatus = 'refundable-with-penalty';
+            refundableText = 'Refundable with penalty fees';
+            refundable = true;
+            break;
+          case 4:
+            refundableStatus = 'fully-refundable';
+            refundableText = 'Fully refundable';
+            refundable = true;
+            break;
+          case 2:
+          default:
+            refundableStatus = 'non-refundable';
+            refundableText = 'Ticket can\'t be refunded';
+            refundable = false;
+            break;
+        }
+        
+        return { refundable, refundableStatus, refundableText };
       })(),
       changeable: isChangeable,
       seatSelectionFree: isSeatSelectionFree,

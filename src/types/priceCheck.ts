@@ -401,7 +401,12 @@ export interface PriceCheckResult {
     destination: string;
     validatingCarrier: string;
     lastTicketDate: string;
+    /** true if any form of refund is available (codes 1, 3, 4) */
     refundable: boolean;
+    /** Detailed refund status: 'non-refundable' | 'refundable' | 'refundable-with-penalty' | 'fully-refundable' */
+    refundableStatus: 'non-refundable' | 'refundable' | 'refundable-with-penalty' | 'fully-refundable';
+    /** Human-readable refund description */
+    refundableText: string;
     changeable: boolean;
     seatSelectionFree: boolean;
     availableSeats: string;
