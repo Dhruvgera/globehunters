@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { X, Check, Info, Clock, Briefcase, Package, ShoppingBag, XCircle as XIcon, Plane, MapPin, UtensilsCrossed, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { X, Check, Info, Clock, Briefcase, Package, ShoppingBag, XCircle as XIcon, Plane, MapPin, UtensilsCrossed, Loader2, ChevronDown, ChevronUp, RotateCcw, RefreshCw, Armchair } from "lucide-react";
 import Image from "next/image";
 import {
   Dialog,
@@ -722,11 +722,7 @@ export default function FlightInfoModal({
                     {/* Refundable Status - Dynamic from API */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-start gap-3 flex-1 min-w-0">
-                        {priceCheck?.flightDetails?.refundable ? (
-                          <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0 mt-0.5" />
-                        ) : (
-                          <XIcon className="w-5 h-5 sm:w-6 sm:h-6 text-[#010D50] shrink-0 mt-0.5" />
-                        )}
+                        <RotateCcw className="w-5 h-5 sm:w-6 sm:h-6 text-[#010D50] shrink-0 mt-0.5" />
                         <div className="flex flex-col gap-0.5 min-w-0">
                           <span className="text-xs sm:text-sm font-medium text-[#010D50]">
                             {priceCheck?.flightDetails?.refundable ? 'Refundable' : 'Non-Refundable'}
@@ -738,39 +734,55 @@ export default function FlightInfoModal({
                           </span>
                         </div>
                       </div>
-                      <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
+                      {priceCheck?.flightDetails?.refundable ? (
+                        <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
+                      ) : (
+                        <XIcon className="w-5 h-5 sm:w-6 sm:h-6 text-[#DC2626] shrink-0" />
+                      )}
                     </div>
 
                     {/* Changes - depends on fare type */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <XIcon className="w-5 h-5 sm:w-6 sm:h-6 text-[#010D50] shrink-0 mt-0.5" />
+                        <RefreshCw className="w-5 h-5 sm:w-6 sm:h-6 text-[#010D50] shrink-0 mt-0.5" />
                         <div className="flex flex-col gap-0.5 min-w-0">
                           <span className="text-xs sm:text-sm font-medium text-[#010D50]">
-                            Changes not allowed
+                            {priceCheck?.flightDetails?.changeable ? 'Changes allowed' : 'Changes not allowed'}
                           </span>
                           <span className="text-xs sm:text-sm text-[#3A478A] break-words">
-                            Flights can&apos;t be changed after booking
+                            {priceCheck?.flightDetails?.changeable 
+                              ? 'Flights can be changed (fees may apply)' 
+                              : 'Flights can\'t be changed after booking'}
                           </span>
                         </div>
                       </div>
-                      <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
+                      {priceCheck?.flightDetails?.changeable ? (
+                        <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
+                      ) : (
+                        <XIcon className="w-5 h-5 sm:w-6 sm:h-6 text-[#DC2626] shrink-0" />
+                      )}
                     </div>
 
                     {/* Seat Choice */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#010D50] shrink-0 mt-0.5" />
+                        <Armchair className="w-5 h-5 sm:w-6 sm:h-6 text-[#010D50] shrink-0 mt-0.5" />
                         <div className="flex flex-col gap-0.5 min-w-0">
                           <span className="text-xs sm:text-sm font-medium text-[#010D50]">
-                            Seat choice for free
+                            {priceCheck?.flightDetails?.seatSelectionFree ? 'Seat choice for free' : 'Seat selection available'}
                           </span>
                           <span className="text-xs sm:text-sm text-[#3A478A] break-words">
-                            Choose your desired seat for free
+                            {priceCheck?.flightDetails?.seatSelectionFree 
+                              ? 'Choose your desired seat for free' 
+                              : 'Seat selection available for a charge'}
                           </span>
                         </div>
                       </div>
-                      <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
+                      {priceCheck?.flightDetails?.seatSelectionFree ? (
+                        <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
+                      ) : (
+                        <XIcon className="w-5 h-5 sm:w-6 sm:h-6 text-[#DC2626] shrink-0" />
+                      )}
                     </div>
                   </div>
                 </div>

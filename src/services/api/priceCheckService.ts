@@ -191,6 +191,31 @@ export async function transformPriceCheckResponse(
       );
     }
 
+    // Extract flexibility info from OptionalService array in first price_data
+    // Handle both array and object-with-numeric-keys formats
+    let firstPriceData: any = null;
+    if (Array.isArray(pc.price_data)) {
+      firstPriceData = pc.price_data[0];
+    } else if (pc.price_data && typeof pc.price_data === 'object') {
+      // Get first item from object (key "0" or first available key)
+      const keys = Object.keys(pc.price_data).sort((a, b) => parseInt(a) - parseInt(b));
+      firstPriceData = keys.length > 0 ? (pc.price_data as any)[keys[0]] : null;
+    }
+    
+    const optionalServices = firstPriceData?.Total_Fare?.OptionalService || [];
+    
+    // Check if changeable (Rebooking tag with "Included in the brand")
+    const changeableService = optionalServices.find(
+      (s: { Tag?: string }) => s.Tag === 'Rebooking'
+    );
+    const isChangeable = changeableService?.Chargeable === 'Included in the brand';
+    
+    // Check if seat selection is free (Basic Seat tag with "Included in the brand")
+    const seatService = optionalServices.find(
+      (s: { Tag?: string }) => s.Tag === 'Basic Seat'
+    );
+    const isSeatSelectionFree = seatService?.Chargeable === 'Included in the brand';
+
     // Extract flight details safely
     const flightDetails = {
       id: flightResult.id || '',
@@ -208,6 +233,8 @@ export async function transformPriceCheckResponse(
         });
         return isRefundable;
       })(),
+      changeable: isChangeable,
+      seatSelectionFree: isSeatSelectionFree,
       availableSeats: flightResult.avlSeats || 'Limited',
       segments: flightSegments.map((seg) => {
         try {
@@ -244,10 +271,20 @@ export async function transformPriceCheckResponse(
     };
 
     // Extract price options (upgrade options) - handle safely
+    // Normalize price_data: API returns either an array OR an object with numeric keys
+    let priceDataArray: PriceData[] = [];
+    if (Array.isArray(pc.price_data)) {
+      priceDataArray = pc.price_data;
+    } else if (pc.price_data && typeof pc.price_data === 'object') {
+      // Convert object with numeric keys to array
+      priceDataArray = Object.values(pc.price_data) as PriceData[];
+      console.log('[PriceCheck] Converted price_data object to array:', priceDataArray.length, 'options');
+    }
+
     let priceOptions: TransformedPriceOption[] = [];
     try {
       priceOptions = extractUpgradeOptions(
-        pc.price_data || [],
+        priceDataArray,
         sourceCurrency
       );
     } catch (priceError) {

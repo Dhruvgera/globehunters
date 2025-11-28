@@ -311,6 +311,16 @@ export interface TotalFare {
   Atol_fee: string;
   Atol_count: string;
   SAFI: string;
+  OptionalService?: {
+    Type?: string;
+    Tag?: string;
+    Chargeable?: string;
+    text?: string;
+    DisplayOrder?: number;
+    Key?: string;
+    ServiceSubCode?: string;
+    SecondaryType?: string;
+  }[];
 }
 
 /**
@@ -392,6 +402,8 @@ export interface PriceCheckResult {
     validatingCarrier: string;
     lastTicketDate: string;
     refundable: boolean;
+    changeable: boolean;
+    seatSelectionFree: boolean;
     availableSeats: string;
     segments: {
       segmentNumber: number;
