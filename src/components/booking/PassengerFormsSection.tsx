@@ -54,18 +54,18 @@ export default function PassengerFormsSection({
       }
       addPassenger(passenger);
     }
-    setSaved((prev) => {
-      const next = { ...prev, [slotIndex]: true };
-      const allSaved = requiredPassengers.every((_, idx) => next[idx]);
-      setPassengersSaved(allSaved);
-      return next;
-    });
+    setSaved((prev) => ({ ...prev, [slotIndex]: true }));
   };
+
+  // Sync passengersSaved state when saved changes
+  useEffect(() => {
+    const allSaved = requiredPassengers.length > 0 && requiredPassengers.every((_, idx) => saved[idx]);
+    setPassengersSaved(allSaved);
+  }, [saved, requiredPassengers, setPassengersSaved]);
 
   useEffect(() => {
     setSaved({});
-    setPassengersSaved(false);
-  }, [searchParams, setPassengersSaved]);
+  }, [searchParams]);
 
   return (
     <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-6">
@@ -103,11 +103,7 @@ export default function PassengerFormsSection({
                 leadAddress={idx > 0 ? { address: passengers[0]?.address, postalCode: passengers[0]?.postalCode } : undefined}
                 passengerType={slot.type}
                 onCancel={() => {
-                  setSaved((prev) => {
-                    const next = { ...prev, [idx]: false };
-                    setPassengersSaved(false);
-                    return next;
-                  });
+                  setSaved((prev) => ({ ...prev, [idx]: false }));
                 }}
               />
             </div>
