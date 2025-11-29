@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useState, ReactNode } from "react";
 
 interface Airline {
   name: string;
@@ -10,9 +10,10 @@ interface Airline {
 
 interface AirlineHeaderProps {
   airline: Airline;
+  rightContent?: ReactNode;
 }
 
-export function AirlineHeader({ airline }: AirlineHeaderProps) {
+export function AirlineHeader({ airline, rightContent }: AirlineHeaderProps) {
   const [imgError, setImgError] = useState(false);
   
   // Use airhex.com for airline logos
@@ -42,22 +43,8 @@ export function AirlineHeader({ airline }: AirlineHeaderProps) {
           {airline.name}
         </span>
       </div>
-      <div className="flex items-center gap-3">
-        <svg
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          className="text-[#FF3800]"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M5 12h14M12 5l7 7-7 7"
-          />
-        </svg>
+      <div className="flex items-center gap-2">
+        {rightContent}
       </div>
     </div>
   );

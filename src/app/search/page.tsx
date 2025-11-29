@@ -633,7 +633,7 @@ function SearchPageContent() {
           </div>
 
           {/* Flight Results */}
-          <div className="flex-1 flex flex-col gap-2 order-2 lg:order-2">
+          <div className="flex-1 flex flex-col gap-2 order-2 lg:order-2 min-w-0 overflow-hidden">
             <FlightsList
               flights={filteredFlights}
               displayCount={displayedFlightsCount}

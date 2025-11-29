@@ -149,6 +149,7 @@
       "viewFlightInfo": "View Flight Info",
       "ticketOptions": "Ticket Options",
       "select": "Select",
+      "book": "Book",
       "bookNow": "Book Now",
       "selectFlight": "Select this flight",
       "perPerson": "/per person",
@@ -159,7 +160,8 @@
       "whatsapp": "WhatsApp",
       "email": "Email",
       "copyLink": "Copy Link",
-      "linkCopied": "Link copied to clipboard!"
+      "linkCopied": "Link copied to clipboard!",
+      "noUpgradesAvailable": "No upgrades available for this fare"
     },
     "states": {
       "loading": {

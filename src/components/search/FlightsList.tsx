@@ -21,7 +21,7 @@ export function FlightsList({
   const hasMore = displayCount < flights.length;
 
   return (
-    <div className="flex-1 flex flex-col gap-2">
+    <div className="flex-1 flex flex-col gap-2 min-w-0">
       {displayedFlights.map((flight) => (
         <FlightCard key={flight.id} flight={flight} />
       ))}

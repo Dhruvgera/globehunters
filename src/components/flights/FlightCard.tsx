@@ -10,6 +10,7 @@ import { FlightLegMobile } from "./flight-card/FlightLegMobile";
 import { FlightLegDesktop } from "./flight-card/FlightLegDesktop";
 import { FlightActions } from "./flight-card/FlightActions";
 import { TicketOptionsPanel } from "./flight-card/TicketOptionsPanel";
+import { ShareButton } from "@/components/ui/share-button";
 import { usePriceCheck } from "@/hooks/usePriceCheck";
 
 interface FlightCardProps {
@@ -48,7 +49,7 @@ export default function FlightCard({
   const isDebugMode = process.env.NEXT_PUBLIC_DEBUG_FLIGHT_IDS === 'true';
 
   return (
-    <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow">
+    <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow overflow-hidden w-full max-w-full">
       {/* Debug Info */}
       {isDebugMode && (flight.segmentResultId || flight.moduleId) && (
         <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs font-mono space-y-1">
@@ -70,7 +71,10 @@ export default function FlightCard({
       {/* Flight Details */}
       <div className="flex flex-col gap-4">
         {/* Airline Header */}
-        <AirlineHeader airline={flight.airline} />
+        <AirlineHeader 
+          airline={flight.airline} 
+          rightContent={<ShareButton flight={flight} />}
+        />
 
         {/* Outbound Flight */}
         <FlightLegMobile leg={flight.outbound} />
@@ -90,7 +94,6 @@ export default function FlightCard({
 
       {/* Price and Actions */}
       <FlightActions
-        flight={flight}
         currency={flight.currency}
         pricePerPerson={flight.pricePerPerson}
         showTicketOptions={showTicketOptions}
