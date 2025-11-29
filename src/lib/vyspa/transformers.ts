@@ -182,9 +182,16 @@ function transformResult(result: VyspaResult): Flight | null {
     currency: result.currency_code.toUpperCase(), // Store code, not symbol
     webRef: result.Result_id,
     baggage: result.Baggage,
-    refundable: typeof (firstFlight as any).refundable === 'string'
-      ? ((firstFlight as any).refundable === '1')
-      : (typeof (firstFlight as any).refundable === 'boolean' ? (firstFlight as any).refundable : null),
+    // Refundable codes: 1=Refundable, 2=Non-Refundable, 3=RefundableWithPenalty, 4=FullyRefundable
+    refundable: (() => {
+      const raw = (firstFlight as any).refundable;
+      if (raw === undefined || raw === null) return null;
+      const code = typeof raw === 'string' ? parseInt(raw, 10) : raw;
+      // Codes 1, 3, 4 are refundable; code 2 is non-refundable
+      if (code === 1 || code === 3 || code === 4) return true;
+      if (code === 2) return false;
+      return null;
+    })(),
     refundableText: (firstFlight as any).refundable_text,
     hasBaggage,
     // Store segment result ID for price check

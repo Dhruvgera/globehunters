@@ -131,9 +131,7 @@ function matchesArrivalAirport(flight: Flight, selectedAirports: string[]): bool
 }
 
 /**
- * Check if flight matches extras filter
- * Note: This is a placeholder. The Flight type needs to include refundable, meals, and baggage fields
- * for this filter to work properly. For now, it returns true (shows all flights).
+ * Check if flight matches extras filter (refundable, meals, baggage)
  */
 function matchesExtras(flight: Flight, selectedExtras: string[]): boolean {
   if (selectedExtras.length === 0) {
