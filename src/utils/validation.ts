@@ -33,6 +33,30 @@ export function validateName(name: string): boolean {
 }
 
 /**
+ * Calculate age in years from date of birth
+ */
+export function calculateAge(dateOfBirth: string): number {
+  const dob = new Date(dateOfBirth);
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const monthDiff = now.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) {
+    age--;
+  }
+  return age;
+}
+
+/**
+ * Calculate age in months from date of birth (for infants)
+ */
+export function calculateAgeInMonths(dateOfBirth: string): number {
+  const dob = new Date(dateOfBirth);
+  const now = new Date();
+  const months = (now.getFullYear() - dob.getFullYear()) * 12 + (now.getMonth() - dob.getMonth());
+  return months;
+}
+
+/**
  * Validate date of birth (must be in the past, valid date)
  */
 export function validateDateOfBirth(dateString: string, minAge: number = 0, maxAge: number = 120): boolean {
@@ -52,6 +76,118 @@ export function validateDateOfBirth(dateString: string, minAge: number = 0, maxA
   // Check age constraints
   const age = Math.floor((now.getTime() - date.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
   return age >= minAge && age <= maxAge;
+}
+
+/**
+ * Parse date string in various formats (DD/MM/YYYY, YYYY-MM-DD, etc.)
+ */
+function parseDateString(dateString: string): Date | null {
+  if (!dateString) return null;
+  
+  // Try DD/MM/YYYY format first (common in UK)
+  const ddmmyyyyMatch = dateString.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (ddmmyyyyMatch) {
+    const [, day, month, year] = ddmmyyyyMatch;
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    if (!isNaN(date.getTime())) {
+      return date;
+    }
+  }
+  
+  // Try YYYY-MM-DD format (ISO)
+  const isoMatch = dateString.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (isoMatch) {
+    const [, year, month, day] = isoMatch;
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    if (!isNaN(date.getTime())) {
+      return date;
+    }
+  }
+  
+  // Fallback to native Date parsing
+  const date = new Date(dateString);
+  if (!isNaN(date.getTime())) {
+    return date;
+  }
+  
+  return null;
+}
+
+/**
+ * Validate date of birth for a specific passenger type
+ * ADT (Adult): 12+ years old
+ * CHD (Child): 2-11 years old
+ * INF (Infant): 0-23 months old
+ */
+export function validateDateOfBirthForType(
+  dateString: string, 
+  passengerType: 'adult' | 'child' | 'infant'
+): { valid: boolean; error?: string } {
+  const date = parseDateString(dateString);
+  const now = new Date();
+
+  // Check if valid date
+  if (!date) {
+    return { valid: false, error: 'Please enter a valid date of birth' };
+  }
+
+  // Check if in the past
+  if (date >= now) {
+    return { valid: false, error: 'Date of birth must be in the past' };
+  }
+
+  // Calculate age using the parsed date
+  const ageInYears = calculateAgeFromDate(date);
+  const ageInMonths = calculateAgeInMonthsFromDate(date);
+
+  switch (passengerType) {
+    case 'adult':
+      // Adults must be 12+ years old
+      if (ageInYears < 12) {
+        return { valid: false, error: 'Adult passengers must be 12 years or older' };
+      }
+      break;
+    
+    case 'child':
+      // Children must be 2-11 years old
+      if (ageInYears < 2) {
+        return { valid: false, error: 'Child passengers must be at least 2 years old' };
+      }
+      if (ageInYears >= 12) {
+        return { valid: false, error: 'Child passengers must be under 12 years old' };
+      }
+      break;
+    
+    case 'infant':
+      // Infants must be 0-23 months old
+      if (ageInMonths >= 24) {
+        return { valid: false, error: 'Infant passengers must be under 24 months old' };
+      }
+      break;
+  }
+
+  return { valid: true };
+}
+
+/**
+ * Calculate age in years from a Date object
+ */
+function calculateAgeFromDate(dob: Date): number {
+  const now = new Date();
+  let age = now.getFullYear() - dob.getFullYear();
+  const monthDiff = now.getMonth() - dob.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dob.getDate())) {
+    age--;
+  }
+  return age;
+}
+
+/**
+ * Calculate age in months from a Date object
+ */
+function calculateAgeInMonthsFromDate(dob: Date): number {
+  const now = new Date();
+  return (now.getFullYear() - dob.getFullYear()) * 12 + (now.getMonth() - dob.getMonth());
 }
 
 /**
@@ -179,8 +315,13 @@ export function validatePostalCode(postalCode: string, country?: string): boolea
 
 /**
  * Validate complete passenger form
+ * @param passenger - Passenger data to validate
+ * @param passengerType - Optional passenger type for age validation (adult, child, infant)
  */
-export function validatePassenger(passenger: Passenger): PassengerFormErrors {
+export function validatePassenger(
+  passenger: Passenger, 
+  passengerType?: 'adult' | 'child' | 'infant'
+): PassengerFormErrors {
   const errors: PassengerFormErrors = {};
 
   if (!validateName(passenger.firstName)) {
@@ -191,8 +332,11 @@ export function validatePassenger(passenger: Passenger): PassengerFormErrors {
     errors.lastName = 'Please enter a valid last name';
   }
 
-  if (!validateDateOfBirth(passenger.dateOfBirth)) {
-    errors.dateOfBirth = 'Please enter a valid date of birth';
+  // Use type-specific validation if passenger type is provided
+  const type = passengerType || passenger.type || 'adult';
+  const dobValidation = validateDateOfBirthForType(passenger.dateOfBirth, type);
+  if (!dobValidation.valid) {
+    errors.dateOfBirth = dobValidation.error || 'Please enter a valid date of birth';
   }
 
   if (!validateEmail(passenger.email)) {

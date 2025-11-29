@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Passenger, PassengerFormErrors } from "@/types/booking";
-import { validatePassenger, hasErrors } from "@/utils/validation";
+import { validatePassenger, hasErrors, validateDateOfBirthForType } from "@/utils/validation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,8 @@ interface PassengerFormProps {
   showPassportFields?: boolean;
   disabled?: boolean;
   leadAddress?: { address?: string; postalCode?: string };
+  /** Passenger type for age validation: adult (12+), child (2-11), infant (0-23 months) */
+  passengerType?: 'adult' | 'child' | 'infant';
 }
 
 export function PassengerForm({
@@ -33,6 +35,7 @@ export function PassengerForm({
   showPassportFields = false,
   disabled = false,
   leadAddress,
+  passengerType = 'adult',
 }: PassengerFormProps) {
   const t = useTranslations('booking.passengerDetails');
   
@@ -52,8 +55,28 @@ export function PassengerForm({
 
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
+  // Validate date of birth on initial load if pre-populated
+  useEffect(() => {
+    if (formData.dateOfBirth) {
+      const dobValidation = validateDateOfBirthForType(formData.dateOfBirth, passengerType);
+      if (!dobValidation.valid) {
+        setErrors((prev) => ({ ...prev, dateOfBirth: dobValidation.error }));
+      }
+    }
+  }, [formData.dateOfBirth, passengerType]);
+
   const handleChange = (field: keyof Passenger, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    
+    // Real-time validation for date of birth
+    if (field === 'dateOfBirth' && value) {
+      const dobValidation = validateDateOfBirthForType(value, passengerType);
+      if (!dobValidation.valid) {
+        setErrors((prev) => ({ ...prev, dateOfBirth: dobValidation.error }));
+        return;
+      }
+    }
+    
     // Clear error for this field when user starts typing
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));
@@ -79,8 +102,15 @@ export function PassengerForm({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate form data
-    const validationErrors = validatePassenger(formData as Passenger);
+    // Validate form data with passenger type for age validation
+    const validationErrors = validatePassenger(formData as Passenger, passengerType);
+    
+    console.log('[PassengerForm] Validation:', {
+      passengerType,
+      dateOfBirth: formData.dateOfBirth,
+      errors: validationErrors,
+      hasErrors: hasErrors(validationErrors),
+    });
 
     if (hasErrors(validationErrors)) {
       setErrors(validationErrors as Record<string, string | undefined>);

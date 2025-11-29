@@ -33,6 +33,11 @@ export const API_CONFIG = {
       protectionPlans: '/v1/add-ons/protection-plans',
       baggage: '/v1/add-ons/baggage',
     },
+    folders: {
+      create: '/rest/v4/ApiCreateFolder/',
+      addToFolder: '/rest/v4/ApiAddToFolder/',
+      get: '/rest/v4/ApiGetFolder/',
+    },
   },
 };
 

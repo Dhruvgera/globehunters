@@ -249,6 +249,7 @@ export async function POST(req: Request) {
       folderNumber,
       passengerCount: mappedPassengers.length,
       passengerIndices,
+      payload: JSON.stringify(addToFolderPayload, null, 2),
     });
 
     const addToFolderResponse = await fetch(`${apiUrl}/rest/v4/ApiAddToFolder/`, {
@@ -290,10 +291,18 @@ export async function POST(req: Request) {
       );
     }
 
-    const addToFolderJson: any = await addToFolderResponse.json().catch((jsonError) => {
+    // Get raw text first to debug HTML responses
+    const addToFolderText = await addToFolderResponse.text();
+    let addToFolderJson: any = {};
+    
+    try {
+      addToFolderJson = JSON.parse(addToFolderText);
+    } catch (jsonError) {
       console.error('❌ Vyspa ApiAddToFolder JSON parse failed', jsonError);
-      return {};
-    });
+      console.log('📦 Vyspa ApiAddToFolder raw response:', addToFolderText.substring(0, 1000));
+    }
+
+    console.log('📦 Vyspa ApiAddToFolder response body:', JSON.stringify(addToFolderJson, null, 2));
 
     // Debug-only: fetch folder details to verify folder creation
     try {
