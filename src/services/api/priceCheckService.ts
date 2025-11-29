@@ -599,28 +599,38 @@ export function mapCabinClass(code: string): string {
 
 /**
  * Parse baggage description from baggage code
- * Format examples: "SK***", "SK***1p", "SK***2p"
+ * Format examples: 
+ * - "SK***" - cabin bag only
+ * - "SK***1p", "SK***2p" - piece-based
+ * - "GF***25K", "GF***30K" - weight-based (kg)
  */
 function parseBaggageDescription(baggageCode: string): string {
   if (!baggageCode || baggageCode.trim() === '') return '1 Cabin bag';
   
   const code = baggageCode.trim();
   
+  // Check for weight-based indicators (e.g., "GF***25K", "GF***30K", "25kg")
+  const weightMatch = code.match(/(\d+)\s*[Kk][Gg]?/);
+  if (weightMatch) {
+    const weight = parseInt(weightMatch[1]);
+    if (weight > 0) return `${weight}kg checked baggage`;
+  }
+  
   // Check for piece indicators
-  if (code.includes('1p')) return '1 piece';
-  if (code.includes('2p')) return '2 pieces';
-  if (code.includes('3p')) return '3 pieces';
+  if (code.includes('1p')) return '1 checked bag';
+  if (code.includes('2p')) return '2 checked bags';
+  if (code.includes('3p')) return '3 checked bags';
   
   // If ends with just *** or similar, no checked bags
   if (code.endsWith('***') || code === 'SK***') return 'Cabin bag only';
   
-  // Extract number if present
+  // Extract number if present (piece-based)
   const numberMatch = code.match(/(\d+)p/i);
   if (numberMatch) {
     const num = parseInt(numberMatch[1]);
     if (num === 0) return 'Cabin bag only';
-    if (num === 1) return '1 piece';
-    return `${num} pieces`;
+    if (num === 1) return '1 checked bag';
+    return `${num} checked bags`;
   }
   
   // Default
