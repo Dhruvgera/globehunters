@@ -661,23 +661,52 @@ export default function FlightInfoModal({
                     Baggage
                   </span>
                   <div className="flex flex-col gap-3">
-                    {/* Baggage from API */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <Package className="w-5 h-5 sm:w-6 sm:h-6 text-[#010D50] shrink-0 mt-0.5" />
-                        <div className="flex flex-col gap-0.5 min-w-0">
-                          <span className="text-xs sm:text-sm font-medium text-[#010D50]">
-                            {selectedUpgradeOption.baggage.description}
-                          </span>
-                          {selectedUpgradeOption.baggage.details && (
-                            <span className="text-xs sm:text-sm text-[#3A478A] break-words">
-                              {selectedUpgradeOption.baggage.details.substring(0, 100)}
-                            </span>
-                          )}
+                    {/* Baggage from API - show per-leg if different */}
+                    {(() => {
+                      const perLeg = selectedUpgradeOption.baggage.perLeg;
+                      const hasDifferentBaggage = perLeg && perLeg.length > 1 && 
+                        !perLeg.every(leg => leg.allowance === perLeg[0].allowance);
+                      
+                      if (hasDifferentBaggage && perLeg) {
+                        // Show each leg's baggage separately
+                        return perLeg.map((leg, idx) => (
+                          <div key={idx} className="flex items-start justify-between gap-2">
+                            <div className="flex items-start gap-3 flex-1 min-w-0">
+                              <Package className="w-5 h-5 sm:w-6 sm:h-6 text-[#010D50] shrink-0 mt-0.5" />
+                              <div className="flex flex-col gap-0.5 min-w-0">
+                                <span className="text-xs sm:text-sm font-medium text-[#010D50]">
+                                  {leg.allowance}
+                                </span>
+                                <span className="text-xs sm:text-sm text-[#3A478A]">
+                                  {leg.route}
+                                </span>
+                              </div>
+                            </div>
+                            <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
+                          </div>
+                        ));
+                      }
+                      
+                      // Single baggage allowance for all legs
+                      return (
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <Package className="w-5 h-5 sm:w-6 sm:h-6 text-[#010D50] shrink-0 mt-0.5" />
+                            <div className="flex flex-col gap-0.5 min-w-0">
+                              <span className="text-xs sm:text-sm font-medium text-[#010D50]">
+                                {selectedUpgradeOption.baggage.description}
+                              </span>
+                              {selectedUpgradeOption.baggage.details && (
+                                <span className="text-xs sm:text-sm text-[#3A478A] break-words">
+                                  {selectedUpgradeOption.baggage.details.substring(0, 100)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
                         </div>
-                      </div>
-                      <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
-                    </div>
+                      );
+                    })()}
 
                     {/* Personal Item */}
                     <div className="flex items-start justify-between gap-2">

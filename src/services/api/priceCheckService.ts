@@ -522,19 +522,38 @@ function transformPriceOption(
 
   // Parse baggage from baggageTxt
   // Support both array-of-strings and route-keyed objects
+  // For mixed-cabin fares, show baggage per leg
   let baggageInfo = '';
+  let perLegBaggage: { route: string; allowance: string }[] = [];
   const baggageTxt = option.baggageTxt;
+  
   if (Array.isArray(baggageTxt)) {
     baggageInfo = baggageTxt[0] || '';
   } else if (baggageTxt && typeof baggageTxt === 'object') {
     const routeKeys = Object.keys(baggageTxt);
-    const firstRoute = routeKeys[0];
-    baggageInfo = firstRoute ? (baggageTxt as any)[firstRoute]?.ADT : '';
+    // Build per-leg baggage info with unique allowances per route
+    perLegBaggage = routeKeys.map(route => {
+      const rawValue = (baggageTxt as any)[route]?.ADT || '';
+      return {
+        route,
+        allowance: parseBaggageDescription(rawValue),
+      };
+    });
+    // For the main description, show the highest baggage allowance
+    const weights = routeKeys.map(route => {
+      const raw = (baggageTxt as any)[route]?.ADT || '';
+      const match = raw.match(/(\d+)\s*[Kk]/);
+      return match ? parseInt(match[1]) : 0;
+    });
+    const maxWeight = Math.max(...weights);
+    const maxIndex = weights.indexOf(maxWeight);
+    baggageInfo = maxIndex >= 0 ? (baggageTxt as any)[routeKeys[maxIndex]]?.ADT : '';
   }
   
   const baggage = {
     description: baggageInfo ? parseBaggageDescription(baggageInfo) : '1 Cabin bag',
     details: (baggageInfo && !/^[A-Z]{2}\*{3}/i.test(baggageInfo)) ? baggageInfo : undefined,
+    perLeg: perLegBaggage.length > 0 ? perLegBaggage : undefined,
   };
 
   return {

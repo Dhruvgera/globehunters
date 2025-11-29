@@ -62,6 +62,7 @@ export default function UpgradeOptionsModal({
       : formatPrice(o.totalPrice, o.currency),
     baggageDesc: o.baggage?.description,
     baggageDetails: o.baggage?.details,
+    baggagePerLeg: o.baggage?.perLeg,
     _raw: o,
   }));
 
@@ -156,6 +157,7 @@ export default function UpgradeOptionsModal({
                     {(() => {
                       if (hasApiOptions && (fare as any).baggageDesc) {
                         const raw = (fare as any)._raw as TransformedPriceOption;
+                        const perLeg = (fare as any).baggagePerLeg as { route: string; allowance: string }[] | undefined;
                         const brandFeatures: string[] = [];
                         (raw?.brandInfo || []).forEach((b: any) => {
                           if (Array.isArray(b?.features)) {
@@ -169,20 +171,43 @@ export default function UpgradeOptionsModal({
                           }
                         });
                         const refundable = priceCheckData?.flightDetails?.refundable ?? false;
-                        const features = [
-                          {
+                        
+                        // Build baggage features - show per-leg if available and different
+                        const baggageFeatures: { icon: string; title: string; description?: string }[] = [];
+                        if (perLeg && perLeg.length > 1) {
+                          // Check if all legs have same baggage
+                          const allSame = perLeg.every(leg => leg.allowance === perLeg[0].allowance);
+                          if (allSame) {
+                            baggageFeatures.push({
+                              icon: "checked_bags",
+                              title: perLeg[0].allowance,
+                            });
+                          } else {
+                            // Show each leg's baggage
+                            perLeg.forEach(leg => {
+                              baggageFeatures.push({
+                                icon: "checked_bags",
+                                title: `${leg.route}: ${leg.allowance}`,
+                              });
+                            });
+                          }
+                        } else {
+                          baggageFeatures.push({
                             icon: "checked_bags",
                             title: (fare as any).baggageDesc as string,
                             description: (fare as any).baggageDetails?.substring(0, 100) as string | undefined,
-                          },
+                          });
+                        }
+                        
+                        const features = [
+                          ...baggageFeatures,
                           {
                             icon: refundable ? "seat_choice" : "non_refundable",
                             title: refundable ? "Refundable" : "Non-Refundable",
-                            description: refundable ? "Ticket can be refunded per fare rules" : "Ticket can't be refunded",
+                            description: refundable ? "Ticket can be refunded (fees may apply)" : "Ticket can't be refunded",
                           },
-                          // Personal item and carry-on are universally included; omit to avoid noise
                           // Additional brand features when available
-                          ...brandFeatures.slice(0, 6).map((txt) => ({
+                          ...brandFeatures.slice(0, 4).map((txt) => ({
                             icon: normalizeFeatureIcon(txt),
                             title: txt,
                             description: undefined as string | undefined,

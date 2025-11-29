@@ -381,6 +381,7 @@ export interface TransformedPriceOption {
   baggage: {
     description: string;
     details?: string;
+    perLeg?: { route: string; allowance: string }[];
   };
   brandInfo?: BrandInfo[];
   isUpgrade: boolean; // true if this is an upgrade from base fare
