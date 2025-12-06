@@ -7,6 +7,14 @@ import { Flight, SearchParams } from '@/types/flight';
 import { flightService, FlightSearchResponse } from '@/services/api/flightService';
 import { flightCache } from '@/lib/cache/flightCache';
 
+// Helper to safely get timestamp from a date that might be a string or Date
+function getTimestamp(date: Date | string | undefined | null): number | undefined {
+  if (!date) return undefined;
+  if (date instanceof Date) return date.getTime();
+  const parsed = new Date(date);
+  return isNaN(parsed.getTime()) ? undefined : parsed.getTime();
+}
+
 interface UseFlightsOptions {
   enabled?: boolean; // Whether to automatically fetch on mount
 }
@@ -82,8 +90,8 @@ export function useFlights(
   }, [
     searchParams?.from,
     searchParams?.to,
-    searchParams?.departureDate?.getTime(),
-    searchParams?.returnDate?.getTime(),
+    getTimestamp(searchParams?.departureDate),
+    getTimestamp(searchParams?.returnDate),
     searchParams?.passengers?.adults,
     searchParams?.passengers?.children,
     searchParams?.passengers?.infants,

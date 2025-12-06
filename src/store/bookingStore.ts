@@ -101,10 +101,20 @@ const initialState = {
   currentStep: 'search' as const,
 };
 
-export const useBookingStore = create<BookingState>()(
+// Track hydration status
+interface HydrationState {
+  _hasHydrated: boolean;
+  setHasHydrated: (state: boolean) => void;
+}
+
+export const useBookingStore = create<BookingState & HydrationState>()(
   persist(
     (set) => ({
       ...initialState,
+      
+      // Hydration tracking
+      _hasHydrated: false,
+      setHasHydrated: (state) => set({ _hasHydrated: state }),
 
       // Search params
       setSearchParams: (params) => set({ searchParams: params }),
@@ -232,9 +242,18 @@ export const useBookingStore = create<BookingState>()(
         currentStep: state.currentStep,
         // Don't persist payment details for security
       }),
+      // Set hydration state when store is rehydrated
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );
+
+/**
+ * Hook to check if store has been hydrated from storage
+ */
+export const useStoreHydration = () => useBookingStore((state) => state._hasHydrated);
 
 /**
  * Selectors for commonly used derived state

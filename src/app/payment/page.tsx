@@ -4,17 +4,17 @@ import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
-import { useBookingStore, useSelectedFlight } from "@/store/bookingStore";
+import { useBookingStore, useSelectedFlight, useStoreHydration } from "@/store/bookingStore";
 import { PRICING_CONFIG, IASSURE_PRICING } from "@/config/constants";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
 import { useTranslations } from "next-intl";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ErrorMessage } from "@/components/ui/error-message";
-import { usePayment } from "@/hooks/usePayment";
+import { useBoxPay } from "@/hooks/useBoxPay";
 import { getRegion } from "@/lib/utils/domainMapping";
 
 // Import new modular components
@@ -37,6 +37,9 @@ function PaymentContent() {
   const [paymentErrorOpen, setPaymentErrorOpen] = useState(false);
   const [paymentErrorMessage, setPaymentErrorMessage] = useState<string>('');
 
+  // Check if store has been hydrated from sessionStorage
+  const hasHydrated = useStoreHydration();
+
   // Get selected flight and upgrade from Zustand store
   const flight = useSelectedFlight();
   const selectedUpgrade = useBookingStore((state) => state.selectedUpgradeOption);
@@ -48,11 +51,15 @@ function PaymentContent() {
   const setProtectionPlan = useBookingStore((state) => state.setProtectionPlan);
   const setAdditionalBaggage = useBookingStore((state) => state.setAdditionalBaggage);
   const vyspaFolderNumber = useBookingStore((state) => state.vyspaFolderNumber);
+  const passengers = useBookingStore((state) => state.passengers);
+  const contactEmail = useBookingStore((state) => state.contactEmail);
+  const contactPhone = useBookingStore((state) => state.contactPhone);
 
   const protectionPlan = addOns.protectionPlan;
   const additionalBaggage = addOns.additionalBaggage;
 
-  const { processPayment } = usePayment();
+  const { createSession, redirectToCheckout, loading: boxPayLoading, error: boxPayError } = useBoxPay();
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   
   // Get affiliate phone number
   const { phoneNumber: affiliatePhone } = useAffiliatePhone();
@@ -64,12 +71,12 @@ function PaymentContent() {
     return a.startsWith('sk') || a.includes('skyscanner');
   })();
 
-  // Redirect to search if no flight selected
+  // Redirect to search if no flight selected (only after store has hydrated)
   useEffect(() => {
-    if (!flight) {
+    if (hasHydrated && !flight) {
       router.push('/search');
     }
-  }, [flight, router]);
+  }, [hasHydrated, flight, router]);
 
   // Track session start for 60-min refresh expiry
   useEffect(() => {
@@ -94,9 +101,13 @@ function PaymentContent() {
     sessionStorage.setItem('paymentVisited', '1');
   }, []);
 
-  // Show loading state while redirecting
-  if (!flight) {
-    return null;
+  // Show loading state while store is hydrating or no flight selected
+  if (!hasHydrated || !flight) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-[#3754ED] animate-spin" />
+      </div>
+    );
   }
 
   // Price calculation - Use real pricing from selected upgrade or flight
@@ -242,8 +253,8 @@ function PaymentContent() {
               currency={currency}
             />
 
-            {/* Payment Details Form */}
-            <PaymentForm onSubmit={async (card, address) => {
+            {/* Billing Address Form */}
+            <PaymentForm onSubmit={async (billingAddress) => {
               // Block duplicate payment attempts if already processed
               const completedOrderId = sessionStorage.getItem('paymentCompletedOrderId');
               if (completedOrderId) {
@@ -251,35 +262,60 @@ function PaymentContent() {
                 setPaymentErrorOpen(true);
                 return;
               }
+              
+              setIsProcessingPayment(true);
+              
               try {
-                const resp = await processPayment({
-                  bookingId: orderId,
-                  paymentDetails: {
-                    method: 'credit_card',
-                    cardNumber: card.cardNumber!,
-                    expiryMonth: card.expiryMonth!,
-                    expiryYear: card.expiryYear!,
-                    cvv: card.cvv!,
-                    cardholderName: card.cardholderName!,
-                    billingAddress: address as any,
-                  } as any,
-                } as any);
-                if (resp && resp.paymentId) {
-                  // Mark as completed to prevent double charging
-                  sessionStorage.setItem('paymentCompletedOrderId', orderId);
-                  // Navigate to confirmation (placeholder)
-                  // router.push('/payment-completed');
+                // Get shopper info from billing address or passengers
+                const leadPassenger = passengers[0];
+                const firstName = billingAddress.firstName || leadPassenger?.firstName || 'Guest';
+                const lastName = billingAddress.lastName || leadPassenger?.lastName || 'User';
+                
+                // Create BoxPay session
+                const result = await createSession({
+                  orderId,
+                  amount: tripTotal,
+                  currency: currency,
+                  shopper: {
+                    firstName,
+                    lastName,
+                    email: contactEmail || 'customer@globehunters.com',
+                    phone: contactPhone || '442089444555',
+                    address: {
+                      address1: billingAddress.addressLine1,
+                      address2: billingAddress.addressLine2,
+                      city: billingAddress.city,
+                      state: billingAddress.state || billingAddress.city,
+                      countryCode: billingAddress.country === 'United Kingdom' ? 'GB' : billingAddress.country?.substring(0, 2).toUpperCase() || 'GB',
+                      postalCode: billingAddress.postalCode,
+                    },
+                  },
+                });
+
+                if (result.success && result.checkoutUrl) {
+                  // Store order info before redirect
+                  sessionStorage.setItem('pendingOrderId', orderId);
+                  sessionStorage.setItem('pendingOrderAmount', tripTotal.toString());
+                  sessionStorage.setItem('pendingOrderCurrency', currency);
+                  
+                  // Redirect to BoxPay checkout
+                  redirectToCheckout(result.checkoutUrl);
+                } else {
+                  throw new Error(result.error || 'Failed to create payment session');
                 }
               } catch (e) {
+                console.error('BoxPay error:', e);
                 // Show affiliate-specific copy
                 if (isSkyscanner) {
-                  setPaymentErrorMessage(`There has been a problem processing your order (${orderId}), and no payment has been charged from your card. Please check that all the card details are correct and try again`);
+                  setPaymentErrorMessage(`There has been a problem processing your order (${orderId}). Please check that all the details are correct and try again`);
                 } else {
-                  setPaymentErrorMessage(`There has been a problem processing your booking, please check that all the card details are correct and then try again. If you still encounter a problem, please call on 1800 226 817 quoting your reference number ${orderId}.\n\nPlease DO NOT book alternative travel arrangements as this may result in a duplicate booking - charges will apply`);
+                  setPaymentErrorMessage(`There has been a problem processing your booking, please check that all the details are correct and then try again. If you still encounter a problem, please call on ${affiliatePhone} quoting your reference number ${orderId}.\n\nPlease DO NOT book alternative travel arrangements as this may result in a duplicate booking - charges will apply`);
                 }
                 setPaymentErrorOpen(true);
+              } finally {
+                setIsProcessingPayment(false);
               }
-            }} onValidityChange={setIsPaymentValid} />
+            }} onValidityChange={setIsPaymentValid} loading={isProcessingPayment || boxPayLoading} />
 
             {/* Terms and Complete Booking */}
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-3 flex flex-col gap-6">
@@ -293,9 +329,23 @@ function PaymentContent() {
                 </label>
               </div>
 
-              <Button disabled={!isPaymentValid || !paymentTermsAccepted} className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-full px-5 py-2 h-auto gap-1 text-sm font-bold w-fit disabled:opacity-50 disabled:cursor-not-allowed">
-                {t('form.completeBooking')}
-                <ChevronLeft className="w-5 h-5 rotate-180" />
+              <Button 
+                type="submit"
+                form="billing-address-form"
+                disabled={!isPaymentValid || !paymentTermsAccepted || isProcessingPayment || boxPayLoading} 
+                className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-full px-5 py-2 h-auto gap-1 text-sm font-bold w-fit disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {(isProcessingPayment || boxPayLoading) ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    {t('form.completeBooking')}
+                    <ChevronLeft className="w-5 h-5 rotate-180" />
+                  </>
+                )}
               </Button>
             </div>
           </div>

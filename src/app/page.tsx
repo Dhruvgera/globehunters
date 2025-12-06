@@ -1,14 +1,132 @@
 "use client";
 
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
 import SearchBar from "@/components/search/SearchBar";
-import { Plane } from "lucide-react";
+import { Plane, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useBookingStore } from "@/store/bookingStore";
+import { useAffiliate } from "@/lib/AffiliateContext";
 
-export default function Home() {
+function HomeContent() {
   const t = useTranslations('home');
-  
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const { setAffiliateCode } = useAffiliate();
+  const setSelectedFlight = useBookingStore((state) => state.setSelectedFlight);
+  const setSearchParams = useBookingStore((state) => state.setSearchParams);
+  const setAffiliateData = useBookingStore((state) => state.setAffiliateData);
+
+  const [isLoadingDeeplink, setIsLoadingDeeplink] = useState(false);
+
+  // Check for deeplink params and handle meta channel URLs (Skyscanner)
+  useEffect(() => {
+    const key = searchParams.get("key");
+    const utmSource = searchParams.get("utm_source");
+    const utmMedium = searchParams.get("utm_medium");
+    const utmCampaign = searchParams.get("utm_campaign");
+    const cnc = searchParams.get("cnc");
+
+    // If no key, this is not a deeplink - show normal home page
+    if (!key) return;
+
+    // Handle deeplink flow
+    async function processDeeplink() {
+      setIsLoadingDeeplink(true);
+
+      // Store affiliate/tracking data
+      if (utmSource) {
+        setAffiliateCode(utmSource);
+        setAffiliateData({ code: utmSource });
+
+        // Store in sessionStorage for persistence
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("utm_source", utmSource);
+          if (utmMedium) sessionStorage.setItem("utm_medium", utmMedium);
+          if (utmCampaign) sessionStorage.setItem("utm_campaign", utmCampaign);
+          if (cnc) sessionStorage.setItem("cnc", cnc);
+        }
+      }
+
+      try {
+        // Call FlightView API to get flight details
+        const response = await fetch("/api/flight-view", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+          console.error("FlightView API error:", data);
+          // On error, redirect to search with error message
+          router.push("/search?error=flight_unavailable");
+          return;
+        }
+
+        // Store flight and search params in booking store
+        if (data.flight) {
+          setSelectedFlight(data.flight, data.flight.outbound?.cabinClass || "Economy");
+        }
+
+        if (data.searchParams) {
+          // Convert date strings back to Date objects
+          const params = {
+            ...data.searchParams,
+            departureDate: new Date(data.searchParams.departureDate),
+            returnDate: data.searchParams.returnDate
+              ? new Date(data.searchParams.returnDate)
+              : undefined,
+          };
+          setSearchParams(params);
+        }
+
+        // Redirect directly to booking page
+        router.push("/booking");
+      } catch (error) {
+        console.error("Deeplink processing error:", error);
+        router.push("/search?error=flight_unavailable");
+      }
+    }
+
+    processDeeplink();
+  }, [searchParams, router, setAffiliateCode, setSelectedFlight, setSearchParams, setAffiliateData]);
+
+  // Show loading state when processing deeplink
+  if (isLoadingDeeplink) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+        <Navbar />
+        <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
+          <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
+            <div className="relative mb-6">
+              <div className="w-20 h-20 mx-auto bg-[rgba(55,84,237,0.1)] rounded-full flex items-center justify-center">
+                <Plane className="w-10 h-10 text-[#3754ED] animate-pulse" />
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Loader2 className="w-24 h-24 text-[#3754ED]/20 animate-spin" />
+              </div>
+            </div>
+            <h1 className="text-2xl font-bold text-[#010D50] mb-3">
+              Loading Your Flight
+            </h1>
+            <p className="text-[#3A478A]">
+              Please wait while we retrieve your selected flight details...
+            </p>
+            <div className="mt-6 flex justify-center gap-1">
+              <span className="w-2 h-2 bg-[#3754ED] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+              <span className="w-2 h-2 bg-[#3754ED] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+              <span className="w-2 h-2 bg-[#3754ED] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
       <Navbar />
@@ -74,5 +192,19 @@ export default function Home() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white flex items-center justify-center">
+          <Loader2 className="w-12 h-12 text-[#3754ED] animate-spin" />
+        </div>
+      }
+    >
+      <HomeContent />
+    </Suspense>
   );
 }

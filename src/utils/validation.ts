@@ -395,8 +395,17 @@ export function validatePaymentCard(card: CardDetails): PaymentFormErrors {
 /**
  * Validate billing address
  */
-export function validateBillingAddress(address: BillingAddress): PaymentFormErrors {
-  const errors: PaymentFormErrors = {};
+export function validateBillingAddress(address: BillingAddress): Record<string, string | undefined> {
+  const errors: Record<string, string | undefined> = {};
+
+  // Validate name fields
+  if (!address.firstName || address.firstName.trim().length < 2) {
+    errors.firstName = 'Please enter your first name';
+  }
+
+  if (!address.lastName || address.lastName.trim().length < 2) {
+    errors.lastName = 'Please enter your last name';
+  }
 
   if (!address.addressLine1 || address.addressLine1.trim().length < 5) {
     errors.addressLine1 = 'Please enter a valid address';
@@ -406,12 +415,12 @@ export function validateBillingAddress(address: BillingAddress): PaymentFormErro
     errors.city = 'Please enter a valid city';
   }
 
-  if (!validatePostalCode(address.postalCode, address.country)) {
+  if (!address.postalCode || address.postalCode.trim().length < 2) {
     errors.postalCode = 'Please enter a valid postal code';
   }
 
-  if (!address.country || address.country.length !== 2) {
-    errors.country = 'Please select a country';
+  if (!address.country || address.country.trim().length < 2) {
+    errors.country = 'Please enter a country';
   }
 
   return errors;

@@ -12,6 +12,14 @@ import { flightCache } from '@/lib/cache/flightCache';
 const DATE_SLIDER_STAGGER_MS = Number(process.env.NEXT_PUBLIC_DATE_SLIDER_STAGGER_MS || 500);
 const DATE_SLIDER_CHUNK_SIZE = Number(process.env.NEXT_PUBLIC_DATE_SLIDER_CHUNK_SIZE || 2);
 
+// Helper to safely get timestamp from a date that might be a string or Date
+function getTimestamp(date: Date | string | undefined | null): number | undefined {
+  if (!date) return undefined;
+  if (date instanceof Date) return date.getTime();
+  const parsed = new Date(date);
+  return isNaN(parsed.getTime()) ? undefined : parsed.getTime();
+}
+
 // Normalize date to midnight for safe comparisons
 function normalizeDate(date: Date): Date {
   const d = new Date(date);
@@ -546,8 +554,8 @@ export function useDatePrices(
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    searchParams?.departureDate?.getTime(), 
-    searchParams?.returnDate?.getTime(), 
+    getTimestamp(searchParams?.departureDate), 
+    getTimestamp(searchParams?.returnDate), 
     searchParams?.tripType,
     searchParams?.class,
     basePrice

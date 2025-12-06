@@ -1,10 +1,11 @@
 "use client";
 
 import { Suspense, useState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
-import { useBookingStore, useSelectedFlight, useSelectedUpgrade, usePriceCheckData } from "@/store/bookingStore";
+import { useBookingStore, useSelectedFlight, useSelectedUpgrade, usePriceCheckData, useStoreHydration } from "@/store/bookingStore";
 import { useTranslations } from "next-intl";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ErrorMessage } from "@/components/ui/error-message";
@@ -45,6 +46,9 @@ function BookingContent() {
   const [showFlightInfo, setShowFlightInfo] = useState(false);
   const [idleTimeoutOpen, setIdleTimeoutOpen] = useState(false);
 
+  // Check if store has been hydrated from sessionStorage
+  const hasHydrated = useStoreHydration();
+
   // Get selected flight and upgrade from Zustand store
   const flight = useSelectedFlight();
   const selectedUpgrade = useSelectedUpgrade();
@@ -56,12 +60,12 @@ function BookingContent() {
   // Get affiliate phone number
   const { phoneNumber: affiliatePhone } = useAffiliatePhone();
 
-  // Redirect to search if no flight selected
+  // Redirect to search if no flight selected (only after store has hydrated)
   useEffect(() => {
-    if (!flight) {
+    if (hasHydrated && !flight) {
       router.push("/search");
     }
-  }, [flight, router]);
+  }, [hasHydrated, flight, router]);
 
   // Prefetch price check for booking if missing
   useEffect(() => {
@@ -81,9 +85,13 @@ function BookingContent() {
     onIdle: () => setIdleTimeoutOpen(true),
   });
 
-  // Show loading state while redirecting
-  if (!flight) {
-    return null;
+  // Show loading state while store is hydrating or no flight selected
+  if (!hasHydrated || !flight) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-[#3754ED] animate-spin" />
+      </div>
+    );
   }
 
   // Extract flight leg data from the selected flight (supports multi-city)

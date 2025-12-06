@@ -1,32 +1,26 @@
 "use client";
 
-import { useState } from "react";
-import { CardDetails, BillingAddress, PaymentFormErrors } from "@/types/payment";
-import { validatePaymentCard, validateBillingAddress, hasErrors } from "@/utils/validation";
+import { useState, useEffect } from "react";
+import { BillingAddress } from "@/types/payment";
+import { validateBillingAddress, hasErrors } from "@/utils/validation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { CreditCard, Lock } from "lucide-react";
+import { MapPin, Shield, CreditCard } from "lucide-react";
 import { useTranslations } from "next-intl";
+import Image from "next/image";
 
 interface PaymentFormProps {
-  onSubmit: (cardDetails: CardDetails, billingAddress: BillingAddress) => void;
+  onSubmit: (billingAddress: BillingAddress) => void;
   loading?: boolean;
   onValidityChange?: (valid: boolean) => void;
 }
 
 export function PaymentForm({ onSubmit, loading = false, onValidityChange }: PaymentFormProps) {
   const t = useTranslations('payment.form');
-  
-  const [cardDetails, setCardDetails] = useState<Partial<CardDetails>>({
-    cardNumber: "",
-    cardholderName: "",
-    expiryMonth: "",
-    expiryYear: "",
-    cvv: "",
-  });
 
   const [billingAddress, setBillingAddress] = useState<Partial<BillingAddress>>({
+    firstName: "",
+    lastName: "",
     addressLine1: "",
     addressLine2: "",
     city: "",
@@ -37,29 +31,16 @@ export function PaymentForm({ onSubmit, loading = false, onValidityChange }: Pay
 
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
-  // Derived validity
+  // Derived validity - only check billing address
   const isValid = (() => {
-    const cardErrors = validatePaymentCard(cardDetails as CardDetails);
     const addressErrors = validateBillingAddress(billingAddress as BillingAddress);
-    return !hasErrors({ ...cardErrors, ...addressErrors });
+    return !hasErrors(addressErrors);
   })();
 
   // Notify parent when validity changes
-  useState(() => {
+  useEffect(() => {
     onValidityChange?.(isValid);
-  });
-
-  const handleCardChange = (field: keyof CardDetails, value: string) => {
-    // Format card number with spaces
-    if (field === "cardNumber") {
-      value = value.replace(/\s/g, "").replace(/(\d{4})/g, "$1 ").trim();
-    }
-    
-    setCardDetails((prev) => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: undefined }));
-    }
-  };
+  }, [isValid, onValidityChange]);
 
   const handleAddressChange = (field: keyof BillingAddress, value: string) => {
     setBillingAddress((prev) => ({ ...prev, [field]: value }));
@@ -71,112 +52,45 @@ export function PaymentForm({ onSubmit, loading = false, onValidityChange }: Pay
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate card details
-    const cardErrors = validatePaymentCard(cardDetails as CardDetails);
+    // Validate billing address only
     const addressErrors = validateBillingAddress(billingAddress as BillingAddress);
 
-    const allErrors = { ...cardErrors, ...addressErrors };
-
-    if (hasErrors(allErrors)) {
-      setErrors(allErrors as Record<string, string | undefined>);
+    if (hasErrors(addressErrors)) {
+      setErrors(addressErrors as Record<string, string | undefined>);
       return;
     }
 
-    // Submit payment
-    onSubmit(cardDetails as CardDetails, billingAddress as BillingAddress);
+    // Submit with billing address
+    onSubmit(billingAddress as BillingAddress);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Card Details Section */}
-      <div className="bg-white border border-[#DFE0E4] rounded-xl p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <CreditCard className="w-5 h-5 text-[#3754ED]" />
-          <h3 className="text-lg font-semibold text-[#010D50]">{t('cardDetails')}</h3>
+    <form id="billing-address-form" onSubmit={handleSubmit} className="space-y-6">
+      {/* Payment Info Banner */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-4">
+        <div className="flex items-start gap-3">
+          <div className="p-2 bg-white rounded-lg shadow-sm">
+            <Shield className="w-5 h-5 text-[#3754ED]" />
+          </div>
+          <div>
+            <h4 className="font-semibold text-[#010D50] mb-1">Secure Payment via BoxPay</h4>
+            <p className="text-sm text-[#3A478A]">
+              You'll be redirected to our secure payment partner to complete your payment. 
+              Your card details are handled securely and never stored on our servers.
+            </p>
+          </div>
         </div>
-
-        <div className="grid grid-cols-1 gap-4">
-          {/* Card Number */}
-          <div className="space-y-2">
-            <Label htmlFor="cardNumber">{t('cardNumber')} {t('required')}</Label>
-            <Input
-              id="cardNumber"
-              type="text"
-              value={cardDetails.cardNumber}
-              onChange={(e) => handleCardChange("cardNumber", e.target.value)}
-              placeholder={t('cardNumberPlaceholder')}
-              maxLength={19}
-              className={errors.cardNumber ? "border-red-500" : ""}
-            />
-            {errors.cardNumber && (
-              <p className="text-xs text-red-600">{errors.cardNumber}</p>
-            )}
-          </div>
-
-          {/* Cardholder Name */}
-          <div className="space-y-2">
-            <Label htmlFor="cardholderName">{t('cardholderName')} {t('required')}</Label>
-            <Input
-              id="cardholderName"
-              type="text"
-              value={cardDetails.cardholderName}
-              onChange={(e) => handleCardChange("cardholderName", e.target.value)}
-              placeholder={t('cardholderPlaceholder')}
-              className={errors.cardholderName ? "border-red-500" : ""}
-            />
-            {errors.cardholderName && (
-              <p className="text-xs text-red-600">{errors.cardholderName}</p>
-            )}
-          </div>
-
-          {/* Expiry and CVV */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="expiryMonth">{t('month')} {t('required')}</Label>
-              <Input
-                id="expiryMonth"
-                type="text"
-                value={cardDetails.expiryMonth}
-                onChange={(e) => handleCardChange("expiryMonth", e.target.value)}
-                placeholder={t('monthPlaceholder')}
-                maxLength={2}
-                className={errors.expiryMonth ? "border-red-500" : ""}
-              />
-              {errors.expiryMonth && (
-                <p className="text-xs text-red-600">{errors.expiryMonth}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="expiryYear">{t('year')} {t('required')}</Label>
-              <Input
-                id="expiryYear"
-                type="text"
-                value={cardDetails.expiryYear}
-                onChange={(e) => handleCardChange("expiryYear", e.target.value)}
-                placeholder={t('yearPlaceholder')}
-                maxLength={2}
-                className={errors.expiryYear ? "border-red-500" : ""}
-              />
-              {errors.expiryYear && (
-                <p className="text-xs text-red-600">{errors.expiryYear}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="cvv">{t('cvv')} {t('required')}</Label>
-              <Input
-                id="cvv"
-                type="text"
-                value={cardDetails.cvv}
-                onChange={(e) => handleCardChange("cvv", e.target.value)}
-                placeholder={t('cvvPlaceholder')}
-                maxLength={4}
-                className={errors.cvv ? "border-red-500" : ""}
-              />
-              {errors.cvv && (
-                <p className="text-xs text-red-600">{errors.cvv}</p>
-              )}
+        
+        {/* Accepted Cards */}
+        <div className="mt-4 pt-4 border-t border-blue-100">
+          <p className="text-xs text-[#3A478A] mb-2">Accepted payment methods:</p>
+          <div className="flex items-center gap-3">
+            <Image src="/visa.png" alt="Visa" width={40} height={25} className="h-6 w-auto object-contain" />
+            <Image src="/mastercard.png" alt="Mastercard" width={40} height={25} className="h-6 w-auto object-contain" />
+            <Image src="/amex.png" alt="American Express" width={40} height={25} className="h-6 w-auto object-contain" />
+            <div className="flex items-center gap-1 text-xs text-[#3A478A]">
+              <CreditCard className="w-4 h-4" />
+              <span>& more</span>
             </div>
           </div>
         </div>
@@ -184,11 +98,47 @@ export function PaymentForm({ onSubmit, loading = false, onValidityChange }: Pay
 
       {/* Billing Address Section */}
       <div className="bg-white border border-[#DFE0E4] rounded-xl p-6">
-        <h3 className="text-lg font-semibold text-[#010D50] mb-4">
-          {t('billingAddress')}
-        </h3>
+        <div className="flex items-center gap-2 mb-4">
+          <MapPin className="w-5 h-5 text-[#3754ED]" />
+          <h3 className="text-lg font-semibold text-[#010D50]">
+            {t('billingAddress')}
+          </h3>
+        </div>
 
         <div className="grid grid-cols-1 gap-4">
+          {/* Name Fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="firstName">First Name {t('required')}</Label>
+              <Input
+                id="firstName"
+                type="text"
+                value={billingAddress.firstName}
+                onChange={(e) => handleAddressChange("firstName", e.target.value)}
+                placeholder="John"
+                className={errors.firstName ? "border-red-500" : ""}
+              />
+              {errors.firstName && (
+                <p className="text-xs text-red-600">{errors.firstName}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="lastName">Last Name {t('required')}</Label>
+              <Input
+                id="lastName"
+                type="text"
+                value={billingAddress.lastName}
+                onChange={(e) => handleAddressChange("lastName", e.target.value)}
+                placeholder="Smith"
+                className={errors.lastName ? "border-red-500" : ""}
+              />
+              {errors.lastName && (
+                <p className="text-xs text-red-600">{errors.lastName}</p>
+              )}
+            </div>
+          </div>
+
           {/* Address Line 1 */}
           <div className="space-y-2">
             <Label htmlFor="addressLine1">{t('addressLine1')} {t('required')}</Label>
@@ -235,7 +185,7 @@ export function PaymentForm({ onSubmit, loading = false, onValidityChange }: Pay
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="state">{t('state')} {t('required')}</Label>
+              <Label htmlFor="state">{t('state')}</Label>
               <Input
                 id="state"
                 type="text"
@@ -283,19 +233,10 @@ export function PaymentForm({ onSubmit, loading = false, onValidityChange }: Pay
         </div>
       </div>
 
-      {/* Submit Button */}
-      <Button
-        type="submit"
-        disabled={loading || !isValid}
-        className="w-full bg-[#3754ED] hover:bg-[#2942D1] text-white rounded-full px-6 py-3 h-auto text-base font-semibold flex items-center justify-center gap-2"
-      >
-        <Lock className="w-5 h-5" />
-        {loading ? t('processing') : t('completePayment')}
-      </Button>
-
       {/* Security Notice */}
-      <div className="text-center text-xs text-[#3A478A]">
-        <p>{t('securityNotice')}</p>
+      <div className="flex items-center justify-center gap-2 text-xs text-[#3A478A]">
+        <Shield className="w-4 h-4" />
+        <p>Your payment is protected with 3D Secure authentication and SSL encryption</p>
       </div>
     </form>
   );

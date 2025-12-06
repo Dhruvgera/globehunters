@@ -21,14 +21,31 @@ export function useSearchForm() {
   const hasInitializedRef = useRef(false);
   const lastStoreVersionRef = useRef<string>('');
   
+  // Helper to safely get timestamp from a date that might be a string or Date
+  const getTimestamp = (date: Date | string | undefined | null): number | undefined => {
+    if (!date) return undefined;
+    if (date instanceof Date) return date.getTime();
+    // If it's a string, parse it
+    const parsed = new Date(date);
+    return isNaN(parsed.getTime()) ? undefined : parsed.getTime();
+  };
+
+  // Helper to ensure a date value is a Date object
+  const ensureDate = (date: Date | string | undefined | null): Date | undefined => {
+    if (!date) return undefined;
+    if (date instanceof Date) return date;
+    const parsed = new Date(date);
+    return isNaN(parsed.getTime()) ? undefined : parsed;
+  };
+
   // Generate a version key from store params to detect changes
   const getStoreVersion = (params: typeof searchParamsFromStore) => {
     if (!params) return '';
     return JSON.stringify({
       from: params.from,
       to: params.to,
-      departureDate: params.departureDate?.getTime(),
-      returnDate: params.returnDate?.getTime(),
+      departureDate: getTimestamp(params.departureDate),
+      returnDate: getTimestamp(params.returnDate),
       class: params.class,
       tripType: params.tripType,
       adults: params.passengers?.adults,
@@ -102,10 +119,12 @@ export function useSearchForm() {
           setTo(buildAirport(searchParamsFromStore.to));
         }
         if (searchParamsFromStore.departureDate) {
-          setDepartureDate(searchParamsFromStore.departureDate);
+          // Ensure date is a Date object (might be string from sessionStorage)
+          setDepartureDate(ensureDate(searchParamsFromStore.departureDate));
         }
         if (searchParamsFromStore.returnDate) {
-          setReturnDate(searchParamsFromStore.returnDate);
+          // Ensure date is a Date object (might be string from sessionStorage)
+          setReturnDate(ensureDate(searchParamsFromStore.returnDate));
         }
         // Reset multi-city rows to empty defaults when switching away
         setMultiCitySegments([
