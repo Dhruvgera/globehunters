@@ -4,14 +4,10 @@ import createNextIntlPlugin from 'next-intl/plugin';
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 const nextConfig: NextConfig = {
-  eslint: {
-    // Skip ESLint errors during production builds to unblock compilation
-    ignoreDuringBuilds: true,
-  },
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
+        protocol: 'https' as const,
         hostname: 'images.kiwi.com',
         pathname: '/airlines/**',
       },
