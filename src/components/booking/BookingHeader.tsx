@@ -5,17 +5,29 @@ import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useBookingStore } from "@/store/bookingStore";
+import { SearchParams } from "@/types/flight";
 
 interface BookingHeaderProps {
   currentStep?: number;
+}
+
+interface AffiliateData {
+  code: string;
+  id?: number;
+  name?: string;
+  phone?: string;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  cnc?: string;
 }
 
 /**
  * Build search URL with preserved search params and UTM tracking
  */
 function buildSearchUrl(
-  searchParams: ReturnType<typeof useBookingStore>["searchParams"],
-  affiliateData: ReturnType<typeof useBookingStore>["affiliateData"]
+  searchParams: SearchParams | null,
+  affiliateData: AffiliateData | null
 ): string {
   const params = new URLSearchParams();
 

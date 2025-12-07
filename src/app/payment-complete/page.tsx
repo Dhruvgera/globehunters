@@ -535,7 +535,7 @@ function PaymentCompleteContent() {
         setPaymentInfo({
           status: mockBookingConfirmation.paymentInfo.status,
           orderId: mockBookingConfirmation.paymentInfo.orderId,
-          amount: mockBookingConfirmation.paymentInfo.amount,
+          amount: mockBookingConfirmation.paymentInfo.amount.toString(),
           currency: mockBookingConfirmation.paymentInfo.currency,
           transactionId: mockBookingConfirmation.paymentInfo.transactionId,
           timestamp: mockBookingConfirmation.paymentInfo.timestamp,
