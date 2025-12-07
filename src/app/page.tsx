@@ -18,6 +18,7 @@ function HomeContent() {
   const setSelectedFlight = useBookingStore((state) => state.setSelectedFlight);
   const setSearchParams = useBookingStore((state) => state.setSearchParams);
   const setAffiliateData = useBookingStore((state) => state.setAffiliateData);
+  const setIsFromDeeplink = useBookingStore((state) => state.setIsFromDeeplink);
 
   const [isLoadingDeeplink, setIsLoadingDeeplink] = useState(false);
 
@@ -36,12 +37,21 @@ function HomeContent() {
     async function processDeeplink() {
       setIsLoadingDeeplink(true);
 
-      // Store affiliate/tracking data
+      // Mark this as a deeplink flow
+      setIsFromDeeplink(true);
+
+      // Store affiliate/tracking data with full UTM params
       if (utmSource) {
         setAffiliateCode(utmSource);
-        setAffiliateData({ code: utmSource });
+        setAffiliateData({
+          code: utmSource,
+          utmSource: utmSource,
+          utmMedium: utmMedium || undefined,
+          utmCampaign: utmCampaign || undefined,
+          cnc: cnc || undefined,
+        });
 
-        // Store in sessionStorage for persistence
+        // Store in sessionStorage for persistence across page loads
         if (typeof window !== "undefined") {
           sessionStorage.setItem("utm_source", utmSource);
           if (utmMedium) sessionStorage.setItem("utm_medium", utmMedium);
@@ -93,7 +103,7 @@ function HomeContent() {
     }
 
     processDeeplink();
-  }, [searchParams, router, setAffiliateCode, setSelectedFlight, setSearchParams, setAffiliateData]);
+  }, [searchParams, router, setAffiliateCode, setSelectedFlight, setSearchParams, setAffiliateData, setIsFromDeeplink]);
 
   // Show loading state when processing deeplink
   if (isLoadingDeeplink) {

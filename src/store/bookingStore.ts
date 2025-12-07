@@ -15,6 +15,11 @@ interface AffiliateData {
   id?: number;
   name?: string;
   phone?: string;
+  // UTM tracking data from meta channel deeplinks
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  cnc?: string;
 }
 
 interface BookingState {
@@ -25,6 +30,10 @@ interface BookingState {
   // Affiliate data
   affiliateData: AffiliateData | null;
   setAffiliateData: (data: AffiliateData | null) => void;
+
+  // Deeplink tracking (for meta channel URLs from Skyscanner, etc.)
+  isFromDeeplink: boolean;
+  setIsFromDeeplink: (isDeeplink: boolean) => void;
 
   // Selected flight
   selectedFlight: Flight | null;
@@ -81,6 +90,7 @@ interface BookingState {
 const initialState = {
   searchParams: null,
   affiliateData: null,
+  isFromDeeplink: false,
   selectedFlight: null,
   selectedFareType: 'Economy',
   selectedUpgradeOption: null,
@@ -121,6 +131,9 @@ export const useBookingStore = create<BookingState & HydrationState>()(
 
       // Affiliate data
       setAffiliateData: (data) => set({ affiliateData: data }),
+
+      // Deeplink tracking
+      setIsFromDeeplink: (isDeeplink) => set({ isFromDeeplink: isDeeplink }),
 
       // Selected flight
       setSelectedFlight: (flight, fareType = 'Economy') =>
@@ -226,6 +239,7 @@ export const useBookingStore = create<BookingState & HydrationState>()(
       partialize: (state) => ({
         searchParams: state.searchParams,
         affiliateData: state.affiliateData,
+        isFromDeeplink: state.isFromDeeplink,
         selectedFlight: state.selectedFlight,
         selectedFareType: state.selectedFareType,
         selectedUpgradeOption: state.selectedUpgradeOption,
@@ -266,3 +280,4 @@ export const useAddOns = () => useBookingStore((state) => state.addOns);
 export const useBooking = () => useBookingStore((state) => state.booking);
 export const useCurrentStep = () => useBookingStore((state) => state.currentStep);
 export const useAffiliateData = () => useBookingStore((state) => state.affiliateData);
+export const useIsFromDeeplink = () => useBookingStore((state) => state.isFromDeeplink);

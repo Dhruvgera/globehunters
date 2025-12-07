@@ -53,12 +53,25 @@ function SearchPageContent() {
   const [isDateChanging, setIsDateChanging] = useState(false);
   const [fareExpiredOpen, setFareExpiredOpen] = useState(false);
 
-  // Handle affiliate code from URL
+  // Handle affiliate code and UTM params from URL
   useEffect(() => {
     const affCode = urlParams.get('aff');
-    if (affCode) {
-      setAffiliateCode(affCode);
-      console.log('Affiliate code detected in search URL:', affCode);
+    const utmSource = urlParams.get('utm_source');
+    
+    // Prioritize aff code, fall back to utm_source
+    const affiliateCode = affCode || utmSource;
+    if (affiliateCode) {
+      setAffiliateCode(affiliateCode);
+      console.log('Affiliate code detected in search URL:', affiliateCode);
+    }
+    
+    // Store UTM params in sessionStorage for persistence
+    if (typeof window !== 'undefined') {
+      if (utmSource) sessionStorage.setItem('utm_source', utmSource);
+      const utmMedium = urlParams.get('utm_medium');
+      const utmCampaign = urlParams.get('utm_campaign');
+      if (utmMedium) sessionStorage.setItem('utm_medium', utmMedium);
+      if (utmCampaign) sessionStorage.setItem('utm_campaign', utmCampaign);
     }
   }, [urlParams, setAffiliateCode]);
   
