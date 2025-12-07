@@ -255,9 +255,9 @@ function PaymentContent() {
 
             {/* Billing Address Form */}
             <PaymentForm onSubmit={async (billingAddress) => {
-              // Block duplicate payment attempts if already processed
+              // Block duplicate payment attempts if the SAME order was already processed
               const completedOrderId = sessionStorage.getItem('paymentCompletedOrderId');
-              if (completedOrderId) {
+              if (completedOrderId && completedOrderId === orderId) {
                 setPaymentErrorMessage(`This order has already been processed, please call on ${affiliatePhone} quoting your reference number ${completedOrderId}. Please DO NOT book alternative travel arrangements as this may result in a duplicate booking - charges will apply.`);
                 setPaymentErrorOpen(true);
                 return;

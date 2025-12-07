@@ -10,6 +10,10 @@ import { useBoxPay } from "@/hooks/useBoxPay";
 import { PaymentCompletionInfo } from "@/types/boxpay";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
 import {
+  mockBookingConfirmation,
+  airportNames,
+} from "@/data/mockBookingConfirmation";
+import {
   CheckCircle2,
   XCircle,
   Clock,
@@ -23,18 +27,36 @@ import {
   Home,
   Download,
   Loader2,
+  ChevronDown,
+  ChevronUp,
+  Info,
+  AlertTriangle,
 } from "lucide-react";
+import Image from "next/image";
+
+// Check if mock mode is enabled
+const isMockMode = process.env.NEXT_PUBLIC_MOCK_BOOKING_CONFIRMATION === "true";
 
 // Confetti particle component
-function ConfettiParticle({ delay, color, left }: { delay: number; color: string; left: number }) {
+function ConfettiParticle({
+  delay,
+  color,
+  left,
+}: {
+  delay: number;
+  color: string;
+  left: number;
+}) {
   return (
     <div
       className="confetti-particle"
-      style={{
-        '--delay': `${delay}s`,
-        '--color': color,
-        '--left': `${left}%`,
-      } as React.CSSProperties}
+      style={
+        {
+          "--delay": `${delay}s`,
+          "--color": color,
+          "--left": `${left}%`,
+        } as React.CSSProperties
+      }
     />
   );
 }
@@ -42,14 +64,14 @@ function ConfettiParticle({ delay, color, left }: { delay: number; color: string
 // Confetti explosion component
 function ConfettiExplosion() {
   const colors = [
-    '#3754ED', // Primary blue
-    '#10B981', // Green
-    '#F59E0B', // Amber
-    '#EF4444', // Red
-    '#8B5CF6', // Purple
-    '#EC4899', // Pink
-    '#06B6D4', // Cyan
-    '#FFD700', // Gold
+    "#3754ED", // Primary blue
+    "#10B981", // Green
+    "#F59E0B", // Amber
+    "#EF4444", // Red
+    "#8B5CF6", // Purple
+    "#EC4899", // Pink
+    "#06B6D4", // Cyan
+    "#FFD700", // Gold
   ];
 
   const particles = Array.from({ length: 80 }, (_, i) => ({
@@ -123,57 +145,342 @@ function ConfettiExplosion() {
   );
 }
 
-// Status badge component
-function StatusBadge({ status }: { status: PaymentCompletionInfo['status'] }) {
-  const config = {
-    success: {
-      icon: CheckCircle2,
-      text: 'Payment Successful',
-      bgColor: 'bg-emerald-50',
-      textColor: 'text-emerald-700',
-      borderColor: 'border-emerald-200',
-      iconColor: 'text-emerald-500',
-    },
-    failed: {
-      icon: XCircle,
-      text: 'Payment Failed',
-      bgColor: 'bg-red-50',
-      textColor: 'text-red-700',
-      borderColor: 'border-red-200',
-      iconColor: 'text-red-500',
-    },
-    pending: {
-      icon: Clock,
-      text: 'Payment Pending',
-      bgColor: 'bg-amber-50',
-      textColor: 'text-amber-700',
-      borderColor: 'border-amber-200',
-      iconColor: 'text-amber-500',
-    },
-    cancelled: {
-      icon: XCircle,
-      text: 'Payment Cancelled',
-      bgColor: 'bg-gray-50',
-      textColor: 'text-gray-700',
-      borderColor: 'border-gray-200',
-      iconColor: 'text-gray-500',
-    },
-    unknown: {
-      icon: AlertCircle,
-      text: 'Status Unknown',
-      bgColor: 'bg-gray-50',
-      textColor: 'text-gray-700',
-      borderColor: 'border-gray-200',
-      iconColor: 'text-gray-500',
-    },
-  };
+// Flight leg component for the confirmation card - matches Figma exactly
+interface FlightLegProps {
+  departureCode: string;
+  departureCity: string;
+  departureTime: string;
+  departureTerminal?: string;
+  departureDate?: string;
+  arrivalCode: string;
+  arrivalCity: string;
+  arrivalTime: string;
+  arrivalTerminal?: string;
+  arrivalDate?: string;
+  travelTime: string;
+  flightNumber: number;
+  totalFlights: number;
+}
 
-  const { icon: Icon, text, bgColor, textColor, borderColor, iconColor } = config[status];
+function FlightLegDisplay({
+  departureCode,
+  departureCity,
+  departureTime,
+  departureTerminal,
+  departureDate,
+  arrivalCode,
+  arrivalCity,
+  arrivalTime,
+  arrivalTerminal,
+  arrivalDate,
+  travelTime,
+  flightNumber,
+  totalFlights,
+}: FlightLegProps) {
+  return (
+    <div className="flex flex-col gap-2">
+      {/* Flight number indicator */}
+      <div className="text-xs text-[#3A478A]">
+        Flight {flightNumber} of {totalFlights}
+      </div>
+
+      {/* Route visualization - matching FlightInfoModal style */}
+      <div className="flex gap-4">
+        {/* Visual Timeline with dots and dashed line */}
+        <div className="flex flex-col items-center py-1">
+          {/* Departure dot (empty circle) */}
+          <div className="w-3 h-3 rounded-full border-2 border-[#010D50]" />
+          {/* Dashed line */}
+          <div className="flex-1 w-px border-l-2 border-dashed border-[#010D50] my-1" />
+          {/* Arrival dot (filled circle) */}
+          <div className="w-3 h-3 bg-[#010D50] rounded-full" />
+        </div>
+
+        {/* Flight Details */}
+        <div className="flex flex-col justify-between flex-1 gap-4">
+          {/* Departure */}
+          <div className="flex items-start justify-between">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium text-[#010D50]">
+                {departureCity} ({departureCode})
+              </span>
+              {departureTerminal && (
+                <span className="text-xs text-[#3A478A]">{departureTerminal}</span>
+              )}
+            </div>
+            <div className="flex flex-col items-end gap-0.5">
+              <span className="text-xl font-bold text-[#010D50]">
+                {departureTime}
+              </span>
+              {departureDate && (
+                <span className="text-xs text-[#3A478A]">{departureDate}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Travel time */}
+          <div className="flex items-center gap-1 pl-1">
+            <Clock className="w-3 h-3 text-[#3A478A]" />
+            <span className="text-xs text-[#3A478A]">
+              Travel time: {travelTime}
+            </span>
+          </div>
+
+          {/* Arrival */}
+          <div className="flex items-start justify-between">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-sm font-medium text-[#010D50]">
+                {arrivalCity} ({arrivalCode})
+              </span>
+              {arrivalTerminal && (
+                <span className="text-xs text-[#3A478A]">{arrivalTerminal}</span>
+              )}
+            </div>
+            <div className="flex flex-col items-end gap-0.5">
+              <span className="text-xl font-bold text-[#010D50]">
+                {arrivalTime}
+              </span>
+              {arrivalDate && (
+                <span className="text-xs text-[#3A478A]">{arrivalDate}</span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Baggage Alert Banner
+function BaggageAlertBanner() {
+  return (
+    <div className="bg-[#FEF2F2] border border-[#FCA5A5] rounded-lg p-3 flex items-start gap-2">
+      <AlertTriangle className="w-4 h-4 text-[#DC2626] shrink-0 mt-0.5" />
+      <div className="flex flex-col gap-0.5">
+        <p className="text-xs font-semibold text-[#DC2626]">
+          Baggage Alert: Re-Check Required
+        </p>
+        <p className="text-[10px] text-[#DC2626] leading-tight">
+          Due to airline or flight changes during your stop, you MUST collect
+          your checked luggage and re-check it with the connecting airline.
+          Always confirm your luggage tag instructions upon arrival at your
+          layover city.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// Stopover info component
+function StopoverBadge({
+  airportCode,
+  duration,
+}: {
+  airportCode: string;
+  duration: string;
+}) {
+  const airportInfo = airportNames[airportCode] || {
+    city: airportCode,
+    name: airportCode,
+  };
+  return (
+    <div className="flex items-center gap-2 py-2">
+      <span className="text-sm text-[#6B7280]">
+        Stopover at {airportInfo.city} ({airportCode}) for
+      </span>
+      <div className="flex items-center gap-1 text-sm font-medium text-[#010D50]">
+        <Clock className="w-4 h-4" />
+        {duration}
+      </div>
+    </div>
+  );
+}
+
+// Flight confirmation card component
+interface FlightCardConfirmationProps {
+  title: string;
+  date: string;
+  passengerCount: number;
+  cabinClass: string;
+  airlineName: string;
+  airlineCode: string;
+  flightNumber: string;
+  distance: string;
+  aircraftType: string;
+  segment: any;
+  onViewDetails: () => void;
+}
+
+function FlightConfirmationCard({
+  title,
+  date,
+  passengerCount,
+  cabinClass,
+  airlineName,
+  airlineCode,
+  flightNumber,
+  distance,
+  aircraftType,
+  segment,
+  onViewDetails,
+}: FlightCardConfirmationProps) {
+  const [showDetails, setShowDetails] = useState(true); // Show details by default per Figma
+  const [imgError, setImgError] = useState(false);
+
+  const logoUrl = `https://images.kiwi.com/airlines/64/${airlineCode}.png`;
+
+  // Get individual flights for the multi-leg display
+  const individualFlights = segment.individualFlights || [];
+  const layovers = segment.layovers || [];
 
   return (
-    <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border ${bgColor} ${borderColor}`}>
-      <Icon className={`w-5 h-5 ${iconColor}`} />
-      <span className={`font-semibold ${textColor}`}>{text}</span>
+    <div className="bg-white rounded-2xl border border-[#E5E7EB] p-5 flex flex-col gap-4 flex-1 min-w-[320px]">
+      {/* Header */}
+      <div className="flex flex-col gap-1">
+        <h3 className="text-lg font-semibold text-[#010D50]">{title}</h3>
+        <p className="text-sm text-[#6B7280]">{date}</p>
+      </div>
+
+      {/* Passenger info row */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-[#010D50]">
+            {passengerCount} passenger{passengerCount > 1 ? "s" : ""}
+          </span>
+          <span className="text-[#6B7280]">•</span>
+          <button
+            onClick={() => setShowDetails(!showDetails)}
+            className="text-sm text-[#3754ED] font-medium hover:underline flex items-center gap-1"
+          >
+            View Details
+            {showDetails ? (
+              <ChevronUp className="w-4 h-4" />
+            ) : (
+              <ChevronDown className="w-4 h-4" />
+            )}
+          </button>
+        </div>
+        <span className="text-sm text-[#010D50]">{cabinClass}</span>
+      </div>
+
+      {/* Airline info - always visible */}
+      <div className="flex items-center gap-3 pt-2 border-t border-[#E5E7EB]">
+        {!imgError ? (
+          <div className="w-8 h-8 relative flex items-center justify-center">
+            <Image
+              src={logoUrl}
+              alt={`${airlineName} logo`}
+              width={32}
+              height={32}
+              className="object-contain"
+              onError={() => setImgError(true)}
+            />
+          </div>
+        ) : (
+          <div className="w-8 h-8 bg-[#C8102E] rounded flex items-center justify-center">
+            <Plane className="w-4 h-4 text-white" />
+          </div>
+        )}
+        <div className="flex flex-col">
+          <span className="text-sm font-semibold text-[#010D50]">
+            {airlineName}
+          </span>
+          <span className="text-xs text-[#6B7280]">
+            {flightNumber} - {cabinClass} • {distance} km • {aircraftType}
+          </span>
+        </div>
+      </div>
+
+      {/* Flight legs - collapsible */}
+      {showDetails && (
+        <div className="flex flex-col gap-3 mt-2">
+          {individualFlights.length > 0 ? (
+            <>
+              {/* First leg */}
+              <div className="bg-[#F5F7FF] rounded-xl p-4">
+                <FlightLegDisplay
+                  departureCode={individualFlights[0].departureAirport}
+                  departureCity={
+                    airportNames[individualFlights[0].departureAirport]?.city ||
+                    individualFlights[0].departureAirport
+                  }
+                  departureTime={individualFlights[0].departureTime}
+                  departureTerminal={segment.departureTerminal}
+                  departureDate={segment.date}
+                  arrivalCode={individualFlights[0].arrivalAirport}
+                  arrivalCity={
+                    airportNames[individualFlights[0].arrivalAirport]?.city ||
+                    individualFlights[0].arrivalAirport
+                  }
+                  arrivalTime={individualFlights[0].arrivalTime}
+                  arrivalTerminal={segment.arrivalTerminal}
+                  arrivalDate={segment.date}
+                  travelTime={individualFlights[0].duration}
+                  flightNumber={1}
+                  totalFlights={individualFlights.length}
+                />
+              </div>
+
+              {/* Stopover info */}
+              {layovers.length > 0 && (
+                <>
+                  <StopoverBadge
+                    airportCode={layovers[0].viaAirport}
+                    duration={layovers[0].duration}
+                  />
+                  <BaggageAlertBanner />
+                </>
+              )}
+
+              {/* Second leg (if exists) */}
+              {individualFlights.length > 1 && (
+                <div className="bg-[#F5F7FF] rounded-xl p-4">
+                  <FlightLegDisplay
+                    departureCode={individualFlights[1].departureAirport}
+                    departureCity={
+                      airportNames[individualFlights[1].departureAirport]?.city ||
+                      individualFlights[1].departureAirport
+                    }
+                    departureTime={individualFlights[1].departureTime}
+                    departureTerminal={segment.departureTerminal}
+                    departureDate={segment.date}
+                    arrivalCode={individualFlights[1].arrivalAirport}
+                    arrivalCity={
+                      airportNames[individualFlights[1].arrivalAirport]?.city ||
+                      individualFlights[1].arrivalAirport
+                    }
+                    arrivalTime={individualFlights[1].arrivalTime}
+                    arrivalTerminal={segment.arrivalTerminal}
+                    arrivalDate={segment.arrivalDate || segment.date}
+                    travelTime={individualFlights[1].duration}
+                    flightNumber={2}
+                    totalFlights={individualFlights.length}
+                  />
+                </div>
+              )}
+            </>
+          ) : (
+            // Fallback for simple segment without individual flights
+            <div className="bg-[#F5F7FF] rounded-xl p-4">
+              <FlightLegDisplay
+                departureCode={segment.departureAirport.code}
+                departureCity={segment.departureAirport.city}
+                departureTime={segment.departureTime}
+                departureTerminal={segment.departureTerminal}
+                departureDate={segment.date}
+                arrivalCode={segment.arrivalAirport.code}
+                arrivalCity={segment.arrivalAirport.city}
+                arrivalTime={segment.arrivalTime}
+                arrivalTerminal={segment.arrivalTerminal}
+                arrivalDate={segment.arrivalDate || segment.date}
+                travelTime={segment.duration}
+                flightNumber={1}
+                totalFlights={1}
+              />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -183,75 +490,113 @@ function PaymentCompleteContent() {
   const searchParams = useSearchParams();
   const { inquirePayment, loading: inquiryLoading } = useBoxPay();
   const { phoneNumber: affiliatePhone } = useAffiliatePhone();
-  
-  const [paymentInfo, setPaymentInfo] = useState<PaymentCompletionInfo | null>(null);
+
+  const [paymentInfo, setPaymentInfo] = useState<PaymentCompletionInfo | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
 
-  // Get flight and booking info from store
-  const flight = useSelectedFlight();
-  const vyspaFolderNumber = useBookingStore((state) => state.vyspaFolderNumber);
-  const priceCheckData = useBookingStore((state) => state.priceCheckData);
-  const passengers = useBookingStore((state) => state.passengers);
-  const contactEmail = useBookingStore((state) => state.contactEmail);
-  const contactPhone = useBookingStore((state) => state.contactPhone);
+  // Get flight and booking info from store (or mock data)
+  const storeSelectedFlight = useSelectedFlight();
+  const storeVyspaFolderNumber = useBookingStore(
+    (state) => state.vyspaFolderNumber
+  );
+  const storePriceCheckData = useBookingStore((state) => state.priceCheckData);
+  const storePassengers = useBookingStore((state) => state.passengers);
+  const storeContactEmail = useBookingStore((state) => state.contactEmail);
+  const storeContactPhone = useBookingStore((state) => state.contactPhone);
   const resetBooking = useBookingStore((state) => state.resetBooking);
 
+  // Use mock data if enabled, otherwise use store data
+  const flight = isMockMode ? mockBookingConfirmation.flight : storeSelectedFlight;
+  const passengers = isMockMode
+    ? mockBookingConfirmation.passengers
+    : storePassengers;
+  const vyspaFolderNumber = isMockMode
+    ? mockBookingConfirmation.vyspaFolderNumber
+    : storeVyspaFolderNumber;
+  const contactEmail = isMockMode
+    ? mockBookingConfirmation.contactEmail
+    : storeContactEmail;
+  const contactPhone = isMockMode
+    ? mockBookingConfirmation.contactPhone
+    : storeContactPhone;
+
   // Get orderId and redirectionResult from URL
-  const orderId = searchParams?.get('orderId') || '';
-  const redirectionResult = searchParams?.get('redirectionResult') || '';
+  const orderId = searchParams?.get("orderId") || "";
+  const redirectionResult = searchParams?.get("redirectionResult") || "";
 
   // Inquire payment status on mount
   useEffect(() => {
     const checkPaymentStatus = async () => {
+      // If mock mode, use mock payment info
+      if (isMockMode) {
+        setPaymentInfo({
+          status: mockBookingConfirmation.paymentInfo.status,
+          orderId: mockBookingConfirmation.paymentInfo.orderId,
+          amount: mockBookingConfirmation.paymentInfo.amount,
+          currency: mockBookingConfirmation.paymentInfo.currency,
+          transactionId: mockBookingConfirmation.paymentInfo.transactionId,
+          timestamp: mockBookingConfirmation.paymentInfo.timestamp,
+        });
+        setShowConfetti(true);
+        return;
+      }
+
       // If we have a redirectionResult token, use it to check status
       if (redirectionResult) {
         const result = await inquirePayment(redirectionResult);
-        
+
         if (result.success && result.payment) {
           setPaymentInfo(result.payment);
-          
+
           // Show confetti on success
-          if (result.payment.status === 'success') {
+          if (result.payment.status === "success") {
             setShowConfetti(true);
             // Mark as completed to prevent double charging
-            sessionStorage.setItem('paymentCompletedOrderId', result.payment.orderId);
+            sessionStorage.setItem(
+              "paymentCompletedOrderId",
+              result.payment.orderId
+            );
             // Clear pending order info
-            sessionStorage.removeItem('pendingOrderId');
-            sessionStorage.removeItem('pendingOrderAmount');
-            sessionStorage.removeItem('pendingOrderCurrency');
+            sessionStorage.removeItem("pendingOrderId");
+            sessionStorage.removeItem("pendingOrderAmount");
+            sessionStorage.removeItem("pendingOrderCurrency");
           }
         } else {
-          setError(result.error || 'Failed to get payment status');
+          setError(result.error || "Failed to get payment status");
         }
       } else {
         // If no redirectionResult, check for stored order info
-        const pendingOrderId = sessionStorage.getItem('pendingOrderId');
-        const completedOrderId = sessionStorage.getItem('paymentCompletedOrderId');
-        
+        const pendingOrderId = sessionStorage.getItem("pendingOrderId");
+        const completedOrderId = sessionStorage.getItem(
+          "paymentCompletedOrderId"
+        );
+
         if (completedOrderId) {
           // Show success state for already completed orders
           setPaymentInfo({
-            status: 'success',
+            status: "success",
             orderId: completedOrderId,
           });
           setShowConfetti(true);
         } else if (pendingOrderId) {
           // If we have a pending order but no redirect result, show pending status
           setPaymentInfo({
-            status: 'pending',
+            status: "pending",
             orderId: pendingOrderId,
-            message: 'Waiting for payment confirmation...',
+            message: "Waiting for payment confirmation...",
           });
         } else if (orderId) {
           // Use the orderId from URL params
           setPaymentInfo({
-            status: 'pending',
+            status: "pending",
             orderId: orderId,
-            message: 'Checking payment status...',
+            message: "Checking payment status...",
           });
         } else {
-          setError('No payment information found');
+          setError("No payment information found");
         }
       }
     };
@@ -268,104 +613,224 @@ function PaymentCompleteContent() {
   }, [showConfetti]);
 
   const handleGoHome = useCallback(() => {
-    // Optionally reset booking state
-    // resetBooking();
-    router.push('/');
-  }, [router]);
-
-  const handleNewSearch = useCallback(() => {
+    // Clear all payment-related sessionStorage items to allow new bookings
+    sessionStorage.removeItem("paymentCompletedOrderId");
+    sessionStorage.removeItem("pendingOrderId");
+    sessionStorage.removeItem("pendingOrderAmount");
+    sessionStorage.removeItem("pendingOrderCurrency");
+    sessionStorage.removeItem("paymentSessionStart");
+    sessionStorage.removeItem("paymentVisited");
+    
     resetBooking();
-    router.push('/search');
+    router.push("/");
   }, [router, resetBooking]);
 
-  // Flight summary data
-  const refNumber = paymentInfo?.orderId || vyspaFolderNumber || orderId || '—';
-  const journeySegments = flight?.segments && flight.segments.length > 0
-    ? flight.segments
-    : flight?.outbound 
-      ? [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])]
-      : [];
+  const handleNewSearch = useCallback(() => {
+    // Clear session-related items (but keep paymentCompletedOrderId for duplicate protection)
+    sessionStorage.removeItem("pendingOrderId");
+    sessionStorage.removeItem("pendingOrderAmount");
+    sessionStorage.removeItem("pendingOrderCurrency");
+    sessionStorage.removeItem("paymentSessionStart");
+    sessionStorage.removeItem("paymentVisited");
+    
+    resetBooking();
+    router.push("/search");
+  }, [router, resetBooking]);
 
-  const isSuccess = paymentInfo?.status === 'success';
-  const isFailed = paymentInfo?.status === 'failed';
-  const isPending = paymentInfo?.status === 'pending';
-  const isCancelled = paymentInfo?.status === 'cancelled';
+  const handleViewTrip = useCallback(() => {
+    // Placeholder for viewing trip details
+    // Could navigate to a trip details page
+  }, []);
+
+  const handleDownloadReceipt = useCallback(() => {
+    window.print();
+  }, []);
+
+  // Flight summary data
+  const refNumber =
+    paymentInfo?.orderId || vyspaFolderNumber || orderId || "—";
+
+  const isSuccess = paymentInfo?.status === "success";
+  const isFailed = paymentInfo?.status === "failed";
+  const isPending = paymentInfo?.status === "pending";
+  const isCancelled = paymentInfo?.status === "cancelled";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-[#F9FAFB]">
       {showConfetti && <ConfettiExplosion />}
-      
+
       <Navbar />
 
-      <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-12">
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8">
         {/* Loading State */}
-        {inquiryLoading && !paymentInfo && (
+        {inquiryLoading && !paymentInfo && !isMockMode && (
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="w-12 h-12 text-[#3754ED] animate-spin mb-4" />
-            <p className="text-lg text-[#3A478A]">Checking payment status...</p>
+            <p className="text-lg text-[#3A478A]">
+              Checking payment status...
+            </p>
           </div>
         )}
 
         {/* Error State */}
-        {error && !paymentInfo && (
+        {error && !paymentInfo && !isMockMode && (
           <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
             <div className="w-20 h-20 mx-auto mb-6 bg-red-100 rounded-full flex items-center justify-center">
               <AlertCircle className="w-10 h-10 text-red-500" />
             </div>
-            <h1 className="text-2xl font-bold text-[#010D50] mb-2">Something went wrong</h1>
+            <h1 className="text-2xl font-bold text-[#010D50] mb-2">
+              Something went wrong
+            </h1>
             <p className="text-[#3A478A] mb-6">{error}</p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Button onClick={handleGoHome} variant="outline" className="gap-2">
+              <Button
+                onClick={handleGoHome}
+                variant="outline"
+                className="gap-2"
+              >
                 <Home className="w-4 h-4" />
                 Go Home
               </Button>
-              <Button onClick={handleNewSearch} className="gap-2 bg-[#3754ED] hover:bg-[#2942D1]">
+              <Button
+                onClick={handleNewSearch}
+                className="gap-2 bg-[#3754ED] hover:bg-[#2942D1]"
+              >
                 Start New Search
               </Button>
             </div>
           </div>
         )}
 
-        {/* Success State */}
-        {paymentInfo && (
+        {/* Success State - New Figma Design */}
+        {(paymentInfo || isMockMode) && isSuccess && (
           <div className="space-y-6">
-            {/* Main Success Card */}
+            {/* Header Card */}
+            <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] p-8 text-center">
+              {/* Success icon */}
+              <div className="w-16 h-16 mx-auto mb-4 bg-[#10B981] rounded-full flex items-center justify-center">
+                <CheckCircle2 className="w-8 h-8 text-white" />
+              </div>
+
+              <h1 className="text-2xl font-bold text-[#010D50] mb-2">
+                Booking Confirmed
+              </h1>
+              <p className="text-[#6B7280] mb-6">
+                We&apos;ll email your confirmation shortly. Thank you for
+                choosing Globehunters
+              </p>
+
+              {/* Action buttons */}
+              <div className="flex items-center justify-center gap-3">
+                <Button
+                  onClick={handleViewTrip}
+                  className="bg-[#3754ED] hover:bg-[#2942D1] text-white px-6"
+                >
+                  View your trip
+                </Button>
+                <Button
+                  onClick={handleDownloadReceipt}
+                  variant="outline"
+                  className="border-[#E5E7EB] text-[#010D50] px-6"
+                >
+                  Download receipt
+                </Button>
+              </div>
+            </div>
+
+            {/* Flight Cards */}
+            {flight && (
+              <div className="flex flex-col lg:flex-row gap-6">
+                {/* Departing Flight */}
+                <FlightConfirmationCard
+                  title="Departing Flight"
+                  date={flight.outbound.date}
+                  passengerCount={passengers.length || 2}
+                  cabinClass={flight.outbound.cabinClass || "Economy"}
+                  airlineName={flight.airline.name}
+                  airlineCode={flight.airline.code}
+                  flightNumber={flight.outbound.flightNumber || "AT555"}
+                  distance={String(flight.outbound.distance || "3123")}
+                  aircraftType={flight.outbound.aircraftType || "Airbus A330-200"}
+                  segment={flight.outbound}
+                  onViewDetails={() => {}}
+                />
+
+                {/* Returning Flight (if round trip) */}
+                {flight.inbound && (
+                  <FlightConfirmationCard
+                    title="Returning Flight"
+                    date={flight.inbound.date}
+                    passengerCount={passengers.length || 2}
+                    cabinClass={flight.inbound.cabinClass || "Economy"}
+                    airlineName={flight.airline.name}
+                    airlineCode={flight.airline.code}
+                    flightNumber={flight.inbound.flightNumber || "AT555"}
+                    distance={String(flight.inbound.distance || "3123")}
+                    aircraftType={flight.inbound.aircraftType || "Airbus A330-200"}
+                    segment={flight.inbound}
+                    onViewDetails={() => {}}
+                  />
+                )}
+              </div>
+            )}
+
+            {/* Footer disclaimer */}
+            <div className="text-center">
+              <p className="text-xs text-[#6B7280]">
+                *Flight schedule and aircraft type are subject to change per the
+                Contract of Carriage.{" "}
+                <button className="text-[#3754ED] hover:underline">More</button>
+              </p>
+            </div>
+
+            {/* Support Card */}
+            <div className="bg-white rounded-xl shadow-sm border border-[#E5E7EB] p-6 text-center">
+              <h3 className="font-semibold text-[#010D50] mb-2">Need Help?</h3>
+              <p className="text-[#6B7280] mb-4">
+                Our customer support team is here to assist you 24/7
+              </p>
+              <div className="flex items-center justify-center gap-2">
+                <Phone className="w-5 h-5 text-[#3754ED]" />
+                <a
+                  href={`tel:${affiliatePhone}`}
+                  className="text-lg font-bold text-[#3754ED] hover:underline"
+                >
+                  {affiliatePhone}
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Failed/Pending/Cancelled States */}
+        {paymentInfo && !isSuccess && (
+          <div className="space-y-6">
+            {/* Main Card */}
             <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
-              {/* Success Header */}
-              <div className={`p-8 text-center ${
-                isSuccess 
-                  ? 'bg-gradient-to-br from-emerald-500 to-teal-600' 
-                  : isFailed 
-                    ? 'bg-gradient-to-br from-red-500 to-rose-600'
+              {/* Header */}
+              <div
+                className={`p-8 text-center ${
+                  isFailed
+                    ? "bg-gradient-to-br from-red-500 to-rose-600"
                     : isCancelled
-                      ? 'bg-gradient-to-br from-gray-500 to-slate-600'
-                      : 'bg-gradient-to-br from-amber-500 to-orange-600'
-              }`}>
-                <div className={`w-24 h-24 mx-auto mb-4 rounded-full flex items-center justify-center ${
-                  isSuccess 
-                    ? 'bg-white/20' 
-                    : 'bg-white/20'
-                }`}>
-                  {isSuccess && <CheckCircle2 className="w-14 h-14 text-white" />}
+                    ? "bg-gradient-to-br from-gray-500 to-slate-600"
+                    : "bg-gradient-to-br from-amber-500 to-orange-600"
+                }`}
+              >
+                <div className="w-24 h-24 mx-auto mb-4 rounded-full flex items-center justify-center bg-white/20">
                   {isFailed && <XCircle className="w-14 h-14 text-white" />}
                   {isPending && <Clock className="w-14 h-14 text-white" />}
                   {isCancelled && <XCircle className="w-14 h-14 text-white" />}
-                  {!isSuccess && !isFailed && !isPending && !isCancelled && (
-                    <AlertCircle className="w-14 h-14 text-white" />
-                  )}
                 </div>
                 <h1 className="text-3xl font-bold text-white mb-2">
-                  {isSuccess && 'Booking Confirmed!'}
-                  {isFailed && 'Payment Failed'}
-                  {isPending && 'Payment Processing'}
-                  {isCancelled && 'Payment Cancelled'}
-                  {!isSuccess && !isFailed && !isPending && !isCancelled && 'Payment Status Unknown'}
+                  {isFailed && "Payment Failed"}
+                  {isPending && "Payment Processing"}
+                  {isCancelled && "Payment Cancelled"}
                 </h1>
                 <p className="text-white/90 text-lg">
-                  {isSuccess && 'Thank you for booking with GlobeHunters'}
-                  {isFailed && 'Your payment could not be processed'}
-                  {isPending && 'Your payment is being processed'}
-                  {isCancelled && 'Your payment was cancelled'}
+                  {isFailed && "Your payment could not be processed"}
+                  {isPending && "Your payment is being processed"}
+                  {isCancelled && "Your payment was cancelled"}
                 </p>
               </div>
 
@@ -373,153 +838,29 @@ function PaymentCompleteContent() {
               <div className="p-6 border-b border-gray-100">
                 <div className="flex items-center justify-between flex-wrap gap-4">
                   <div>
-                    <p className="text-sm text-[#3A478A] mb-1">Booking Reference</p>
-                    <p className="text-2xl font-bold text-[#010D50] tracking-wider">{refNumber}</p>
+                    <p className="text-sm text-[#3A478A] mb-1">
+                      Booking Reference
+                    </p>
+                    <p className="text-2xl font-bold text-[#010D50] tracking-wider">
+                      {refNumber}
+                    </p>
                   </div>
-                  <StatusBadge status={paymentInfo.status} />
                 </div>
               </div>
-
-              {/* Payment Details */}
-              {(paymentInfo.amount || paymentInfo.transactionId) && (
-                <div className="p-6 border-b border-gray-100">
-                  <h3 className="text-lg font-semibold text-[#010D50] mb-4 flex items-center gap-2">
-                    <CreditCard className="w-5 h-5 text-[#3754ED]" />
-                    Payment Details
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {paymentInfo.amount && (
-                      <div>
-                        <p className="text-sm text-[#3A478A]">Amount Paid</p>
-                        <p className="font-semibold text-[#010D50]">
-                          {paymentInfo.currency === 'GBP' ? '£' : paymentInfo.currency} {paymentInfo.amount}
-                        </p>
-                      </div>
-                    )}
-                    {paymentInfo.transactionId && (
-                      <div>
-                        <p className="text-sm text-[#3A478A]">Transaction ID</p>
-                        <p className="font-mono text-sm text-[#010D50]">{paymentInfo.transactionId}</p>
-                      </div>
-                    )}
-                    {paymentInfo.paymentMethod && (
-                      <div>
-                        <p className="text-sm text-[#3A478A]">Payment Method</p>
-                        <p className="font-semibold text-[#010D50]">
-                          {paymentInfo.paymentMethod.brand || paymentInfo.paymentMethod.type}
-                        </p>
-                      </div>
-                    )}
-                    {paymentInfo.timestamp && (
-                      <div>
-                        <p className="text-sm text-[#3A478A]">Date & Time</p>
-                        <p className="font-semibold text-[#010D50]">
-                          {new Date(paymentInfo.timestamp).toLocaleString()}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Flight Summary */}
-              {flight && journeySegments.length > 0 && (
-                <div className="p-6 border-b border-gray-100">
-                  <h3 className="text-lg font-semibold text-[#010D50] mb-4 flex items-center gap-2">
-                    <Plane className="w-5 h-5 text-[#3754ED]" />
-                    Flight Details
-                  </h3>
-                  <div className="space-y-4">
-                    {journeySegments.map((segment, index) => (
-                      <div key={index} className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="font-bold text-[#010D50]">
-                              {segment.departureAirport?.city || 'Origin'} ({segment.departureAirport?.code})
-                            </span>
-                            <Plane className="w-4 h-4 text-[#3754ED]" />
-                            <span className="font-bold text-[#010D50]">
-                              {segment.arrivalAirport?.city || 'Destination'} ({segment.arrivalAirport?.code})
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm text-[#3A478A]">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-4 h-4" />
-                              {segment.date}
-                            </span>
-                            <span>
-                              {segment.departureTime} - {segment.arrivalTime}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Passenger Info */}
-              {passengers.length > 0 && (
-                <div className="p-6 border-b border-gray-100">
-                  <h3 className="text-lg font-semibold text-[#010D50] mb-4 flex items-center gap-2">
-                    <Users className="w-5 h-5 text-[#3754ED]" />
-                    Passengers
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {passengers.map((passenger, index) => (
-                      <div key={index} className="px-3 py-2 bg-slate-50 rounded-lg">
-                        <span className="text-[#010D50]">
-                          {passenger.title} {passenger.firstName} {passenger.lastName}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Contact Info */}
-              {(contactEmail || contactPhone) && (
-                <div className="p-6 border-b border-gray-100">
-                  <h3 className="text-lg font-semibold text-[#010D50] mb-4">Contact Information</h3>
-                  <div className="flex flex-wrap gap-6">
-                    {contactEmail && (
-                      <div className="flex items-center gap-2 text-[#3A478A]">
-                        <Mail className="w-4 h-4" />
-                        <span>{contactEmail}</span>
-                      </div>
-                    )}
-                    {contactPhone && (
-                      <div className="flex items-center gap-2 text-[#3A478A]">
-                        <Phone className="w-4 h-4" />
-                        <span>{contactPhone}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Important Notice */}
-              {isSuccess && (
-                <div className="p-6 bg-blue-50">
-                  <h4 className="font-semibold text-[#010D50] mb-2">What's Next?</h4>
-                  <ul className="text-sm text-[#3A478A] space-y-2">
-                    <li>• A confirmation email has been sent to your email address</li>
-                    <li>• Please save your booking reference: <strong>{refNumber}</strong></li>
-                    <li>• E-tickets will be emailed within 24 hours</li>
-                    <li>• For any queries, call us at <strong>{affiliatePhone}</strong></li>
-                  </ul>
-                </div>
-              )}
 
               {/* Failed Notice */}
               {isFailed && (
                 <div className="p-6 bg-red-50">
-                  <h4 className="font-semibold text-red-800 mb-2">What happened?</h4>
+                  <h4 className="font-semibold text-red-800 mb-2">
+                    What happened?
+                  </h4>
                   <p className="text-sm text-red-700 mb-4">
-                    {paymentInfo.message || 'Your payment could not be processed. This could be due to insufficient funds, card restrictions, or a technical issue.'}
+                    {paymentInfo.message ||
+                      "Your payment could not be processed. This could be due to insufficient funds, card restrictions, or a technical issue."}
                   </p>
                   <p className="text-sm text-red-700">
-                    Please try again or contact us at <strong>{affiliatePhone}</strong> for assistance.
+                    Please try again or contact us at{" "}
+                    <strong>{affiliatePhone}</strong> for assistance.
                   </p>
                 </div>
               )}
@@ -527,24 +868,19 @@ function PaymentCompleteContent() {
 
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              {isSuccess && (
-                <>
-                  <Button variant="outline" className="gap-2" onClick={() => window.print()}>
-                    <Download className="w-4 h-4" />
-                    Download Confirmation
-                  </Button>
-                  <Button onClick={handleGoHome} className="gap-2 bg-[#3754ED] hover:bg-[#2942D1]">
-                    <Home className="w-4 h-4" />
-                    Go Home
-                  </Button>
-                </>
-              )}
               {isFailed && (
                 <>
-                  <Button onClick={() => router.push('/payment')} className="gap-2 bg-[#3754ED] hover:bg-[#2942D1]">
+                  <Button
+                    onClick={() => router.push("/payment")}
+                    className="gap-2 bg-[#3754ED] hover:bg-[#2942D1]"
+                  >
                     Try Again
                   </Button>
-                  <Button variant="outline" onClick={handleGoHome} className="gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleGoHome}
+                    className="gap-2"
+                  >
                     <Home className="w-4 h-4" />
                     Go Home
                   </Button>
@@ -552,10 +888,17 @@ function PaymentCompleteContent() {
               )}
               {(isPending || isCancelled) && (
                 <>
-                  <Button onClick={handleNewSearch} className="gap-2 bg-[#3754ED] hover:bg-[#2942D1]">
+                  <Button
+                    onClick={handleNewSearch}
+                    className="gap-2 bg-[#3754ED] hover:bg-[#2942D1]"
+                  >
                     Start New Search
                   </Button>
-                  <Button variant="outline" onClick={handleGoHome} className="gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={handleGoHome}
+                    className="gap-2"
+                  >
                     <Home className="w-4 h-4" />
                     Go Home
                   </Button>
@@ -571,7 +914,10 @@ function PaymentCompleteContent() {
               </p>
               <div className="flex items-center justify-center gap-2">
                 <Phone className="w-5 h-5 text-[#3754ED]" />
-                <a href={`tel:${affiliatePhone}`} className="text-lg font-bold text-[#3754ED] hover:underline">
+                <a
+                  href={`tel:${affiliatePhone}`}
+                  className="text-lg font-bold text-[#3754ED] hover:underline"
+                >
                   {affiliatePhone}
                 </a>
               </div>
@@ -587,13 +933,14 @@ function PaymentCompleteContent() {
 
 export default function PaymentCompletePage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-        <Loader2 className="w-12 h-12 text-[#3754ED] animate-spin" />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-[#F9FAFB]">
+          <Loader2 className="w-12 h-12 text-[#3754ED] animate-spin" />
+        </div>
+      }
+    >
       <PaymentCompleteContent />
     </Suspense>
   );
 }
-
