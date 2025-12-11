@@ -13,7 +13,9 @@ interface FlightLeg {
   departureAirport: Airport;
   arrivalAirport: Airport;
   stopDetails?: string;
-  duration: string;
+  duration: string; // Flying time only (excluding layovers)
+  totalJourneyTime?: string; // Total time including layovers
+  stops: number;
 }
 
 interface FlightLegMobileProps {
@@ -84,9 +86,21 @@ export function FlightLegMobile({ leg }: FlightLegMobileProps) {
             </div>
             <div className="flex-1 border-t border-dashed border-[#010D50]" />
           </div>
-          <span className="text-[11px] font-medium text-[#010D50] mt-0.5">
-            {leg.duration}
-          </span>
+          {/* Show total journey time for flights with stops, otherwise just duration */}
+          {leg.stops > 0 && leg.totalJourneyTime ? (
+            <div className="flex flex-col items-center mt-0.5">
+              <span className="text-[11px] font-medium text-[#010D50]">
+                {leg.totalJourneyTime}
+              </span>
+              <span className="text-[9px] text-[#6B7280]">
+                ({leg.duration} flying)
+              </span>
+            </div>
+          ) : (
+            <span className="text-[11px] font-medium text-[#010D50] mt-0.5">
+              {leg.duration}
+            </span>
+          )}
         </div>
         <div className="min-w-10 text-right">
           <div className="text-sm font-medium text-[#010D50] leading-5">

@@ -40,6 +40,7 @@ export interface FlightSearchResponse {
     maxPrice: number;
   };
   datePrices?: DatePrice[];
+  requestId?: string; // Request ID from API - used as web ref until folder is created
 }
 
 export interface FlightPricing {

@@ -34,6 +34,15 @@ interface AvailableFilters {
 interface FilterSidebarProps {
   filterState: FilterState;
   filters: AvailableFilters;
+  showInboundLeg: boolean;
+  journeyTimeBounds: {
+    outbound: { min: number; max: number };
+    inbound: { min: number; max: number };
+  };
+  /** Origin airport code (e.g., "DEL") */
+  originAirport?: string;
+  /** Destination airport code (e.g., "YYZ") */
+  destinationAirport?: string;
   expandedFilters: Record<string, boolean>;
   onToggleExpand: (key: string) => void;
   onToggleStop: (stops: number) => void;
@@ -51,6 +60,10 @@ interface FilterSidebarProps {
 export function FilterSidebar({
   filterState,
   filters,
+  showInboundLeg,
+  journeyTimeBounds,
+  originAirport,
+  destinationAirport,
   expandedFilters,
   onToggleExpand,
   onToggleStop,
@@ -119,6 +132,9 @@ export function FilterSidebar({
           onInboundChange={(range) =>
             onUpdateDepartureTime("inbound", range)
           }
+          showInbound={showInboundLeg}
+          outboundAirport={originAirport}
+          inboundAirport={destinationAirport}
         />
       </FilterSection>
 
@@ -133,6 +149,11 @@ export function FilterSidebar({
           inboundDuration={filterState.journeyTimeInbound}
           onOutboundChange={(range) => onUpdateJourneyTime("outbound", range)}
           onInboundChange={(range) => onUpdateJourneyTime("inbound", range)}
+          outboundMin={journeyTimeBounds.outbound.min}
+          outboundMax={journeyTimeBounds.outbound.max}
+          inboundMin={journeyTimeBounds.inbound.min}
+          inboundMax={journeyTimeBounds.inbound.max}
+          showInbound={showInboundLeg}
         />
       </FilterSection>
 

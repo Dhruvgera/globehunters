@@ -31,6 +31,9 @@ import type {
 export function transformVyspaResponse(
   vyspaData: VyspaApiResponse
 ): FlightSearchResponse {
+  // Extract Request_id from API response (used as web ref until folder is created)
+  const requestId = vyspaData.Request_id ? String(vyspaData.Request_id) : undefined;
+
   // Handle errors or empty results
   if (!vyspaData.Results || vyspaData.Results.length === 0) {
     return {
@@ -42,6 +45,7 @@ export function transformVyspaResponse(
         minPrice: 0,
         maxPrice: 0,
       },
+      requestId,
     };
   }
 
@@ -85,6 +89,7 @@ export function transformVyspaResponse(
       minPrice: minPrice === Infinity ? 0 : Math.floor(minPrice),
       maxPrice: maxPrice === -Infinity ? 0 : Math.ceil(maxPrice),
     },
+    requestId,
   };
 }
 

@@ -187,6 +187,7 @@ export interface VyspaResult {
  * Vyspa API response
  */
 export interface VyspaApiResponse {
+  Request_id?: number; // Request ID from the API - used as web ref until folder is created
   Results?: VyspaResult[];
   error?: string; // Error message if request failed
 }

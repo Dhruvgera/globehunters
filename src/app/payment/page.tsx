@@ -51,6 +51,7 @@ function PaymentContent() {
   const setProtectionPlan = useBookingStore((state) => state.setProtectionPlan);
   const setAdditionalBaggage = useBookingStore((state) => state.setAdditionalBaggage);
   const vyspaFolderNumber = useBookingStore((state) => state.vyspaFolderNumber);
+  const searchRequestId = useBookingStore((state) => state.searchRequestId);
   const passengers = useBookingStore((state) => state.passengers);
   const contactEmail = useBookingStore((state) => state.contactEmail);
   const contactPhone = useBookingStore((state) => state.contactPhone);
@@ -197,7 +198,8 @@ function PaymentContent() {
     return parts.join(", ");
   })();
   const cabinLabel = selectedUpgrade?.cabinClassDisplay || useBookingStore((s) => s.selectedFareType) || 'Economy';
-  const refNumber = vyspaFolderNumber || flight.webRef || (priceCheckData?.sessionInfo?.sessionId || '—');
+  // Web reference: prefer folder number, then search request ID, then fallbacks
+  const refNumber = vyspaFolderNumber || searchRequestId || flight.webRef || '—';
   const orderId = refNumber;
 
   return (
@@ -243,6 +245,7 @@ function PaymentContent() {
                   ? `${flight.outbound.segmentBaggageQuantity} ${flight.outbound.segmentBaggageUnit}`
                   : flight.outbound.segmentBaggage || flight.baggage || undefined)
               }
+              maxBaggageCount={(storeSearchParams?.passengers.adults || 1) + (storeSearchParams?.passengers.children || 0)}
             />
 
             {/* iAssure Protection Plan */}

@@ -1,6 +1,6 @@
 "use client";
 
-import { Briefcase, Package, ShoppingBag } from "lucide-react";
+import { Briefcase, ShoppingBag, Luggage } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { BaggageItem } from "./baggage/BaggageItem";
 import { BaggageCounter } from "./baggage/BaggageCounter";
@@ -9,16 +9,21 @@ interface BaggageSectionProps {
   additionalBaggage: number;
   onUpdateBaggage: (count: number) => void;
   baggageDescription?: string;
+  /** Maximum number of bags allowed (typically adults + children count) */
+  maxBaggageCount?: number;
 }
 
 export function BaggageSection({
   additionalBaggage,
   onUpdateBaggage,
   baggageDescription,
+  maxBaggageCount = 10,
 }: BaggageSectionProps) {
   const t = useTranslations('payment.baggage');
 
-  const hasCheckedIncluded = !!baggageDescription && !/^no$|^none$/i.test(baggageDescription.trim());
+  // Check if baggage is NOT included - matches: "no", "none", "0", "0p", "0 pc", "0 piece", "0 pieces", "0 kg", "0kg", etc.
+  const hasCheckedIncluded = !!baggageDescription && 
+    !/^no$|^none$|^0\s*(p|pc|pcs|piece|pieces|kg|lb|lbs)?$/i.test(baggageDescription.trim());
 
   return (
     <div className="bg-white border border-[#DFE0E4] rounded-xl p-3 flex flex-col gap-6">
@@ -54,9 +59,9 @@ export function BaggageSection({
           notIncludedText={t('notIncluded')}
         />
 
-        {/* Checked bags - Not Included */}
+        {/* Checked bags */}
         <BaggageItem
-          icon={Package}
+          icon={Luggage}
           title={t('checkedBags')}
           description={baggageDescription || t('checkedBagsDesc')}
           included={hasCheckedIncluded}
@@ -64,15 +69,18 @@ export function BaggageSection({
           notIncludedText={t('notIncluded')}
         />
 
-        {/* Add Additional Baggage */}
-        <BaggageCounter
-          count={additionalBaggage}
-          onIncrement={() => onUpdateBaggage(additionalBaggage + 1)}
-          onDecrement={() => onUpdateBaggage(Math.max(0, additionalBaggage - 1))}
-          title={t('addBaggage')}
-          description={t('addBaggageDesc')}
-          priceText={t('baggagePrice')}
-        />
+        {/* Add Additional Baggage - Only show if baggage NOT included */}
+        {!hasCheckedIncluded && (
+          <BaggageCounter
+            count={additionalBaggage}
+            onIncrement={() => onUpdateBaggage(Math.min(additionalBaggage + 1, maxBaggageCount))}
+            onDecrement={() => onUpdateBaggage(Math.max(0, additionalBaggage - 1))}
+            maxCount={maxBaggageCount}
+            title={t('addBaggage')}
+            description={t('addBaggageDesc')}
+            priceText={t('baggagePrice')}
+          />
+        )}
       </div>
     </div>
   );

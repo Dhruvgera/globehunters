@@ -23,6 +23,7 @@ interface UseFlightsReturn {
   flights: Flight[];
   filters: FlightSearchResponse['filters'] | null;
   datePrices: FlightSearchResponse['datePrices'];
+  requestId: string | null;
   loading: boolean;
   error: Error | null;
   refetch: () => Promise<void>;
@@ -37,6 +38,7 @@ export function useFlights(
   const [flights, setFlights] = useState<Flight[]>([]);
   const [filters, setFilters] = useState<FlightSearchResponse['filters'] | null>(null);
   const [datePrices, setDatePrices] = useState<FlightSearchResponse['datePrices']>([]);
+  const [requestId, setRequestId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
@@ -58,6 +60,7 @@ export function useFlights(
         setFlights(cachedData.flights);
         setFilters(cachedData.filters);
         setDatePrices(cachedData.datePrices);
+        setRequestId(cachedData.requestId || null);
         setLoading(false);
       }, 100); // 100ms delay to show transition
       return;
@@ -73,6 +76,7 @@ export function useFlights(
       setFlights(response.flights);
       setFilters(response.filters);
       setDatePrices(response.datePrices);
+      setRequestId(response.requestId || null);
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Failed to fetch flights');
       setError(error);
@@ -104,6 +108,7 @@ export function useFlights(
     flights,
     filters,
     datePrices,
+    requestId,
     loading,
     error,
     refetch: fetchFlights,

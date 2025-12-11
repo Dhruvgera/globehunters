@@ -22,7 +22,6 @@ interface PassengerFormProps {
   onCancel?: () => void;
   showPassportFields?: boolean;
   disabled?: boolean;
-  leadAddress?: { address?: string; postalCode?: string };
   /** Passenger type for age validation: adult (12+), child (2-11), infant (0-23 months) */
   passengerType?: 'adult' | 'child' | 'infant';
 }
@@ -34,7 +33,6 @@ export function PassengerForm({
   onCancel,
   showPassportFields = false,
   disabled = false,
-  leadAddress,
   passengerType = 'adult',
 }: PassengerFormProps) {
   const t = useTranslations('booking.passengerDetails');
@@ -46,8 +44,7 @@ export function PassengerForm({
     dateOfBirth: initialData?.dateOfBirth || "",
     email: initialData?.email || "",
     phone: initialData?.phone || "",
-    address: initialData?.address || "",
-    postalCode: initialData?.postalCode || "",
+    countryCode: initialData?.countryCode || "+44",
     passportNumber: initialData?.passportNumber || "",
     passportExpiry: initialData?.passportExpiry || "",
     nationality: initialData?.nationality || "",
@@ -80,22 +77,6 @@ export function PassengerForm({
     // Clear error for this field when user starts typing
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));
-    }
-  };
-
-  const handleCopyAddressFromLead = () => {
-    if (!leadAddress) return;
-    setFormData((prev) => ({
-      ...prev,
-      address: leadAddress.address || '',
-      postalCode: leadAddress.postalCode || '',
-    }));
-    if (errors.address || errors.postalCode) {
-      setErrors((prev) => ({
-        ...prev,
-        address: undefined,
-        postalCode: undefined,
-      }));
     }
   };
 
@@ -224,62 +205,155 @@ export function PassengerForm({
             )}
           </div>
 
-          {/* Phone */}
-          <div className="space-y-2">
+          {/* Phone with Country Code */}
+          <div className="space-y-2 md:col-span-2">
             <Label htmlFor={`phone-${passengerIndex}`}>{t('phone')} {t('required')}</Label>
-            <Input
-              id={`phone-${passengerIndex}`}
-              type="tel"
-              value={formData.phone}
-              onChange={(e) => handleChange("phone", e.target.value)}
-              placeholder={t('phonePlaceholder')}
-              className={errors.phone ? "border-red-500" : ""}
-              disabled={disabled}
-            />
-            {errors.phone && (
-              <p className="text-xs text-red-600">{errors.phone}</p>
-            )}
-          </div>
-
-          {/* Address (used for booking folder) */}
-          <div className="space-y-2">
-            <Label htmlFor={`address-${passengerIndex}`}>Address</Label>
-            {leadAddress && passengerIndex > 0 && (
-              <button
-                type="button"
-                onClick={handleCopyAddressFromLead}
-                className="ml-2 text-xs text-[#3754ED] underline"
+            <div className="flex gap-2">
+              {/* Country Code Selector */}
+              <Select
+                value={formData.countryCode || "+44"}
+                onValueChange={(value) => handleChange("countryCode", value)}
                 disabled={disabled}
               >
-                {t('copyAddressFromLead')}
-              </button>
-            )}
-            <Input
-              id={`address-${passengerIndex}`}
-              type="text"
-              value={formData.address || ""}
-              onChange={(e) => handleChange("address", e.target.value)}
-              placeholder="1 Fish Street, Goring by Sea, West Sussex"
-              disabled={disabled}
-            />
-            {errors.address && (
-              <p className="text-xs text-red-600">{errors.address}</p>
-            )}
-          </div>
-
-          {/* Postcode (zip code) */}
-          <div className="space-y-2">
-            <Label htmlFor={`postalCode-${passengerIndex}`}>Postcode</Label>
-            <Input
-              id={`postalCode-${passengerIndex}`}
-              type="text"
-              value={formData.postalCode || ""}
-              onChange={(e) => handleChange("postalCode", e.target.value)}
-              placeholder="BN1 1NB"
-              disabled={disabled}
-            />
-            {errors.postalCode && (
-              <p className="text-xs text-red-600">{errors.postalCode}</p>
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  <SelectItem value="+44">
+                    <span className="flex items-center gap-2">
+                      <span className="fi fi-gb w-4 h-3"></span>
+                      <span>+44</span>
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="+1">
+                    <span className="flex items-center gap-2">
+                      <span className="fi fi-us w-4 h-3"></span>
+                      <span>+1</span>
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="+91">
+                    <span className="flex items-center gap-2">
+                      <span className="fi fi-in w-4 h-3"></span>
+                      <span>+91</span>
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="+61">
+                    <span className="flex items-center gap-2">
+                      <span className="fi fi-au w-4 h-3"></span>
+                      <span>+61</span>
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="+49">
+                    <span className="flex items-center gap-2">
+                      <span className="fi fi-de w-4 h-3"></span>
+                      <span>+49</span>
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="+33">
+                    <span className="flex items-center gap-2">
+                      <span className="fi fi-fr w-4 h-3"></span>
+                      <span>+33</span>
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="+34">
+                    <span className="flex items-center gap-2">
+                      <span className="fi fi-es w-4 h-3"></span>
+                      <span>+34</span>
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="+39">
+                    <span className="flex items-center gap-2">
+                      <span className="fi fi-it w-4 h-3"></span>
+                      <span>+39</span>
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="+81">
+                    <span className="flex items-center gap-2">
+                      <span className="fi fi-jp w-4 h-3"></span>
+                      <span>+81</span>
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="+86">
+                    <span className="flex items-center gap-2">
+                      <span className="fi fi-cn w-4 h-3"></span>
+                      <span>+86</span>
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="+971">
+                    <span className="flex items-center gap-2">
+                      <span className="fi fi-ae w-4 h-3"></span>
+                      <span>+971</span>
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="+65">
+                    <span className="flex items-center gap-2">
+                      <span className="fi fi-sg w-4 h-3"></span>
+                      <span>+65</span>
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="+27">
+                    <span className="flex items-center gap-2">
+                      <span className="fi fi-za w-4 h-3"></span>
+                      <span>+27</span>
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="+55">
+                    <span className="flex items-center gap-2">
+                      <span className="fi fi-br w-4 h-3"></span>
+                      <span>+55</span>
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="+52">
+                    <span className="flex items-center gap-2">
+                      <span className="fi fi-mx w-4 h-3"></span>
+                      <span>+52</span>
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="+31">
+                    <span className="flex items-center gap-2">
+                      <span className="fi fi-nl w-4 h-3"></span>
+                      <span>+31</span>
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="+46">
+                    <span className="flex items-center gap-2">
+                      <span className="fi fi-se w-4 h-3"></span>
+                      <span>+46</span>
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="+41">
+                    <span className="flex items-center gap-2">
+                      <span className="fi fi-ch w-4 h-3"></span>
+                      <span>+41</span>
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="+64">
+                    <span className="flex items-center gap-2">
+                      <span className="fi fi-nz w-4 h-3"></span>
+                      <span>+64</span>
+                    </span>
+                  </SelectItem>
+                  <SelectItem value="+353">
+                    <span className="flex items-center gap-2">
+                      <span className="fi fi-ie w-4 h-3"></span>
+                      <span>+353</span>
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              {/* Phone Number Input */}
+              <Input
+                id={`phone-${passengerIndex}`}
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => handleChange("phone", e.target.value)}
+                placeholder={t('phonePlaceholder')}
+                className={`flex-1 ${errors.phone ? "border-red-500" : ""}`}
+                disabled={disabled}
+              />
+            </div>
+            {errors.phone && (
+              <p className="text-xs text-red-600">{errors.phone}</p>
             )}
           </div>
         </div>

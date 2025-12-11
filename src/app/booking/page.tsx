@@ -55,7 +55,12 @@ function BookingContent() {
   const priceCheckData = usePriceCheckData();
   const storeSearchParams = useBookingStore((s) => s.searchParams);
   const setPriceCheckData = useBookingStore((s) => s.setPriceCheckData);
+  const vyspaFolderNumber = useBookingStore((s) => s.vyspaFolderNumber);
+  const searchRequestId = useBookingStore((s) => s.searchRequestId);
   const { checkPrice, priceCheck } = usePriceCheck();
+
+  // Web reference: prefer folder number, then request ID
+  const webRefNumber = vyspaFolderNumber || searchRequestId || '—';
   
   // Get affiliate phone number
   const { phoneNumber: affiliatePhone } = useAffiliatePhone();
@@ -147,7 +152,7 @@ function BookingContent() {
         <div className="flex flex-col lg:flex-row gap-4">
           {/* Web Ref Card - Mobile Only (shown at top) */}
           <WebRefCard
-            refNumber="IN-649707636"
+            refNumber={webRefNumber}
             phoneNumber={affiliatePhone}
             isMobile={true}
           />
@@ -208,7 +213,7 @@ function BookingContent() {
           <div className="w-full lg:w-[482px] flex flex-col gap-4">
             {/* Web Ref Card - Desktop Only */}
             <WebRefCard
-              refNumber="IN-649707636"
+              refNumber={webRefNumber}
               phoneNumber={affiliatePhone}
               isMobile={false}
             />

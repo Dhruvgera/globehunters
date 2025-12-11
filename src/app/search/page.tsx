@@ -8,7 +8,7 @@ import Footer from "@/components/navigation/Footer";
 import { useFlights } from "@/hooks/useFlights";
 import { useDatePrices } from "@/hooks/useDatePrices";
 import { useBookingStore } from "@/store/bookingStore";
-import { filterFlights, sortFlights } from "@/utils/flightFilter";
+import { filterFlights, parseDurationToMinutes, sortFlights } from "@/utils/flightFilter";
 import { FilterState, SearchParams } from "@/types/flight";
 import { mockFlights, mockDatePrices, mockAirlines, mockAirports } from "@/data/mockFlights";
 import { useFilterExpansion } from "@/hooks/useFilterExpansion";
@@ -46,6 +46,7 @@ function SearchPageContent() {
   const urlParams = useSearchParams();
   const setStoreSearchParams = useBookingStore((state) => state.setSearchParams);
   const storeSearchParams = useBookingStore((state) => state.searchParams);
+  const setSearchRequestId = useBookingStore((state) => state.setSearchRequestId);
   const { setAffiliateCode } = useAffiliate();
   const [isInitialized, setIsInitialized] = useState(false);
   const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
@@ -173,10 +174,17 @@ function SearchPageContent() {
   const effectiveSearchParams = storeSearchParams || DEFAULT_SEARCH_PARAMS;
 
   // Fetch flights using custom hook - but only after initialization
-  const { flights, filters: apiFilters, loading, error } = useFlights(
+  const { flights, filters: apiFilters, requestId, loading, error } = useFlights(
     isInitialized ? effectiveSearchParams : null,
     { enabled: isInitialized }
   );
+
+  // Store requestId in booking store when flights are fetched
+  useEffect(() => {
+    if (requestId) {
+      setSearchRequestId(requestId);
+    }
+  }, [requestId, setSearchRequestId]);
 
   // Keep last successful flights to avoid blanking the UI during date changes
   const lastFlightsRef = useRef<typeof flights>([]);
@@ -372,6 +380,8 @@ function SearchPageContent() {
     extras: [],
   });
 
+  const showInboundLeg = effectiveSearchParams.tripType === "round-trip";
+
   // UI state
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [displayedFlightsCount, setDisplayedFlightsCount] = useState(5);
@@ -471,6 +481,73 @@ function SearchPageContent() {
       } catch {}
     });
   }, [preparedFlights]);
+
+  // Compute min/max journey duration from actual flight results
+  const journeyTimeBounds = useMemo(() => {
+    const fallback = {
+      outbound: { min: 0, max: 35 },
+      inbound: { min: 0, max: 35 },
+    };
+
+    if (!preparedFlights || preparedFlights.length === 0) {
+      return fallback;
+    }
+
+    const clampBounds = (min: number, max: number) => {
+      if (!isFinite(min) || !isFinite(max)) return { min: 0, max: 35 };
+      const normalizedMin = Math.max(0, Math.floor(min));
+      const normalizedMax = Math.max(normalizedMin + 1, Math.ceil(max));
+      return { min: normalizedMin, max: normalizedMax };
+    };
+
+    const outboundHours = preparedFlights
+      .map((f) => parseDurationToMinutes(f.outbound.duration) / 60)
+      .filter((v) => Number.isFinite(v));
+
+    const inboundHours = preparedFlights
+      .filter((f) => !!f.inbound)
+      .map((f) => parseDurationToMinutes(f.inbound!.duration) / 60)
+      .filter((v) => Number.isFinite(v));
+
+    const outbound =
+      outboundHours.length > 0
+        ? clampBounds(Math.min(...outboundHours), Math.max(...outboundHours))
+        : fallback.outbound;
+
+    const inbound =
+      inboundHours.length > 0
+        ? clampBounds(Math.min(...inboundHours), Math.max(...inboundHours))
+        : fallback.inbound;
+
+    return { outbound, inbound };
+  }, [preparedFlights]);
+
+  // Align duration ranges to actual min/max (avoid 0-based slider)
+  useEffect(() => {
+    setFilterState((prev) => {
+      const clampRange = (range: [number, number], bounds: { min: number; max: number }): [number, number] => {
+        const lo = Math.max(bounds.min, Math.min(bounds.max, range[0]));
+        const hi = Math.max(bounds.min, Math.min(bounds.max, range[1]));
+        return lo <= hi ? [lo, hi] : [bounds.min, bounds.max];
+      };
+
+      const shouldResetOutbound =
+        prev.journeyTimeOutbound[0] === 0 && prev.journeyTimeOutbound[1] === 35 && journeyTimeBounds.outbound.min > 0;
+
+      const shouldResetInbound =
+        prev.journeyTimeInbound[0] === 0 && prev.journeyTimeInbound[1] === 35 && journeyTimeBounds.inbound.min > 0;
+
+      return {
+        ...prev,
+        journeyTimeOutbound: shouldResetOutbound
+          ? [journeyTimeBounds.outbound.min, journeyTimeBounds.outbound.max]
+          : clampRange(prev.journeyTimeOutbound, journeyTimeBounds.outbound),
+        journeyTimeInbound: shouldResetInbound
+          ? [journeyTimeBounds.inbound.min, journeyTimeBounds.inbound.max]
+          : clampRange(prev.journeyTimeInbound, journeyTimeBounds.inbound),
+      };
+    });
+  }, [journeyTimeBounds]);
 
   // Filter flights
   const filteredFlights = useMemo(() => {
@@ -584,8 +661,8 @@ function SearchPageContent() {
                     priceRange: [effectiveFilters.minPrice, effectiveFilters.maxPrice],
                   departureTimeOutbound: [0, 24],
                   departureTimeInbound: [0, 24],
-                  journeyTimeOutbound: [0, 35],
-                  journeyTimeInbound: [0, 35],
+                  journeyTimeOutbound: [journeyTimeBounds.outbound.min, journeyTimeBounds.outbound.max],
+                  journeyTimeInbound: [journeyTimeBounds.inbound.min, journeyTimeBounds.inbound.max],
                   departureAirports: [],
                   arrivalAirports: [],
                   airlines: [],
@@ -606,6 +683,10 @@ function SearchPageContent() {
         onOpenChange={setIsFilterSheetOpen}
         filterState={filterState}
         filters={effectiveFilters}
+        showInboundLeg={showInboundLeg}
+        journeyTimeBounds={journeyTimeBounds}
+        originAirport={effectiveSearchParams.from}
+        destinationAirport={effectiveSearchParams.to}
         expandedFilters={expandedFilters}
         onToggleExpand={toggleFilter}
         onToggleStop={toggleStop}
@@ -630,6 +711,10 @@ function SearchPageContent() {
               <FilterSidebar
                 filterState={filterState}
                 filters={effectiveFilters}
+                showInboundLeg={showInboundLeg}
+                journeyTimeBounds={journeyTimeBounds}
+                originAirport={effectiveSearchParams.from}
+                destinationAirport={effectiveSearchParams.to}
                 expandedFilters={expandedFilters}
                 onToggleExpand={toggleFilter}
                 onToggleStop={toggleStop}

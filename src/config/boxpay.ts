@@ -38,3 +38,4 @@ export const getBoxPayEndpoints = (merchantId: string = BOXPAY_CONFIG.merchantId
   inquireTransaction: `${BOXPAY_CONFIG.baseUrl}/v0/merchants/${merchantId}/transactions/inquiries`,
 });
 
+

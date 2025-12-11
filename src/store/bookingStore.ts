@@ -75,6 +75,10 @@ interface BookingState {
   vyspaEmailAddress: string | null;
   setVyspaFolderInfo: (info: { folderNumber: string; customerId?: number | null; emailAddress?: string | null }) => void;
 
+  // Search request ID (used as web ref until folder is created)
+  searchRequestId: string | null;
+  setSearchRequestId: (requestId: string | null) => void;
+
   // Payment information
   paymentDetails: PaymentDetails | null;
   setPaymentDetails: (details: PaymentDetails) => void;
@@ -108,6 +112,7 @@ const initialState = {
   vyspaFolderNumber: null,
   vyspaCustomerId: null,
   vyspaEmailAddress: null,
+  searchRequestId: null,
   currentStep: 'search' as const,
 };
 
@@ -161,6 +166,7 @@ export const useBookingStore = create<BookingState & HydrationState>()(
           vyspaFolderNumber: null,
           vyspaCustomerId: null,
           vyspaEmailAddress: null,
+          searchRequestId: null,
         }),
 
       // Passengers
@@ -222,6 +228,10 @@ export const useBookingStore = create<BookingState & HydrationState>()(
           vyspaEmailAddress: info.emailAddress ?? null,
         }),
 
+      // Search request ID (web ref before folder creation)
+      setSearchRequestId: (requestId) =>
+        set({ searchRequestId: requestId }),
+
       // Payment
       setPaymentDetails: (details) =>
         set({ paymentDetails: details }),
@@ -253,6 +263,7 @@ export const useBookingStore = create<BookingState & HydrationState>()(
         vyspaFolderNumber: state.vyspaFolderNumber,
         vyspaCustomerId: state.vyspaCustomerId,
         vyspaEmailAddress: state.vyspaEmailAddress,
+        searchRequestId: state.searchRequestId,
         currentStep: state.currentStep,
         // Don't persist payment details for security
       }),

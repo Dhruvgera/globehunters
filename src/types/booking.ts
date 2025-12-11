@@ -16,10 +16,9 @@ export interface Passenger {
   dateOfBirth: string; // ISO date string
   email: string;
   phone: string;
+  countryCode?: string; // Phone country code e.g., "+44"
   type: PassengerType;
   // Optional fields for international travel
-  address?: string;
-  postalCode?: string;
   passportNumber?: string;
   passportExpiry?: string;
   nationality?: string;
@@ -129,8 +128,6 @@ export interface PassengerFormErrors {
   dateOfBirth?: string;
   email?: string;
   phone?: string;
-  address?: string;
-  postalCode?: string;
   passportNumber?: string;
   passportExpiry?: string;
 }
