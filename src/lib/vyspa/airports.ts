@@ -65,6 +65,7 @@ function normalizeCountryCode(countryInput?: string): string {
  */
 function transformVyspaAirport(item: VyspaAirportResponse): Airport | null {
   const code = String(item.id || '').toUpperCase().trim();
+  const name = String(item.name || '').trim();
   const city = String(item.city || '').trim();
   const country = String(item.country || '').trim();
   const countryCode = normalizeCountryCode(item.country_code || item.country);
@@ -75,6 +76,7 @@ function transformVyspaAirport(item: VyspaAirportResponse): Airport | null {
   
   return {
     code,
+    name: name || city || code, // Fallback to city, then code if name is empty
     city: city || code, // Fallback to code if city is empty
     country: country || countryCode,
     countryCode,

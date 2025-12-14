@@ -117,6 +117,10 @@ export interface FilterState {
   priceRange: [number, number];
   departureTimeOutbound: [number, number];
   departureTimeInbound: [number, number];
+  arrivalTimeOutbound: [number, number];
+  arrivalTimeInbound: [number, number];
+  /** Which time filter mode is active: 'takeoff' filters by departure, 'landing' filters by arrival */
+  timeFilterMode: 'takeoff' | 'landing';
   journeyTimeOutbound: [number, number];
   journeyTimeInbound: [number, number];
   departureAirports: string[];

@@ -1,6 +1,7 @@
 /**
  * Airport Cache System
  * In-memory cache for airport data with TTL
+ * Works on both server (direct Vyspa call) and client (via API route)
  */
 
 import type { Airport } from '@/types/airport';
@@ -11,6 +12,9 @@ interface AirportCacheEntry {
   timestamp: number;
   ttl: number; // Time to live in milliseconds
 }
+
+// Check if running on server or client
+const isServer = typeof window === 'undefined';
 
 class AirportCacheManager {
   private cache: AirportCacheEntry | null = null;
@@ -57,12 +61,27 @@ class AirportCacheManager {
 
   /**
    * Fetch airports and update cache
+   * Uses direct Vyspa call on server, API route on client
    */
   private async fetchAndCache(): Promise<Airport[]> {
-    console.log('🔄 Fetching fresh airport data...');
+    console.log(`🔄 Fetching fresh airport data (${isServer ? 'server' : 'client'})...`);
     
     try {
-      const airports = await fetchAirportsFromVyspa();
+      let airports: Airport[];
+      
+      if (isServer) {
+        // On server: directly call Vyspa API (has access to env vars)
+        airports = await fetchAirportsFromVyspa();
+      } else {
+        // On client: use internal API route
+        const response = await fetch('/api/airports');
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        airports = await response.json();
+      }
       
       // Update cache
       this.cache = {
@@ -82,7 +101,8 @@ class AirportCacheManager {
         return this.cache.airports;
       }
       
-      throw error;
+      // Return empty array instead of throwing to prevent app crashes
+      return [];
     }
   }
 
@@ -118,6 +138,22 @@ class AirportCacheManager {
       airportCount: this.cache?.airports.length || 0,
       age: this.cache ? Date.now() - this.cache.timestamp : 0,
     };
+  }
+  
+  /**
+   * Get airport by code from cache (sync - returns null if not cached)
+   */
+  getAirportByCode(code: string): Airport | null {
+    if (!this.cache) return null;
+    return this.cache.airports.find(a => a.code.toUpperCase() === code.toUpperCase()) || null;
+  }
+  
+  /**
+   * Get airport name by code (sync - returns code if not found)
+   */
+  getAirportName(code: string): string {
+    const airport = this.getAirportByCode(code);
+    return airport?.name || airport?.city || code;
   }
 }
 

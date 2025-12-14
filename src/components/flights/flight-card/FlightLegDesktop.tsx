@@ -2,6 +2,7 @@
 
 interface Airport {
   code: string;
+  name?: string;
   city: string;
 }
 
@@ -16,6 +17,10 @@ interface FlightLeg {
   duration: string; // Flying time only (excluding layovers)
   totalJourneyTime?: string; // Total time including layovers
   stops: number;
+  layovers?: Array<{
+    viaAirport: string;
+    duration: string;
+  }>;
 }
 
 interface FlightLegDesktopProps {
@@ -66,6 +71,11 @@ export function FlightLegDesktop({ leg }: FlightLegDesktopProps) {
         <span className="text-sm font-medium text-[#010D50]">
           {leg.departureAirport.code}
         </span>
+        {leg.departureAirport.name && leg.departureAirport.name !== leg.departureAirport.code && (
+          <span className="text-xs text-[#5A6184] truncate" title={leg.departureAirport.name}>
+            {leg.departureAirport.name}
+          </span>
+        )}
       </div>
 
       {/* Flight Path */}
@@ -85,9 +95,15 @@ export function FlightLegDesktop({ leg }: FlightLegDesktopProps) {
             <span className="text-xs font-medium text-[#010D50]">
               {leg.totalJourneyTime}
             </span>
-            <span className="text-[10px] text-[#6B7280]">
-              ({leg.duration} flying)
-            </span>
+            {leg.layovers && leg.layovers.length > 0 ? (
+              <span className="text-[10px] text-[#6B7280]">
+                ({leg.layovers.map(l => l.duration).join(' + ')} layover)
+              </span>
+            ) : (
+              <span className="text-[10px] text-[#6B7280]">
+                ({leg.duration} flying)
+              </span>
+            )}
           </div>
         ) : (
           <span className="text-xs font-medium text-[#010D50]">
@@ -108,6 +124,11 @@ export function FlightLegDesktop({ leg }: FlightLegDesktopProps) {
         <span className="text-sm font-medium text-[#010D50]">
           {leg.arrivalAirport.code}
         </span>
+        {leg.arrivalAirport.name && leg.arrivalAirport.name !== leg.arrivalAirport.code && (
+          <span className="text-xs text-[#5A6184] truncate" title={leg.arrivalAirport.name}>
+            {leg.arrivalAirport.name}
+          </span>
+        )}
       </div>
     </div>
   );

@@ -47,10 +47,23 @@ interface FilterSheetProps {
     outbound: { min: number; max: number };
     inbound: { min: number; max: number };
   };
+  /** Time bounds for departure and arrival filters */
+  timeBounds?: {
+    outboundDeparture?: { min: number; max: number };
+    outboundArrival?: { min: number; max: number };
+    inboundDeparture?: { min: number; max: number };
+    inboundArrival?: { min: number; max: number };
+  };
   /** Origin airport code (e.g., "DEL") */
   originAirport?: string;
   /** Destination airport code (e.g., "YYZ") */
   destinationAirport?: string;
+  /** Full name of origin airport */
+  originAirportName?: string;
+  /** Full name of destination airport */
+  destinationAirportName?: string;
+  /** Count of flights for each stop category (0=direct, 1=one stop, 2=two+) */
+  availableStops?: Record<number, number>;
   expandedFilters: Record<string, boolean>;
   onToggleExpand: (key: string) => void;
   onToggleStop: (stops: number) => void;
@@ -60,7 +73,9 @@ interface FilterSheetProps {
   onToggleArrivalAirport: (code: string) => void;
   onUpdatePrice: (range: [number, number]) => void;
   onUpdateDepartureTime: (type: "outbound" | "inbound", range: [number, number]) => void;
+  onUpdateArrivalTime: (type: "outbound" | "inbound", range: [number, number]) => void;
   onUpdateJourneyTime: (type: "outbound" | "inbound", range: [number, number]) => void;
+  onTimeTypeChange: (type: "takeoff" | "landing") => void;
   onToggleExtra: (extra: string) => void;
   resultCount: number;
 }
@@ -72,8 +87,12 @@ export function FilterSheet({
   filters,
   showInboundLeg,
   journeyTimeBounds,
+  timeBounds,
   originAirport,
   destinationAirport,
+  originAirportName,
+  destinationAirportName,
+  availableStops,
   expandedFilters,
   onToggleExpand,
   onToggleStop,
@@ -83,7 +102,9 @@ export function FilterSheet({
   onToggleArrivalAirport,
   onUpdatePrice,
   onUpdateDepartureTime,
+  onUpdateArrivalTime,
   onUpdateJourneyTime,
+  onTimeTypeChange,
   onToggleExtra,
   resultCount,
 }: FilterSheetProps) {
@@ -111,6 +132,7 @@ export function FilterSheet({
             <StopsFilter
               selectedStops={filterState.stops}
               onToggle={onToggleStop}
+              availableStops={availableStops}
             />
           </FilterSection>
 
@@ -137,15 +159,32 @@ export function FilterSheet({
             <TimeFilter
               outboundTime={filterState.departureTimeOutbound}
               inboundTime={filterState.departureTimeInbound}
+              outboundArrivalTime={filterState.arrivalTimeOutbound}
+              inboundArrivalTime={filterState.arrivalTimeInbound}
               onOutboundChange={(range) =>
                 onUpdateDepartureTime("outbound", range)
               }
               onInboundChange={(range) =>
                 onUpdateDepartureTime("inbound", range)
               }
+              onOutboundArrivalChange={(range) =>
+                onUpdateArrivalTime("outbound", range)
+              }
+              onInboundArrivalChange={(range) =>
+                onUpdateArrivalTime("inbound", range)
+              }
               showInbound={showInboundLeg}
               outboundAirport={originAirport}
               inboundAirport={destinationAirport}
+              outboundArrivalAirport={destinationAirport}
+              inboundArrivalAirport={originAirport}
+              outboundAirportName={originAirportName}
+              inboundAirportName={destinationAirportName}
+              outboundArrivalAirportName={destinationAirportName}
+              inboundArrivalAirportName={originAirportName}
+              timeType={filterState.timeFilterMode}
+              onTimeTypeChange={onTimeTypeChange}
+              timeBounds={timeBounds}
             />
           </FilterSection>
 

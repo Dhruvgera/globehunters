@@ -11,6 +11,10 @@ interface BaggageSectionProps {
   baggageDescription?: string;
   /** Maximum number of bags allowed (typically adults + children count) */
   maxBaggageCount?: number;
+  /** Price per bag for additional baggage (default: 90) */
+  baggagePrice?: number;
+  /** Currency symbol (default: £) */
+  currencySymbol?: string;
 }
 
 export function BaggageSection({
@@ -18,12 +22,18 @@ export function BaggageSection({
   onUpdateBaggage,
   baggageDescription,
   maxBaggageCount = 10,
+  baggagePrice = 90,
+  currencySymbol = "£",
 }: BaggageSectionProps) {
   const t = useTranslations('payment.baggage');
 
   // Check if baggage is NOT included - matches: "no", "none", "0", "0p", "0 pc", "0 piece", "0 pieces", "0 kg", "0kg", etc.
+  // Also treat "cabin" or "cabin only" or "cabin baggage" as not having checked baggage
   const hasCheckedIncluded = !!baggageDescription && 
-    !/^no$|^none$|^0\s*(p|pc|pcs|piece|pieces|kg|lb|lbs)?$/i.test(baggageDescription.trim());
+    !/^no$|^none$|^0\s*(p|pc|pcs|piece|pieces|kg|lb|lbs)?$|^cabin(\s+only|\s+baggage)?$/i.test(baggageDescription.trim());
+
+  // Format the price text for additional baggage
+  const formattedPriceText = `(${currencySymbol}${baggagePrice.toFixed(2)} per person each way)`;
 
   return (
     <div className="bg-white border border-[#DFE0E4] rounded-xl p-3 flex flex-col gap-6">
@@ -63,10 +73,10 @@ export function BaggageSection({
         <BaggageItem
           icon={Luggage}
           title={t('checkedBags')}
-          description={baggageDescription || t('checkedBagsDesc')}
+          description={hasCheckedIncluded ? (baggageDescription || t('checkedBagsDesc')) : t('checkedBagsDesc')}
           included={hasCheckedIncluded}
           includedText={t('included')}
-          notIncludedText={t('notIncluded')}
+          notIncludedText="Not Available"
         />
 
         {/* Add Additional Baggage - Only show if baggage NOT included */}
@@ -78,7 +88,7 @@ export function BaggageSection({
             maxCount={maxBaggageCount}
             title={t('addBaggage')}
             description={t('addBaggageDesc')}
-            priceText={t('baggagePrice')}
+            priceText={formattedPriceText}
           />
         )}
       </div>

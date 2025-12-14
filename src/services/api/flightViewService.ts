@@ -461,3 +461,4 @@ function mapCabinClass(cabinCode: string): 'Economy' | 'Premium Economy' | 'Busi
 
 
 
+

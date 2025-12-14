@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useMemo } from "react";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/navigation/Navbar";
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ErrorMessage } from "@/components/ui/error-message";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
+import { airportCache } from "@/lib/cache/airportCache";
 
 // Import new modular components
 import { BookingHeader } from "@/components/booking/BookingHeader";
@@ -90,6 +91,36 @@ function BookingContent() {
     onIdle: () => setIdleTimeoutOpen(true),
   });
 
+  // State for resolved airport names from cache
+  const [airportNameCache, setAirportNameCache] = useState<Record<string, string>>({});
+
+  // Load airport names from cache on mount
+  useEffect(() => {
+    const loadAirportNames = async () => {
+      await airportCache.getAirports();
+      // Get all unique airport codes from the flight
+      if (flight) {
+        const codes = new Set<string>();
+        const segments = flight.segments && flight.segments.length > 0
+          ? flight.segments
+          : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
+        
+        segments.forEach((seg) => {
+          codes.add(seg.departureAirport.code);
+          codes.add(seg.arrivalAirport.code);
+        });
+        
+        const nameMap: Record<string, string> = {};
+        codes.forEach((code) => {
+          nameMap[code] = airportCache.getAirportName(code);
+        });
+        setAirportNameCache(nameMap);
+      }
+    };
+    
+    loadAirportNames();
+  }, [flight]);
+
   // Show loading state while store is hydrating or no flight selected
   if (!hasHydrated || !flight) {
     return (
@@ -104,9 +135,22 @@ function BookingContent() {
     ? flight.segments
     : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
 
+  // Helper to get airport name - prefer cache, then flight data, then code
+  const getAirportName = (code: string, flightName: string, city: string) => {
+    // Check cache first
+    const cached = airportNameCache[code];
+    if (cached && cached !== code) return cached;
+    // Fall back to flight data
+    if (flightName && flightName !== code) return flightName;
+    // Fall back to city
+    if (city && city !== code) return city;
+    return code;
+  };
+
   const summaryLegs = journeySegments.map((seg) => ({
-    from: seg.departureAirport.city,
-    to: seg.arrivalAirport.city,
+    // Use full airport name from cache or flight data
+    from: getAirportName(seg.departureAirport.code, seg.departureAirport.name, seg.departureAirport.city),
+    to: getAirportName(seg.arrivalAirport.code, seg.arrivalAirport.name, seg.arrivalAirport.city),
     fromCode: seg.departureAirport.code,
     toCode: seg.arrivalAirport.code,
     departureTime: seg.departureTime,

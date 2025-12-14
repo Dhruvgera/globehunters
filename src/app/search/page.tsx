@@ -8,7 +8,8 @@ import Footer from "@/components/navigation/Footer";
 import { useFlights } from "@/hooks/useFlights";
 import { useDatePrices } from "@/hooks/useDatePrices";
 import { useBookingStore } from "@/store/bookingStore";
-import { filterFlights, parseDurationToMinutes, sortFlights } from "@/utils/flightFilter";
+import { filterFlights, parseDurationToMinutes, sortFlights, countByStops, getTimeBounds } from "@/utils/flightFilter";
+import { airportCache } from "@/lib/cache/airportCache";
 import { FilterState, SearchParams } from "@/types/flight";
 import { mockFlights, mockDatePrices, mockAirlines, mockAirports } from "@/data/mockFlights";
 import { useFilterExpansion } from "@/hooks/useFilterExpansion";
@@ -186,6 +187,33 @@ function SearchPageContent() {
     }
   }, [requestId, setSearchRequestId]);
 
+  // State for resolved airport names (loaded from cache)
+  const [resolvedAirportNames, setResolvedAirportNames] = useState<{
+    origin: string;
+    destination: string;
+  }>({ origin: '', destination: '' });
+
+  // Load airport cache and resolve airport names
+  useEffect(() => {
+    const loadAirportNames = async () => {
+      // Ensure airport cache is populated
+      await airportCache.getAirports();
+      
+      // Get airport names from cache
+      const originName = airportCache.getAirportName(effectiveSearchParams.from);
+      const destName = airportCache.getAirportName(effectiveSearchParams.to);
+      
+      setResolvedAirportNames({
+        origin: originName,
+        destination: destName,
+      });
+    };
+    
+    if (effectiveSearchParams.from && effectiveSearchParams.to) {
+      loadAirportNames();
+    }
+  }, [effectiveSearchParams.from, effectiveSearchParams.to]);
+
   // Keep last successful flights to avoid blanking the UI during date changes
   const lastFlightsRef = useRef<typeof flights>([]);
   useEffect(() => {
@@ -271,14 +299,32 @@ function SearchPageContent() {
   
   const effectiveFilters = useMemo(() => {
     // Always return filters (even empty during loading)
-    return apiFilters || {
+    const baseFilters = apiFilters || {
       airlines: loading ? [] : mockAirlines,
       departureAirports: loading ? [] : mockAirports.departure,
       arrivalAirports: loading ? [] : mockAirports.arrival,
       minPrice: 400,
       maxPrice: 1200,
     };
-  }, [apiFilters, loading]);
+    
+    // Enrich airport names from cache (the cache is loaded asynchronously)
+    // This will update when resolvedAirportNames changes (cache loaded)
+    if (resolvedAirportNames.origin) {
+      return {
+        ...baseFilters,
+        departureAirports: baseFilters.departureAirports.map((airport) => ({
+          ...airport,
+          name: airportCache.getAirportName(airport.code) || airport.name,
+        })),
+        arrivalAirports: baseFilters.arrivalAirports.map((airport) => ({
+          ...airport,
+          name: airportCache.getAirportName(airport.code) || airport.name,
+        })),
+      };
+    }
+    
+    return baseFilters;
+  }, [apiFilters, loading, resolvedAirportNames]);
   
   // Initialize/adjust price range when real API filters arrive or bounds change
   useEffect(() => {
@@ -372,6 +418,9 @@ function SearchPageContent() {
     priceRange: [0, 2000],
     departureTimeOutbound: [0, 24],
     departureTimeInbound: [0, 24],
+    arrivalTimeOutbound: [0, 24],
+    arrivalTimeInbound: [0, 24],
+    timeFilterMode: 'takeoff',
     journeyTimeOutbound: [0, 35],
     journeyTimeInbound: [0, 35],
     departureAirports: [],
@@ -379,6 +428,9 @@ function SearchPageContent() {
     airlines: [],
     extras: [],
   });
+  
+  // Track previous search params to detect new searches and reset filters
+  const prevSearchParamsRef = useRef<string | null>(null);
 
   const showInboundLeg = effectiveSearchParams.tripType === "round-trip";
 
@@ -454,6 +506,20 @@ function SearchPageContent() {
       [type === "outbound" ? "journeyTimeOutbound" : "journeyTimeInbound"]: range,
     }));
   };
+  
+  const updateArrivalTime = (type: "outbound" | "inbound", range: [number, number]) => {
+    setFilterState((prev) => ({
+      ...prev,
+      [type === "outbound" ? "arrivalTimeOutbound" : "arrivalTimeInbound"]: range,
+    }));
+  };
+  
+  const updateTimeType = (timeType: "takeoff" | "landing") => {
+    setFilterState((prev) => ({
+      ...prev,
+      timeFilterMode: timeType,
+    }));
+  };
 
   const toggleExtra = (extra: string) => {
     setFilterState((prev) => ({
@@ -465,9 +531,110 @@ function SearchPageContent() {
   };
 
   // Prepare flights for instant render: default sort (price asc) and memoize
+  // Also enrich airport names from cache when available
   const preparedFlights = useMemo(() => {
-    return sortFlights(effectiveFlights, 'price-asc');
-  }, [effectiveFlights]);
+    const sorted = sortFlights(effectiveFlights, 'price-asc');
+    
+    // If cache has loaded (indicated by resolvedAirportNames), enrich flight airport names
+    if (resolvedAirportNames.origin && resolvedAirportNames.origin !== effectiveSearchParams.from) {
+      return sorted.map((flight) => ({
+        ...flight,
+        outbound: {
+          ...flight.outbound,
+          departureAirport: {
+            ...flight.outbound.departureAirport,
+            name: airportCache.getAirportName(flight.outbound.departureAirport.code),
+          },
+          arrivalAirport: {
+            ...flight.outbound.arrivalAirport,
+            name: airportCache.getAirportName(flight.outbound.arrivalAirport.code),
+          },
+        },
+        ...(flight.inbound ? {
+          inbound: {
+            ...flight.inbound,
+            departureAirport: {
+              ...flight.inbound.departureAirport,
+              name: airportCache.getAirportName(flight.inbound.departureAirport.code),
+            },
+            arrivalAirport: {
+              ...flight.inbound.arrivalAirport,
+              name: airportCache.getAirportName(flight.inbound.arrivalAirport.code),
+            },
+          },
+        } : {}),
+      }));
+    }
+    
+    return sorted;
+  }, [effectiveFlights, resolvedAirportNames, effectiveSearchParams.from]);
+  
+  // Compute available stops from flights (for hiding unavailable filter options)
+  const availableStops = useMemo(() => {
+    return countByStops(preparedFlights);
+  }, [preparedFlights]);
+  
+  // Compute time bounds from flights
+  const timeBounds = useMemo(() => {
+    return getTimeBounds(preparedFlights);
+  }, [preparedFlights]);
+  
+  // Get airport names from resolved state (loaded asynchronously from cache)
+  const airportNames = useMemo(() => {
+    // Use resolved names from state (loaded from cache asynchronously)
+    if (resolvedAirportNames.origin && resolvedAirportNames.origin !== effectiveSearchParams.from) {
+      return resolvedAirportNames;
+    }
+    
+    // Fall back to flight data if cache hasn't loaded yet
+    if (preparedFlights.length > 0) {
+      const firstFlight = preparedFlights[0];
+      const originName = firstFlight.outbound.departureAirport.name;
+      const destName = firstFlight.outbound.arrivalAirport.name;
+      
+      // Only use flight data if name is different from code
+      return {
+        origin: (originName && originName !== firstFlight.outbound.departureAirport.code) 
+          ? originName 
+          : effectiveSearchParams.from,
+        destination: (destName && destName !== firstFlight.outbound.arrivalAirport.code) 
+          ? destName 
+          : effectiveSearchParams.to,
+      };
+    }
+    
+    return {
+      origin: effectiveSearchParams.from,
+      destination: effectiveSearchParams.to,
+    };
+  }, [preparedFlights, effectiveSearchParams.from, effectiveSearchParams.to, resolvedAirportNames]);
+  
+  // Reset filters when a new search is done (different from/to or dates)
+  useEffect(() => {
+    const currentSearchKey = `${effectiveSearchParams.from}-${effectiveSearchParams.to}-${effectiveSearchParams.departureDate?.toISOString()}-${effectiveSearchParams.returnDate?.toISOString()}-${effectiveSearchParams.tripType}`;
+    
+    if (prevSearchParamsRef.current !== null && prevSearchParamsRef.current !== currentSearchKey) {
+      // New search detected - reset filters
+      setFilterState({
+        stops: [0, 1, 2],
+        priceRange: [0, 2000],
+        departureTimeOutbound: [0, 24],
+        departureTimeInbound: [0, 24],
+        arrivalTimeOutbound: [0, 24],
+        arrivalTimeInbound: [0, 24],
+        timeFilterMode: 'takeoff',
+        journeyTimeOutbound: [0, 35],
+        journeyTimeInbound: [0, 35],
+        departureAirports: [],
+        arrivalAirports: [],
+        airlines: [],
+        extras: [],
+      });
+      setDisplayedFlightsCount(5);
+    }
+    
+    prevSearchParamsRef.current = currentSearchKey;
+  }, [effectiveSearchParams.from, effectiveSearchParams.to, effectiveSearchParams.departureDate, effectiveSearchParams.returnDate, effectiveSearchParams.tripType]);
 
   // Prefetch airline logos for top results to avoid layout delays
   useEffect(() => {
@@ -657,10 +824,13 @@ function SearchPageContent() {
               onClick={() => {
                 setFilterState({
                   stops: [0, 1, 2],
-                    // Reset price range to full inclusive range based on current filters
-                    priceRange: [effectiveFilters.minPrice, effectiveFilters.maxPrice],
+                  // Reset price range to full inclusive range based on current filters
+                  priceRange: [effectiveFilters.minPrice, effectiveFilters.maxPrice],
                   departureTimeOutbound: [0, 24],
                   departureTimeInbound: [0, 24],
+                  arrivalTimeOutbound: [0, 24],
+                  arrivalTimeInbound: [0, 24],
+                  timeFilterMode: 'takeoff',
                   journeyTimeOutbound: [journeyTimeBounds.outbound.min, journeyTimeBounds.outbound.max],
                   journeyTimeInbound: [journeyTimeBounds.inbound.min, journeyTimeBounds.inbound.max],
                   departureAirports: [],
@@ -685,8 +855,12 @@ function SearchPageContent() {
         filters={effectiveFilters}
         showInboundLeg={showInboundLeg}
         journeyTimeBounds={journeyTimeBounds}
+        timeBounds={timeBounds}
         originAirport={effectiveSearchParams.from}
         destinationAirport={effectiveSearchParams.to}
+        originAirportName={airportNames.origin}
+        destinationAirportName={airportNames.destination}
+        availableStops={availableStops}
         expandedFilters={expandedFilters}
         onToggleExpand={toggleFilter}
         onToggleStop={toggleStop}
@@ -696,7 +870,9 @@ function SearchPageContent() {
         onToggleArrivalAirport={toggleArrivalAirport}
         onUpdatePrice={updatePriceRange}
         onUpdateDepartureTime={updateDepartureTime}
+        onUpdateArrivalTime={updateArrivalTime}
         onUpdateJourneyTime={updateJourneyTime}
+        onTimeTypeChange={updateTimeType}
         onToggleExtra={toggleExtra}
         resultCount={filteredFlights.length}
       />
@@ -713,8 +889,12 @@ function SearchPageContent() {
                 filters={effectiveFilters}
                 showInboundLeg={showInboundLeg}
                 journeyTimeBounds={journeyTimeBounds}
+                timeBounds={timeBounds}
                 originAirport={effectiveSearchParams.from}
                 destinationAirport={effectiveSearchParams.to}
+                originAirportName={airportNames.origin}
+                destinationAirportName={airportNames.destination}
+                availableStops={availableStops}
                 expandedFilters={expandedFilters}
                 onToggleExpand={toggleFilter}
                 onToggleStop={toggleStop}
@@ -724,7 +904,9 @@ function SearchPageContent() {
                 onToggleArrivalAirport={toggleArrivalAirport}
                 onUpdatePrice={updatePriceRange}
                 onUpdateDepartureTime={updateDepartureTime}
+                onUpdateArrivalTime={updateArrivalTime}
                 onUpdateJourneyTime={updateJourneyTime}
+                onTimeTypeChange={updateTimeType}
                 onToggleExtra={toggleExtra}
                 resultCount={filteredFlights.length}
               />

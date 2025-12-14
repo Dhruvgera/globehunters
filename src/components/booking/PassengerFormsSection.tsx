@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { PassengerForm } from "./PassengerForm";
 import { useBookingStore } from "@/store/bookingStore";
@@ -19,7 +19,6 @@ export default function PassengerFormsSection({
   const addPassenger = useBookingStore((s) => s.addPassenger);
   const updatePassenger = useBookingStore((s) => s.updatePassenger);
   const setPassengersSaved = useBookingStore((s) => s.setPassengersSaved);
-  const [saved, setSaved] = useState<Record<number, boolean>>({});
 
   // Build the required passenger slots from search parameters
   const requiredPassengers: { type: PassengerType; index: number }[] = useMemo(() => {
@@ -54,18 +53,16 @@ export default function PassengerFormsSection({
       }
       addPassenger(passenger);
     }
-    setSaved((prev) => ({ ...prev, [slotIndex]: true }));
   };
 
-  // Sync passengersSaved state when saved changes
+  // Check if all passengers have complete data
   useEffect(() => {
-    const allSaved = requiredPassengers.length > 0 && requiredPassengers.every((_, idx) => saved[idx]);
-    setPassengersSaved(allSaved);
-  }, [saved, requiredPassengers, setPassengersSaved]);
-
-  useEffect(() => {
-    setSaved({});
-  }, [searchParams]);
+    const allComplete = requiredPassengers.length > 0 && requiredPassengers.every((_, idx) => {
+      const p = passengers[idx];
+      return p && p.firstName && p.lastName && p.dateOfBirth && p.email && p.phone;
+    });
+    setPassengersSaved(allComplete);
+  }, [passengers, requiredPassengers, setPassengersSaved]);
 
   return (
     <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-6">
@@ -99,11 +96,7 @@ export default function PassengerFormsSection({
                 initialData={initial}
                 onSave={(p) => handleSave(idx, slot.type, p)}
                 showPassportFields={showPassportFields}
-                disabled={!!saved[idx]}
                 passengerType={slot.type}
-                onCancel={() => {
-                  setSaved((prev) => ({ ...prev, [idx]: false }));
-                }}
               />
             </div>
           );

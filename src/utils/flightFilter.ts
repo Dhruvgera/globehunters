@@ -96,6 +96,20 @@ function matchesDepartureTime(
 }
 
 /**
+ * Check if flight matches arrival/landing time filter
+ */
+function matchesArrivalTime(
+  flight: Flight,
+  timeRange: [number, number],
+  isInbound: boolean = false
+): boolean {
+  const segment = isInbound && flight.inbound ? flight.inbound : flight.outbound;
+  const arrivalMinutes = parseTimeToMinutes(segment.arrivalTime);
+
+  return arrivalMinutes >= timeRange[0] * 60 && arrivalMinutes <= timeRange[1] * 60;
+}
+
+/**
  * Check if flight matches journey time filter
  */
 function matchesJourneyTime(
@@ -172,14 +186,25 @@ export function filterFlights(flights: Flight[], filters: FilterState): Flight[]
       return false;
     }
 
-    // Outbound departure time filter
-    if (!matchesDepartureTime(flight, filters.departureTimeOutbound, false)) {
-      return false;
-    }
-
-    // Inbound departure time filter (if round trip)
-    if (flight.inbound && !matchesDepartureTime(flight, filters.departureTimeInbound, true)) {
-      return false;
+    // Time filters based on mode (takeoff = departure, landing = arrival)
+    if (filters.timeFilterMode === 'landing') {
+      // Outbound arrival/landing time filter
+      if (!matchesArrivalTime(flight, filters.arrivalTimeOutbound, false)) {
+        return false;
+      }
+      // Inbound arrival/landing time filter (if round trip)
+      if (flight.inbound && !matchesArrivalTime(flight, filters.arrivalTimeInbound, true)) {
+        return false;
+      }
+    } else {
+      // Default: Outbound departure/takeoff time filter
+      if (!matchesDepartureTime(flight, filters.departureTimeOutbound, false)) {
+        return false;
+      }
+      // Inbound departure/takeoff time filter (if round trip)
+      if (flight.inbound && !matchesDepartureTime(flight, filters.departureTimeInbound, true)) {
+        return false;
+      }
     }
 
     // Outbound journey time filter
@@ -316,4 +341,62 @@ export function countByStops(flights: Flight[]): Record<number, number> {
   });
 
   return counts;
+}
+
+/**
+ * Get time bounds (min/max hours) for departure and arrival times from flights
+ * Returns bounds as hours (0-24) for use with time filter sliders
+ */
+export function getTimeBounds(flights: Flight[]): {
+  outboundDeparture: { min: number; max: number };
+  outboundArrival: { min: number; max: number };
+  inboundDeparture: { min: number; max: number };
+  inboundArrival: { min: number; max: number };
+} {
+  const defaultBounds = { min: 0, max: 24 };
+  
+  if (flights.length === 0) {
+    return {
+      outboundDeparture: { ...defaultBounds },
+      outboundArrival: { ...defaultBounds },
+      inboundDeparture: { ...defaultBounds },
+      inboundArrival: { ...defaultBounds },
+    };
+  }
+
+  // Collect times from all flights
+  const outboundDepartureTimes: number[] = [];
+  const outboundArrivalTimes: number[] = [];
+  const inboundDepartureTimes: number[] = [];
+  const inboundArrivalTimes: number[] = [];
+
+  flights.forEach(flight => {
+    // Outbound
+    const outDepMinutes = parseTimeToMinutes(flight.outbound.departureTime);
+    const outArrMinutes = parseTimeToMinutes(flight.outbound.arrivalTime);
+    outboundDepartureTimes.push(outDepMinutes / 60);
+    outboundArrivalTimes.push(outArrMinutes / 60);
+
+    // Inbound (if exists)
+    if (flight.inbound) {
+      const inDepMinutes = parseTimeToMinutes(flight.inbound.departureTime);
+      const inArrMinutes = parseTimeToMinutes(flight.inbound.arrivalTime);
+      inboundDepartureTimes.push(inDepMinutes / 60);
+      inboundArrivalTimes.push(inArrMinutes / 60);
+    }
+  });
+
+  const computeBounds = (times: number[]): { min: number; max: number } => {
+    if (times.length === 0) return { ...defaultBounds };
+    const min = Math.floor(Math.min(...times));
+    const max = Math.ceil(Math.max(...times));
+    return { min: Math.max(0, min), max: Math.min(24, max) };
+  };
+
+  return {
+    outboundDeparture: computeBounds(outboundDepartureTimes),
+    outboundArrival: computeBounds(outboundArrivalTimes),
+    inboundDeparture: computeBounds(inboundDepartureTimes),
+    inboundArrival: computeBounds(inboundArrivalTimes),
+  };
 }

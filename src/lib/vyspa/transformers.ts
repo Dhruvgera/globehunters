@@ -12,6 +12,7 @@ import {
   calculateDuration,
 } from './utils';
 import { getAircraftName } from './aircraftTypes';
+import { airportCache } from '@/lib/cache/airportCache';
 import type { 
   VyspaApiResponse, 
   VyspaResult, 
@@ -214,18 +215,22 @@ function transformSegmentToFlightSegment(segment: VyspaSegment): FlightSegment {
   const firstFlight = segment.Flights[0];
   const lastFlight = segment.Flights[segment.Flights.length - 1];
 
-  // Get departure info from first flight
+  // Get departure info from first flight - lookup full names from airport cache
+  const depCode = firstFlight.departure_airport;
+  const depCached = airportCache.getAirportByCode(depCode);
   const departureAirport: Airport = {
-    code: firstFlight.departure_airport,
-    name: firstFlight.departure_airport, // Vyspa doesn't provide full names
-    city: firstFlight.departure_airport,
+    code: depCode,
+    name: depCached?.name || depCode,
+    city: depCached?.city || depCode,
   };
 
-  // Get arrival info from last flight
+  // Get arrival info from last flight - lookup full names from airport cache
+  const arrCode = lastFlight.arrival_airport;
+  const arrCached = airportCache.getAirportByCode(arrCode);
   const arrivalAirport: Airport = {
-    code: lastFlight.arrival_airport,
-    name: lastFlight.arrival_airport,
-    city: lastFlight.arrival_airport,
+    code: arrCode,
+    name: arrCached?.name || arrCode,
+    city: arrCached?.city || arrCode,
   };
 
   // Format times

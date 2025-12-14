@@ -464,12 +464,16 @@ function FlightConfirmationCard({
             <div className="bg-[#F5F7FF] rounded-xl p-4">
               <FlightLegDisplay
                 departureCode={segment.departureAirport.code}
-                departureCity={segment.departureAirport.city}
+                departureCity={segment.departureAirport.name && segment.departureAirport.name !== segment.departureAirport.code 
+                  ? segment.departureAirport.name 
+                  : segment.departureAirport.city}
                 departureTime={segment.departureTime}
                 departureTerminal={segment.departureTerminal}
                 departureDate={segment.date}
                 arrivalCode={segment.arrivalAirport.code}
-                arrivalCity={segment.arrivalAirport.city}
+                arrivalCity={segment.arrivalAirport.name && segment.arrivalAirport.name !== segment.arrivalAirport.code 
+                  ? segment.arrivalAirport.name 
+                  : segment.arrivalAirport.city}
                 arrivalTime={segment.arrivalTime}
                 arrivalTerminal={segment.arrivalTerminal}
                 arrivalDate={segment.arrivalDate || segment.date}

@@ -18,6 +18,7 @@ import { useBookingStore } from "@/store/bookingStore";
 import { usePriceCheck } from "@/hooks/usePriceCheck";
 import { TransformedPriceOption } from "@/types/priceCheck";
 import { ErrorMessage } from "@/components/ui/error-message";
+import { airportCache } from "@/lib/cache/airportCache";
 
 /** Debug component to display raw API response */
 function RawResponseDebug({ rawResponse, title }: { rawResponse: any; title: string }) {
@@ -61,6 +62,7 @@ export default function FlightInfoModal({
   const setPriceCheckData = useBookingStore((state) => state.setPriceCheckData);
   const selectedUpgradeInStore = useBookingStore((state) => state.selectedUpgradeOption);
   const passengersInStore = useBookingStore((state) => state.passengers);
+  const searchParams = useBookingStore((state) => state.searchParams);
   const [imgError, setImgError] = useState(false);
   const [selectedLegIndex, setSelectedLegIndex] = useState(0);
   const [selectedUpgradeOption, setSelectedUpgradeOption] = useState<TransformedPriceOption | null>(null);
@@ -71,6 +73,55 @@ export default function FlightInfoModal({
   const { priceCheck, isLoading, error, checkPrice, clearError } = usePriceCheck();
 
   const hasUpgradeOptions = !!(priceCheck && priceCheck.priceOptions && priceCheck.priceOptions.some((opt) => opt.isUpgrade));
+
+  // State for resolved airport names from cache
+  const [airportNameCache, setAirportNameCache] = useState<Record<string, string>>({});
+
+  // Load airport names from cache when modal opens
+  useEffect(() => {
+    if (!open) return;
+    
+    const loadAirportNames = async () => {
+      await airportCache.getAirports();
+      
+      // Get all unique airport codes from the flight
+      const codes = new Set<string>();
+      const segments = flight.segments && flight.segments.length > 0
+        ? flight.segments
+        : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
+      
+      segments.forEach((seg) => {
+        if (seg) {
+          codes.add(seg.departureAirport.code);
+          codes.add(seg.arrivalAirport.code);
+          // Also add individual flight airport codes
+          if (seg.individualFlights) {
+            seg.individualFlights.forEach((f) => {
+              if (f.departureAirport) codes.add(f.departureAirport);
+              if (f.arrivalAirport) codes.add(f.arrivalAirport);
+            });
+          }
+        }
+      });
+      
+      const nameMap: Record<string, string> = {};
+      codes.forEach((code) => {
+        nameMap[code] = airportCache.getAirportName(code);
+      });
+      setAirportNameCache(nameMap);
+    };
+    
+    loadAirportNames();
+  }, [open, flight]);
+
+  // Helper to get airport name - prefer cache, then flight data, then code
+  const getAirportName = (code: string, flightName?: string, city?: string) => {
+    const cached = airportNameCache[code];
+    if (cached && cached !== code) return cached;
+    if (flightName && flightName !== code) return flightName;
+    if (city && city !== code) return city;
+    return code;
+  };
 
   const journeySegments = flight.segments && flight.segments.length > 0
     ? flight.segments
@@ -147,9 +198,38 @@ export default function FlightInfoModal({
         return;
       }
     }
-    // Otherwise default to first option
+    
+    // Try to match the searched cabin class
+    const searchedClass = searchParams?.class;
+    if (searchedClass) {
+      // Map search class names to possible cabin class display values
+      const classMapping: Record<string, string[]> = {
+        'Economy': ['Economy', 'ECONOMY', 'Economy Delight', 'Economy Flex', 'Economy Light'],
+        'Premium Economy': ['Premium Economy', 'PREMIUM ECONOMY', 'Premium', 'PREMIUM'],
+        'Business': ['Business', 'BUSINESS', 'Business Class', 'Upper Class'],
+        'First': ['First', 'FIRST', 'First Class', 'Upper Class Flex'],
+      };
+      
+      const possibleMatches = classMapping[searchedClass] || [searchedClass];
+      
+      // Find the first option that matches the searched class (cheapest within that class)
+      const matchingOptions = priceCheck.priceOptions.filter((o) => 
+        possibleMatches.some((match) => 
+          o.cabinClassDisplay?.toLowerCase().includes(match.toLowerCase())
+        )
+      );
+      
+      if (matchingOptions.length > 0) {
+        // Sort by price and pick the cheapest matching option
+        const cheapestMatch = matchingOptions.sort((a, b) => a.totalPrice - b.totalPrice)[0];
+        setSelectedUpgradeOption(cheapestMatch);
+        return;
+      }
+    }
+    
+    // Fallback: default to the first option (usually the cheapest/base fare)
     setSelectedUpgradeOption(priceCheck.priceOptions[0]);
-  }, [priceCheck, selectedUpgradeOption, selectedUpgradeInStore, hasUpgradeOptions]);
+  }, [priceCheck, selectedUpgradeOption, selectedUpgradeInStore, hasUpgradeOptions, searchParams?.class]);
 
   function prettifyCabinName(name: string) {
     if (!name) return '';
@@ -335,8 +415,9 @@ export default function FlightInfoModal({
                       setSelectedLegIndex(index);
                     }}
                   >
+                    {/* Use airport codes for tab headings to prevent overflow */}
                     <span className="hidden sm:inline">
-                      {seg.departureAirport.city} - {seg.arrivalAirport.city} - {seg.date}
+                      {seg.departureAirport.code} - {seg.arrivalAirport.code} - {seg.date}
                     </span>
                     <span className="sm:hidden">
                       {seg.departureAirport.code} - {seg.arrivalAirport.code}
@@ -431,8 +512,7 @@ export default function FlightInfoModal({
                           {/* Departure */}
                           <div className="flex flex-col gap-1">
                             <span className="text-xs sm:text-sm font-semibold text-[#010D50] break-words">
-                              {currentLeg.departureAirport.city} (
-                              {currentLeg.departureAirport.code})
+                              {getAirportName(currentLeg.departureAirport.code, currentLeg.departureAirport.name, currentLeg.departureAirport.city)} ({currentLeg.departureAirport.code})
                             </span>
                             {currentLeg?.departureTerminal && (
                               <span className="text-xs sm:text-sm text-[#3A478A]">
@@ -455,7 +535,7 @@ export default function FlightInfoModal({
                                           {flight.carrierCode}{flight.flightNumber}
                                         </span>
                                         <span className="text-[#3A478A]">
-                                          {flight.departureAirport} → {flight.arrivalAirport}
+                                          {getAirportName(flight.departureAirport, undefined, undefined)} → {getAirportName(flight.arrivalAirport, undefined, undefined)}
                                         </span>
                                         <span className="text-[#3A478A] opacity-50">•</span>
                                         <span className="text-[#010D50] font-medium">
@@ -498,8 +578,7 @@ export default function FlightInfoModal({
                           {/* Arrival */}
                           <div className="flex flex-col gap-1">
                             <span className="text-xs sm:text-sm font-semibold text-[#010D50] break-words">
-                              {currentLeg.arrivalAirport.city} (
-                              {currentLeg.arrivalAirport.code})
+                              {getAirportName(currentLeg.arrivalAirport.code, currentLeg.arrivalAirport.name, currentLeg.arrivalAirport.city)} ({currentLeg.arrivalAirport.code})
                             </span>
                             {currentLeg?.arrivalTerminal && (
                               <span className="text-xs sm:text-sm text-[#3A478A]">

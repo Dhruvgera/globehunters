@@ -63,7 +63,8 @@ export function PassengerForm({
   }, [formData.dateOfBirth, passengerType]);
 
   const handleChange = (field: keyof Passenger, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    const newFormData = { ...formData, [field]: value };
+    setFormData(newFormData);
     
     // Real-time validation for date of birth
     if (field === 'dateOfBirth' && value) {
@@ -77,6 +78,21 @@ export function PassengerForm({
     // Clear error for this field when user starts typing
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));
+    }
+    
+    // Auto-save silently when all required fields are filled (no UI lock)
+    const requiredFields = ['title', 'firstName', 'lastName', 'dateOfBirth', 'email', 'phone'];
+    const allFieldsFilled = requiredFields.every(f => {
+      const val = f === field ? value : (formData as any)[f];
+      return val && String(val).trim() !== '';
+    });
+    
+    if (allFieldsFilled) {
+      // Validate and save to store (but keep form editable)
+      const validationErrors = validatePassenger(newFormData as Passenger, passengerType);
+      if (!hasErrors(validationErrors)) {
+        onSave(newFormData as Passenger);
+      }
     }
   };
 
@@ -434,38 +450,6 @@ export function PassengerForm({
         )}
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex items-center justify-end gap-3">
-        {onCancel && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCancel}
-            className="rounded-full px-6 py-2 h-auto text-sm font-medium"
-            disabled={disabled}
-          >
-            {t('cancel')}
-          </Button>
-        )}
-        {disabled && (
-          <Button
-            type="button"
-            variant="outline"
-            className="rounded-full px-6 py-2 h-auto text-sm font-medium"
-            onClick={handleEdit}
-          >
-            Edit
-          </Button>
-        )}
-        {!disabled && (
-          <Button
-            type="submit"
-            className="bg-[#3754ED] hover:bg-[#2942D1] text-white rounded-full px-6 py-2 h-auto text-sm font-medium"
-          >
-            {t('save')}
-          </Button>
-        )}
-      </div>
     </form>
   );
 }

@@ -4,6 +4,7 @@
 
 export interface Airport {
   code: string; // IATA code (e.g., "LHR")
+  name?: string; // Full airport name (e.g., "London Heathrow Airport")
   city: string; // City name
   country: string; // Country name
   countryCode: string; // ISO2 code (e.g., "GB")
@@ -16,6 +17,7 @@ export interface AirportSearchResult extends Airport {
 
 export interface VyspaAirportResponse {
   id: string; // Airport IATA code
+  name?: string; // Full airport name (e.g., "London Heathrow Airport")
   city?: string;
   country?: string; // Country name
   country_code?: string; // ISO2 code

@@ -2,6 +2,7 @@
 
 interface Airport {
   code: string;
+  name?: string;
   city: string;
 }
 
@@ -16,6 +17,10 @@ interface FlightLeg {
   duration: string; // Flying time only (excluding layovers)
   totalJourneyTime?: string; // Total time including layovers
   stops: number;
+  layovers?: Array<{
+    viaAirport: string;
+    duration: string;
+  }>;
 }
 
 interface FlightLegMobileProps {
@@ -70,9 +75,10 @@ export function FlightLegMobile({ leg }: FlightLegMobileProps) {
           <div className="text-sm font-medium text-[#010D50] leading-5">
             {leg.departureAirport.code}
           </div>
-          {leg.departureAirport.city !== leg.departureAirport.code && (
-            <div className="text-[11px] text-[#5A6184] leading-4 truncate">
-              {leg.departureAirport.city}
+          {(leg.departureAirport.name || leg.departureAirport.city) && 
+           (leg.departureAirport.name || leg.departureAirport.city) !== leg.departureAirport.code && (
+            <div className="text-[11px] text-[#5A6184] leading-4 truncate" title={leg.departureAirport.name || leg.departureAirport.city}>
+              {leg.departureAirport.name || leg.departureAirport.city}
             </div>
           )}
         </div>
@@ -92,9 +98,15 @@ export function FlightLegMobile({ leg }: FlightLegMobileProps) {
               <span className="text-[11px] font-medium text-[#010D50]">
                 {leg.totalJourneyTime}
               </span>
-              <span className="text-[9px] text-[#6B7280]">
-                ({leg.duration} flying)
-              </span>
+              {leg.layovers && leg.layovers.length > 0 ? (
+                <span className="text-[9px] text-[#6B7280]">
+                  ({leg.layovers.map(l => l.duration).join(' + ')} layover)
+                </span>
+              ) : (
+                <span className="text-[9px] text-[#6B7280]">
+                  ({leg.duration} flying)
+                </span>
+              )}
             </div>
           ) : (
             <span className="text-[11px] font-medium text-[#010D50] mt-0.5">
@@ -106,9 +118,10 @@ export function FlightLegMobile({ leg }: FlightLegMobileProps) {
           <div className="text-sm font-medium text-[#010D50] leading-5">
             {leg.arrivalAirport.code}
           </div>
-          {leg.arrivalAirport.city !== leg.arrivalAirport.code && (
-            <div className="text-[11px] text-[#5A6184] leading-4 truncate">
-              {leg.arrivalAirport.city}
+          {(leg.arrivalAirport.name || leg.arrivalAirport.city) && 
+           (leg.arrivalAirport.name || leg.arrivalAirport.city) !== leg.arrivalAirport.code && (
+            <div className="text-[11px] text-[#5A6184] leading-4 truncate" title={leg.arrivalAirport.name || leg.arrivalAirport.city}>
+              {leg.arrivalAirport.name || leg.arrivalAirport.city}
             </div>
           )}
         </div>

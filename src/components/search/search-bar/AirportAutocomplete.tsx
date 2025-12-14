@@ -168,10 +168,10 @@ export function AirportAutocomplete({
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-semibold text-gray-900 truncate">
-                          {highlightText(airport.code, inputValue)} - {highlightText(airport.city, inputValue)}
+                          {highlightText(airport.code, inputValue)} - {highlightText(airport.name || airport.city, inputValue)}
                         </div>
                         <div className="text-xs text-gray-500 truncate">
-                          {airport.country}
+                          {airport.city}, {airport.country}
                         </div>
                       </div>
                     </div>
