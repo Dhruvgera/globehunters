@@ -14,6 +14,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useTranslations } from "next-intl";
+import { countryCodes } from "@/lib/utils/countryCodes";
+
+// Deduplicate country codes - keep first occurrence of each phone code
+const uniqueCountryCodes = countryCodes.filter(
+  (country, index, self) => 
+    index === self.findIndex((c) => c.code === country.code)
+);
 
 interface PassengerFormProps {
   passengerIndex: number;
@@ -196,6 +203,7 @@ export function PassengerForm({
               type="date"
               value={formData.dateOfBirth}
               onChange={(e) => handleChange("dateOfBirth", e.target.value)}
+              max={new Date().toISOString().split('T')[0]}
               className={errors.dateOfBirth ? "border-red-500" : ""}
               disabled={disabled}
             />
@@ -231,130 +239,19 @@ export function PassengerForm({
                 onValueChange={(value) => handleChange("countryCode", value)}
                 disabled={disabled}
               >
-                <SelectTrigger className="w-[140px]">
+                <SelectTrigger className="w-[180px]">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent className="max-h-[300px]">
-                  <SelectItem value="+44">
-                    <span className="flex items-center gap-2">
-                      <span className="fi fi-gb w-4 h-3"></span>
-                      <span>+44</span>
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="+1">
-                    <span className="flex items-center gap-2">
-                      <span className="fi fi-us w-4 h-3"></span>
-                      <span>+1</span>
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="+91">
-                    <span className="flex items-center gap-2">
-                      <span className="fi fi-in w-4 h-3"></span>
-                      <span>+91</span>
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="+61">
-                    <span className="flex items-center gap-2">
-                      <span className="fi fi-au w-4 h-3"></span>
-                      <span>+61</span>
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="+49">
-                    <span className="flex items-center gap-2">
-                      <span className="fi fi-de w-4 h-3"></span>
-                      <span>+49</span>
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="+33">
-                    <span className="flex items-center gap-2">
-                      <span className="fi fi-fr w-4 h-3"></span>
-                      <span>+33</span>
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="+34">
-                    <span className="flex items-center gap-2">
-                      <span className="fi fi-es w-4 h-3"></span>
-                      <span>+34</span>
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="+39">
-                    <span className="flex items-center gap-2">
-                      <span className="fi fi-it w-4 h-3"></span>
-                      <span>+39</span>
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="+81">
-                    <span className="flex items-center gap-2">
-                      <span className="fi fi-jp w-4 h-3"></span>
-                      <span>+81</span>
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="+86">
-                    <span className="flex items-center gap-2">
-                      <span className="fi fi-cn w-4 h-3"></span>
-                      <span>+86</span>
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="+971">
-                    <span className="flex items-center gap-2">
-                      <span className="fi fi-ae w-4 h-3"></span>
-                      <span>+971</span>
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="+65">
-                    <span className="flex items-center gap-2">
-                      <span className="fi fi-sg w-4 h-3"></span>
-                      <span>+65</span>
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="+27">
-                    <span className="flex items-center gap-2">
-                      <span className="fi fi-za w-4 h-3"></span>
-                      <span>+27</span>
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="+55">
-                    <span className="flex items-center gap-2">
-                      <span className="fi fi-br w-4 h-3"></span>
-                      <span>+55</span>
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="+52">
-                    <span className="flex items-center gap-2">
-                      <span className="fi fi-mx w-4 h-3"></span>
-                      <span>+52</span>
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="+31">
-                    <span className="flex items-center gap-2">
-                      <span className="fi fi-nl w-4 h-3"></span>
-                      <span>+31</span>
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="+46">
-                    <span className="flex items-center gap-2">
-                      <span className="fi fi-se w-4 h-3"></span>
-                      <span>+46</span>
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="+41">
-                    <span className="flex items-center gap-2">
-                      <span className="fi fi-ch w-4 h-3"></span>
-                      <span>+41</span>
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="+64">
-                    <span className="flex items-center gap-2">
-                      <span className="fi fi-nz w-4 h-3"></span>
-                      <span>+64</span>
-                    </span>
-                  </SelectItem>
-                  <SelectItem value="+353">
-                    <span className="flex items-center gap-2">
-                      <span className="fi fi-ie w-4 h-3"></span>
-                      <span>+353</span>
-                    </span>
-                  </SelectItem>
+                <SelectContent className="max-h-[300px] overflow-y-auto">
+                  {uniqueCountryCodes.map((country) => (
+                    <SelectItem key={country.code} value={country.code}>
+                      <span className="flex items-center gap-2">
+                        <span className={`fi fi-${country.isoCode} w-4 h-3`}></span>
+                        <span className="font-medium">{country.code}</span>
+                        <span className="text-gray-500 text-sm">{country.name}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {/* Phone Number Input */}
