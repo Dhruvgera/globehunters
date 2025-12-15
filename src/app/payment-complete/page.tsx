@@ -13,6 +13,7 @@ import {
   mockBookingConfirmation,
   airportNames,
 } from "@/data/mockBookingConfirmation";
+import { transformBookingToEmailData, sendBookingConfirmationEmail } from "@/lib/emailHelper";
 import {
   CheckCircle2,
   XCircle,
@@ -510,7 +511,14 @@ function PaymentCompleteContent() {
   const storePassengers = useBookingStore((state) => state.passengers);
   const storeContactEmail = useBookingStore((state) => state.contactEmail);
   const storeContactPhone = useBookingStore((state) => state.contactPhone);
+  const storeVyspaEmailAddress = useBookingStore((state) => state.vyspaEmailAddress);
+  const storeAddOns = useBookingStore((state) => state.addOns);
+  const storeSelectedUpgrade = useBookingStore((state) => state.selectedUpgradeOption);
   const resetBooking = useBookingStore((state) => state.resetBooking);
+  const [emailSent, setEmailSent] = useState(false);
+  
+  // Get email from store or vyspa - use vyspaEmailAddress as fallback
+  const effectiveContactEmail = storeContactEmail || storeVyspaEmailAddress;
 
   // Use mock data if enabled, otherwise use store data
   const flight = isMockMode ? mockBookingConfirmation.flight : storeSelectedFlight;
@@ -567,6 +575,8 @@ function PaymentCompleteContent() {
             sessionStorage.removeItem("pendingOrderId");
             sessionStorage.removeItem("pendingOrderAmount");
             sessionStorage.removeItem("pendingOrderCurrency");
+            
+            // Email sending is handled by separate useEffect to ensure data is available
           }
         } else {
           setError(result.error || "Failed to get payment status");
@@ -649,6 +659,69 @@ function PaymentCompleteContent() {
   const handleDownloadReceipt = useCallback(() => {
     window.print();
   }, []);
+
+  // Send confirmation email async
+  const sendConfirmationEmailAsync = useCallback(async (orderId: string, amount?: string, currency?: string) => {
+    if (emailSent) return;
+    
+    try {
+      const totalAmount = parseFloat(amount || sessionStorage.getItem("pendingOrderAmount") || "0");
+      const currencyCode = currency || sessionStorage.getItem("pendingOrderCurrency") || "GBP";
+      
+      // Get add-on amounts from store
+      const protectionPlanAmount = storeAddOns?.protectionPlan ? totalAmount * 0.05 : 0; // Approximate
+      const baggageAmount = (storeAddOns?.additionalBaggage || 0) * 45; // Approximate per bag
+      
+      if (storeSelectedFlight && effectiveContactEmail) {
+        console.log('Building email data for:', effectiveContactEmail);
+        
+        const emailData = transformBookingToEmailData({
+          orderNumber: orderId,
+          flight: storeSelectedFlight,
+          passengers: storePassengers,
+          contactEmail: effectiveContactEmail,
+          contactPhone: storeContactPhone || '',
+          totalAmount,
+          protectionPlanAmount,
+          baggageAmount,
+          currency: currencyCode,
+          cabinClass: storeSelectedUpgrade?.cabinClassDisplay || 'Economy',
+        });
+
+        const result = await sendBookingConfirmationEmail(effectiveContactEmail, emailData);
+        
+        if (result.success) {
+          setEmailSent(true);
+          sessionStorage.setItem(`emailSent_${orderId}`, 'true');
+          console.log('Confirmation email sent successfully to:', effectiveContactEmail);
+        } else {
+          console.error('Failed to send confirmation email:', result.error);
+        }
+      } else {
+        console.error('Cannot send email - missing data:', { 
+          hasFlightData: !!storeSelectedFlight, 
+          email: effectiveContactEmail 
+        });
+      }
+    } catch (error) {
+      console.error('Error sending confirmation email:', error);
+    }
+  }, [emailSent, storeSelectedFlight, storePassengers, effectiveContactEmail, storeContactPhone, storeSelectedUpgrade, storeAddOns]);
+
+  // Send confirmation email when payment is successful and data is available
+  useEffect(() => {
+    if (paymentInfo?.status === "success" && storeSelectedFlight && effectiveContactEmail && !emailSent) {
+      const emailAlreadySent = sessionStorage.getItem(`emailSent_${paymentInfo.orderId}`);
+      if (!emailAlreadySent) {
+        console.log('Triggering confirmation email:', { 
+          orderId: paymentInfo.orderId, 
+          email: effectiveContactEmail,
+          hasFlightData: !!storeSelectedFlight 
+        });
+        sendConfirmationEmailAsync(paymentInfo.orderId, paymentInfo.amount, paymentInfo.currency);
+      }
+    }
+  }, [paymentInfo, storeSelectedFlight, effectiveContactEmail, emailSent, sendConfirmationEmailAsync]);
 
   // Flight summary data
   const refNumber =

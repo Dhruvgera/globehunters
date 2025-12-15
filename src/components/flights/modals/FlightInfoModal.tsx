@@ -530,36 +530,54 @@ export default function FlightInfoModal({
                           <div className="flex flex-col gap-2">
                             {currentLeg.individualFlights && currentLeg.individualFlights.length > 0 ? (
                               <>
-                                {/* Individual Flight Times */}
-                                {currentLeg.individualFlights.map((flight, idx) => (
-                                  <div key={idx} className="flex flex-col gap-0.5">
-                                    <div className="flex items-center gap-2">
-                                      <Plane className="w-3 sm:w-4 h-3 sm:h-4 text-[#3A478A] shrink-0" />
-                                      <div className="flex items-center gap-2 flex-wrap text-xs sm:text-sm">
-                                        <span className="font-bold text-[#010D50]">
-                                          {flight.carrierCode}{flight.flightNumber}
-                                        </span>
-                                        <span className="text-[#3A478A]">
-                                          {getAirportName(flight.departureAirport, undefined, undefined)} → {getAirportName(flight.arrivalAirport, undefined, undefined)}
-                                        </span>
-                                        <span className="text-[#3A478A] opacity-50">•</span>
-                                        <span className="text-[#010D50] font-medium">
-                                          {flight.departureTime} - {flight.arrivalTime}
-                                        </span>
-                                        <span className="text-[#3A478A] opacity-50">•</span>
-                                        <span className="text-[#3A478A]">
-                                          {flight.duration}
-                                        </span>
+                                {/* Individual Flight Times with Layovers */}
+                                {currentLeg.individualFlights.map((flight, idx) => {
+                                  // Find layover after this flight (if not the last flight)
+                                  const layover = idx < currentLeg.individualFlights!.length - 1 && currentLeg.layovers
+                                    ? currentLeg.layovers.find(lay => lay.viaAirport === flight.arrivalAirport)
+                                    : null;
+                                  
+                                  return (
+                                    <div key={idx} className="flex flex-col gap-2">
+                                      <div className="flex flex-col gap-0.5">
+                                        <div className="flex items-center gap-2">
+                                          <Plane className="w-3 sm:w-4 h-3 sm:h-4 text-[#3A478A] shrink-0" />
+                                          <div className="flex items-center gap-2 flex-wrap text-xs sm:text-sm">
+                                            <span className="font-bold text-[#010D50]">
+                                              {flight.carrierCode}{flight.flightNumber}
+                                            </span>
+                                            <span className="text-[#3A478A]">
+                                              {getAirportName(flight.departureAirport, undefined, undefined)} → {getAirportName(flight.arrivalAirport, undefined, undefined)}
+                                            </span>
+                                            <span className="text-[#3A478A] opacity-50">•</span>
+                                            <span className="text-[#010D50] font-medium">
+                                              {flight.departureTime} - {flight.arrivalTime}
+                                            </span>
+                                            <span className="text-[#3A478A] opacity-50">•</span>
+                                            <span className="text-[#3A478A]">
+                                              {flight.duration}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        {/* Debug: Show raw API dates */}
+                                        {process.env.NEXT_PUBLIC_DEBUG_FLIGHT_DATES === 'true' && (
+                                          <div className="ml-4 text-[10px] font-mono text-orange-600 bg-orange-50 px-1 py-0.5 rounded w-fit">
+                                            API: dep={flight.departureDate} → arr={flight.arrivalDate}
+                                          </div>
+                                        )}
                                       </div>
+                                      {/* Layover indicator between flights */}
+                                      {layover && (
+                                        <div className="flex items-center gap-2 ml-1 py-1">
+                                          <div className="w-3 sm:w-4 h-px bg-[#CBD5E1]" />
+                                          <span className="text-xs text-[#64748B] italic">
+                                            Stopover at {layover.viaAirport} for <span className="font-medium text-[#475569]">{layover.duration}</span>
+                                          </span>
+                                        </div>
+                                      )}
                                     </div>
-                                    {/* Debug: Show raw API dates */}
-                                    {process.env.NEXT_PUBLIC_DEBUG_FLIGHT_DATES === 'true' && (
-                                      <div className="ml-4 text-[10px] font-mono text-orange-600 bg-orange-50 px-1 py-0.5 rounded w-fit">
-                                        API: dep={flight.departureDate} → arr={flight.arrivalDate}
-                                      </div>
-                                    )}
-                                  </div>
-                                ))}
+                                  );
+                                })}
                                 {/* Total Journey Time */}
                                 {currentLeg.totalJourneyTime && (
                                   <div className="flex items-center gap-1 mt-1">
@@ -643,27 +661,6 @@ export default function FlightInfoModal({
                   </div>
                 )}
 
-                {/* Stopover Info (if applicable) */}
-                {currentLeg.stopDetails && currentLeg.stopDetails !== "Direct" && (
-                  <div className="flex flex-col gap-3">
-                    {/* Stopover Durations */}
-                    {currentLeg.layovers && currentLeg.layovers.length > 0 ? (
-                      <div className="flex flex-col gap-2">
-                        {currentLeg.layovers.map((lay, idx) => (
-                          <div key={idx} className="bg-[#F5F7FF] rounded-xl px-4 py-3 flex items-center gap-3 w-fit">
-                            <span className="text-sm text-[#3A478A]">
-                              Stopover at {lay.viaAirport} for <span className="font-medium text-[#010D50]">{lay.duration}</span>
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="bg-[#F5F7FF] rounded-xl px-4 py-3 flex items-center gap-3 w-fit">
-                        <span className="text-sm text-[#3A478A]">{currentLeg.stopDetails}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 {/* Refundable and Meals (Extras) */}
                 {(flight.refundable !== null || flight.meals !== undefined) && (
