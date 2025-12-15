@@ -518,6 +518,20 @@ function parseChargeableStatus(chargeable?: string): 'included' | 'chargeable' |
 }
 
 /**
+ * Decode HTML entities in a string
+ */
+function decodeHtmlEntities(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+}
+
+/**
  * Extract OptionalService items by tag from the OptionalService array
  * Filters out items where Chargeable is "Not offered" (as per email instructions)
  * 
@@ -542,8 +556,8 @@ function extractServicesByTag(
       return true;
     })
     .map((svc: any) => ({
-      tag: svc.Tag || '',
-      text: svc.text || '',
+      tag: decodeHtmlEntities(svc.Tag || ''),
+      text: decodeHtmlEntities(svc.text || ''),
       chargeable: parseChargeableStatus(svc.Chargeable),
       type: svc.Type || undefined,
     }));
