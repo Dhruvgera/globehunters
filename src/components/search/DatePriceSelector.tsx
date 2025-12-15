@@ -200,7 +200,7 @@ export function DatePriceSelector({
     <div className="mx-auto max-w-7xl px-3 sm:px-4 md:px-6 lg:px-8 mb-4 sm:mb-6 mt-4 sm:mt-6">
       <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 min-w-0">
         {/* Departure Dates */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 bg-white border border-[#DFE0E4] rounded-xl p-3 sm:p-4">
           <DateSlider
             label={t('departureDate')}
             icon={CalendarDays}
@@ -216,7 +216,7 @@ export function DatePriceSelector({
 
         {/* Return Dates (if round trip) */}
         {returnDates && onSelectReturnDate && (
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 bg-white border border-[#DFE0E4] rounded-xl p-3 sm:p-4">
             <DateSlider
               label={t('returnDate')}
               icon={CalendarClock}

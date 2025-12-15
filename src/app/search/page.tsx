@@ -611,7 +611,13 @@ function SearchPageContent() {
   
   // Reset filters when a new search is done (different from/to or dates)
   useEffect(() => {
-    const currentSearchKey = `${effectiveSearchParams.from}-${effectiveSearchParams.to}-${effectiveSearchParams.departureDate?.toISOString()}-${effectiveSearchParams.returnDate?.toISOString()}-${effectiveSearchParams.tripType}`;
+    // Safely convert date to string (handles both Date objects and strings)
+    const dateToString = (date: Date | string | undefined): string => {
+      if (!date) return '';
+      if (date instanceof Date) return date.toISOString();
+      return String(date);
+    };
+    const currentSearchKey = `${effectiveSearchParams.from}-${effectiveSearchParams.to}-${dateToString(effectiveSearchParams.departureDate)}-${dateToString(effectiveSearchParams.returnDate)}-${effectiveSearchParams.tripType}`;
     
     if (prevSearchParamsRef.current !== null && prevSearchParamsRef.current !== currentSearchKey) {
       // New search detected - reset filters
@@ -923,7 +929,7 @@ function SearchPageContent() {
 
           {/* Right Sidebar - Contact Card */}
           <div className="w-full lg:w-80 flex flex-col gap-4 order-1 lg:order-3">
-            <ContactCard />
+            <ContactCard webRef={filteredFlights[0]?.webRef} />
           </div>
         </div>
         </div>

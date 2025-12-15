@@ -13,11 +13,12 @@ import type {
   PriceCheckError,
   PriceData,
   TransformedPriceOption,
+  OptionalServiceItem,
 } from '@/types/priceCheck';
 
 /**
  * Call price check API
- * @param segmentResultId - Result ID from flight search
+ * @param segmentResultId - Result ID from flight search (V1: numeric, V3: "79599551-0-0-172")
  * @returns Price check result with upgrade options
  */
 export async function checkPrice(
@@ -35,10 +36,13 @@ export async function checkPrice(
     );
   }
 
-  // Prepare request
+  // Check if V3 format (contains hyphens: "79599551-0-0-172")
+  const isV3Format = /^\d+-\d+-\d+-\d+$/.test(segmentIdStr);
+  
+  // Prepare request - V3 uses full string, V1 uses integer
   const request: PriceCheckRequest[] = [{
-    segment_psw_result1: parseInt(segmentIdStr, 10)
-  }];
+    segment_psw_result1: isV3Format ? segmentIdStr : parseInt(segmentIdStr, 10)
+  }] as any;
 
   console.log('🔍 Price Check Request:', {
     segmentResultId,
@@ -208,11 +212,12 @@ export async function transformPriceCheckResponse(
     const changeableService = optionalServices.find(
       (s: { Tag?: string }) => s.Tag === 'Rebooking'
     );
-    const isChangeable = changeableService?.Chargeable === 'Included in the brand';
+    const isChangeable = changeableService?.Chargeable === 'Included in the brand' ||
+      changeableService?.Chargeable?.toLowerCase().includes('available');
     
-    // Check if seat selection is free (Basic Seat tag with "Included in the brand")
+    // Check if seat selection is free (Seat Assignment tag with "Included in the brand")
     const seatService = optionalServices.find(
-      (s: { Tag?: string }) => s.Tag === 'Basic Seat'
+      (s: { Tag?: string }) => s.Tag === 'Seat Assignment'
     );
     const isSeatSelectionFree = seatService?.Chargeable === 'Included in the brand';
 
@@ -332,6 +337,7 @@ export async function transformPriceCheckResponse(
         id: flightResult.id || 'fallback',
         cabinClass: 'Y',
         cabinClassDisplay: 'Economy',
+        cabinName: 'Economy',
         bookingCode: '',
         totalPrice: parseFloat(flightResult.total_fare || '0'),
         pricePerPerson: parseFloat(flightResult.total_fare || '0'),
@@ -355,6 +361,13 @@ export async function transformPriceCheckResponse(
         brandInfo: [],
         isUpgrade: false,
         priceDifference: undefined,
+        // Default empty OptionalService fields for fallback option
+        checkedBaggageServices: [],
+        carryOnBaggageServices: [],
+        refundService: undefined,
+        rebookingService: undefined,
+        seatServices: [],
+        mealsService: undefined,
       }];
     }
 
@@ -434,6 +447,17 @@ export async function transformPriceCheckResponse(
 }
 
 /**
+ * Generate a unique key for deduplication based on meaningful option parameters
+ * Options are considered duplicates if they have the same:
+ * - cabin class display name
+ * - total price
+ * - baggage description
+ */
+function generateOptionKey(option: TransformedPriceOption): string {
+  return `${option.cabinClassDisplay}|${option.totalPrice}|${option.baggage.description}`;
+}
+
+/**
  * Extract upgrade options from price data
  */
 export function extractUpgradeOptions(
@@ -453,14 +477,88 @@ export function extractUpgradeOptions(
 
   // Sort by total price ascending
   const sorted = [...options].sort((a, b) => a.totalPrice - b.totalPrice);
-  const cheapest = sorted[0]?.totalPrice ?? basePrice;
+  
+  // Deduplicate options with same parameters (cabin class, price, baggage)
+  // Keep the first occurrence (cheapest with those parameters due to sorting)
+  const seen = new Set<string>();
+  const deduplicated = sorted.filter((opt) => {
+    const key = generateOptionKey(opt);
+    if (seen.has(key)) {
+      console.log('[PriceCheck] Removing duplicate upgrade option:', {
+        cabinClass: opt.cabinClassDisplay,
+        price: opt.totalPrice,
+        baggage: opt.baggage.description,
+      });
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+  
+  const cheapest = deduplicated[0]?.totalPrice ?? basePrice;
 
   // Recompute upgrade flags/differences based on cheapest option
-  return sorted.map((opt, idx) => ({
+  return deduplicated.map((opt, idx) => ({
     ...opt,
     isUpgrade: idx > 0 && opt.totalPrice > cheapest,
     priceDifference: idx > 0 ? opt.totalPrice - cheapest : undefined,
   }));
+}
+
+/**
+ * Parse Chargeable field from API to normalized value
+ * API values: "Included in the brand", "Available for a charge", "Not offered"
+ */
+function parseChargeableStatus(chargeable?: string): 'included' | 'chargeable' | 'not_offered' {
+  if (!chargeable) return 'not_offered';
+  const lower = chargeable.toLowerCase();
+  if (lower.includes('included')) return 'included';
+  if (lower.includes('charge') || lower.includes('available')) return 'chargeable';
+  return 'not_offered';
+}
+
+/**
+ * Extract OptionalService items by tag from the OptionalService array
+ * Filters out items where Chargeable is "Not offered" (as per email instructions)
+ * 
+ * @param optionalServices - Array of OptionalService from Total_Fare
+ * @param tag - The tag to filter by (e.g., "Checked Baggage", "Refund")
+ * @param includeNotOffered - If true, also returns "Not offered" items (default: false)
+ */
+function extractServicesByTag(
+  optionalServices: any[],
+  tag: string,
+  includeNotOffered: boolean = false
+): OptionalServiceItem[] {
+  if (!Array.isArray(optionalServices)) return [];
+  
+  return optionalServices
+    .filter((svc: any) => {
+      if (svc.Tag !== tag) return false;
+      // Filter out "Not offered" items unless explicitly requested
+      if (!includeNotOffered && svc.Chargeable?.toLowerCase().includes('not offered')) {
+        return false;
+      }
+      return true;
+    })
+    .map((svc: any) => ({
+      tag: svc.Tag || '',
+      text: svc.text || '',
+      chargeable: parseChargeableStatus(svc.Chargeable),
+      type: svc.Type || undefined,
+    }));
+}
+
+/**
+ * Extract a single OptionalService item by tag (returns first match)
+ */
+function extractSingleServiceByTag(
+  optionalServices: any[],
+  tag: string,
+  includeNotOffered: boolean = false
+): OptionalServiceItem | undefined {
+  const items = extractServicesByTag(optionalServices, tag, includeNotOffered);
+  return items.length > 0 ? items[0] : undefined;
 }
 
 /**
@@ -556,10 +654,31 @@ function transformPriceOption(
     perLeg: perLegBaggage.length > 0 ? perLegBaggage : undefined,
   };
 
+  // Extract CabinName from BrandInfo (e.g., "Economy", "Premium Economy", "Business")
+  const cabinName = option.BrandInfo?.[0]?.CabinName || mapCabinClassCode(cabinClassCode);
+
+  // --- Extract OptionalService items by tag ---
+  // These provide detailed baggage, flexibility, and meal information
+  const optionalServices = totalFare.OptionalService || [];
+  
+  // Baggage: "Checked Baggage" and "Carry On Hand Baggage" tags
+  // Note: We don't include "Not offered" items (per email instructions)
+  const checkedBaggageServices = extractServicesByTag(optionalServices, 'Checked Baggage');
+  const carryOnBaggageServices = extractServicesByTag(optionalServices, 'Carry On Hand Baggage');
+  
+  // Flexibility: "Refund", "Rebooking", and "Seat Assignment" tags
+  const refundService = extractSingleServiceByTag(optionalServices, 'Refund');
+  const rebookingService = extractSingleServiceByTag(optionalServices, 'Rebooking');
+  const seatServices = extractServicesByTag(optionalServices, 'Seat Assignment');
+  
+  // Meals: "Meals and Beverages" tag
+  const mealsService = extractSingleServiceByTag(optionalServices, 'Meals and Beverages');
+
   return {
     id: `fare_${index + 1}`,
     cabinClass: cabinClassCode.toString(),
     cabinClassDisplay,
+    cabinName,
     bookingCode,
     totalPrice,
     pricePerPerson,
@@ -580,6 +699,13 @@ function transformPriceOption(
     brandInfo: option.BrandInfo || [],
     isUpgrade,
     priceDifference,
+    // New OptionalService extracted fields
+    checkedBaggageServices,
+    carryOnBaggageServices,
+    refundService,
+    rebookingService,
+    seatServices,
+    mealsService,
   };
 }
 
@@ -675,8 +801,13 @@ export function createPriceCheckError(
 
 /**
  * Check if segment result is valid
+ * Accepts both V1 format (numeric) and V3 format ("79599551-0-0-172")
  */
 export function isValidSegmentId(segmentId: string): boolean {
-  return /^\d+$/.test(segmentId) && parseInt(segmentId, 10) > 0;
+  // V1 format: pure numeric
+  const isValidV1 = /^\d+$/.test(segmentId) && parseInt(segmentId, 10) > 0;
+  // V3 format: "requestId-segment-index-moduleId"
+  const isValidV3 = /^\d+-\d+-\d+-\d+$/.test(segmentId);
+  return isValidV1 || isValidV3;
 }
 

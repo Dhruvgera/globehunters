@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Check, Briefcase, Package, ShoppingBag, XCircle, ChevronLeft, ChevronRight, Info } from "lucide-react";
+import { X, Check, Briefcase, Package, ChevronLeft, ChevronRight, Info, RotateCcw, RefreshCw, Armchair, UtensilsCrossed } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +19,101 @@ interface UpgradeOptionsModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
+/** Feature item for display */
+interface FeatureItem {
+  icon: 'check' | 'info' | 'x';
+  iconComponent: typeof Check;
+  title: string;
+  description?: string;
+}
+
+/** Build features from OptionalService data */
+function buildFeaturesFromOption(option: TransformedPriceOption): FeatureItem[] {
+  const features: FeatureItem[] = [];
+  
+  // Checked Baggage from OptionalService
+  if (option.checkedBaggageServices && option.checkedBaggageServices.length > 0) {
+    option.checkedBaggageServices.forEach((svc) => {
+      features.push({
+        icon: svc.chargeable === 'included' ? 'check' : 'info',
+        iconComponent: Package,
+        title: svc.text || 'Checked baggage',
+        description: svc.chargeable === 'included' ? 'Included in fare' : 'Available for a charge',
+      });
+    });
+  } else if (option.baggage?.description) {
+    // Fallback to old baggage data
+    features.push({
+      icon: 'check',
+      iconComponent: Package,
+      title: option.baggage.description,
+      description: option.baggage.details?.substring(0, 80),
+    });
+  }
+  
+  // Carry-on Baggage from OptionalService
+  if (option.carryOnBaggageServices && option.carryOnBaggageServices.length > 0) {
+    option.carryOnBaggageServices.forEach((svc) => {
+      features.push({
+        icon: svc.chargeable === 'included' ? 'check' : 'info',
+        iconComponent: Briefcase,
+        title: svc.text || 'Hand baggage',
+        description: svc.chargeable === 'included' ? 'Included in fare' : 'Available for a charge',
+      });
+    });
+  }
+  
+  // Refund from OptionalService
+  if (option.refundService) {
+    const isIncluded = option.refundService.chargeable === 'included';
+    const isChargeable = option.refundService.chargeable === 'chargeable';
+    features.push({
+      icon: isIncluded ? 'check' : isChargeable ? 'info' : 'x',
+      iconComponent: RotateCcw,
+      title: isIncluded ? 'Refunds included' : isChargeable ? 'Refunds available' : 'Refunds',
+      description: isIncluded ? 'Ticket can be refunded' : isChargeable ? 'Refundable for a charge' : option.refundService.text,
+    });
+  }
+  
+  // Rebooking/Changes from OptionalService
+  if (option.rebookingService) {
+    const isIncluded = option.rebookingService.chargeable === 'included';
+    const isChargeable = option.rebookingService.chargeable === 'chargeable';
+    features.push({
+      icon: isIncluded ? 'check' : isChargeable ? 'info' : 'x',
+      iconComponent: RefreshCw,
+      title: isIncluded ? 'Changes included' : isChargeable ? 'Changes available' : 'Changes',
+      description: isIncluded ? 'Free flight changes' : isChargeable ? 'Changes for a charge' : option.rebookingService.text,
+    });
+  }
+  
+  // Seat Selection from OptionalService
+  if (option.seatServices && option.seatServices.length > 0) {
+    const seatService = option.seatServices.find(s => s.chargeable !== 'not_offered');
+    if (seatService) {
+      const isIncluded = seatService.chargeable === 'included';
+      features.push({
+        icon: isIncluded ? 'check' : 'info',
+        iconComponent: Armchair,
+        title: seatService.text || 'Seat selection',
+        description: isIncluded ? 'Included in fare' : 'Available for a charge',
+      });
+    }
+  }
+  
+  // Meals from OptionalService
+  if (option.mealsService) {
+    const isIncluded = option.mealsService.chargeable === 'included';
+    features.push({
+      icon: isIncluded ? 'check' : 'info',
+      iconComponent: UtensilsCrossed,
+      title: option.mealsService.text || 'Meals and beverages',
+      description: isIncluded ? 'Included in fare' : 'Available for purchase',
+    });
+  }
+  
+  return features;
+}
 
 export default function UpgradeOptionsModal({
   open,
@@ -34,35 +129,14 @@ export default function UpgradeOptionsModal({
   const apiOptions: TransformedPriceOption[] = priceCheckData?.priceOptions || [];
   const hasApiOptions = apiOptions.length > 0;
 
-  function normalizeFeatureIcon(title: string): 'personal_bag' | 'luggage' | 'checked_bags' | 'non_refundable' | 'no_changes' | 'seat_choice' | 'info' {
-    const t = (title || '').toLowerCase();
-    if (t.includes('bag') || t.includes('baggage') || t.includes('luggage')) return 'checked_bags';
-    if (t.includes('seat')) return 'seat_choice';
-    if (t.includes('change')) return 'no_changes';
-    if (t.includes('refund')) return 'non_refundable';
-    return 'info';
-  }
-  function mapIcon(name: string) {
-    return name === "personal_bag" ? ShoppingBag :
-      name === "luggage" ? Briefcase :
-      name === "checked_bags" ? Package :
-      name === "non_refundable" ? XCircle :
-      name === "no_changes" ? XCircle :
-      name === "seat_choice" ? Check :
-      Info;
-  }
-
   // Map API options to fare display format
   const fares = apiOptions.map((o) => ({
     id: o.id,
     name: o.cabinClassDisplay,
-    // show incremental difference if upgrade, else total price
-    price: o.isUpgrade && o.priceDifference
-      ? `+${formatPrice(o.priceDifference, o.currency)}`
-      : formatPrice(o.totalPrice, o.currency),
-    baggageDesc: o.baggage?.description,
-    baggageDetails: o.baggage?.details,
-    baggagePerLeg: o.baggage?.perLeg,
+    cabinName: o.cabinName,
+    // Always show actual total fare, not price difference
+    price: formatPrice(o.totalPrice, o.currency),
+    features: buildFeaturesFromOption(o),
     _raw: o,
   }));
 
@@ -148,92 +222,43 @@ export default function UpgradeOptionsModal({
                   </button>
                 </div>
 
-                {/* Features */}
+                {/* Features - Using OptionalService data */}
                 <div className="flex flex-col gap-2 sm:gap-4">
                   <span className="text-xs sm:text-sm text-[#3A478A]">
                     {t('includedInFare')}
                   </span>
                   <div className="flex flex-col gap-2 sm:gap-3">
-                    {(() => {
-                      if (hasApiOptions && (fare as any).baggageDesc) {
-                        const raw = (fare as any)._raw as TransformedPriceOption;
-                        const perLeg = (fare as any).baggagePerLeg as { route: string; allowance: string }[] | undefined;
-                        const brandFeatures: string[] = [];
-                        (raw?.brandInfo || []).forEach((b: any) => {
-                          if (Array.isArray(b?.features)) {
-                            b.features.forEach((f: any) => typeof f === 'string' && brandFeatures.push(f));
-                          } else {
-                            Object.values(b || {}).forEach((v: any) => {
-                              if (typeof v === 'string' && /refund|change|seat/i.test(v)) {
-                                brandFeatures.push(v);
-                              }
-                            });
-                          }
-                        });
-                        const refundable = priceCheckData?.flightDetails?.refundable ?? false;
+                    {fare.features.length > 0 ? (
+                      fare.features.map((feature, index) => {
+                        const IconComponent = feature.iconComponent;
+                        // Determine icon color based on status
+                        const iconColorClass = 
+                          feature.icon === 'check' ? 'text-[#008234]' :
+                          feature.icon === 'info' ? 'text-[#F59E0B]' :
+                          'text-[#DC2626]';
                         
-                        // Build baggage features - show per-leg if available and different
-                        const baggageFeatures: { icon: string; title: string; description?: string }[] = [];
-                        if (perLeg && perLeg.length > 1) {
-                          // Check if all legs have same baggage
-                          const allSame = perLeg.every(leg => leg.allowance === perLeg[0].allowance);
-                          if (allSame) {
-                            baggageFeatures.push({
-                              icon: "checked_bags",
-                              title: perLeg[0].allowance,
-                            });
-                          } else {
-                            // Show each leg's baggage
-                            perLeg.forEach(leg => {
-                              baggageFeatures.push({
-                                icon: "checked_bags",
-                                title: `${leg.route}: ${leg.allowance}`,
-                              });
-                            });
-                          }
-                        } else {
-                          baggageFeatures.push({
-                            icon: "checked_bags",
-                            title: (fare as any).baggageDesc as string,
-                            description: (fare as any).baggageDetails?.substring(0, 100) as string | undefined,
-                          });
-                        }
-                        
-                        const features = [
-                          ...baggageFeatures,
-                          {
-                            icon: refundable ? "seat_choice" : "non_refundable",
-                            title: refundable ? "Refundable" : "Non-Refundable",
-                            description: refundable ? "Ticket can be refunded (fees may apply)" : "Ticket can't be refunded",
-                          },
-                          // Additional brand features when available
-                          ...brandFeatures.slice(0, 4).map((txt) => ({
-                            icon: normalizeFeatureIcon(txt),
-                            title: txt,
-                            description: undefined as string | undefined,
-                          })),
-                        ];
-                        return features.map((feature: any, index: number) => {
-                          const IconComponent = mapIcon(feature.icon);
-                          return (
-                            <div key={index} className="flex items-start gap-2 sm:gap-3">
-                              <IconComponent className={`w-4 h-4 sm:w-6 sm:h-6 ${feature.icon === 'non_refundable' ? 'text-[#FF3B30]' : 'text-[#010D50]'} shrink-0 mt-0.5`} />
-                              <div className="flex flex-col gap-0.5 sm:gap-1">
-                                <span className="text-xs sm:text-sm font-medium text-[#010D50]">
-                                  {feature.title}
+                        return (
+                          <div key={index} className="flex items-start gap-2 sm:gap-3">
+                            <IconComponent className={`w-4 h-4 sm:w-5 sm:h-5 ${iconColorClass} shrink-0 mt-0.5`} />
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs sm:text-sm font-medium text-[#010D50]">
+                                {feature.title}
+                              </span>
+                              {feature.description && (
+                                <span className="text-xs text-[#3A478A]">
+                                  {feature.description}
                                 </span>
-                                {feature.description && (
-                                  <span className="text-xs sm:text-sm text-[#3A478A]">
-                                    {feature.description}
-                                  </span>
-                                )}
-                              </div>
+                              )}
                             </div>
-                          );
-                        });
-                      }
-                      return null;
-                    })()}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      // Fallback when no features available
+                      <span className="text-xs text-[#3A478A]">
+                        See flight details for more information
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

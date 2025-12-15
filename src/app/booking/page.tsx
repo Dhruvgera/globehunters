@@ -74,11 +74,12 @@ function BookingContent() {
   }, [hasHydrated, flight, router]);
 
   // Prefetch price check for booking if missing
+  // V3 flow: Use flightKey for FlightView -> psw_result_id -> PriceCheck
   useEffect(() => {
-    if (flight?.segmentResultId && !priceCheckData) {
-      checkPrice(String(flight.segmentResultId));
+    if ((flight?.flightKey || flight?.segmentResultId) && !priceCheckData) {
+      checkPrice(String(flight.segmentResultId || ''), flight.flightKey);
     }
-  }, [flight?.segmentResultId, priceCheckData, checkPrice]);
+  }, [flight?.segmentResultId, flight?.flightKey, priceCheckData, checkPrice]);
   useEffect(() => {
     if (priceCheck) {
       setPriceCheckData(priceCheck);

@@ -95,10 +95,37 @@ export function transformVyspaResponse(
 }
 
 /**
+ * Extract the Request_id (first number before hyphen) from Result_id
+ * V3 format: "79596866-0-0-172" -> "79596866"
+ * V1 format: "940769580" -> "940769580"
+ */
+function extractRequestIdFromResultId(resultId: string): string {
+  if (!resultId) return '';
+  // V3 format has hyphens, extract first part
+  if (resultId.includes('-')) {
+    return resultId.split('-')[0];
+  }
+  // V1 format is just the ID
+  return resultId;
+}
+
+/**
+ * Extract the flight key from Deep_link URL
+ * Deep_link format: "www.globehunters.com/checkout.htm?...&flight=bnprMzRsc2ZxbXkwRHZJOUxpNHcyRW5TRENmZHVZNzdSRVFCWDZGSUw3RT0="
+ * Returns the base64 encoded flight key
+ */
+function extractFlightKeyFromDeepLink(deepLink?: string): string | undefined {
+  if (!deepLink) return undefined;
+  const match = deepLink.match(/flight=([^&"]+)/);
+  return match ? match[1] : undefined;
+}
+
+/**
  * Transform a single Vyspa result to Flight
  */
 function transformResult(result: VyspaResult): Flight | null {
   // Robust total price calculation
+  // V3 returns Total as number, V1 returns as string
   // Prefer Result.Total, but fall back to Total_fare/Breakdown totals when needed
   let totalPrice = parsePriceValue(result.Total, 0);
 
@@ -107,11 +134,17 @@ function transformResult(result: VyspaResult): Flight | null {
     const totalFareField = anyResult.Total_fare ?? anyResult.TotalFare;
     const totalFareValue = parsePriceValue(totalFareField, 0);
 
+    // V1 format: Breakdown array
     const breakdownTotal = (result.Breakdown || []).reduce((sum, entry: any) => {
       return sum + parsePriceValue(entry.total, 0);
     }, 0);
+    
+    // V3 format: Pax_breakdown array
+    const paxBreakdownTotal = (result.Pax_breakdown || []).reduce((sum, entry) => {
+      return sum + (entry.total_fare || 0);
+    }, 0);
 
-    const fallbackTotal = totalFareValue || breakdownTotal;
+    const fallbackTotal = totalFareValue || paxBreakdownTotal || breakdownTotal;
     if (fallbackTotal > 0) {
       totalPrice = fallbackTotal;
     }
@@ -121,9 +154,17 @@ function transformResult(result: VyspaResult): Flight | null {
     console.warn('Flight has zero total price after fallbacks:', result.Result_id);
   }
 
-  // Calculate total passengers
+  // Calculate total passengers - support both V1 and V3 formats
   let totalPassengers = 0;
-  if (result.Breakdown) {
+  
+  // V3 format: Pax_breakdown
+  if (result.Pax_breakdown && result.Pax_breakdown.length > 0) {
+    for (const pax of result.Pax_breakdown) {
+      totalPassengers += pax.pax_count || 0;
+    }
+  }
+  // V1 format: Breakdown
+  else if (result.Breakdown) {
     for (const breakdown of result.Breakdown) {
       totalPassengers += parseIntSafe(breakdown.total_pax, 0);
     }
@@ -168,9 +209,29 @@ function transformResult(result: VyspaResult): Flight | null {
   // Transform all segments for multi-city support
   const allSegments: FlightSegment[] = vyspaSegments.map(transformSegmentToFlightSegment);
 
+  // Get baggage info - V3 has baggage in Pax_breakdown and flight-level, V1 has Baggage field
+  const v3Baggage = result.Pax_breakdown?.[0]?.baggage?.[0]; // e.g., "25kg"
+  const v3FlightBaggage = (firstFlight as any).baggage; // lowercase for V3
+  const v1Baggage = firstFlight.Baggage || result.Baggage; // uppercase for V1
+  const baggageValue = v3Baggage || v3FlightBaggage || v1Baggage;
+  
   const hasBaggage =
-    (firstFlight.Baggage && String(firstFlight.Baggage).toLowerCase() !== 'none') ||
+    (baggageValue && String(baggageValue).toLowerCase() !== 'none' && String(baggageValue) !== '0p') ||
     (firstFlight.BaggageQuantity && firstFlight.BaggageQuantity !== '0') ? true : false;
+
+  // Get currency code - V3 uses Currency_code (uppercase), V1 uses currency_code (lowercase)
+  const currencyCode = (result.Currency_code || result.currency_code || 'GBP').toUpperCase();
+  
+  // Get module_id - V3 uses Module_id (uppercase), V1 uses module_id (lowercase)
+  // Convert to string as Flight type expects string
+  const moduleIdRaw = result.Module_id ?? result.module_id;
+  const moduleId = moduleIdRaw !== undefined ? String(moduleIdRaw) : undefined;
+  
+  // Extract Request_id from Result_id for web ref (first number before hyphen in V3)
+  const requestIdForWebRef = extractRequestIdFromResultId(result.Result_id);
+  
+  // Extract flight key from Deep_link (V3) for FlightView API
+  const flightKey = extractFlightKeyFromDeepLink(result.Deep_link);
 
   const flight: Flight = {
     id: result.Result_id,
@@ -185,9 +246,9 @@ function transformResult(result: VyspaResult): Flight | null {
     })(),
     price: Math.round(totalPrice),
     pricePerPerson: Math.round(pricePerPerson),
-    currency: result.currency_code.toUpperCase(), // Store code, not symbol
-    webRef: result.Result_id,
-    baggage: result.Baggage,
+    currency: currencyCode, // Store code, not symbol
+    webRef: requestIdForWebRef, // Use Request_id (first part before hyphen) for web ref
+    baggage: baggageValue,
     // Refundable codes: 1=Refundable, 2=Non-Refundable, 3=RefundableWithPenalty, 4=FullyRefundable
     refundable: (() => {
       const raw = (firstFlight as any).refundable;
@@ -200,9 +261,10 @@ function transformResult(result: VyspaResult): Flight | null {
     })(),
     refundableText: (firstFlight as any).refundable_text,
     hasBaggage,
-    // Store segment result ID for price check
+    // Store Result_id for V1, or flightKey for V3 price check flow
     segmentResultId: result.Result_id,
-    moduleId: result.module_id,
+    flightKey: flightKey, // V3: Base64 key for FlightView API
+    moduleId: moduleId,
   };
 
   return flight;
@@ -237,8 +299,8 @@ function transformSegmentToFlightSegment(segment: VyspaSegment): FlightSegment {
   const departureTime = formatTime(firstFlight.departure_time);
   const arrivalTime = formatTime(lastFlight.arrival_time);
 
-  // Calculate total duration
-  const totalDuration = segment.FlyingTime || 0;
+  // Calculate total duration - V3 uses Flying_time, V1 uses FlyingTime
+  const totalDuration = segment.Flying_time ?? segment.FlyingTime ?? 0;
   const duration = formatDuration(totalDuration);
 
   // Format date (convert YYYY-MM-DD to readable format)
@@ -313,11 +375,17 @@ function transformSegmentToFlightSegment(segment: VyspaSegment): FlightSegment {
     cabinClass: firstFlight.cabin_class,
     aircraftType: aircraftName || undefined,
     distance: distanceStr,
-    departureTerminal: firstFlight.departure_terminal,
-    arrivalTerminal: lastFlight.arrival_terminal,
+    // Convert terminals to strings (V3 can return numbers like 4, 1)
+    departureTerminal: firstFlight.departure_terminal !== undefined && firstFlight.departure_terminal !== '' 
+      ? String(firstFlight.departure_terminal) 
+      : undefined,
+    arrivalTerminal: lastFlight.arrival_terminal !== undefined && lastFlight.arrival_terminal !== '' 
+      ? String(lastFlight.arrival_terminal) 
+      : undefined,
     layovers: layovers.length > 0 ? layovers : undefined,
     individualFlights: individualFlights.length > 1 ? individualFlights : undefined,
-    segmentBaggage: firstFlight.Baggage,
+    // Baggage - V3 uses lowercase 'baggage', V1 uses 'Baggage'
+    segmentBaggage: (firstFlight as any).baggage || firstFlight.Baggage,
     segmentBaggageQuantity: firstFlight.BaggageQuantity,
     segmentBaggageUnit: firstFlight.BaggageUnit,
   };
@@ -408,7 +476,8 @@ function buildSegmentFromFlights(flights: VyspaFlight[]): VyspaSegment {
 
   return {
     Route: `${first.departure_airport}${last.arrival_airport}`,
-    FlyingTime: totalFlyingTime,
+    FlyingTime: totalFlyingTime, // V1 format
+    Flying_time: totalFlyingTime, // V3 format
     Stops: stops,
     Flights: flights,
   };

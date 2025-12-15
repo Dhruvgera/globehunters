@@ -42,7 +42,7 @@ class BookingService {
 
       const mockBooking: BookingResponse = {
         bookingId: `BKG-${Date.now()}`,
-        webReference: `IN-${Math.floor(Math.random() * 900000000) + 100000000}`,
+        webReference: `${Math.floor(Math.random() * 900000000) + 100000000}`,
         status: 'pending',
         flight: flight,
         passengers: request.passengers,

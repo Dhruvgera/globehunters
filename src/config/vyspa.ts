@@ -20,7 +20,7 @@ export const VYSPA_CONFIG = {
     token: process.env.VYSPA_TOKEN || '',
   },
   defaults: {
-    version: '2' as const,
+    version: '3' as const,
     method: 'flights_availability_search' as const,
     timeout: 30000, // 30 seconds
     defaultChildAge: '9',

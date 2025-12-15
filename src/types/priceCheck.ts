@@ -356,12 +356,24 @@ export interface PassengerData {
 // ============================================================================
 
 /**
+ * Optional service item extracted from price check response
+ * Chargeable values: "Included in the brand", "Available for a charge", "Not offered"
+ */
+export interface OptionalServiceItem {
+  tag: string;
+  text: string;
+  chargeable: 'included' | 'chargeable' | 'not_offered';
+  type?: string;
+}
+
+/**
  * Transformed price option for UI display
  */
 export interface TransformedPriceOption {
   id: string;
   cabinClass: string;
   cabinClassDisplay: string; // "Economy", "Premium Economy", "Business", "First"
+  cabinName: string; // From BrandInfo CabinName (e.g., "Economy", "Premium Economy", "Business")
   bookingCode: string;
   totalPrice: number;
   pricePerPerson: number;
@@ -386,6 +398,19 @@ export interface TransformedPriceOption {
   brandInfo?: BrandInfo[];
   isUpgrade: boolean; // true if this is an upgrade from base fare
   priceDifference?: number; // difference from base fare
+  
+  // --- NEW: Extracted from OptionalService array ---
+  // Baggage details from OptionalService tags
+  checkedBaggageServices: OptionalServiceItem[];  // Tag: "Checked Baggage"
+  carryOnBaggageServices: OptionalServiceItem[];  // Tag: "Carry On Hand Baggage"
+  
+  // Flexibility details from OptionalService tags
+  refundService?: OptionalServiceItem;     // Tag: "Refund"
+  rebookingService?: OptionalServiceItem;  // Tag: "Rebooking"
+  seatServices: OptionalServiceItem[];     // Tag: "Seat Assignment"
+  
+  // Meals from OptionalService tags
+  mealsService?: OptionalServiceItem;      // Tag: "Meals and Beverages"
 }
 
 /**

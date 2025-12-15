@@ -83,10 +83,8 @@ export function TicketOptionsPanel({
       return priceOptions.map((opt) => ({
         id: opt.id,
         label: prettify(opt.cabinClassDisplay),
-        suffix:
-          opt.isUpgrade && opt.priceDifference
-            ? `+${formatPrice(opt.priceDifference, opt.currency)}`
-            : undefined,
+        // Always show the actual total fare, not the price difference
+        suffix: formatPrice(opt.totalPrice, opt.currency),
       }));
     }
     return ticketOptions.map((opt) => ({

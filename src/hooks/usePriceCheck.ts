@@ -10,7 +10,7 @@ interface UsePriceCheckReturn {
   priceCheck: PriceCheckResult | null;
   isLoading: boolean;
   error: PriceCheckError | null;
-  checkPrice: (segmentId: string) => Promise<void>;
+  checkPrice: (segmentId: string, flightKey?: string) => Promise<void>;
   clearCache: () => void;
   clearError: () => void;
 }
@@ -102,26 +102,31 @@ export function usePriceCheck(): UsePriceCheckReturn {
 
   /**
    * Check price for a segment
+   * @param segmentId - Result_id from flight search (V1 numeric, or V3 compound format)
+   * @param flightKey - Optional: Base64 flight key from Deep_link for V3 FlightView flow
    */
-  const checkPrice = useCallback(async (segmentId: string) => {
+  const checkPrice = useCallback(async (segmentId: string, flightKey?: string) => {
+    // Use flightKey as cache key if available, otherwise segmentId
+    const cacheKey = flightKey || segmentId;
+    
     // Don't make duplicate requests
-    if (currentRequestRef.current === segmentId && isLoading) {
-      console.log('⏩ Price check already in progress for', segmentId);
+    if (currentRequestRef.current === cacheKey && isLoading) {
+      console.log('⏩ Price check already in progress for', cacheKey);
       return;
     }
 
-    const cachedFailure = getCachedPriceCheckFailure(segmentId);
+    const cachedFailure = getCachedPriceCheckFailure(cacheKey);
     if (cachedFailure) {
-      console.log('⏩ Skipping price check due to cached failure for', segmentId);
+      console.log('⏩ Skipping price check due to cached failure for', cacheKey);
       setError(cachedFailure);
       setPriceCheck(null);
       return;
     }
 
     // Check cache first
-    const cached = getCachedPriceCheck(segmentId);
+    const cached = getCachedPriceCheck(cacheKey);
     if (cached) {
-      console.log('✅ Using cached price check for', segmentId);
+      console.log('✅ Using cached price check for', cacheKey);
       setPriceCheck(cached);
       setError(null);
       return;
@@ -130,9 +135,9 @@ export function usePriceCheck(): UsePriceCheckReturn {
     // Start loading
     setIsLoading(true);
     setError(null);
-    currentRequestRef.current = segmentId;
+    currentRequestRef.current = cacheKey;
 
-    console.log('🔍 Fetching price check for', segmentId);
+    console.log('🔍 Fetching price check for', segmentId, flightKey ? '(with flightKey)' : '');
 
     try {
       const res = await fetch('/api/price-check', {
@@ -140,7 +145,7 @@ export function usePriceCheck(): UsePriceCheckReturn {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ segmentResultId: segmentId }),
+        body: JSON.stringify({ segmentResultId: segmentId, flightKey }),
       });
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
@@ -155,14 +160,14 @@ export function usePriceCheck(): UsePriceCheckReturn {
       const result: PriceCheckResult = await res.json();
       
       // Only update if this is still the current request
-      if (currentRequestRef.current === segmentId) {
+      if (currentRequestRef.current === cacheKey) {
         setPriceCheck(result);
-        setCachedPriceCheck(segmentId, result);
-        console.log('✅ Price check successful for', segmentId);
+        setCachedPriceCheck(cacheKey, result);
+        console.log('✅ Price check successful for', cacheKey);
       }
     } catch (err: any) {
       // Only update if this is still the current request
-      if (currentRequestRef.current === segmentId) {
+      if (currentRequestRef.current === cacheKey) {
         console.error('❌ Price check error caught:', err);
         
         const priceCheckError: PriceCheckError = {
@@ -178,15 +183,15 @@ export function usePriceCheck(): UsePriceCheckReturn {
         setPriceCheck(null);
         // Cache this failure so we don't keep retrying a segment that is
         // returning errors (e.g., repeated 502s) within the TTL window.
-        setCachedPriceCheckFailure(segmentId, priceCheckError);
+        setCachedPriceCheckFailure(cacheKey, priceCheckError);
 
         const status = (priceCheckError.details && (priceCheckError.details as any).status) as number | undefined;
         if (status === 502) {
-          console.warn('⚠️ Price check received 502 Bad Gateway for', segmentId, {
+          console.warn('⚠️ Price check received 502 Bad Gateway for', cacheKey, {
             error: priceCheckError,
           });
         } else {
-          console.error('❌ Price check failed for', segmentId, {
+          console.error('❌ Price check failed for', cacheKey, {
             error: priceCheckError,
             originalError: err,
           });
@@ -194,7 +199,7 @@ export function usePriceCheck(): UsePriceCheckReturn {
       }
     } finally {
       // Only update loading state if this is still the current request
-      if (currentRequestRef.current === segmentId) {
+      if (currentRequestRef.current === cacheKey) {
         setIsLoading(false);
         currentRequestRef.current = null;
       }

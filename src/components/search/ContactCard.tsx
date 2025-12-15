@@ -4,15 +4,25 @@ import { Phone } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
 
-export function ContactCard() {
+interface ContactCardProps {
+  /** Web reference ID from the flight search (Request_id) */
+  webRef?: string | number;
+}
+
+export function ContactCard({ webRef }: ContactCardProps) {
   const t = useTranslations('search.contact');
   const { phoneNumber } = useAffiliatePhone();
   
+  // Format web ref - use the Request_id directly
+  const displayWebRef = webRef ? `${webRef}` : null;
+  
   return (
     <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-3 sticky top-20">
-      <span className="text-base font-semibold text-[#3754ED]">
-        {t('webRef')}: IN-649707636
-      </span>
+      {displayWebRef && (
+        <span className="text-base font-semibold text-[#3754ED]">
+          {t('webRef')}: {displayWebRef}
+        </span>
+      )}
       <p className="text-xs text-[#3A478A]">
         {t('title')}
       </p>

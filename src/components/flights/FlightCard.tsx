@@ -30,13 +30,20 @@ export default function FlightCard({
   const [showFlightInfo, setShowFlightInfo] = useState(false);
 
   // Prefetch price check for this flight on intent (hover) to speed up modal/options
+  // V3 flow: Use flightKey for FlightView -> psw_result_id -> PriceCheck
   const { checkPrice, priceCheck, isLoading } = usePriceCheck();
   const prefetchOptions = () => {
-    if (flight.segmentResultId) {
-      checkPrice(String(flight.segmentResultId));
+    if (flight.flightKey || flight.segmentResultId) {
+      checkPrice(String(flight.segmentResultId || ''), flight.flightKey);
     }
   };
   const priceCheckData = priceCheck;
+
+  // Use price check data for displayed price when available (first/base option)
+  // This ensures the card shows the updated price from price check, not the search result
+  const baseOption = priceCheckData?.priceOptions?.[0];
+  const effectivePricePerPerson = baseOption?.pricePerPerson ?? flight.pricePerPerson;
+  const effectiveCurrency = baseOption?.currency ?? flight.currency;
 
   const handleSelectFlight = (
     fareType: "Eco Value" | "Eco Classic" | "Eco Flex"
@@ -92,10 +99,10 @@ export default function FlightCard({
       {/* Divider */}
       <div className="border-t border-dashed border-[#DAE0FF] my-4" />
 
-      {/* Price and Actions */}
+      {/* Price and Actions - use price check data when available */}
       <FlightActions
-        currency={flight.currency}
-        pricePerPerson={flight.pricePerPerson}
+        currency={effectiveCurrency}
+        pricePerPerson={effectivePricePerPerson}
         showTicketOptions={showTicketOptions}
         onViewFlightInfo={() => setShowFlightInfo(!showFlightInfo)}
         onToggleTicketOptions={() => {

@@ -82,8 +82,9 @@ export interface Flight {
   refundableText?: string;
   hasBaggage?: boolean;
   meals?: boolean;
-  // Price check integration
-  segmentResultId?: string;    // Result_id from API for price check
+  // Price check integration (V3 flow: flightKey -> FlightView -> psw_result_id -> PriceCheck)
+  segmentResultId?: string;    // Result_id from API (V1) or psw_result_id (V3) for price check
+  flightKey?: string;          // V3: Base64 flight key from Deep_link for FlightView API
   moduleId?: string;           // module_id from API for debugging
 }
 
