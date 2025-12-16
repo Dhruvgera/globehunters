@@ -50,8 +50,8 @@ export const PRICING_CONFIG = {
   // Default discount percentage
   defaultDiscount: 0.20,
 
-  // Additional baggage price per bag (will be dynamic from API)
-  baggagePrice: 4500,
+  // Additional baggage price per bag in GBP (will be dynamic from API)
+  baggagePrice: 90,
 
   // VAT/Tax rate
   taxRate: 0.05,

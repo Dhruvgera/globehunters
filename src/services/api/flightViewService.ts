@@ -104,7 +104,7 @@ export interface TransformedFlightViewResult {
  */
 export function transformFlightViewResponse(data: FlightViewResponse): TransformedFlightViewResult {
   const segments = data.Segments || [];
-  
+
   if (segments.length === 0) {
     throw new Error('No flight segments in response');
   }
@@ -136,7 +136,7 @@ export function transformFlightViewResponse(data: FlightViewResponse): Transform
   for (const breakdown of data.Breakdown || []) {
     const count = parseIntSafe(breakdown.total_pax, 0);
     totalPassengers += count;
-    
+
     if (breakdown.pax_type === 'ADT') {
       adults = count;
     } else if (breakdown.pax_type === 'CHD') {
@@ -171,11 +171,11 @@ export function transformFlightViewResponse(data: FlightViewResponse): Transform
   // Get refundable status from first flight
   const refundableCode = parseIntSafe(firstFlight.refundable, 0);
   const refundable = refundableCode === 1 || refundableCode === 3 || refundableCode === 4 ? true :
-                     refundableCode === 2 ? false : null;
+    refundableCode === 2 ? false : null;
 
   // Check for baggage
-  const hasBaggage = firstFlight.Baggage && 
-    String(firstFlight.Baggage).toLowerCase() !== 'none' && 
+  const hasBaggage = firstFlight.Baggage &&
+    String(firstFlight.Baggage).toLowerCase() !== 'none' &&
     String(firstFlight.Baggage).trim() !== '';
 
   // Build the Flight object
@@ -224,7 +224,7 @@ export function transformFlightViewResponse(data: FlightViewResponse): Transform
  */
 function transformSegment(segment: FlightViewSegment): FlightSegment {
   const flights = segment.Flights || [];
-  
+
   if (flights.length === 0) {
     throw new Error('No flights in segment');
   }
@@ -251,8 +251,8 @@ function transformSegment(segment: FlightViewSegment): FlightSegment {
 
   // Format date
   const date = formatDate(firstFlight.departure_date);
-  const arrivalDate = lastFlight.arrival_date !== firstFlight.departure_date 
-    ? formatDate(lastFlight.arrival_date) 
+  const arrivalDate = lastFlight.arrival_date !== firstFlight.departure_date
+    ? formatDate(lastFlight.arrival_date)
     : undefined;
 
   // Calculate duration
@@ -267,14 +267,14 @@ function transformSegment(segment: FlightViewSegment): FlightSegment {
     for (let i = 0; i < flights.length - 1; i++) {
       const current = flights[i];
       const next = flights[i + 1];
-      
+
       const layoverMinutes = calculateLayoverMinutes(
         current.arrival_date,
         current.arrival_time,
         next.departure_date,
         next.departure_time
       );
-      
+
       totalLayoverMinutes += layoverMinutes;
       layovers.push({
         viaAirport: current.arrival_airport,
@@ -287,8 +287,8 @@ function transformSegment(segment: FlightViewSegment): FlightSegment {
   const totalJourneyMinutes = totalFlyingTime + totalLayoverMinutes;
   const totalJourneyTime = formatDuration(totalJourneyMinutes);
 
-  // Get stop details
-  const stops = parseIntSafe(segment.Stops, 0);
+  // Get stop details - compute stops from actual flight count since API Stops field is unreliable
+  const stops = Math.max(0, flights.length - 1);
   const stopDetails = getStopDetails(stops, layovers);
 
   // Build individual flights
@@ -397,7 +397,7 @@ function formatDate(dateStr: string): string {
  */
 function extractCityFromAirportName(airportName: string): string {
   if (!airportName) return '';
-  
+
   // Common patterns: "City Name Airport", "City Name International Airport"
   const patterns = [
     /^(.+?)\s+(International\s+)?Airport$/i,
@@ -422,7 +422,7 @@ function extractCityFromAirportName(airportName: string): string {
  */
 function mapCabinClass(cabinCode: string): 'Economy' | 'Premium Economy' | 'Business' | 'First' {
   const code = (cabinCode || '').toUpperCase();
-  
+
   // Common cabin class codes
   switch (code) {
     case 'F':

@@ -3,27 +3,27 @@
  * Transform Vyspa API responses to frontend types
  */
 
-import { 
-  parsePriceValue, 
-  formatTime, 
-  parseIntSafe, 
+import {
+  parsePriceValue,
+  formatTime,
+  parseIntSafe,
   formatDuration,
   parsePriceBreakdownString,
   calculateDuration,
 } from './utils';
 import { getAircraftName } from './aircraftTypes';
 import { airportCache } from '@/lib/cache/airportCache';
-import type { 
-  VyspaApiResponse, 
-  VyspaResult, 
-  VyspaSegment, 
+import type {
+  VyspaApiResponse,
+  VyspaResult,
+  VyspaSegment,
   VyspaFlight,
 } from '@/types/vyspa';
 import type { Flight, FlightSegment, Airport, Airline } from '@/types/flight';
-import type { 
-  FlightSearchResponse, 
-  AirlineFilter, 
-  AirportFilter 
+import type {
+  FlightSearchResponse,
+  AirlineFilter,
+  AirportFilter
 } from '@/services/api/flightService';
 
 /**
@@ -138,7 +138,7 @@ function transformResult(result: VyspaResult): Flight | null {
     const breakdownTotal = (result.Breakdown || []).reduce((sum, entry: any) => {
       return sum + parsePriceValue(entry.total, 0);
     }, 0);
-    
+
     // V3 format: Pax_breakdown array
     const paxBreakdownTotal = (result.Pax_breakdown || []).reduce((sum, entry) => {
       return sum + (entry.total_fare || 0);
@@ -156,7 +156,7 @@ function transformResult(result: VyspaResult): Flight | null {
 
   // Calculate total passengers - support both V1 and V3 formats
   let totalPassengers = 0;
-  
+
   // V3 format: Pax_breakdown
   if (result.Pax_breakdown && result.Pax_breakdown.length > 0) {
     for (const pax of result.Pax_breakdown) {
@@ -214,22 +214,22 @@ function transformResult(result: VyspaResult): Flight | null {
   const v3FlightBaggage = (firstFlight as any).baggage; // lowercase for V3
   const v1Baggage = firstFlight.Baggage || result.Baggage; // uppercase for V1
   const baggageValue = v3Baggage || v3FlightBaggage || v1Baggage;
-  
+
   const hasBaggage =
     (baggageValue && String(baggageValue).toLowerCase() !== 'none' && String(baggageValue) !== '0p') ||
-    (firstFlight.BaggageQuantity && firstFlight.BaggageQuantity !== '0') ? true : false;
+      (firstFlight.BaggageQuantity && firstFlight.BaggageQuantity !== '0') ? true : false;
 
   // Get currency code - V3 uses Currency_code (uppercase), V1 uses currency_code (lowercase)
   const currencyCode = (result.Currency_code || result.currency_code || 'GBP').toUpperCase();
-  
+
   // Get module_id - V3 uses Module_id (uppercase), V1 uses module_id (lowercase)
   // Convert to string as Flight type expects string
   const moduleIdRaw = result.Module_id ?? result.module_id;
   const moduleId = moduleIdRaw !== undefined ? String(moduleIdRaw) : undefined;
-  
+
   // Extract Request_id from Result_id for web ref (first number before hyphen in V3)
   const requestIdForWebRef = extractRequestIdFromResultId(result.Result_id);
-  
+
   // Extract flight key from Deep_link (V3) for FlightView API
   const flightKey = extractFlightKeyFromDeepLink(result.Deep_link);
 
@@ -307,8 +307,9 @@ function transformSegmentToFlightSegment(segment: VyspaSegment): FlightSegment {
   const date = formatDate(firstFlight.departure_date);
   const arrivalDate = lastFlight.arrival_date ? formatDate(lastFlight.arrival_date) : undefined;
 
-  // Get stop details
-  const stops = segment.Stops || 0;
+  // Get stop details - compute stops from actual flight count since API Stops field is unreliable
+  const flightCount = segment.Flights?.length || 0;
+  const stops = Math.max(0, flightCount - 1);
   const stopDetails = getStopDetails(segment);
 
   // Compute layover durations between connecting flights
@@ -352,8 +353,8 @@ function transformSegmentToFlightSegment(segment: VyspaSegment): FlightSegment {
 
   // Format distance with unit (API returns miles)
   const distanceValue = firstFlight.distance;
-  const distanceStr = distanceValue !== undefined && distanceValue !== null && String(distanceValue).trim() !== '' 
-    ? `${distanceValue} mi` 
+  const distanceStr = distanceValue !== undefined && distanceValue !== null && String(distanceValue).trim() !== ''
+    ? `${distanceValue} mi`
     : undefined;
 
   // Convert aircraft type code to human-readable name
@@ -376,11 +377,11 @@ function transformSegmentToFlightSegment(segment: VyspaSegment): FlightSegment {
     aircraftType: aircraftName || undefined,
     distance: distanceStr,
     // Convert terminals to strings (V3 can return numbers like 4, 1)
-    departureTerminal: firstFlight.departure_terminal !== undefined && firstFlight.departure_terminal !== '' 
-      ? String(firstFlight.departure_terminal) 
+    departureTerminal: firstFlight.departure_terminal !== undefined && firstFlight.departure_terminal !== ''
+      ? String(firstFlight.departure_terminal)
       : undefined,
-    arrivalTerminal: lastFlight.arrival_terminal !== undefined && lastFlight.arrival_terminal !== '' 
-      ? String(lastFlight.arrival_terminal) 
+    arrivalTerminal: lastFlight.arrival_terminal !== undefined && lastFlight.arrival_terminal !== ''
+      ? String(lastFlight.arrival_terminal)
       : undefined,
     layovers: layovers.length > 0 ? layovers : undefined,
     individualFlights: individualFlights.length > 1 ? individualFlights : undefined,
@@ -485,14 +486,18 @@ function buildSegmentFromFlights(flights: VyspaFlight[]): VyspaSegment {
 
 /**
  * Get stop details text
+ * NOTE: We compute stops from Flights.length - 1 because the API's Stops field
+ * is often incorrect (returns 0 even when there are multiple connecting flights)
  */
 function getStopDetails(segment: VyspaSegment): string {
-  const stops = segment.Stops || 0;
-  
+  // Compute stops from actual flight count - API Stops field is unreliable
+  const flightCount = segment.Flights?.length || 0;
+  const stops = Math.max(0, flightCount - 1);
+
   if (stops === 0) {
     return 'Direct';
   }
-  
+
   if (stops === 1) {
     // Try to get layover airport
     if (segment.Flights.length >= 2) {
@@ -501,7 +506,7 @@ function getStopDetails(segment: VyspaSegment): string {
     }
     return '1 stop';
   }
-  
+
   return `${stops} stops`;
 }
 
@@ -513,12 +518,12 @@ function formatDate(dateStr: string): string {
     const date = new Date(dateStr);
     const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
     const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-    
+
     const dayName = days[date.getDay()];
     const day = date.getDate();
     const month = months[date.getMonth()];
     const year = date.getFullYear().toString().slice(2);
-    
+
     return `${dayName}, ${day} ${month} ${year}`;
   } catch (error) {
     return dateStr;
@@ -538,7 +543,7 @@ function getCurrencySymbol(code: string): string {
     'CAD': 'C$',
     'AUD': 'A$',
   };
-  
+
   return symbols[code.toUpperCase()] || code;
 }
 

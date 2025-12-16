@@ -28,9 +28,9 @@ export function BaggageSection({
   const t = useTranslations('payment.baggage');
 
   // Check if baggage is NOT included - matches: "no", "none", "0", "0p", "0 pc", "0 piece", "0 pieces", "0 kg", "0kg", etc.
-  // Also treat "cabin" or "cabin only" or "cabin baggage" as not having checked baggage
-  const hasCheckedIncluded = !!baggageDescription && 
-    !/^no$|^none$|^0\s*(p|pc|pcs|piece|pieces|kg|lb|lbs)?$|^cabin(\s+only|\s+baggage)?$/i.test(baggageDescription.trim());
+  // Also treat "cabin" or "cabin only" or "cabin bag only" or "cabin baggage" as not having checked baggage
+  const hasCheckedIncluded = !!baggageDescription &&
+    !/^no$|^none$|^0\s*(p|pc|pcs|piece|pieces|kg|lb|lbs)?$|^cabin\s*(bag)?\s*(only|baggage)?$/i.test(baggageDescription.trim());
 
   // Format the price text for additional baggage
   const formattedPriceText = `(${currencySymbol}${baggagePrice.toFixed(2)} per person each way)`;
