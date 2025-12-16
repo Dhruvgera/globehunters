@@ -59,14 +59,14 @@ function SearchPageContent() {
   useEffect(() => {
     const affCode = urlParams.get('aff');
     const utmSource = urlParams.get('utm_source');
-    
+
     // Prioritize aff code, fall back to utm_source
     const affiliateCode = affCode || utmSource;
     if (affiliateCode) {
       setAffiliateCode(affiliateCode);
       console.log('Affiliate code detected in search URL:', affiliateCode);
     }
-    
+
     // Store UTM params in sessionStorage for persistence
     if (typeof window !== 'undefined') {
       if (utmSource) sessionStorage.setItem('utm_source', utmSource);
@@ -76,7 +76,7 @@ function SearchPageContent() {
       if (utmCampaign) sessionStorage.setItem('utm_campaign', utmCampaign);
     }
   }, [urlParams, setAffiliateCode]);
-  
+
   // Helper to parse date string (YYYY-MM-DD) as local date
   const parseDateFromURL = (dateStr: string): Date => {
     // Parse YYYY-MM-DD as local date at midnight (not UTC)
@@ -171,7 +171,7 @@ function SearchPageContent() {
     // Mark as initialized after parsing URL params
     setIsInitialized(true);
   }, [urlParams, setStoreSearchParams]);
-  
+
   const effectiveSearchParams = storeSearchParams || DEFAULT_SEARCH_PARAMS;
 
   // Fetch flights using custom hook - but only after initialization
@@ -198,17 +198,17 @@ function SearchPageContent() {
     const loadAirportNames = async () => {
       // Ensure airport cache is populated
       await airportCache.getAirports();
-      
+
       // Get airport names from cache
       const originName = airportCache.getAirportName(effectiveSearchParams.from);
       const destName = airportCache.getAirportName(effectiveSearchParams.to);
-      
+
       setResolvedAirportNames({
         origin: originName,
         destination: destName,
       });
     };
-    
+
     if (effectiveSearchParams.from && effectiveSearchParams.to) {
       loadAirportNames();
     }
@@ -235,17 +235,17 @@ function SearchPageContent() {
   // Calculate actual minimum price from flights for current dates
   const actualMinPrice = useMemo(() => {
     if (flights.length === 0) return null;
-    const minFlight = flights.reduce((min, flight) => 
+    const minFlight = flights.reduce((min, flight) =>
       flight.pricePerPerson < min.pricePerPerson ? flight : min
-    , flights[0]);
+      , flights[0]);
     return minFlight.pricePerPerson;
   }, [flights]);
 
   // Fetch date prices with background loading and lazy fetching
-  const { 
-    departureDates, 
-    returnDates, 
-    loadingIndices, 
+  const {
+    departureDates,
+    returnDates,
+    loadingIndices,
     fetchDatePrice,
     fetchDatePricesBatch,
     getDateFromIndex
@@ -296,7 +296,7 @@ function SearchPageContent() {
     // Otherwise empty
     return [];
   }, [flights, loading, error]);
-  
+
   const effectiveFilters = useMemo(() => {
     // Always return filters (even empty during loading)
     const baseFilters = apiFilters || {
@@ -306,7 +306,7 @@ function SearchPageContent() {
       minPrice: 400,
       maxPrice: 1200,
     };
-    
+
     // Enrich airport names from cache (the cache is loaded asynchronously)
     // This will update when resolvedAirportNames changes (cache loaded)
     if (resolvedAirportNames.origin) {
@@ -322,10 +322,10 @@ function SearchPageContent() {
         })),
       };
     }
-    
+
     return baseFilters;
   }, [apiFilters, loading, resolvedAirportNames]);
-  
+
   // Initialize/adjust price range when real API filters arrive or bounds change
   useEffect(() => {
     if (apiFilters?.minPrice != null && apiFilters?.maxPrice != null) {
@@ -343,7 +343,7 @@ function SearchPageContent() {
       });
     }
   }, [apiFilters?.minPrice, apiFilters?.maxPrice]);
-  
+
   // Handler for when a date comes into view
   const handleDateInView = (index: number, type: 'departure' | 'return') => {
     // Fetch date price when it comes into view
@@ -359,7 +359,7 @@ function SearchPageContent() {
       setIsDateChanging(true);
       // Check if we need to adjust return date (for round trips)
       let updatedReturnDate = effectiveSearchParams.returnDate;
-      
+
       if (effectiveSearchParams.tripType === 'round-trip' && updatedReturnDate) {
         // Ensure return date is not before departure date
         if (updatedReturnDate < selectedDate) {
@@ -369,7 +369,7 @@ function SearchPageContent() {
           console.log('⚠️  Return date adjusted to be after departure date');
         }
       }
-      
+
       // Update search params with new departure date (and adjusted return date if needed)
       const updatedParams: SearchParams = {
         ...effectiveSearchParams,
@@ -377,7 +377,7 @@ function SearchPageContent() {
         returnDate: updatedReturnDate,
       };
       setStoreSearchParams(updatedParams);
-      
+
       // Reset to middle index since date range will re-center around selected date
       // With 7 dates (±3), middle index is 3
       const middleIndex = Math.floor(departureDates.length / 2);
@@ -397,14 +397,14 @@ function SearchPageContent() {
         console.warn('⚠️  Cannot select return date before departure date');
         return; // Don't allow selection
       }
-      
+
       // Update search params with new return date
       const updatedParams: SearchParams = {
         ...effectiveSearchParams,
         returnDate: selectedDate,
       };
       setStoreSearchParams(updatedParams);
-      
+
       // Reset to middle index since date range will re-center around selected date
       // With 7 dates (±3), middle index is 3
       const middleIndex = Math.floor(returnDates.length / 2);
@@ -428,7 +428,7 @@ function SearchPageContent() {
     airlines: [],
     extras: [],
   });
-  
+
   // Track previous search params to detect new searches and reset filters
   const prevSearchParamsRef = useRef<string | null>(null);
 
@@ -506,14 +506,14 @@ function SearchPageContent() {
       [type === "outbound" ? "journeyTimeOutbound" : "journeyTimeInbound"]: range,
     }));
   };
-  
+
   const updateArrivalTime = (type: "outbound" | "inbound", range: [number, number]) => {
     setFilterState((prev) => ({
       ...prev,
       [type === "outbound" ? "arrivalTimeOutbound" : "arrivalTimeInbound"]: range,
     }));
   };
-  
+
   const updateTimeType = (timeType: "takeoff" | "landing") => {
     setFilterState((prev) => ({
       ...prev,
@@ -534,7 +534,7 @@ function SearchPageContent() {
   // Also enrich airport names from cache when available
   const preparedFlights = useMemo(() => {
     const sorted = sortFlights(effectiveFlights, 'price-asc');
-    
+
     // If cache has loaded (indicated by resolvedAirportNames), enrich flight airport names
     if (resolvedAirportNames.origin && resolvedAirportNames.origin !== effectiveSearchParams.from) {
       return sorted.map((flight) => ({
@@ -565,61 +565,57 @@ function SearchPageContent() {
         } : {}),
       }));
     }
-    
+
     return sorted;
   }, [effectiveFlights, resolvedAirportNames, effectiveSearchParams.from]);
-  
+
   // Compute available stops from flights (for hiding unavailable filter options)
   const availableStops = useMemo(() => {
     return countByStops(preparedFlights);
   }, [preparedFlights]);
-  
+
   // Compute time bounds from flights
   const timeBounds = useMemo(() => {
     return getTimeBounds(preparedFlights);
   }, [preparedFlights]);
-  
+
   // Get airport names from resolved state (loaded asynchronously from cache)
   const airportNames = useMemo(() => {
     // Use resolved names from state (loaded from cache asynchronously)
     if (resolvedAirportNames.origin && resolvedAirportNames.origin !== effectiveSearchParams.from) {
       return resolvedAirportNames;
     }
-    
+
     // Fall back to flight data if cache hasn't loaded yet
     if (preparedFlights.length > 0) {
       const firstFlight = preparedFlights[0];
       const originName = firstFlight.outbound.departureAirport.name;
       const destName = firstFlight.outbound.arrivalAirport.name;
-      
+
       // Only use flight data if name is different from code
       return {
-        origin: (originName && originName !== firstFlight.outbound.departureAirport.code) 
-          ? originName 
+        origin: (originName && originName !== firstFlight.outbound.departureAirport.code)
+          ? originName
           : effectiveSearchParams.from,
-        destination: (destName && destName !== firstFlight.outbound.arrivalAirport.code) 
-          ? destName 
+        destination: (destName && destName !== firstFlight.outbound.arrivalAirport.code)
+          ? destName
           : effectiveSearchParams.to,
       };
     }
-    
+
     return {
       origin: effectiveSearchParams.from,
       destination: effectiveSearchParams.to,
     };
   }, [preparedFlights, effectiveSearchParams.from, effectiveSearchParams.to, resolvedAirportNames]);
-  
-  // Reset filters when a new search is done (different from/to or dates)
+
+  // Reset filters when a new search is initiated (URL query params change)
+  // This ensures filters are cleared on every new search from home page
   useEffect(() => {
-    // Safely convert date to string (handles both Date objects and strings)
-    const dateToString = (date: Date | string | undefined): string => {
-      if (!date) return '';
-      if (date instanceof Date) return date.toISOString();
-      return String(date);
-    };
-    const currentSearchKey = `${effectiveSearchParams.from}-${effectiveSearchParams.to}-${dateToString(effectiveSearchParams.departureDate)}-${dateToString(effectiveSearchParams.returnDate)}-${effectiveSearchParams.tripType}`;
-    
-    if (prevSearchParamsRef.current !== null && prevSearchParamsRef.current !== currentSearchKey) {
+    const currentUrlKey = urlParams.toString();
+
+    // Only reset if we have a previous key and it's different (skip initial load)
+    if (prevSearchParamsRef.current !== null && prevSearchParamsRef.current !== currentUrlKey) {
       // New search detected - reset filters
       setFilterState({
         stops: [0, 1, 2],
@@ -638,9 +634,9 @@ function SearchPageContent() {
       });
       setDisplayedFlightsCount(5);
     }
-    
-    prevSearchParamsRef.current = currentSearchKey;
-  }, [effectiveSearchParams.from, effectiveSearchParams.to, effectiveSearchParams.departureDate, effectiveSearchParams.returnDate, effectiveSearchParams.tripType]);
+
+    prevSearchParamsRef.current = currentUrlKey;
+  }, [urlParams]);
 
   // Prefetch airline logos for top results to avoid layout delays
   useEffect(() => {
@@ -651,7 +647,7 @@ function SearchPageContent() {
       try {
         const img = new Image();
         img.src = src as string;
-      } catch {}
+      } catch { }
     });
   }, [preparedFlights]);
 
@@ -817,41 +813,7 @@ function SearchPageContent() {
         </div>
       )}
 
-      {/* No Filtered Results - Show when filters return 0 results but flights exist */}
-      {!loading && !error && flights.length > 0 && filteredFlights.length === 0 && (
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-8 text-center">
-            <svg className="w-16 h-16 text-blue-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Flights Match Your Filters</h3>
-            <p className="text-gray-600 mb-4">Try adjusting your filters to see more results</p>
-            <button
-              onClick={() => {
-                setFilterState({
-                  stops: [0, 1, 2],
-                  // Reset price range to full inclusive range based on current filters
-                  priceRange: [effectiveFilters.minPrice, effectiveFilters.maxPrice],
-                  departureTimeOutbound: [0, 24],
-                  departureTimeInbound: [0, 24],
-                  arrivalTimeOutbound: [0, 24],
-                  arrivalTimeInbound: [0, 24],
-                  timeFilterMode: 'takeoff',
-                  journeyTimeOutbound: [journeyTimeBounds.outbound.min, journeyTimeBounds.outbound.max],
-                  journeyTimeInbound: [journeyTimeBounds.inbound.min, journeyTimeBounds.inbound.max],
-                  departureAirports: [],
-                  arrivalAirports: [],
-                  airlines: [],
-                  extras: [],
-                });
-              }}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Clear All Filters
-            </button>
-          </div>
-        </div>
-      )}
+
 
       {/* Mobile Filter Sheet */}
       {!loading && !error && !isDateChanging && <FilterSheet
@@ -884,7 +846,7 @@ function SearchPageContent() {
       />
       }
       {/* Main Content - Hide during date change; show when we have flights */}
-      {!error && !isDateChanging && preparedFlights.length > 0 && filteredFlights.length > 0 && (
+      {!error && !isDateChanging && preparedFlights.length > 0 && (
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-8">
           <div className="flex flex-col lg:flex-row gap-4">
             {/* Filters Sidebar - Desktop Only */}
@@ -916,22 +878,54 @@ function SearchPageContent() {
                 onToggleExtra={toggleExtra}
                 resultCount={filteredFlights.length}
               />
-          </div>
+            </div>
 
-          {/* Flight Results */}
-          <div className="flex-1 flex flex-col gap-2 order-2 lg:order-2 min-w-0 overflow-hidden">
-            <FlightsList
-              flights={filteredFlights}
-              displayCount={displayedFlightsCount}
-              onLoadMore={handleLoadMore}
-            />
-          </div>
+            {/* Flight Results */}
+            <div className="flex-1 flex flex-col gap-2 order-2 lg:order-2 min-w-0 overflow-hidden">
+              {filteredFlights.length > 0 ? (
+                <FlightsList
+                  flights={filteredFlights}
+                  displayCount={displayedFlightsCount}
+                  onLoadMore={handleLoadMore}
+                />
+              ) : (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-8 text-center">
+                  <svg className="w-16 h-16 text-blue-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">No Flights Match Your Filters</h3>
+                  <p className="text-gray-600 mb-4">Try adjusting your filters to see more results</p>
+                  <button
+                    onClick={() => {
+                      setFilterState({
+                        stops: [0, 1, 2],
+                        priceRange: [effectiveFilters.minPrice, effectiveFilters.maxPrice],
+                        departureTimeOutbound: [0, 24],
+                        departureTimeInbound: [0, 24],
+                        arrivalTimeOutbound: [0, 24],
+                        arrivalTimeInbound: [0, 24],
+                        timeFilterMode: 'takeoff',
+                        journeyTimeOutbound: [journeyTimeBounds.outbound.min, journeyTimeBounds.outbound.max],
+                        journeyTimeInbound: [journeyTimeBounds.inbound.min, journeyTimeBounds.inbound.max],
+                        departureAirports: [],
+                        arrivalAirports: [],
+                        airlines: [],
+                        extras: [],
+                      });
+                    }}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Clear All Filters
+                  </button>
+                </div>
+              )}
+            </div>
 
-          {/* Right Sidebar - Contact Card */}
-          <div className="w-full lg:w-80 flex flex-col gap-4 order-1 lg:order-3">
-            <ContactCard webRef={filteredFlights[0]?.webRef} />
+            {/* Right Sidebar - Contact Card */}
+            <div className="w-full lg:w-80 flex flex-col gap-4 order-1 lg:order-3">
+              <ContactCard webRef={preparedFlights[0]?.webRef} />
+            </div>
           </div>
-        </div>
         </div>
       )}
 
