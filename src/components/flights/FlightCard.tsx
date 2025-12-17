@@ -78,8 +78,8 @@ export default function FlightCard({
       {/* Flight Details */}
       <div className="flex flex-col gap-4">
         {/* Airline Header */}
-        <AirlineHeader 
-          airline={flight.airline} 
+        <AirlineHeader
+          airline={flight.airline}
           rightContent={<ShareButton flight={flight} />}
         />
 

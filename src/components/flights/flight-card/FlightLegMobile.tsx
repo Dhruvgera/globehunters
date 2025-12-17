@@ -30,7 +30,7 @@ interface FlightLegMobileProps {
 // Calculate day difference between departure and arrival dates
 function getDayDifference(departureDate: string, arrivalDate?: string): number {
   if (!arrivalDate || arrivalDate === departureDate) return 0;
-  
+
   // Parse dates from format like "SUN, 30 NOV 25" or "MON, 1 DEC 25"
   const parseDate = (dateStr: string): Date | null => {
     const months: Record<string, number> = {
@@ -45,12 +45,12 @@ function getDayDifference(departureDate: string, arrivalDate?: string): number {
     if (year < 100) year += 2000;
     return new Date(year, month, day);
   };
-  
+
   const depDate = parseDate(departureDate);
   const arrDate = parseDate(arrivalDate);
-  
+
   if (!depDate || !arrDate) return 0;
-  
+
   const diffTime = arrDate.getTime() - depDate.getTime();
   const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
   return diffDays > 0 ? diffDays : 0;
@@ -58,35 +58,33 @@ function getDayDifference(departureDate: string, arrivalDate?: string): number {
 
 export function FlightLegMobile({ leg }: FlightLegMobileProps) {
   const dayDiff = getDayDifference(leg.date, leg.arrivalDate);
-  
+
   return (
-    <div className="sm:hidden bg-white rounded-xl p-3 flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] text-[#010D50]">{leg.date}</span>
-        <span className="text-sm font-semibold text-[#010D50]">
-          {leg.departureTime} → {leg.arrivalTime}
-          {dayDiff > 0 && (
-            <sup className="text-[9px] text-[#E53935] font-medium ml-0.5">+{dayDiff}</sup>
-          )}
-        </span>
-      </div>
-      <div className="flex items-center gap-2">
-        <div className="min-w-10 text-left">
-          <div className="text-sm font-medium text-[#010D50] leading-5">
+    <div className="sm:hidden bg-white rounded-xl p-3">
+      <div className="flex items-start gap-2">
+        {/* Departure Column */}
+        <div className="flex flex-col items-start min-w-[70px]">
+          <span className="text-[10px] text-[#5A6184]">{leg.date}</span>
+          <span className="text-base font-semibold text-[#010D50]">
+            {leg.departureTime}
+          </span>
+          <div className="text-xs font-medium text-[#010D50]">
             {leg.departureAirport.code}
           </div>
-          {(leg.departureAirport.name || leg.departureAirport.city) && 
-           (leg.departureAirport.name || leg.departureAirport.city) !== leg.departureAirport.code && (
-            <div className="text-[11px] text-[#5A6184] leading-4 truncate" title={leg.departureAirport.name || leg.departureAirport.city}>
-              {leg.departureAirport.name || leg.departureAirport.city}
-            </div>
-          )}
+          {(leg.departureAirport.name || leg.departureAirport.city) &&
+            (leg.departureAirport.name || leg.departureAirport.city) !== leg.departureAirport.code && (
+              <div className="text-[10px] text-[#5A6184] leading-3 max-w-[70px] truncate" title={leg.departureAirport.name || leg.departureAirport.city}>
+                {leg.departureAirport.name || leg.departureAirport.city}
+              </div>
+            )}
         </div>
-        <div className="flex-1 flex flex-col items-center justify-center">
+
+        {/* Flight Path - Center Column */}
+        <div className="flex-1 flex flex-col items-center justify-center pt-4">
           <div className="flex items-center w-full">
             <div className="flex-1 border-t border-dashed border-[#010D50]" />
-            <div className="px-2 py-0">
-              <span className="text-[11px] font-medium text-[#008234]">
+            <div className="px-1.5">
+              <span className="text-[10px] font-medium text-[#008234]">
                 {leg.stopDetails || "Direct"}
               </span>
             </div>
@@ -95,7 +93,7 @@ export function FlightLegMobile({ leg }: FlightLegMobileProps) {
           {/* Show total journey time for flights with stops, otherwise just duration */}
           {leg.stops > 0 && leg.totalJourneyTime ? (
             <div className="flex flex-col items-center mt-0.5">
-              <span className="text-[11px] font-medium text-[#010D50]">
+              <span className="text-[10px] font-medium text-[#010D50]">
                 {leg.totalJourneyTime}
               </span>
               {leg.layovers && leg.layovers.length > 0 ? (
@@ -109,21 +107,30 @@ export function FlightLegMobile({ leg }: FlightLegMobileProps) {
               )}
             </div>
           ) : (
-            <span className="text-[11px] font-medium text-[#010D50] mt-0.5">
+            <span className="text-[10px] font-medium text-[#010D50] mt-0.5">
               {leg.duration}
             </span>
           )}
         </div>
-        <div className="min-w-10 text-right">
-          <div className="text-sm font-medium text-[#010D50] leading-5">
+
+        {/* Arrival Column */}
+        <div className="flex flex-col items-end min-w-[70px]">
+          <span className="text-[10px] text-[#5A6184]">{leg.arrivalDate || leg.date}</span>
+          <span className="text-base font-semibold text-[#010D50]">
+            {leg.arrivalTime}
+            {dayDiff > 0 && (
+              <sup className="text-[9px] text-[#E53935] font-medium ml-0.5">+{dayDiff}</sup>
+            )}
+          </span>
+          <div className="text-xs font-medium text-[#010D50]">
             {leg.arrivalAirport.code}
           </div>
-          {(leg.arrivalAirport.name || leg.arrivalAirport.city) && 
-           (leg.arrivalAirport.name || leg.arrivalAirport.city) !== leg.arrivalAirport.code && (
-            <div className="text-[11px] text-[#5A6184] leading-4 truncate" title={leg.arrivalAirport.name || leg.arrivalAirport.city}>
-              {leg.arrivalAirport.name || leg.arrivalAirport.city}
-            </div>
-          )}
+          {(leg.arrivalAirport.name || leg.arrivalAirport.city) &&
+            (leg.arrivalAirport.name || leg.arrivalAirport.city) !== leg.arrivalAirport.code && (
+              <div className="text-[10px] text-[#5A6184] leading-3 max-w-[70px] truncate text-right" title={leg.arrivalAirport.name || leg.arrivalAirport.city}>
+                {leg.arrivalAirport.name || leg.arrivalAirport.city}
+              </div>
+            )}
         </div>
       </div>
     </div>
