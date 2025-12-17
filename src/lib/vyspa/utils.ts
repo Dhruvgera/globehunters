@@ -265,6 +265,21 @@ export function normalizeAirportCode(code: string): string {
 }
 
 /**
+ * Shorten airport name by replacing common words and removing "Airport"
+ * @param name Full airport name
+ * @returns Shortened airport name
+ */
+export function shortenAirportName(name: string): string {
+  if (!name) return '';
+
+  return name
+    .replace(/\bInternational\b/gi, 'Intl')
+    .replace(/\bAirport\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * Generate a unique search ID
  * @returns Unique ID string
  */

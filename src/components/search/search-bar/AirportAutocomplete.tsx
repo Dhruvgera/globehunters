@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { MapPin, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useAirportSearch } from "@/hooks/useAirportSearch";
+import { shortenAirportName } from "@/lib/vyspa/utils";
 import type { Airport } from "@/types/airport";
 
 interface AirportAutocompleteProps {
@@ -40,7 +41,7 @@ export function AirportAutocomplete({
     search(newValue);
     setIsOpen(true);
     setSelectedIndex(-1);
-    
+
     // Clear selection if input is cleared
     if (newValue.trim() === '') {
       onChange(null);
@@ -62,7 +63,7 @@ export function AirportAutocomplete({
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setSelectedIndex(prev => 
+        setSelectedIndex(prev =>
           prev < results.length - 1 ? prev + 1 : prev
         );
         break;
@@ -156,9 +157,8 @@ export function AirportAutocomplete({
                     type="button"
                     onClick={() => handleSelect(airport)}
                     onMouseEnter={() => setSelectedIndex(index)}
-                    className={`w-full px-4 py-2.5 text-left hover:bg-gray-50 transition-colors ${
-                      index === selectedIndex ? 'bg-blue-50' : ''
-                    }`}
+                    className={`w-full px-4 py-2.5 text-left hover:bg-gray-50 transition-colors ${index === selectedIndex ? 'bg-blue-50' : ''
+                      }`}
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -168,7 +168,7 @@ export function AirportAutocomplete({
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-semibold text-gray-900 truncate">
-                          {highlightText(airport.code, inputValue)} - {highlightText(airport.name || airport.city, inputValue)}
+                          {highlightText(airport.code, inputValue)} - {highlightText(shortenAirportName(airport.name || airport.city), inputValue)}
                         </div>
                         <div className="text-xs text-gray-500 truncate">
                           {airport.city}, {airport.country}

@@ -5,7 +5,7 @@
  */
 
 import { Flight, FlightSegment, Airport, Airline, SearchParams } from '@/types/flight';
-import { formatTime, formatDuration, parseIntSafe, parsePriceValue } from '@/lib/vyspa/utils';
+import { formatTime, formatDuration, parseIntSafe, parsePriceValue, shortenAirportName } from '@/lib/vyspa/utils';
 import { getAircraftName } from '@/lib/vyspa/aircraftTypes';
 
 // ============================================================================
@@ -182,7 +182,7 @@ export function transformFlightViewResponse(data: FlightViewResponse): Transform
   // Extract request ID for web reference
   // The Request_id is the search request ID from the previous stage, used as web ref
   const requestId = String(data.Request_id);
-  
+
   // Build the Flight object
   const flight: Flight = {
     id: String(data.Result_id),
@@ -241,13 +241,13 @@ function transformSegment(segment: FlightViewSegment): FlightSegment {
   // Build airport info
   const departureAirport: Airport = {
     code: firstFlight.departure_airport,
-    name: firstFlight.depart_airport_name || firstFlight.departure_airport,
+    name: firstFlight.depart_airport_name ? shortenAirportName(firstFlight.depart_airport_name) : firstFlight.departure_airport,
     city: extractCityFromAirportName(firstFlight.depart_airport_name) || firstFlight.departure_airport,
   };
 
   const arrivalAirport: Airport = {
     code: lastFlight.arrival_airport,
-    name: lastFlight.arrive_airport_name || lastFlight.arrival_airport,
+    name: lastFlight.arrive_airport_name ? shortenAirportName(lastFlight.arrive_airport_name) : lastFlight.arrival_airport,
     city: extractCityFromAirportName(lastFlight.arrive_airport_name) || lastFlight.arrival_airport,
   };
 

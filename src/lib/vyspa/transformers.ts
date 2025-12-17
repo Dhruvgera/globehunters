@@ -10,6 +10,7 @@ import {
   formatDuration,
   parsePriceBreakdownString,
   calculateDuration,
+  shortenAirportName,
 } from './utils';
 import { getAircraftName } from './aircraftTypes';
 import { airportCache } from '@/lib/cache/airportCache';
@@ -298,7 +299,7 @@ function transformSegmentToFlightSegment(segment: VyspaSegment): FlightSegment {
   const depCached = depCode ? airportCache.getAirportByCode(depCode) : null;
   const departureAirport: Airport = {
     code: depCode || 'Unknown',
-    name: depCached?.name || depCode || 'Unknown',
+    name: depCached?.name ? shortenAirportName(depCached.name) : depCode || 'Unknown',
     city: depCached?.city || depCode || 'Unknown',
   };
 
@@ -307,7 +308,7 @@ function transformSegmentToFlightSegment(segment: VyspaSegment): FlightSegment {
   const arrCached = arrCode ? airportCache.getAirportByCode(arrCode) : null;
   const arrivalAirport: Airport = {
     code: arrCode || 'Unknown',
-    name: arrCached?.name || arrCode || 'Unknown',
+    name: arrCached?.name ? shortenAirportName(arrCached.name) : arrCode || 'Unknown',
     city: arrCached?.city || arrCode || 'Unknown',
   };
 
@@ -594,7 +595,7 @@ function collectFilterData(
 
   // Update departure airport filter
   const depCode = flight.outbound.departureAirport.code;
-  const depName = flight.outbound.departureAirport.name;
+  const depName = shortenAirportName(flight.outbound.departureAirport.name || depCode);
   if (departureAirportsMap.has(depCode)) {
     const airport = departureAirportsMap.get(depCode)!;
     airport.count++;
@@ -610,7 +611,7 @@ function collectFilterData(
 
   // Update arrival airport filter (from outbound)
   const arrCode = flight.outbound.arrivalAirport.code;
-  const arrName = flight.outbound.arrivalAirport.name;
+  const arrName = shortenAirportName(flight.outbound.arrivalAirport.name || arrCode);
   if (arrivalAirportsMap.has(arrCode)) {
     const airport = arrivalAirportsMap.get(arrCode)!;
     airport.count++;

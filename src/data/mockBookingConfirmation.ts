@@ -44,12 +44,12 @@ const outboundSegment: FlightSegment = {
   arrivalTime: "05:50",
   departureAirport: {
     code: "LGW",
-    name: "London Gatwick Airport",
+    name: "London Gatwick",
     city: "London",
   },
   arrivalAirport: {
     code: "LOS",
-    name: "Murtala Muhammed International Airport",
+    name: "Murtala Muhammed Intl",
     city: "Lagos",
   },
   date: "Sun, Oct 5, 2025",
@@ -99,12 +99,12 @@ const inboundSegment: FlightSegment = {
   arrivalTime: "16:40",
   departureAirport: {
     code: "LOS",
-    name: "Murtala Muhammed International Airport",
+    name: "Murtala Muhammed Intl",
     city: "Lagos",
   },
   arrivalAirport: {
     code: "LGW",
-    name: "London Gatwick Airport",
+    name: "London Gatwick",
     city: "London",
   },
   date: "Wed, Oct 15, 2025",
@@ -210,8 +210,8 @@ export const mockBookingConfirmation: MockBookingConfirmation = {
 
 // Airport code to full name mapping for display
 export const airportNames: Record<string, { name: string; city: string }> = {
-  LGW: { name: "London Gatwick Airport", city: "London" },
-  CMN: { name: "Mohammed V International Airport", city: "Casablanca" },
-  LOS: { name: "Murtala Muhammed International Airport", city: "Lagos" },
+  LGW: { name: "London Gatwick", city: "London" },
+  CMN: { name: "Mohammed V Intl", city: "Casablanca" },
+  LOS: { name: "Murtala Muhammed Intl", city: "Lagos" },
 };
 

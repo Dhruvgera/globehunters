@@ -11,6 +11,7 @@ import { useDatePrices } from "@/hooks/useDatePrices";
 import { useBookingStore } from "@/store/bookingStore";
 import { filterFlights, parseDurationToMinutes, sortFlights, countByStops, getTimeBounds } from "@/utils/flightFilter";
 import { airportCache } from "@/lib/cache/airportCache";
+import { shortenAirportName } from "@/lib/vyspa/utils";
 import { FilterState, SearchParams } from "@/types/flight";
 import { mockFlights, mockDatePrices, mockAirlines, mockAirports } from "@/data/mockFlights";
 import { useFilterExpansion } from "@/hooks/useFilterExpansion";
@@ -309,8 +310,8 @@ function SearchPageContent() {
       const destName = airportCache.getAirportName(effectiveSearchParams.to);
 
       setResolvedAirportNames({
-        origin: originName,
-        destination: destName,
+        origin: shortenAirportName(originName),
+        destination: shortenAirportName(destName),
       });
     };
 
@@ -419,11 +420,11 @@ function SearchPageContent() {
         ...baseFilters,
         departureAirports: baseFilters.departureAirports.map((airport) => ({
           ...airport,
-          name: airportCache.getAirportName(airport.code) || airport.name,
+          name: shortenAirportName(airportCache.getAirportName(airport.code) || airport.name),
         })),
         arrivalAirports: baseFilters.arrivalAirports.map((airport) => ({
           ...airport,
-          name: airportCache.getAirportName(airport.code) || airport.name,
+          name: shortenAirportName(airportCache.getAirportName(airport.code) || airport.name),
         })),
       };
     }
@@ -650,11 +651,11 @@ function SearchPageContent() {
           ...flight.outbound,
           departureAirport: {
             ...flight.outbound.departureAirport,
-            name: airportCache.getAirportName(flight.outbound.departureAirport.code),
+            name: shortenAirportName(airportCache.getAirportName(flight.outbound.departureAirport.code)),
           },
           arrivalAirport: {
             ...flight.outbound.arrivalAirport,
-            name: airportCache.getAirportName(flight.outbound.arrivalAirport.code),
+            name: shortenAirportName(airportCache.getAirportName(flight.outbound.arrivalAirport.code)),
           },
         },
         ...(flight.inbound ? {
@@ -662,11 +663,11 @@ function SearchPageContent() {
             ...flight.inbound,
             departureAirport: {
               ...flight.inbound.departureAirport,
-              name: airportCache.getAirportName(flight.inbound.departureAirport.code),
+              name: shortenAirportName(airportCache.getAirportName(flight.inbound.departureAirport.code)),
             },
             arrivalAirport: {
               ...flight.inbound.arrivalAirport,
-              name: airportCache.getAirportName(flight.inbound.arrivalAirport.code),
+              name: shortenAirportName(airportCache.getAirportName(flight.inbound.arrivalAirport.code)),
             },
           },
         } : {}),

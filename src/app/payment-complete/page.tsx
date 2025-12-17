@@ -14,6 +14,7 @@ import {
   airportNames,
 } from "@/data/mockBookingConfirmation";
 import { transformBookingToEmailData, sendBookingConfirmationEmail } from "@/lib/emailHelper";
+import { shortenAirportName } from "@/lib/vyspa/utils";
 import {
   CheckCircle2,
   XCircle,
@@ -203,7 +204,7 @@ function FlightLegDisplay({
           <div className="flex items-start justify-between">
             <div className="flex flex-col gap-0.5">
               <span className="text-sm font-medium text-[#010D50]">
-                {departureCity} ({departureCode})
+                {shortenAirportName(departureCity)} ({departureCode})
               </span>
               {departureTerminal && (
                 <span className="text-xs text-[#3A478A]">{departureTerminal}</span>
@@ -231,7 +232,7 @@ function FlightLegDisplay({
           <div className="flex items-start justify-between">
             <div className="flex flex-col gap-0.5">
               <span className="text-sm font-medium text-[#010D50]">
-                {arrivalCity} ({arrivalCode})
+                {shortenAirportName(arrivalCity)} ({arrivalCode})
               </span>
               {arrivalTerminal && (
                 <span className="text-xs text-[#3A478A]">{arrivalTerminal}</span>
@@ -282,12 +283,12 @@ function StopoverBadge({
 }) {
   const airportInfo = airportNames[airportCode] || {
     city: airportCode,
-    name: airportCode,
+    name: shortenAirportName(airportCode),
   };
   return (
     <div className="flex items-center gap-2 py-2">
       <span className="text-sm text-[#6B7280]">
-        Stopover at {airportInfo.city} ({airportCode}) for
+        Stopover at {shortenAirportName(airportInfo.city)} ({airportCode}) for
       </span>
       <div className="flex items-center gap-1 text-sm font-medium text-[#010D50]">
         <Clock className="w-4 h-4" />
@@ -465,16 +466,16 @@ function FlightConfirmationCard({
             <div className="bg-[#F5F7FF] rounded-xl p-4">
               <FlightLegDisplay
                 departureCode={segment.departureAirport.code}
-                departureCity={segment.departureAirport.name && segment.departureAirport.name !== segment.departureAirport.code 
-                  ? segment.departureAirport.name 
-                  : segment.departureAirport.city}
+                departureCity={segment.departureAirport.name && segment.departureAirport.name !== segment.departureAirport.code
+                  ? shortenAirportName(segment.departureAirport.name)
+                  : shortenAirportName(segment.departureAirport.city)}
                 departureTime={segment.departureTime}
                 departureTerminal={segment.departureTerminal}
                 departureDate={segment.date}
                 arrivalCode={segment.arrivalAirport.code}
-                arrivalCity={segment.arrivalAirport.name && segment.arrivalAirport.name !== segment.arrivalAirport.code 
-                  ? segment.arrivalAirport.name 
-                  : segment.arrivalAirport.city}
+                arrivalCity={segment.arrivalAirport.name && segment.arrivalAirport.name !== segment.arrivalAirport.code
+                  ? shortenAirportName(segment.arrivalAirport.name)
+                  : shortenAirportName(segment.arrivalAirport.city)}
                 arrivalTime={segment.arrivalTime}
                 arrivalTerminal={segment.arrivalTerminal}
                 arrivalDate={segment.arrivalDate || segment.date}
@@ -516,7 +517,7 @@ function PaymentCompleteContent() {
   const storeSelectedUpgrade = useBookingStore((state) => state.selectedUpgradeOption);
   const resetBooking = useBookingStore((state) => state.resetBooking);
   const [emailSent, setEmailSent] = useState(false);
-  
+
   // Get email from store or vyspa - use vyspaEmailAddress as fallback
   const effectiveContactEmail = storeContactEmail || storeVyspaEmailAddress;
 
@@ -575,7 +576,7 @@ function PaymentCompleteContent() {
             sessionStorage.removeItem("pendingOrderId");
             sessionStorage.removeItem("pendingOrderAmount");
             sessionStorage.removeItem("pendingOrderCurrency");
-            
+
             // Email sending is handled by separate useEffect to ensure data is available
           }
         } else {
@@ -634,7 +635,7 @@ function PaymentCompleteContent() {
     sessionStorage.removeItem("pendingOrderCurrency");
     sessionStorage.removeItem("paymentSessionStart");
     sessionStorage.removeItem("paymentVisited");
-    
+
     resetBooking();
     router.push("/");
   }, [router, resetBooking]);
@@ -646,7 +647,7 @@ function PaymentCompleteContent() {
     sessionStorage.removeItem("pendingOrderCurrency");
     sessionStorage.removeItem("paymentSessionStart");
     sessionStorage.removeItem("paymentVisited");
-    
+
     resetBooking();
     router.push("/search");
   }, [router, resetBooking]);
@@ -663,18 +664,18 @@ function PaymentCompleteContent() {
   // Send confirmation email async
   const sendConfirmationEmailAsync = useCallback(async (orderId: string, amount?: string, currency?: string) => {
     if (emailSent) return;
-    
+
     try {
       const totalAmount = parseFloat(amount || sessionStorage.getItem("pendingOrderAmount") || "0");
       const currencyCode = currency || sessionStorage.getItem("pendingOrderCurrency") || "GBP";
-      
+
       // Get add-on amounts from store
       const protectionPlanAmount = storeAddOns?.protectionPlan ? totalAmount * 0.05 : 0; // Approximate
       const baggageAmount = (storeAddOns?.additionalBaggage || 0) * 45; // Approximate per bag
-      
+
       if (storeSelectedFlight && effectiveContactEmail) {
         console.log('Building email data for:', effectiveContactEmail);
-        
+
         const emailData = transformBookingToEmailData({
           orderNumber: orderId,
           flight: storeSelectedFlight,
@@ -689,7 +690,7 @@ function PaymentCompleteContent() {
         });
 
         const result = await sendBookingConfirmationEmail(effectiveContactEmail, emailData);
-        
+
         if (result.success) {
           setEmailSent(true);
           sessionStorage.setItem(`emailSent_${orderId}`, 'true');
@@ -698,9 +699,9 @@ function PaymentCompleteContent() {
           console.error('Failed to send confirmation email:', result.error);
         }
       } else {
-        console.error('Cannot send email - missing data:', { 
-          hasFlightData: !!storeSelectedFlight, 
-          email: effectiveContactEmail 
+        console.error('Cannot send email - missing data:', {
+          hasFlightData: !!storeSelectedFlight,
+          email: effectiveContactEmail
         });
       }
     } catch (error) {
@@ -713,10 +714,10 @@ function PaymentCompleteContent() {
     if (paymentInfo?.status === "success" && storeSelectedFlight && effectiveContactEmail && !emailSent) {
       const emailAlreadySent = sessionStorage.getItem(`emailSent_${paymentInfo.orderId}`);
       if (!emailAlreadySent) {
-        console.log('Triggering confirmation email:', { 
-          orderId: paymentInfo.orderId, 
+        console.log('Triggering confirmation email:', {
+          orderId: paymentInfo.orderId,
           email: effectiveContactEmail,
-          hasFlightData: !!storeSelectedFlight 
+          hasFlightData: !!storeSelectedFlight
         });
         sendConfirmationEmailAsync(paymentInfo.orderId, paymentInfo.amount, paymentInfo.currency);
       }
@@ -829,7 +830,7 @@ function PaymentCompleteContent() {
                   distance={String(flight.outbound.distance || "3123")}
                   aircraftType={flight.outbound.aircraftType || "Airbus A330-200"}
                   segment={flight.outbound}
-                  onViewDetails={() => {}}
+                  onViewDetails={() => { }}
                 />
 
                 {/* Returning Flight (if round trip) */}
@@ -845,7 +846,7 @@ function PaymentCompleteContent() {
                     distance={String(flight.inbound.distance || "3123")}
                     aircraftType={flight.inbound.aircraftType || "Airbus A330-200"}
                     segment={flight.inbound}
-                    onViewDetails={() => {}}
+                    onViewDetails={() => { }}
                   />
                 )}
               </div>
@@ -886,13 +887,12 @@ function PaymentCompleteContent() {
             <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
               {/* Header */}
               <div
-                className={`p-8 text-center ${
-                  isFailed
-                    ? "bg-gradient-to-br from-red-500 to-rose-600"
-                    : isCancelled
+                className={`p-8 text-center ${isFailed
+                  ? "bg-gradient-to-br from-red-500 to-rose-600"
+                  : isCancelled
                     ? "bg-gradient-to-br from-gray-500 to-slate-600"
                     : "bg-gradient-to-br from-amber-500 to-orange-600"
-                }`}
+                  }`}
               >
                 <div className="w-24 h-24 mx-auto mb-4 rounded-full flex items-center justify-center bg-white/20">
                   {isFailed && <XCircle className="w-14 h-14 text-white" />}

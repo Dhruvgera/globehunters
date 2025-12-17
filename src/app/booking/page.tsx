@@ -12,6 +12,7 @@ import { ErrorMessage } from "@/components/ui/error-message";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
 import { airportCache } from "@/lib/cache/airportCache";
+import { shortenAirportName } from "@/lib/vyspa/utils";
 
 // Import new modular components
 import { BookingHeader } from "@/components/booking/BookingHeader";
@@ -62,7 +63,7 @@ function BookingContent() {
 
   // Web reference: prefer folder number, then request ID
   const webRefNumber = vyspaFolderNumber || searchRequestId || '—';
-  
+
   // Get affiliate phone number
   const { phoneNumber: affiliatePhone } = useAffiliatePhone();
 
@@ -105,12 +106,12 @@ function BookingContent() {
         const segments = flight.segments && flight.segments.length > 0
           ? flight.segments
           : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
-        
+
         segments.forEach((seg) => {
           codes.add(seg.departureAirport.code);
           codes.add(seg.arrivalAirport.code);
         });
-        
+
         const nameMap: Record<string, string> = {};
         codes.forEach((code) => {
           nameMap[code] = airportCache.getAirportName(code);
@@ -118,7 +119,7 @@ function BookingContent() {
         setAirportNameCache(nameMap);
       }
     };
-    
+
     loadAirportNames();
   }, [flight]);
 
@@ -140,11 +141,11 @@ function BookingContent() {
   const getAirportName = (code: string, flightName: string, city: string) => {
     // Check cache first
     const cached = airportNameCache[code];
-    if (cached && cached !== code) return cached;
+    if (cached && cached !== code) return shortenAirportName(cached);
     // Fall back to flight data
-    if (flightName && flightName !== code) return flightName;
+    if (flightName && flightName !== code) return shortenAirportName(flightName);
     // Fall back to city
-    if (city && city !== code) return city;
+    if (city && city !== code) return shortenAirportName(city);
     return code;
   };
 
@@ -233,15 +234,15 @@ function BookingContent() {
 
             {/* Flight Summary Cards */}
             <div className="flex flex-col gap-3">
-          {summaryLegs.map((leg, index) => (
-            <FlightSummaryCard
-              key={`${leg.fromCode}-${leg.toCode}-${index}`}
-              leg={leg}
-              passengers={passengerLabel || `1 ${t('flightSummary.passenger')}`}
-              onViewDetails={() => setShowFlightInfo(true)}
-              cabinLabel={cabinLabel}
-            />
-          ))}
+              {summaryLegs.map((leg, index) => (
+                <FlightSummaryCard
+                  key={`${leg.fromCode}-${leg.toCode}-${index}`}
+                  leg={leg}
+                  passengers={passengerLabel || `1 ${t('flightSummary.passenger')}`}
+                  onViewDetails={() => setShowFlightInfo(true)}
+                  cabinLabel={cabinLabel}
+                />
+              ))}
             </div>
 
             {/* Passenger Details Form */}

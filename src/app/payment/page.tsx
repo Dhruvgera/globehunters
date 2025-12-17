@@ -17,6 +17,7 @@ import { ErrorMessage } from "@/components/ui/error-message";
 import { useBoxPay } from "@/hooks/useBoxPay";
 import { getRegion } from "@/lib/utils/domainMapping";
 import { airportCache } from "@/lib/cache/airportCache";
+import { shortenAirportName } from "@/lib/vyspa/utils";
 
 // Import new modular components
 import { PaymentHeader } from "@/components/payment/PaymentHeader";
@@ -62,7 +63,7 @@ function PaymentContent() {
 
   const { createSession, redirectToCheckout, loading: boxPayLoading, error: boxPayError } = useBoxPay();
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  
+
   // Get affiliate phone number
   const { phoneNumber: affiliatePhone } = useAffiliatePhone();
 
@@ -116,12 +117,12 @@ function PaymentContent() {
         const segments = flight.segments && flight.segments.length > 0
           ? flight.segments
           : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
-        
+
         segments.forEach((seg) => {
           codes.add(seg.departureAirport.code);
           codes.add(seg.arrivalAirport.code);
         });
-        
+
         const nameMap: Record<string, string> = {};
         codes.forEach((code) => {
           nameMap[code] = airportCache.getAirportName(code);
@@ -129,7 +130,7 @@ function PaymentContent() {
         setAirportNameCache(nameMap);
       }
     };
-    
+
     loadAirportNames();
   }, [flight]);
 
@@ -146,11 +147,11 @@ function PaymentContent() {
   const getAirportName = (code: string, flightName: string, city: string) => {
     // Check cache first
     const cached = airportNameCache[code];
-    if (cached && cached !== code) return cached;
+    if (cached && cached !== code) return shortenAirportName(cached);
     // Fall back to flight data
-    if (flightName && flightName !== code) return flightName;
+    if (flightName && flightName !== code) return shortenAirportName(flightName);
     // Fall back to city
-    if (city && city !== code) return city;
+    if (city && city !== code) return shortenAirportName(city);
     return code;
   };
 
@@ -198,10 +199,10 @@ function PaymentContent() {
     normalizedProtectionPlan === "basic"
       ? "Basic"
       : normalizedProtectionPlan === "premium"
-      ? "Premium"
-      : normalizedProtectionPlan === "all"
-      ? "All Included"
-      : "None";
+        ? "Premium"
+        : normalizedProtectionPlan === "all"
+          ? "All Included"
+          : "None";
 
   // Flight data for summary cards - Use real flight data (supports multi-city)
   const journeySegments = flight.segments && flight.segments.length > 0
@@ -311,15 +312,15 @@ function PaymentContent() {
                 setPaymentErrorOpen(true);
                 return;
               }
-              
+
               setIsProcessingPayment(true);
-              
+
               try {
                 // Get shopper info from billing address or passengers
                 const leadPassenger = passengers[0];
                 const firstName = billingAddress.firstName || leadPassenger?.firstName || 'Guest';
                 const lastName = billingAddress.lastName || leadPassenger?.lastName || 'User';
-                
+
                 // Create BoxPay session
                 const result = await createSession({
                   orderId,
@@ -346,7 +347,7 @@ function PaymentContent() {
                   sessionStorage.setItem('pendingOrderId', orderId);
                   sessionStorage.setItem('pendingOrderAmount', tripTotal.toString());
                   sessionStorage.setItem('pendingOrderCurrency', currency);
-                  
+
                   // Redirect to BoxPay checkout
                   redirectToCheckout(result.checkoutUrl);
                 } else {
@@ -378,10 +379,10 @@ function PaymentContent() {
                 </label>
               </div>
 
-              <Button 
+              <Button
                 type="submit"
                 form="billing-address-form"
-                disabled={!isPaymentValid || !paymentTermsAccepted || isProcessingPayment || boxPayLoading} 
+                disabled={!isPaymentValid || !paymentTermsAccepted || isProcessingPayment || boxPayLoading}
                 className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-full px-5 py-2 h-auto gap-1 text-sm font-bold w-fit disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {(isProcessingPayment || boxPayLoading) ? (
@@ -403,8 +404,8 @@ function PaymentContent() {
           <div className="w-full lg:w-[482px] flex flex-col gap-4">
             {/* Web Ref Card - Desktop Only */}
             <WebRefCard
-            refNumber={refNumber}
-            phoneNumber={affiliatePhone}
+              refNumber={refNumber}
+              phoneNumber={affiliatePhone}
               isMobile={false}
             />
 

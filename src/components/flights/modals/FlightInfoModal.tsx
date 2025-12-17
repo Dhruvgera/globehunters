@@ -19,11 +19,12 @@ import { usePriceCheck } from "@/hooks/usePriceCheck";
 import { TransformedPriceOption } from "@/types/priceCheck";
 import { ErrorMessage } from "@/components/ui/error-message";
 import { airportCache } from "@/lib/cache/airportCache";
+import { shortenAirportName } from "@/lib/vyspa/utils";
 
 /** Debug component to display raw API response */
 function RawResponseDebug({ rawResponse, title }: { rawResponse: any; title: string }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  
+
   return (
     <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
       <button
@@ -80,16 +81,16 @@ export default function FlightInfoModal({
   // Load airport names from cache when modal opens
   useEffect(() => {
     if (!open) return;
-    
+
     const loadAirportNames = async () => {
       await airportCache.getAirports();
-      
+
       // Get all unique airport codes from the flight
       const codes = new Set<string>();
       const segments = flight.segments && flight.segments.length > 0
         ? flight.segments
         : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
-      
+
       segments.forEach((seg) => {
         if (seg) {
           codes.add(seg.departureAirport.code);
@@ -103,31 +104,31 @@ export default function FlightInfoModal({
           }
         }
       });
-      
+
       const nameMap: Record<string, string> = {};
       codes.forEach((code) => {
         nameMap[code] = airportCache.getAirportName(code);
       });
       setAirportNameCache(nameMap);
     };
-    
+
     loadAirportNames();
   }, [open, flight]);
 
   // Helper to get airport name - prefer cache, then flight data, then code
   const getAirportName = (code: string, flightName?: string, city?: string) => {
     const cached = airportNameCache[code];
-    if (cached && cached !== code) return cached;
-    if (flightName && flightName !== code) return flightName;
-    if (city && city !== code) return city;
+    if (cached && cached !== code) return shortenAirportName(cached);
+    if (flightName && flightName !== code) return shortenAirportName(flightName);
+    if (city && city !== code) return shortenAirportName(city);
     return code;
   };
 
   const journeySegments = flight.segments && flight.segments.length > 0
     ? flight.segments
     : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])].filter(
-        (seg): seg is FlightSegment => !!seg
-      );
+      (seg): seg is FlightSegment => !!seg
+    );
 
   const normalizedIndex =
     selectedLegIndex >= 0 && selectedLegIndex < journeySegments.length
@@ -180,7 +181,7 @@ export default function FlightInfoModal({
   // Set default selected option when price check loads
   useEffect(() => {
     if (!priceCheck || priceCheck.priceOptions.length === 0) return;
-    
+
     // If user has already selected an option locally, do not override
     if (selectedUpgradeOption) return;
 
@@ -201,7 +202,7 @@ export default function FlightInfoModal({
         return;
       }
     }
-    
+
     // Try to match the searched cabin class (only if we have multiple options)
     if (hasUpgradeOptions) {
       const searchedClass = searchParams?.class;
@@ -213,16 +214,16 @@ export default function FlightInfoModal({
           'Business': ['Business', 'BUSINESS', 'Business Class', 'Upper Class'],
           'First': ['First', 'FIRST', 'First Class', 'Upper Class Flex'],
         };
-        
+
         const possibleMatches = classMapping[searchedClass] || [searchedClass];
-        
+
         // Find the first option that matches the searched class (cheapest within that class)
-        const matchingOptions = priceCheck.priceOptions.filter((o) => 
-          possibleMatches.some((match) => 
+        const matchingOptions = priceCheck.priceOptions.filter((o) =>
+          possibleMatches.some((match) =>
             o.cabinClassDisplay?.toLowerCase().includes(match.toLowerCase())
           )
         );
-        
+
         if (matchingOptions.length > 0) {
           // Sort by price and pick the cheapest matching option
           const cheapestMatch = matchingOptions.sort((a, b) => a.totalPrice - b.totalPrice)[0];
@@ -231,7 +232,7 @@ export default function FlightInfoModal({
         }
       }
     }
-    
+
     // Fallback: default to the first option (usually the cheapest/base fare)
     setSelectedUpgradeOption(priceCheck.priceOptions[0]);
   }, [priceCheck, selectedUpgradeOption, selectedUpgradeInStore, hasUpgradeOptions, searchParams?.class]);
@@ -243,7 +244,7 @@ export default function FlightInfoModal({
       PremiumEconomy: 'Premium Economy',
     };
     if (map[name]) return map[name];
-    
+
     // If it's all uppercase (like "ECONOMY LIGHT" or "PREMIUM"), convert to Title Case
     if (name === name.toUpperCase()) {
       return name
@@ -252,7 +253,7 @@ export default function FlightInfoModal({
         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
         .join(' ');
     }
-    
+
     // Insert space before capital letters for camelCase
     return name.replace(/([a-z])([A-Z])/g, '$1 $2');
   }
@@ -388,19 +389,19 @@ export default function FlightInfoModal({
 
   return (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent 
-        className="w-[min(100vw-24px,960px)] max-w-full max-h-[90vh] overflow-y-auto overflow-x-clip p-4 sm:p-6 gap-6 sm:gap-8 [&>button]:hidden bg-white rounded-3xl border-0 box-border"
-        aria-describedby="flight-details-description"
-      >
-        <DialogHeader className="sr-only">
-          <DialogTitle>{t('modal.title')}</DialogTitle>
-          <p id="flight-details-description" className="sr-only">
-            View detailed flight information including departure and arrival times, baggage allowance, and fare options
-          </p>
-        </DialogHeader>
-        {/* Header with Flight Leg Selector */}
-        <div className="flex flex-col gap-4">
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          className="w-[min(100vw-24px,960px)] max-w-full max-h-[90vh] overflow-y-auto overflow-x-clip p-4 sm:p-6 gap-6 sm:gap-8 [&>button]:hidden bg-white rounded-3xl border-0 box-border"
+          aria-describedby="flight-details-description"
+        >
+          <DialogHeader className="sr-only">
+            <DialogTitle>{t('modal.title')}</DialogTitle>
+            <p id="flight-details-description" className="sr-only">
+              View detailed flight information including departure and arrival times, baggage allowance, and fare options
+            </p>
+          </DialogHeader>
+          {/* Header with Flight Leg Selector */}
+          <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between gap-3">
               {/* Flight Leg Tabs (supports multi-city) */}
               <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 flex-1">
@@ -408,11 +409,10 @@ export default function FlightInfoModal({
                   <Button
                     key={`${seg.departureAirport.code}-${seg.arrivalAirport.code}-${index}`}
                     variant={normalizedIndex === index ? "default" : "outline"}
-                    className={`${
-                      normalizedIndex === index
+                    className={`${normalizedIndex === index
                         ? "bg-[#E0E7FF] text-[#010D50] hover:bg-[#D0D7EF]"
                         : "bg-[#F6F6F6] text-[#3754ED] border-[#3754ED] hover:bg-[#EEEEEE]"
-                    } rounded-full px-3 sm:px-4 py-2.5 h-auto text-xs sm:text-sm font-medium whitespace-nowrap shrink-0 leading-normal`}
+                      } rounded-full px-3 sm:px-4 py-2.5 h-auto text-xs sm:text-sm font-medium whitespace-nowrap shrink-0 leading-normal`}
                     onClick={() => {
                       if (index > 0 && passengersInStore && passengersInStore.length > 0) {
                         setReturnWarnOpen(true);
@@ -536,7 +536,7 @@ export default function FlightInfoModal({
                                   const layover = idx < currentLeg.individualFlights!.length - 1 && currentLeg.layovers
                                     ? currentLeg.layovers.find(lay => lay.viaAirport === flight.arrivalAirport)
                                     : null;
-                                  
+
                                   return (
                                     <div key={idx} className="flex flex-col gap-2">
                                       <div className="flex flex-col gap-0.5">
@@ -712,33 +712,32 @@ export default function FlightInfoModal({
           {/* Fare Details Section (Dynamic from Price Check or Flight data fallback) */}
           {/* Show either when we have upgrade options OR when price check has loaded (even with fallback data) */}
           {((priceCheck && priceCheck.priceOptions.length > 0 && selectedUpgradeOption) || (!isLoading && priceCheck)) && (
-          <div className="flex flex-col gap-5 sm:gap-6">
-            {/* Only show fare option chips if there are multiple options */}
-            {priceCheck && priceCheck.priceOptions.length > 1 && (
-              <div className="flex flex-wrap items-center gap-2 py-1">
-                {priceCheck.priceOptions.map((option) => (
-                  <Button
-                    key={option.id}
-                    variant={selectedUpgradeOption?.id === option.id ? "default" : "outline"}
-                    className={`${
-                      selectedUpgradeOption?.id === option.id
-                        ? "bg-[#3754ED] text-white hover:bg-[#2A3FB8]"
-                        : "bg-[#F5F7FF] text-[#010D50] border-0 hover:bg-[#E0E7FF]"
-                    } rounded-full px-4 py-2.5 h-auto text-sm font-semibold leading-normal whitespace-nowrap`}
-                    onClick={() => setSelectedUpgradeOption(option)}
-                  >
-                    {prettifyCabinName(option.cabinClassDisplay)}
-                    {/* Always show actual total fare, not price difference */}
-                    <span className="ml-2 text-xs opacity-80">
-                      {formatPrice(option.totalPrice, option.currency)}
-                    </span>
-                  </Button>
-                ))}
-              </div>
-            )}
+            <div className="flex flex-col gap-5 sm:gap-6">
+              {/* Only show fare option chips if there are multiple options */}
+              {priceCheck && priceCheck.priceOptions.length > 1 && (
+                <div className="flex flex-wrap items-center gap-2 py-1">
+                  {priceCheck.priceOptions.map((option) => (
+                    <Button
+                      key={option.id}
+                      variant={selectedUpgradeOption?.id === option.id ? "default" : "outline"}
+                      className={`${selectedUpgradeOption?.id === option.id
+                          ? "bg-[#3754ED] text-white hover:bg-[#2A3FB8]"
+                          : "bg-[#F5F7FF] text-[#010D50] border-0 hover:bg-[#E0E7FF]"
+                        } rounded-full px-4 py-2.5 h-auto text-sm font-semibold leading-normal whitespace-nowrap`}
+                      onClick={() => setSelectedUpgradeOption(option)}
+                    >
+                      {prettifyCabinName(option.cabinClassDisplay)}
+                      {/* Always show actual total fare, not price difference */}
+                      <span className="ml-2 text-xs opacity-80">
+                        {formatPrice(option.totalPrice, option.currency)}
+                      </span>
+                    </Button>
+                  ))}
+                </div>
+              )}
 
-            {/* Fare Details */}
-            <div className="flex flex-col md:flex-row items-stretch gap-3">
+              {/* Fare Details */}
+              <div className="flex flex-col md:flex-row items-stretch gap-3">
                 {/* Baggage Section - From OptionalService tags or fallback */}
                 <div className="flex-1 bg-[#F5F7FF] rounded-xl p-3 sm:p-4 flex flex-col gap-4 sm:gap-6 min-w-0">
                   <span className="text-sm font-semibold text-[#010D50]">
@@ -749,7 +748,7 @@ export default function FlightInfoModal({
                     {(() => {
                       // Use OptionalService data if available
                       const checkedBaggageServices = selectedUpgradeOption?.checkedBaggageServices || [];
-                      
+
                       if (checkedBaggageServices.length > 0) {
                         // Show checked baggage from OptionalService (already filtered to exclude "Not offered")
                         return checkedBaggageServices.map((svc, idx) => (
@@ -773,13 +772,13 @@ export default function FlightInfoModal({
                           </div>
                         ));
                       }
-                      
+
                       // Fallback to old baggage data
                       if (selectedUpgradeOption) {
                         const perLeg = selectedUpgradeOption.baggage.perLeg;
-                        const hasDifferentBaggage = perLeg && perLeg.length > 1 && 
+                        const hasDifferentBaggage = perLeg && perLeg.length > 1 &&
                           !perLeg.every(leg => leg.allowance === perLeg[0].allowance);
-                        
+
                         if (hasDifferentBaggage && perLeg) {
                           return perLeg.map((leg, idx) => (
                             <div key={idx} className="flex items-start justify-between gap-2">
@@ -798,7 +797,7 @@ export default function FlightInfoModal({
                             </div>
                           ));
                         }
-                        
+
                         return (
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -813,7 +812,7 @@ export default function FlightInfoModal({
                           </div>
                         );
                       }
-                      
+
                       // Flight-level fallback
                       const baggageDisplay = flight.baggage || 'Cabin bag included';
                       return (
@@ -838,7 +837,7 @@ export default function FlightInfoModal({
                     {/* Carry-On / Hand Baggage from OptionalService - "Carry On Hand Baggage" tag */}
                     {(() => {
                       const carryOnServices = selectedUpgradeOption?.carryOnBaggageServices || [];
-                      
+
                       if (carryOnServices.length > 0) {
                         return carryOnServices.map((svc, idx) => (
                           <div key={`carryon-${idx}`} className="flex items-start justify-between gap-2">
@@ -861,7 +860,7 @@ export default function FlightInfoModal({
                           </div>
                         ));
                       }
-                      
+
                       // Default carry-on display
                       return (
                         <div className="flex items-start justify-between gap-2">
@@ -908,15 +907,15 @@ export default function FlightInfoModal({
                     {/* Refundable Status - from OptionalService "Refund" tag */}
                     {(() => {
                       const refundService = selectedUpgradeOption?.refundService;
-                      
+
                       if (refundService) {
                         // Use OptionalService "Refund" tag data
                         const isIncluded = refundService.chargeable === 'included';
                         const isChargeable = refundService.chargeable === 'chargeable';
-                        
+
                         let displayLabel = 'Refunds';
                         let displayText = refundService.text || 'Refunds';
-                        
+
                         if (isIncluded) {
                           displayLabel = 'Refunds included';
                           displayText = 'Ticket can be refunded';
@@ -924,7 +923,7 @@ export default function FlightInfoModal({
                           displayLabel = 'Refunds available';
                           displayText = 'Refundable for a charge';
                         }
-                        
+
                         return (
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -948,12 +947,12 @@ export default function FlightInfoModal({
                           </div>
                         );
                       }
-                      
+
                       // Fallback to priceCheck.flightDetails or flight data
                       const isRefundable = priceCheck?.flightDetails?.refundable ?? flight.refundable ?? false;
                       const refundableStatus = priceCheck?.flightDetails?.refundableStatus;
                       const refundableText = priceCheck?.flightDetails?.refundableText || flight.refundableText || (isRefundable ? 'Ticket can be refunded (fees may apply)' : 'Ticket can\'t be refunded');
-                      
+
                       let displayLabel = 'Non-Refundable';
                       if (refundableStatus === 'fully-refundable') {
                         displayLabel = 'Fully Refundable';
@@ -962,7 +961,7 @@ export default function FlightInfoModal({
                       } else if (isRefundable) {
                         displayLabel = 'Refundable';
                       }
-                      
+
                       return (
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -988,14 +987,14 @@ export default function FlightInfoModal({
                     {/* Changes/Rebooking - from OptionalService "Rebooking" tag */}
                     {(() => {
                       const rebookingService = selectedUpgradeOption?.rebookingService;
-                      
+
                       if (rebookingService) {
                         const isIncluded = rebookingService.chargeable === 'included';
                         const isChargeable = rebookingService.chargeable === 'chargeable';
-                        
+
                         let displayLabel = 'Changes';
                         let displayText = rebookingService.text || 'Changes';
-                        
+
                         if (isIncluded) {
                           displayLabel = 'Changes included';
                           displayText = 'Flights can be changed for free';
@@ -1003,7 +1002,7 @@ export default function FlightInfoModal({
                           displayLabel = 'Changes available';
                           displayText = 'Flights can be changed for a charge';
                         }
-                        
+
                         return (
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -1027,7 +1026,7 @@ export default function FlightInfoModal({
                           </div>
                         );
                       }
-                      
+
                       // Fallback to priceCheck.flightDetails
                       return (
                         <div className="flex items-start justify-between gap-2">
@@ -1038,8 +1037,8 @@ export default function FlightInfoModal({
                                 {priceCheck?.flightDetails?.changeable ? 'Changes allowed' : 'Changes not allowed'}
                               </span>
                               <span className="text-xs sm:text-sm text-[#3A478A] break-words">
-                                {priceCheck?.flightDetails?.changeable 
-                                  ? 'Flights can be changed (fees may apply)' 
+                                {priceCheck?.flightDetails?.changeable
+                                  ? 'Flights can be changed (fees may apply)'
                                   : 'Flights can\'t be changed after booking'}
                               </span>
                             </div>
@@ -1056,23 +1055,23 @@ export default function FlightInfoModal({
                     {/* Seat Selection - from OptionalService "Seat Assignment" tag */}
                     {(() => {
                       const seatServices = selectedUpgradeOption?.seatServices || [];
-                      
+
                       // Find the first seat service that's not "Not offered"
                       const seatService = seatServices.find(s => s.chargeable !== 'not_offered');
-                      
+
                       if (seatService) {
                         const isIncluded = seatService.chargeable === 'included';
                         const isChargeable = seatService.chargeable === 'chargeable';
-                        
+
                         let displayLabel = seatService.text || 'Seat selection';
                         let displayText = '';
-                        
+
                         if (isIncluded) {
                           displayText = 'Included in fare';
                         } else if (isChargeable) {
                           displayText = 'Available for a charge';
                         }
-                        
+
                         return (
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -1098,7 +1097,7 @@ export default function FlightInfoModal({
                           </div>
                         );
                       }
-                      
+
                       // Fallback to priceCheck.flightDetails
                       return (
                         <div className="flex items-start justify-between gap-2">
@@ -1109,8 +1108,8 @@ export default function FlightInfoModal({
                                 {priceCheck?.flightDetails?.seatSelectionFree ? 'Seat choice for free' : 'Seat selection available'}
                               </span>
                               <span className="text-xs sm:text-sm text-[#3A478A] break-words">
-                                {priceCheck?.flightDetails?.seatSelectionFree 
-                                  ? 'Choose your desired seat for free' 
+                                {priceCheck?.flightDetails?.seatSelectionFree
+                                  ? 'Choose your desired seat for free'
                                   : 'Seat selection available for a charge'}
                               </span>
                             </div>
@@ -1127,11 +1126,11 @@ export default function FlightInfoModal({
                     {/* Meals - from OptionalService "Meals and Beverages" tag */}
                     {(() => {
                       const mealsService = selectedUpgradeOption?.mealsService;
-                      
+
                       if (mealsService) {
                         const isIncluded = mealsService.chargeable === 'included';
                         const isChargeable = mealsService.chargeable === 'chargeable';
-                        
+
                         return (
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -1155,14 +1154,14 @@ export default function FlightInfoModal({
                           </div>
                         );
                       }
-                      
+
                       // If no mealsService, don't show this section (or show flight.meals fallback if needed)
                       return null;
                     })()}
                   </div>
                 </div>
               </div>
-          </div>
+            </div>
           )}
 
           {/* Debug: Raw Price Check Response */}
@@ -1170,49 +1169,49 @@ export default function FlightInfoModal({
             <RawResponseDebug rawResponse={priceCheck.rawResponse} title="Price Check Raw Response" />
           )}
 
-        {/* Footer - Only show on search/results pages, not on payment page */}
-        {!stayOnCurrentPage && (
-          <div className="sticky bottom-0 z-20 bg-white rounded-xl px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-3 border border-[#EEF0F7] shadow-[0_-8px_24px_-12px_rgba(2,6,23,0.35)]">
-            <div className="flex flex-col gap-1">
-              <span className="text-sm sm:text-lg font-medium text-[#3754ED] whitespace-nowrap">
-                {selectedUpgradeOption 
-                  ? formatPrice(selectedUpgradeOption.totalPrice, selectedUpgradeOption.currency)
-                  : formatPrice(flight.price, flight.currency)}
-              </span>
-              <span className="text-xs text-[#3A478A]">
-                {selectedUpgradeOption
-                  ? `${formatPrice(selectedUpgradeOption.pricePerPerson, selectedUpgradeOption.currency)} per person`
-                  : `${formatPrice(flight.pricePerPerson, flight.currency)} per person`}
-              </span>
-            </div>
-            <Button 
-              onClick={handleBookNow}
-              disabled={!flight.price && !selectedUpgradeOption}
-              className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-full px-4 sm:px-5 py-2 h-auto gap-1 text-sm font-bold shrink-0 disabled:opacity-50"
-            >
-              {isLoading ? 'Book' : (priceCheck && priceCheck.priceOptions.length === 0 ? 'Book Now' : 'Book')}
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                className="text-white sm:w-6 sm:h-6"
+          {/* Footer - Only show on search/results pages, not on payment page */}
+          {!stayOnCurrentPage && (
+            <div className="sticky bottom-0 z-20 bg-white rounded-xl px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-3 border border-[#EEF0F7] shadow-[0_-8px_24px_-12px_rgba(2,6,23,0.35)]">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm sm:text-lg font-medium text-[#3754ED] whitespace-nowrap">
+                  {selectedUpgradeOption
+                    ? formatPrice(selectedUpgradeOption.totalPrice, selectedUpgradeOption.currency)
+                    : formatPrice(flight.price, flight.currency)}
+                </span>
+                <span className="text-xs text-[#3A478A]">
+                  {selectedUpgradeOption
+                    ? `${formatPrice(selectedUpgradeOption.pricePerPerson, selectedUpgradeOption.currency)} per person`
+                    : `${formatPrice(flight.pricePerPerson, flight.currency)} per person`}
+                </span>
+              </div>
+              <Button
+                onClick={handleBookNow}
+                disabled={!flight.price && !selectedUpgradeOption}
+                className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-full px-4 sm:px-5 py-2 h-auto gap-1 text-sm font-bold shrink-0 disabled:opacity-50"
               >
-                <path
-                  d="M8.43 6.43L13.57 12L8.43 17.57"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </Button>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
-    {/* Availability Error Popup */}
-    {/* COMMENTED OUT: Limited Availability Error Dialog
+                {isLoading ? 'Book' : (priceCheck && priceCheck.priceOptions.length === 0 ? 'Book Now' : 'Book')}
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="text-white sm:w-6 sm:h-6"
+                >
+                  <path
+                    d="M8.43 6.43L13.57 12L8.43 17.57"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+      {/* Availability Error Popup */}
+      {/* COMMENTED OUT: Limited Availability Error Dialog
     <Dialog open={availabilityErrorOpen} onOpenChange={setAvailabilityErrorOpen}>
       <DialogContent className="max-w-[min(100vw-24px,560px)] p-0 [&>button]:hidden">
         <DialogHeader className="sr-only">
@@ -1225,8 +1224,8 @@ export default function FlightInfoModal({
       </DialogContent>
     </Dialog>
     */}
-    {/* Return tab warning (passenger page context) */}
-    {/* <Dialog open={returnWarnOpen} onOpenChange={setReturnWarnOpen}>
+      {/* Return tab warning (passenger page context) */}
+      {/* <Dialog open={returnWarnOpen} onOpenChange={setReturnWarnOpen}>
       <DialogContent 
         className="max-w-[min(100vw-24px,560px)] p-0 [&>button]:hidden"
         aria-describedby="booking-warning-description"
