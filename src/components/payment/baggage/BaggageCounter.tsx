@@ -26,20 +26,16 @@ export function BaggageCounter({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-start justify-between w-full">
+      <div className="flex items-center justify-between w-full">
         <div className="flex items-center gap-3">
           <Luggage className="w-6 h-6 text-[#010D50] shrink-0" />
           <div className="flex flex-col gap-1">
             <span className="text-sm font-medium text-[#010D50]">{title}</span>
-            <span className="text-sm text-[#3A478A]">{description}</span>
           </div>
         </div>
-      </div>
 
-      {/* Price and Counter */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 lg:gap-2 pl-0 lg:pl-9">
-        <span className="text-sm font-semibold text-[#010D50]">{priceText}</span>
-        <div className="bg-[rgba(55,84,237,0.12)] rounded-full px-4 py-3 flex items-center gap-2">
+        {/* Counter moved to top row */}
+        <div className="bg-[rgba(55,84,237,0.12)] rounded-full px-4 py-2 flex items-center gap-2 scale-90 sm:scale-100 origin-right">
           <button
             onClick={onDecrement}
             disabled={isAtMin}
@@ -60,6 +56,12 @@ export function BaggageCounter({
             <Plus className="w-5 h-5" />
           </button>
         </div>
+      </div>
+
+      {/* Description and Price */}
+      <div className="flex flex-col gap-1 pl-9">
+        <span className="text-sm text-[#3A478A]">{description}</span>
+        <span className="text-sm font-semibold text-[#010D50]">{priceText}</span>
       </div>
     </div>
   );

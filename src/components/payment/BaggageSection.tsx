@@ -76,7 +76,7 @@ export function BaggageSection({
           description={hasCheckedIncluded ? (baggageDescription || t('checkedBagsDesc')) : t('checkedBagsDesc')}
           included={hasCheckedIncluded}
           includedText={t('included')}
-          notIncludedText="Not Available"
+          notIncludedText={t('notIncluded')}
         />
 
         {/* Add Additional Baggage - Only show if baggage NOT included */}
