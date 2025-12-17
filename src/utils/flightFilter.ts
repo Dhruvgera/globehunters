@@ -118,7 +118,8 @@ function matchesJourneyTime(
   isInbound: boolean = false
 ): boolean {
   const segment = isInbound && flight.inbound ? flight.inbound : flight.outbound;
-  const journeyMinutes = parseDurationToMinutes(segment.duration);
+  // Use totalJourneyTime (includes layovers) if available, otherwise fallback to duration (flying time only)
+  const journeyMinutes = parseDurationToMinutes(segment.totalJourneyTime || segment.duration);
   const journeyHours = journeyMinutes / 60;
 
   return journeyHours >= journeyTimeRange[0] && journeyHours <= journeyTimeRange[1];
@@ -258,22 +259,22 @@ export function sortFlights(
     case 'fastest':
     case 'duration-asc':
       return sorted.sort((a, b) => {
-        const durationA = parseDurationToMinutes(a.outbound.duration) + (a.inbound ? parseDurationToMinutes(a.inbound.duration) : 0);
-        const durationB = parseDurationToMinutes(b.outbound.duration) + (b.inbound ? parseDurationToMinutes(b.inbound.duration) : 0);
+        const durationA = parseDurationToMinutes(a.outbound.totalJourneyTime || a.outbound.duration) + (a.inbound ? parseDurationToMinutes(a.inbound.totalJourneyTime || a.inbound.duration) : 0);
+        const durationB = parseDurationToMinutes(b.outbound.totalJourneyTime || b.outbound.duration) + (b.inbound ? parseDurationToMinutes(b.inbound.totalJourneyTime || b.inbound.duration) : 0);
         return durationA - durationB;
       });
 
     case 'duration-desc':
       return sorted.sort((a, b) => {
-        const durationA = parseDurationToMinutes(a.outbound.duration) + (a.inbound ? parseDurationToMinutes(a.inbound.duration) : 0);
-        const durationB = parseDurationToMinutes(b.outbound.duration) + (b.inbound ? parseDurationToMinutes(b.inbound.duration) : 0);
+        const durationA = parseDurationToMinutes(a.outbound.totalJourneyTime || a.outbound.duration) + (a.inbound ? parseDurationToMinutes(a.inbound.totalJourneyTime || a.inbound.duration) : 0);
+        const durationB = parseDurationToMinutes(b.outbound.totalJourneyTime || b.outbound.duration) + (b.inbound ? parseDurationToMinutes(b.inbound.totalJourneyTime || b.inbound.duration) : 0);
         return durationB - durationA;
       });
 
     case 'best':
       return sorted.sort((a, b) => {
-        const durationA = parseDurationToMinutes(a.outbound.duration) + (a.inbound ? parseDurationToMinutes(a.inbound.duration) : 0);
-        const durationB = parseDurationToMinutes(b.outbound.duration) + (b.inbound ? parseDurationToMinutes(b.inbound.duration) : 0);
+        const durationA = parseDurationToMinutes(a.outbound.totalJourneyTime || a.outbound.duration) + (a.inbound ? parseDurationToMinutes(a.inbound.totalJourneyTime || a.inbound.duration) : 0);
+        const durationB = parseDurationToMinutes(b.outbound.totalJourneyTime || b.outbound.duration) + (b.inbound ? parseDurationToMinutes(b.inbound.totalJourneyTime || b.inbound.duration) : 0);
 
         // Best score: price + (duration in minutes * factor) + (stops * penalty)
         // Factor: £30 per hour (£0.5 per minute)

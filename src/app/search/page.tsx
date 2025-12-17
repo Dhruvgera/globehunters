@@ -778,12 +778,12 @@ function SearchPageContent() {
     };
 
     const outboundHours = preparedFlights
-      .map((f) => parseDurationToMinutes(f.outbound.duration) / 60)
+      .map((f) => parseDurationToMinutes(f.outbound.totalJourneyTime || f.outbound.duration) / 60)
       .filter((v) => Number.isFinite(v));
 
     const inboundHours = preparedFlights
       .filter((f) => !!f.inbound)
-      .map((f) => parseDurationToMinutes(f.inbound!.duration) / 60)
+      .map((f) => parseDurationToMinutes(f.inbound!.totalJourneyTime || f.inbound!.duration) / 60)
       .filter((v) => Number.isFinite(v));
 
     const outbound =
