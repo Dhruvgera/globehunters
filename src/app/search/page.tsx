@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, Suspense, useMemo, useEffect, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Plane, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
@@ -45,18 +46,120 @@ const DEFAULT_SEARCH_PARAMS: SearchParams = {
 function SearchPageContent() {
   const t = useTranslations('search');
   const urlParams = useSearchParams();
+  const router = useRouter();
   const setStoreSearchParams = useBookingStore((state) => state.setSearchParams);
   const storeSearchParams = useBookingStore((state) => state.searchParams);
   const setSearchRequestId = useBookingStore((state) => state.setSearchRequestId);
+  const setSelectedFlight = useBookingStore((state) => state.setSelectedFlight);
+  const setAffiliateData = useBookingStore((state) => state.setAffiliateData);
+  const setIsFromDeeplink = useBookingStore((state) => state.setIsFromDeeplink);
   const { setAffiliateCode } = useAffiliate();
   const [isInitialized, setIsInitialized] = useState(false);
   const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
   const prevLoadingRef = useRef(false);
   const [isDateChanging, setIsDateChanging] = useState(false);
   const [fareExpiredOpen, setFareExpiredOpen] = useState(false);
+  const [isDeeplinkLoading, setIsDeeplinkLoading] = useState(false);
+
+  // Handle flight deeplink parameter - redirect directly to booking
+  useEffect(() => {
+    const flightKey = urlParams.get('flight');
+    
+    if (flightKey) {
+      // This is a deeplink with a pre-selected flight - redirect to booking
+      setIsDeeplinkLoading(true);
+      
+      // Mark this as a deeplink flow
+      setIsFromDeeplink(true);
+
+      // Extract tracking data
+      const affCode = urlParams.get('aff');
+      const utmSource = urlParams.get('utm_source');
+      const utmMedium = urlParams.get('utm_medium');
+      const utmCampaign = urlParams.get('utm_campaign');
+      const cnc = urlParams.get('cnc');
+
+      // Store affiliate/tracking data
+      const affiliateCode = affCode || utmSource;
+      if (affiliateCode) {
+        setAffiliateCode(affiliateCode);
+        setAffiliateData({
+          code: affiliateCode,
+          utmSource: utmSource || undefined,
+          utmMedium: utmMedium || undefined,
+          utmCampaign: utmCampaign || undefined,
+          cnc: cnc || undefined,
+        });
+      }
+
+      // Process the deeplink
+      (async () => {
+        try {
+          // Call FlightView API to get flight details
+          const response = await fetch('/api/flight-view', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key: flightKey }),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok || !data.success) {
+            console.error('FlightView API error:', data);
+            // On error, continue with normal search (remove flight param)
+            const newParams = new URLSearchParams(urlParams.toString());
+            newParams.delete('flight');
+            router.replace(`/search?${newParams.toString()}&error=flight_unavailable`);
+            setIsDeeplinkLoading(false);
+            return;
+          }
+
+          // Store flight and search params in booking store
+          if (data.flight) {
+            const flightWithKey = {
+              ...data.flight,
+              flightKey: flightKey,
+            };
+            setSelectedFlight(flightWithKey, data.flight.outbound?.cabinClass || 'Economy');
+          }
+
+          if (data.searchParams) {
+            const params = {
+              ...data.searchParams,
+              departureDate: new Date(data.searchParams.departureDate),
+              returnDate: data.searchParams.returnDate
+                ? new Date(data.searchParams.returnDate)
+                : undefined,
+            };
+            setStoreSearchParams(params);
+          }
+
+          // Store the request ID as web ref (from FlightView response)
+          if (data.requestId) {
+            setSearchRequestId(data.requestId);
+          }
+
+          // Redirect directly to booking page
+          router.push('/booking');
+        } catch (err) {
+          console.error('Search deeplink processing error:', err);
+          // On error, continue with normal search
+          const newParams = new URLSearchParams(urlParams.toString());
+          newParams.delete('flight');
+          router.replace(`/search?${newParams.toString()}&error=flight_unavailable`);
+          setIsDeeplinkLoading(false);
+        }
+      })();
+      
+      return; // Don't continue with normal search initialization
+    }
+  }, [urlParams, router, setAffiliateCode, setSelectedFlight, setStoreSearchParams, setAffiliateData, setIsFromDeeplink, setSearchRequestId]);
 
   // Handle affiliate code and UTM params from URL
   useEffect(() => {
+    // Skip if this is a deeplink flow (handled above)
+    if (urlParams.get('flight')) return;
+    
     const affCode = urlParams.get('aff');
     const utmSource = urlParams.get('utm_source');
 
@@ -733,6 +836,38 @@ function SearchPageContent() {
     timeoutMs: 30 * 60 * 1000,
     onIdle: () => setFareExpiredOpen(true),
   });
+
+  // Show loading UI when processing a deeplink with flight key
+  if (isDeeplinkLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+        <Navbar />
+        <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
+          <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
+            <div className="relative mb-6">
+              <div className="w-20 h-20 mx-auto bg-[rgba(55,84,237,0.1)] rounded-full flex items-center justify-center">
+                <Plane className="w-10 h-10 text-[#3754ED] animate-pulse" />
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Loader2 className="w-24 h-24 text-[#3754ED]/20 animate-spin" />
+              </div>
+            </div>
+            <h1 className="text-2xl font-bold text-[#010D50] mb-3">
+              Loading Your Flight
+            </h1>
+            <p className="text-[#3A478A]">
+              Please wait while we retrieve your selected flight details...
+            </p>
+            <div className="mt-6 flex justify-center gap-1">
+              <span className="w-2 h-2 bg-[#3754ED] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-2 h-2 bg-[#3754ED] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-2 h-2 bg-[#3754ED] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white">

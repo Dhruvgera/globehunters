@@ -19,6 +19,7 @@ function HomeContent() {
   const setSearchParams = useBookingStore((state) => state.setSearchParams);
   const setAffiliateData = useBookingStore((state) => state.setAffiliateData);
   const setIsFromDeeplink = useBookingStore((state) => state.setIsFromDeeplink);
+  const setSearchRequestId = useBookingStore((state) => state.setSearchRequestId);
 
   const [isLoadingDeeplink, setIsLoadingDeeplink] = useState(false);
 
@@ -79,7 +80,12 @@ function HomeContent() {
 
         // Store flight and search params in booking store
         if (data.flight) {
-          setSelectedFlight(data.flight, data.flight.outbound?.cabinClass || "Economy");
+          // Store the flight key for later use
+          const flightWithKey = {
+            ...data.flight,
+            flightKey: key,
+          };
+          setSelectedFlight(flightWithKey, data.flight.outbound?.cabinClass || "Economy");
         }
 
         if (data.searchParams) {
@@ -94,6 +100,11 @@ function HomeContent() {
           setSearchParams(params);
         }
 
+        // Store the request ID as web ref (from FlightView response)
+        if (data.requestId) {
+          setSearchRequestId(data.requestId);
+        }
+
         // Redirect directly to booking page
         router.push("/booking");
       } catch (error) {
@@ -103,7 +114,7 @@ function HomeContent() {
     }
 
     processDeeplink();
-  }, [searchParams, router, setAffiliateCode, setSelectedFlight, setSearchParams, setAffiliateData, setIsFromDeeplink]);
+  }, [searchParams, router, setAffiliateCode, setSelectedFlight, setSearchParams, setAffiliateData, setIsFromDeeplink, setSearchRequestId]);
 
   // Show loading state when processing deeplink
   if (isLoadingDeeplink) {

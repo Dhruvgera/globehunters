@@ -92,6 +92,7 @@ export interface FlightViewResponse {
 export interface TransformedFlightViewResult {
   flight: Flight;
   searchParams: SearchParams;
+  requestId: string; // The search request ID (used as web ref)
   rawResponse?: FlightViewResponse;
 }
 
@@ -178,6 +179,10 @@ export function transformFlightViewResponse(data: FlightViewResponse): Transform
     String(firstFlight.Baggage).toLowerCase() !== 'none' &&
     String(firstFlight.Baggage).trim() !== '';
 
+  // Extract request ID for web reference
+  // The Request_id is the search request ID from the previous stage, used as web ref
+  const requestId = String(data.Request_id);
+  
   // Build the Flight object
   const flight: Flight = {
     id: String(data.Result_id),
@@ -189,7 +194,7 @@ export function transformFlightViewResponse(data: FlightViewResponse): Transform
     price: Math.round(totalPrice),
     pricePerPerson: Math.round(pricePerPerson),
     currency: 'GBP', // FlightView typically returns GBP for UK market
-    webRef: String(data.Result_id),
+    webRef: requestId, // Use Request_id as web ref (older stage ID)
     baggage: firstFlight.Baggage,
     refundable,
     refundableText: firstFlight.refundable_text,
@@ -215,6 +220,7 @@ export function transformFlightViewResponse(data: FlightViewResponse): Transform
   return {
     flight,
     searchParams,
+    requestId, // Return request ID for storing as web ref in booking store
     rawResponse: process.env.NODE_ENV === 'development' ? data : undefined,
   };
 }

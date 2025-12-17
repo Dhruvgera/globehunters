@@ -20,6 +20,10 @@ const nextConfig: NextConfig = {
         source: '/FlightSearch.htm',
         destination: '/FlightSearch',
       },
+      {
+        source: '/checkout.htm',
+        destination: '/checkout',
+      },
     ];
   },
 };
