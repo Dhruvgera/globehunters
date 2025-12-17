@@ -274,25 +274,41 @@ function transformResult(result: VyspaResult): Flight | null {
  * Transform Vyspa segment to FlightSegment
  */
 function transformSegmentToFlightSegment(segment: VyspaSegment): FlightSegment {
-  const firstFlight = segment.Flights[0];
-  const lastFlight = segment.Flights[segment.Flights.length - 1];
+  const flights = segment.Flights || [];
+  const firstFlight = flights[0];
+  const lastFlight = flights[flights.length - 1];
+
+  // Safety check: if no flights in segment, return a skeleton segment
+  if (!firstFlight || !lastFlight) {
+    const defaultAirport: Airport = { code: 'Unknown', name: 'Unknown', city: 'Unknown' };
+    return {
+      departureTime: '00:00',
+      arrivalTime: '00:00',
+      departureAirport: defaultAirport,
+      arrivalAirport: defaultAirport,
+      date: '',
+      duration: '0m',
+      totalJourneyTime: '0m',
+      stops: 0,
+    };
+  }
 
   // Get departure info from first flight - lookup full names from airport cache
   const depCode = firstFlight.departure_airport;
-  const depCached = airportCache.getAirportByCode(depCode);
+  const depCached = depCode ? airportCache.getAirportByCode(depCode) : null;
   const departureAirport: Airport = {
-    code: depCode,
-    name: depCached?.name || depCode,
-    city: depCached?.city || depCode,
+    code: depCode || 'Unknown',
+    name: depCached?.name || depCode || 'Unknown',
+    city: depCached?.city || depCode || 'Unknown',
   };
 
   // Get arrival info from last flight - lookup full names from airport cache
   const arrCode = lastFlight.arrival_airport;
-  const arrCached = airportCache.getAirportByCode(arrCode);
+  const arrCached = arrCode ? airportCache.getAirportByCode(arrCode) : null;
   const arrivalAirport: Airport = {
-    code: arrCode,
-    name: arrCached?.name || arrCode,
-    city: arrCached?.city || arrCode,
+    code: arrCode || 'Unknown',
+    name: arrCached?.name || arrCode || 'Unknown',
+    city: arrCached?.city || arrCode || 'Unknown',
   };
 
   // Format times
@@ -534,6 +550,8 @@ function formatDate(dateStr: string): string {
  * Get currency symbol from currency code
  */
 function getCurrencySymbol(code: string): string {
+  if (!code) return '';
+  const upperCode = String(code).toUpperCase();
   const symbols: Record<string, string> = {
     'USD': '$',
     'GBP': '£',
@@ -544,7 +562,7 @@ function getCurrencySymbol(code: string): string {
     'AUD': 'A$',
   };
 
-  return symbols[code.toUpperCase()] || code;
+  return symbols[upperCode] || code;
 }
 
 /**

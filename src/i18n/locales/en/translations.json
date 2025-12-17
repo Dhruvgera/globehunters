@@ -204,6 +204,11 @@
     "dateSelector": {
       "departureDate": "Departure Date",
       "returnDate": "Return Date"
+    },
+    "sort": {
+      "cheapest": "Cheapest",
+      "best": "Best",
+      "fastest": "Fastest"
     }
   },
   "booking": {

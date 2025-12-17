@@ -52,15 +52,15 @@ function matchesStops(flight: Flight, selectedStops: number[]): boolean {
   if (selectedStops.length === 0) {
     return true;
   }
-  
+
   // Get the maximum stops across all legs
   const outboundStops = flight.outbound.stops;
   const inboundStops = flight.inbound?.stops ?? 0;
   const maxStops = Math.max(outboundStops, inboundStops);
-  
+
   // Cap at 2 for "2+ stops" category
   const stopsCategory = Math.min(maxStops, 2);
-  
+
   return selectedStops.includes(stopsCategory);
 }
 
@@ -236,34 +236,52 @@ export function filterFlights(flights: Flight[], filters: FilterState): Flight[]
   });
 }
 
+export type SortOption = 'best' | 'cheapest' | 'fastest' | 'price-asc' | 'price-desc' | 'duration-asc' | 'duration-desc' | 'departure-asc' | 'departure-desc';
+
 /**
  * Sort flights by various criteria
  */
 export function sortFlights(
   flights: Flight[],
-  sortBy: 'price-asc' | 'price-desc' | 'duration-asc' | 'duration-desc' | 'departure-asc' | 'departure-desc'
+  sortBy: SortOption
 ): Flight[] {
   const sorted = [...flights];
 
   switch (sortBy) {
+    case 'cheapest':
     case 'price-asc':
       return sorted.sort((a, b) => a.price - b.price);
 
     case 'price-desc':
       return sorted.sort((a, b) => b.price - a.price);
 
+    case 'fastest':
     case 'duration-asc':
       return sorted.sort((a, b) => {
-        const durationA = parseDurationToMinutes(a.outbound.duration);
-        const durationB = parseDurationToMinutes(b.outbound.duration);
+        const durationA = parseDurationToMinutes(a.outbound.duration) + (a.inbound ? parseDurationToMinutes(a.inbound.duration) : 0);
+        const durationB = parseDurationToMinutes(b.outbound.duration) + (b.inbound ? parseDurationToMinutes(b.inbound.duration) : 0);
         return durationA - durationB;
       });
 
     case 'duration-desc':
       return sorted.sort((a, b) => {
-        const durationA = parseDurationToMinutes(a.outbound.duration);
-        const durationB = parseDurationToMinutes(b.outbound.duration);
+        const durationA = parseDurationToMinutes(a.outbound.duration) + (a.inbound ? parseDurationToMinutes(a.inbound.duration) : 0);
+        const durationB = parseDurationToMinutes(b.outbound.duration) + (b.inbound ? parseDurationToMinutes(b.inbound.duration) : 0);
         return durationB - durationA;
+      });
+
+    case 'best':
+      return sorted.sort((a, b) => {
+        const durationA = parseDurationToMinutes(a.outbound.duration) + (a.inbound ? parseDurationToMinutes(a.inbound.duration) : 0);
+        const durationB = parseDurationToMinutes(b.outbound.duration) + (b.inbound ? parseDurationToMinutes(b.inbound.duration) : 0);
+
+        // Best score: price + (duration in minutes * factor) + (stops * penalty)
+        // Factor: £30 per hour (£0.5 per minute)
+        // Penalty: £50 per stop
+        const scoreA = a.price + (durationA * 0.5) + (a.outbound.stops * 50) + (a.inbound ? a.inbound.stops * 50 : 0);
+        const scoreB = b.price + (durationB * 0.5) + (b.outbound.stops * 50) + (b.inbound ? b.inbound.stops * 50 : 0);
+
+        return scoreA - scoreB;
       });
 
     case 'departure-asc':
@@ -334,7 +352,7 @@ export function countByStops(flights: Flight[]): Record<number, number> {
     const outboundStops = flight.outbound.stops;
     const inboundStops = flight.inbound?.stops ?? 0;
     const maxStops = Math.max(outboundStops, inboundStops);
-    
+
     // Cap at 2+ for the filter categories
     const stopsCategory = Math.min(maxStops, 2);
     counts[stopsCategory] = (counts[stopsCategory] || 0) + 1;
@@ -354,7 +372,7 @@ export function getTimeBounds(flights: Flight[]): {
   inboundArrival: { min: number; max: number };
 } {
   const defaultBounds = { min: 0, max: 24 };
-  
+
   if (flights.length === 0) {
     return {
       outboundDeparture: { ...defaultBounds },

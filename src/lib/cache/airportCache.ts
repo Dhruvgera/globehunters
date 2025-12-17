@@ -65,24 +65,24 @@ class AirportCacheManager {
    */
   private async fetchAndCache(): Promise<Airport[]> {
     console.log(`🔄 Fetching fresh airport data (${isServer ? 'server' : 'client'})...`);
-    
+
     try {
       let airports: Airport[];
-      
+
       if (isServer) {
         // On server: directly call Vyspa API (has access to env vars)
         airports = await fetchAirportsFromVyspa();
       } else {
         // On client: use internal API route
         const response = await fetch('/api/airports');
-        
+
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
-        
+
         airports = await response.json();
       }
-      
+
       // Update cache
       this.cache = {
         airports,
@@ -94,13 +94,13 @@ class AirportCacheManager {
       return airports;
     } catch (error) {
       console.error('❌ Failed to fetch airports:', error);
-      
+
       // If fetch fails but we have stale cache, return it
       if (this.cache) {
         console.log('⚠️  Using stale cache due to fetch error');
         return this.cache.airports;
       }
-      
+
       // Return empty array instead of throwing to prevent app crashes
       return [];
     }
@@ -139,15 +139,16 @@ class AirportCacheManager {
       age: this.cache ? Date.now() - this.cache.timestamp : 0,
     };
   }
-  
+
   /**
    * Get airport by code from cache (sync - returns null if not cached)
    */
   getAirportByCode(code: string): Airport | null {
-    if (!this.cache) return null;
-    return this.cache.airports.find(a => a.code.toUpperCase() === code.toUpperCase()) || null;
+    if (!this.cache || !code) return null;
+    const searchCode = String(code).toUpperCase();
+    return this.cache.airports.find(a => a?.code && a.code.toUpperCase() === searchCode) || null;
   }
-  
+
   /**
    * Get airport name by code (sync - returns code if not found)
    */

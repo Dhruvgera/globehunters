@@ -27,6 +27,8 @@ import { FilterSidebar } from "@/components/search/filters/FilterSidebar";
 import { FilterSheet } from "@/components/search/filters/FilterSheet";
 import { FlightsList } from "@/components/search/FlightsList";
 import { ContactCard } from "@/components/search/ContactCard";
+import { FlightSortTabs } from "@/components/search/FlightSortTabs";
+import { SortOption } from "@/utils/flightFilter";
 
 // Default search params
 const DEFAULT_SEARCH_PARAMS: SearchParams = {
@@ -64,11 +66,11 @@ function SearchPageContent() {
   // Handle flight deeplink parameter - redirect directly to booking
   useEffect(() => {
     const flightKey = urlParams.get('flight');
-    
+
     if (flightKey) {
       // This is a deeplink with a pre-selected flight - redirect to booking
       setIsDeeplinkLoading(true);
-      
+
       // Mark this as a deeplink flow
       setIsFromDeeplink(true);
 
@@ -150,7 +152,7 @@ function SearchPageContent() {
           setIsDeeplinkLoading(false);
         }
       })();
-      
+
       return; // Don't continue with normal search initialization
     }
   }, [urlParams, router, setAffiliateCode, setSelectedFlight, setStoreSearchParams, setAffiliateData, setIsFromDeeplink, setSearchRequestId]);
@@ -159,7 +161,7 @@ function SearchPageContent() {
   useEffect(() => {
     // Skip if this is a deeplink flow (handled above)
     if (urlParams.get('flight')) return;
-    
+
     const affCode = urlParams.get('aff');
     const utmSource = urlParams.get('utm_source');
 
@@ -532,6 +534,8 @@ function SearchPageContent() {
     extras: [],
   });
 
+  const [sortBy, setSortBy] = useState<'best' | 'cheapest' | 'fastest'>('cheapest');
+
   // Track previous search params to detect new searches and reset filters
   const prevSearchParamsRef = useRef<string | null>(null);
 
@@ -821,10 +825,11 @@ function SearchPageContent() {
     });
   }, [journeyTimeBounds]);
 
-  // Filter flights
+  // Filter and Sort flights
   const filteredFlights = useMemo(() => {
-    return filterFlights(preparedFlights, filterState);
-  }, [preparedFlights, filterState]);
+    const filtered = filterFlights(preparedFlights, filterState);
+    return sortFlights(filtered, sortBy);
+  }, [preparedFlights, filterState, sortBy]);
 
   // Handler for loading more flights
   const handleLoadMore = () => {
@@ -1018,11 +1023,18 @@ function SearchPageContent() {
             {/* Flight Results */}
             <div className="flex-1 flex flex-col gap-2 order-2 lg:order-2 min-w-0 overflow-hidden">
               {filteredFlights.length > 0 ? (
-                <FlightsList
-                  flights={filteredFlights}
-                  displayCount={displayedFlightsCount}
-                  onLoadMore={handleLoadMore}
-                />
+                <>
+                  <FlightSortTabs
+                    flights={filteredFlights}
+                    activeTab={sortBy}
+                    onTabChange={setSortBy}
+                  />
+                  <FlightsList
+                    flights={filteredFlights}
+                    displayCount={displayedFlightsCount}
+                    onLoadMore={handleLoadMore}
+                  />
+                </>
               ) : (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-8 text-center">
                   <svg className="w-16 h-16 text-blue-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

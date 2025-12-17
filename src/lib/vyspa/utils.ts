@@ -36,7 +36,7 @@ export function convertDateFormat(dateStr: string): string {
  * @returns Array of age strings
  */
 export function generateChildAges(numChildren: number): string[] {
-  return numChildren > 0 
+  return numChildren > 0
     ? Array(numChildren).fill(VYSPA_CONFIG.defaults.defaultChildAge)
     : [];
 }
@@ -61,7 +61,7 @@ export function parsePriceValue(value: any, fallback: number = 0.0): number {
 
     // For strings, clean and convert
     let str = String(value).trim();
-    
+
     // Remove currency symbols, spaces, and keep only digits, comma, dot, minus
     str = str.replace(/[^0-9,.\-]/g, '');
 
@@ -79,7 +79,7 @@ export function parsePriceValue(value: any, fallback: number = 0.0): number {
     }
 
     const result = parseFloat(str);
-    
+
     if (isNaN(result)) {
       return fallback;
     }
@@ -175,15 +175,15 @@ export function calculateDuration(
 export function formatDuration(minutes: number): string {
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
-  
+
   if (hours === 0) {
     return `${mins}m`;
   }
-  
+
   if (mins === 0) {
     return `${hours}h`;
   }
-  
+
   return `${hours}h ${mins}m`;
 }
 
@@ -260,7 +260,8 @@ export function parsePriceBreakdownString(bdownStr: string): Array<{
  * @returns Normalized airport code (uppercase, trimmed)
  */
 export function normalizeAirportCode(code: string): string {
-  return code.trim().toUpperCase();
+  if (!code) return '';
+  return String(code).trim().toUpperCase();
 }
 
 /**
