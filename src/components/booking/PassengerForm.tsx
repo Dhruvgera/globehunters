@@ -15,12 +15,8 @@ import {
 } from "@/components/ui/select";
 import { useTranslations } from "next-intl";
 import { countryCodes } from "@/lib/utils/countryCodes";
+import { CountryCodeSelector } from "./CountryCodeSelector";
 
-// Deduplicate country codes - keep first occurrence of each phone code
-const uniqueCountryCodes = countryCodes.filter(
-  (country, index, self) => 
-    index === self.findIndex((c) => c.code === country.code)
-);
 
 interface PassengerFormProps {
   passengerIndex: number;
@@ -43,7 +39,7 @@ export function PassengerForm({
   passengerType = 'adult',
 }: PassengerFormProps) {
   const t = useTranslations('booking.passengerDetails');
-  
+
   const [formData, setFormData] = useState<Partial<Passenger>>({
     title: initialData?.title || "Mr",
     firstName: initialData?.firstName || "",
@@ -72,7 +68,7 @@ export function PassengerForm({
   const handleChange = (field: keyof Passenger, value: string) => {
     const newFormData = { ...formData, [field]: value };
     setFormData(newFormData);
-    
+
     // Real-time validation for date of birth
     if (field === 'dateOfBirth' && value) {
       const dobValidation = validateDateOfBirthForType(value, passengerType);
@@ -81,19 +77,19 @@ export function PassengerForm({
         return;
       }
     }
-    
+
     // Clear error for this field when user starts typing
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));
     }
-    
+
     // Auto-save silently when all required fields are filled (no UI lock)
     const requiredFields = ['title', 'firstName', 'lastName', 'dateOfBirth', 'email', 'phone'];
     const allFieldsFilled = requiredFields.every(f => {
       const val = f === field ? value : (formData as any)[f];
       return val && String(val).trim() !== '';
     });
-    
+
     if (allFieldsFilled) {
       // Validate and save to store (but keep form editable)
       const validationErrors = validatePassenger(newFormData as Passenger, passengerType);
@@ -108,7 +104,7 @@ export function PassengerForm({
 
     // Validate form data with passenger type for age validation
     const validationErrors = validatePassenger(formData as Passenger, passengerType);
-    
+
     console.log('[PassengerForm] Validation:', {
       passengerType,
       dateOfBirth: formData.dateOfBirth,
@@ -234,26 +230,11 @@ export function PassengerForm({
             <Label htmlFor={`phone-${passengerIndex}`}>{t('phone')} {t('required')}</Label>
             <div className="flex gap-2">
               {/* Country Code Selector */}
-              <Select
+              <CountryCodeSelector
                 value={formData.countryCode || "+44"}
-                onValueChange={(value) => handleChange("countryCode", value)}
+                onChange={(val: string) => handleChange("countryCode", val)}
                 disabled={disabled}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px] overflow-y-auto">
-                  {uniqueCountryCodes.map((country) => (
-                    <SelectItem key={country.code} value={country.code}>
-                      <span className="flex items-center gap-2">
-                        <span className={`fi fi-${country.isoCode} w-4 h-3`}></span>
-                        <span className="font-medium">{country.code}</span>
-                        <span className="text-gray-500 text-sm">{country.name}</span>
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
               {/* Phone Number Input */}
               <Input
                 id={`phone-${passengerIndex}`}
