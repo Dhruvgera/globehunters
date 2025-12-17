@@ -280,6 +280,79 @@ export function shortenAirportName(name: string): string {
 }
 
 /**
+ * Clean airport name for display by removing redundant words
+ * @param name Full airport name
+ * @returns Cleaned airport name
+ */
+export function cleanAirportNameForLabel(name: string): string {
+  if (!name) return '';
+  return name
+    .replace(/\bInternational\b/gi, '')
+    .replace(/\bAirport\b/gi, '')
+    .replace(/\bIntl\.?\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Get the display label for a selected airport
+ * @param airport Airport object
+ * @returns Formatted label like "London Heathrow (LHR)" or "Mumbai (BOM)"
+ */
+export function getAirportSelectionLabel(airport: { code: string; name?: string; city: string } | null | undefined): string {
+  if (!airport) return '';
+
+  const cleanedName = cleanAirportNameForLabel(airport.name || '');
+  const city = (airport.city || '').trim();
+  const code = (airport.code || '').toUpperCase().trim();
+
+  // 1. Handle cases where we only have a code or city is same as code
+  if (city.toUpperCase() === code && !cleanedName) {
+    return code;
+  }
+
+  // 2. If cleaned name is same as city or empty
+  if (!cleanedName || cleanedName.toLowerCase() === city.toLowerCase()) {
+    return city ? `${city} (${code})` : code;
+  }
+
+  // 3. Intelligent merge for city and airport name
+  // Cases like "London" + "London Heathrow" or "New York City" + "New York All Airports"
+  const cityLower = city.toLowerCase();
+  const nameLower = cleanedName.toLowerCase();
+
+  // If name contains city (e.g., "London Heathrow" contains "London")
+  if (nameLower.includes(cityLower)) {
+    return `${cleanedName} (${code})`;
+  }
+
+  // If city contains name (rare but happens)
+  if (cityLower.includes(nameLower)) {
+    return `${city} (${code})`;
+  }
+
+  // Handle overlapping parts (e.g., "New York City" and "New York All Airports")
+  // Check if they share the first word
+  const cityWords = city.split(' ');
+  const nameWords = cleanedName.split(' ');
+
+  if (cityWords.length > 0 && nameWords.length > 0 && cityWords[0].toLowerCase() === nameWords[0].toLowerCase()) {
+    // They share common root. Try to avoid "New York City New York All Airports"
+    // If the city starts with the name or name starts with city root
+    // For "New York City" and "New York All Airports", maybe just "New York City All Airports"
+    // We'll take the city and append the unique parts of the name
+    const uniqueNameWords = nameWords.filter(word => !cityWords.some(cw => cw.toLowerCase() === word.toLowerCase()));
+    if (uniqueNameWords.length > 0) {
+      return `${city} ${uniqueNameWords.join(' ')} (${code})`;
+    }
+    return `${city} (${code})`;
+  }
+
+  // Otherwise combine City CleanedName (Code)
+  return `${city} ${cleanedName} (${code})`;
+}
+
+/**
  * Generate a unique search ID
  * @returns Unique ID string
  */

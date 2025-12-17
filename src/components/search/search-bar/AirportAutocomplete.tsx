@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { MapPin, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useAirportSearch } from "@/hooks/useAirportSearch";
-import { shortenAirportName } from "@/lib/vyspa/utils";
+import { shortenAirportName, getAirportSelectionLabel } from "@/lib/vyspa/utils";
 import type { Airport } from "@/types/airport";
 
 interface AirportAutocompleteProps {
@@ -20,7 +20,7 @@ export function AirportAutocomplete({
 }: AirportAutocompleteProps) {
   const t = useTranslations('search.airport');
   const [isOpen, setIsOpen] = useState(false);
-  const [inputValue, setInputValue] = useState(value?.code || '');
+  const [inputValue, setInputValue] = useState(getAirportSelectionLabel(value));
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -30,7 +30,7 @@ export function AirportAutocomplete({
   // Update input when value changes externally
   useEffect(() => {
     if (value) {
-      setInputValue(value.code);
+      setInputValue(getAirportSelectionLabel(value));
     }
   }, [value]);
 
@@ -50,7 +50,7 @@ export function AirportAutocomplete({
 
   // Handle airport selection
   const handleSelect = (airport: Airport) => {
-    setInputValue(airport.code);
+    setInputValue(getAirportSelectionLabel(airport));
     onChange(airport);
     setIsOpen(false);
     setSelectedIndex(-1);
@@ -112,7 +112,7 @@ export function AirportAutocomplete({
   };
 
   return (
-    <div ref={containerRef} className="relative flex-1">
+    <div ref={containerRef} className="relative flex-1 min-w-0">
       <div className="flex items-center gap-2 border border-[#D3D3D3] rounded-xl px-3 py-2.5 bg-white">
         <MapPin className="w-5 h-5 text-[#010D50] flex-shrink-0" />
         <input
@@ -121,13 +121,15 @@ export function AirportAutocomplete({
           placeholder={placeholder || t('placeholder')}
           value={inputValue}
           onChange={handleInputChange}
-          onFocus={() => {
+          onFocus={(e) => {
             setIsOpen(true);
             if (inputValue) search(inputValue);
+            e.target.select();
           }}
           onKeyDown={handleKeyDown}
-          className="flex-1 outline-none text-sm font-medium text-[#010D50] placeholder:text-gray-400"
+          className="flex-1 outline-none text-sm font-medium text-[#010D50] placeholder:text-gray-400 truncate"
           autoComplete="off"
+          title={inputValue}
         />
         {loading && (
           <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />

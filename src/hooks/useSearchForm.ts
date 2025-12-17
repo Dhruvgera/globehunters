@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { Airport } from "@/types/airport";
 import { useBookingStore } from "@/store/bookingStore";
+import { airportCache } from "@/lib/cache/airportCache";
 
 type TripType = "round-trip" | "one-way" | "multi-city";
 
@@ -20,7 +21,7 @@ export function useSearchForm() {
   const searchParamsFromStore = useBookingStore((state) => state.searchParams);
   const hasInitializedRef = useRef(false);
   const lastStoreVersionRef = useRef<string>('');
-  
+
   // Helper to safely get timestamp from a date that might be a string or Date
   const getTimestamp = (date: Date | string | undefined | null): number | undefined => {
     if (!date) return undefined;
@@ -53,7 +54,7 @@ export function useSearchForm() {
       infants: params.passengers?.infants,
     });
   };
-  
+
   const [tripType, setTripType] = useState<TripType>("round-trip");
   const [from, setFrom] = useState<Airport | null>(null);
   const [to, setTo] = useState<Airport | null>(null);
@@ -70,19 +71,23 @@ export function useSearchForm() {
     { from: null, to: null, departureDate: undefined },
     { from: null, to: null, departureDate: undefined },
   ]);
-  
+
   // Sync with store when it changes (for page refresh scenario)
   useEffect(() => {
     const currentVersion = getStoreVersion(searchParamsFromStore);
     const hasVersionChanged = currentVersion !== lastStoreVersionRef.current;
-    
+
     // Initialize or re-sync when store data changes
     if (searchParamsFromStore && (!hasInitializedRef.current || hasVersionChanged)) {
       hasInitializedRef.current = true;
       lastStoreVersionRef.current = currentVersion;
-      
+
       const buildAirport = (code?: string | null): Airport | null => {
         if (!code) return null;
+        // Try to get from cache first for better display
+        const cached = airportCache.getAirportByCode(code);
+        if (cached) return cached;
+
         return {
           code,
           city: code,
