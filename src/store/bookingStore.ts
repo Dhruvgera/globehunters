@@ -89,6 +89,9 @@ interface BookingState {
 
   // Reset entire booking flow
   resetBooking: () => void;
+
+  // Clear booking data when starting a new search (preserves affiliate data)
+  clearForNewSearch: () => void;
 }
 
 const initialState = {
@@ -126,7 +129,7 @@ export const useBookingStore = create<BookingState & HydrationState>()(
   persist(
     (set) => ({
       ...initialState,
-      
+
       // Hydration tracking
       _hasHydrated: false,
       setHasHydrated: (state) => set({ _hasHydrated: state }),
@@ -241,6 +244,34 @@ export const useBookingStore = create<BookingState & HydrationState>()(
 
       // Reset
       resetBooking: () => set(initialState),
+
+      // Clear booking data when starting a new search (preserves affiliate data, search params, and searchRequestId)
+      clearForNewSearch: () =>
+        set((state) => ({
+          selectedFlight: null,
+          selectedFareType: 'Economy',
+          selectedUpgradeOption: null,
+          priceCheckData: null,
+          vyspaFolderNumber: null,
+          vyspaCustomerId: null,
+          vyspaEmailAddress: null,
+          // Note: searchRequestId is NOT cleared - it gets updated by the flight search API response
+          passengers: [],
+          passengersSaved: false,
+          contactEmail: '',
+          contactPhone: '',
+          addOns: {
+            protectionPlan: undefined,
+            additionalBaggage: 0,
+          },
+          booking: null,
+          currentStep: 'search',
+          // Preserve these
+          affiliateData: state.affiliateData,
+          isFromDeeplink: state.isFromDeeplink,
+          searchParams: state.searchParams,
+          searchRequestId: state.searchRequestId,
+        })),
     }),
     {
       name: 'globehunters-booking-storage', // Storage key

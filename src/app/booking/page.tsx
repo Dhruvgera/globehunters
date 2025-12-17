@@ -61,8 +61,8 @@ function BookingContent() {
   const searchRequestId = useBookingStore((s) => s.searchRequestId);
   const { checkPrice, priceCheck } = usePriceCheck();
 
-  // Web reference: prefer folder number, then request ID
-  const webRefNumber = vyspaFolderNumber || searchRequestId || '—';
+  // Web reference: prefer folder number, then request ID, then flight's webRef
+  const webRefNumber = vyspaFolderNumber || searchRequestId || flight?.webRef || '—';
 
   // Get affiliate phone number
   const { phoneNumber: affiliatePhone } = useAffiliatePhone();

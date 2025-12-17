@@ -61,6 +61,7 @@ export default function FlightInfoModal({
   const setSelectedFlight = useBookingStore((state) => state.setSelectedFlight);
   const setSelectedUpgrade = useBookingStore((state) => state.setSelectedUpgrade);
   const setPriceCheckData = useBookingStore((state) => state.setPriceCheckData);
+  const setVyspaFolderInfo = useBookingStore((state) => state.setVyspaFolderInfo);
   const selectedUpgradeInStore = useBookingStore((state) => state.selectedUpgradeOption);
   const passengersInStore = useBookingStore((state) => state.passengers);
   const searchParams = useBookingStore((state) => state.searchParams);
@@ -293,6 +294,10 @@ export default function FlightInfoModal({
     }
     */
 
+    // Clear any previous folder info when selecting a new flight
+    // This ensures old folder IDs don't carry over to a new booking
+    setVyspaFolderInfo({ folderNumber: '', customerId: null, emailAddress: null });
+
     if (selectedUpgradeOption) {
       // Save selected upgrade to store
       setSelectedUpgrade(selectedUpgradeOption);
@@ -410,8 +415,8 @@ export default function FlightInfoModal({
                     key={`${seg.departureAirport.code}-${seg.arrivalAirport.code}-${index}`}
                     variant={normalizedIndex === index ? "default" : "outline"}
                     className={`${normalizedIndex === index
-                        ? "bg-[#E0E7FF] text-[#010D50] hover:bg-[#D0D7EF]"
-                        : "bg-[#F6F6F6] text-[#3754ED] border-[#3754ED] hover:bg-[#EEEEEE]"
+                      ? "bg-[#E0E7FF] text-[#010D50] hover:bg-[#D0D7EF]"
+                      : "bg-[#F6F6F6] text-[#3754ED] border-[#3754ED] hover:bg-[#EEEEEE]"
                       } rounded-full px-3 sm:px-4 py-2.5 h-auto text-xs sm:text-sm font-medium whitespace-nowrap shrink-0 leading-normal`}
                     onClick={() => {
                       if (index > 0 && passengersInStore && passengersInStore.length > 0) {
@@ -721,8 +726,8 @@ export default function FlightInfoModal({
                       key={option.id}
                       variant={selectedUpgradeOption?.id === option.id ? "default" : "outline"}
                       className={`${selectedUpgradeOption?.id === option.id
-                          ? "bg-[#3754ED] text-white hover:bg-[#2A3FB8]"
-                          : "bg-[#F5F7FF] text-[#010D50] border-0 hover:bg-[#E0E7FF]"
+                        ? "bg-[#3754ED] text-white hover:bg-[#2A3FB8]"
+                        : "bg-[#F5F7FF] text-[#010D50] border-0 hover:bg-[#E0E7FF]"
                         } rounded-full px-4 py-2.5 h-auto text-sm font-semibold leading-normal whitespace-nowrap`}
                       onClick={() => setSelectedUpgradeOption(option)}
                     >

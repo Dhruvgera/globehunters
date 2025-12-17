@@ -56,6 +56,7 @@ function SearchPageContent() {
   const setSelectedFlight = useBookingStore((state) => state.setSelectedFlight);
   const setAffiliateData = useBookingStore((state) => state.setAffiliateData);
   const setIsFromDeeplink = useBookingStore((state) => state.setIsFromDeeplink);
+  const clearForNewSearch = useBookingStore((state) => state.clearForNewSearch);
   const { setAffiliateCode } = useAffiliate();
   const [isInitialized, setIsInitialized] = useState(false);
   const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
@@ -724,7 +725,9 @@ function SearchPageContent() {
 
     // Only reset if we have a previous key and it's different (skip initial load)
     if (prevSearchParamsRef.current !== null && prevSearchParamsRef.current !== currentUrlKey) {
-      // New search detected - reset filters
+      // New search detected - clear stale booking data (folder ID, passengers, etc.)
+      clearForNewSearch();
+      // Reset filters
       setFilterState({
         stops: [0, 1, 2],
         priceRange: [0, 2000],
@@ -744,7 +747,7 @@ function SearchPageContent() {
     }
 
     prevSearchParamsRef.current = currentUrlKey;
-  }, [urlParams]);
+  }, [urlParams, clearForNewSearch]);
 
   // Prefetch airline logos for top results to avoid layout delays
   useEffect(() => {
