@@ -17,7 +17,7 @@ interface UsePriceCheckReturn {
 
 /**
  * In-memory cache for price check results
- * TTL: 5 minutes
+ * TTL: 5 minutes for success, 30 seconds for failures (to allow quick retries after fixes)
  */
 const priceCheckCache = new Map<string, {
   data: PriceCheckResult;
@@ -31,23 +31,24 @@ const priceCheckFailureCache = new Map<string, {
   ttl: number;
 }>();
 
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes for successful price checks
+const FAILURE_CACHE_TTL = 30 * 1000; // 30 seconds for failed price checks (allows quick retries)
 
 /**
  * Get cached price check data
  */
 function getCachedPriceCheck(segmentId: string): PriceCheckResult | null {
   const cached = priceCheckCache.get(segmentId);
-  
+
   if (!cached) return null;
-  
+
   // Check if cache is expired
   const now = Date.now();
   if (now - cached.timestamp > cached.ttl) {
     priceCheckCache.delete(segmentId);
     return null;
   }
-  
+
   return cached.data;
 }
 
@@ -77,7 +78,7 @@ function setCachedPriceCheckFailure(segmentId: string, error: PriceCheckError): 
   priceCheckFailureCache.set(segmentId, {
     error,
     timestamp: Date.now(),
-    ttl: CACHE_TTL,
+    ttl: FAILURE_CACHE_TTL, // Use shorter TTL for failures
   });
 }
 
@@ -96,7 +97,7 @@ export function usePriceCheck(): UsePriceCheckReturn {
   const [priceCheck, setPriceCheck] = useState<PriceCheckResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<PriceCheckError | null>(null);
-  
+
   // Track current request to prevent race conditions
   const currentRequestRef = useRef<string | null>(null);
 
@@ -108,7 +109,7 @@ export function usePriceCheck(): UsePriceCheckReturn {
   const checkPrice = useCallback(async (segmentId: string, flightKey?: string) => {
     // Use flightKey as cache key if available, otherwise segmentId
     const cacheKey = flightKey || segmentId;
-    
+
     // Don't make duplicate requests
     if (currentRequestRef.current === cacheKey && isLoading) {
       console.log('⏩ Price check already in progress for', cacheKey);
@@ -158,7 +159,7 @@ export function usePriceCheck(): UsePriceCheckReturn {
         };
       }
       const result: PriceCheckResult = await res.json();
-      
+
       // Only update if this is still the current request
       if (currentRequestRef.current === cacheKey) {
         setPriceCheck(result);
@@ -169,14 +170,14 @@ export function usePriceCheck(): UsePriceCheckReturn {
       // Only update if this is still the current request
       if (currentRequestRef.current === cacheKey) {
         console.error('❌ Price check error caught:', err);
-        
+
         const priceCheckError: PriceCheckError = {
           type: err.type || 'UNKNOWN_ERROR',
           message: err.message || err.toString() || 'Unknown error',
           userMessage: err.userMessage || 'Unable to load pricing. The fare may no longer be available.',
           details: err.details || err,
         };
-        
+
         setError(priceCheckError);
         // Clear any previous price check data so the UI treats this as
         // "no upgrade options available" and falls back to search pricing.

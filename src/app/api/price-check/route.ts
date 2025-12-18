@@ -9,15 +9,24 @@ export const runtime = 'nodejs';
 /**
  * Call FlightView API to get psw_result_id from flight key
  * V3 flow: flightKey -> FlightView -> psw_result_id
+ * 
+ * NOTE: The Vyspa FlightView API sometimes returns HTTP 500 but still includes
+ * valid data with psw_result_id in the response body. We handle this quirk by
+ * parsing the body regardless of status code.
  */
-async function getFlightView(flightKey: string, basicAuth: string, apiUrl: string): Promise<number | null> {
-	const endpoint = `${apiUrl}/rest/v4/FlightView/`;
-	
+async function getFlightView(flightKey: string, basicAuth: string): Promise<number | null> {
+	// Use the FlightView-specific URL
+	const flightViewUrl = process.env.VYSPA_FLIGHTVIEW_URL || VYSPA_CONFIG.apiUrl.replace(/\/+$/, '');
+	const endpoint = `${flightViewUrl}/rest/v4/FlightView/`;
+	const requestBody = JSON.stringify([{ key: flightKey }]);
+
 	console.log('🔍 FlightView API Call:', {
 		endpoint,
-		flightKey: flightKey.substring(0, 20) + '...',
+		flightKey,
+		apiVersion: VYSPA_CONFIG.apiVersion,
+		requestBody,
 	});
-	
+
 	try {
 		const response = await fetch(endpoint, {
 			method: 'POST',
@@ -26,22 +35,43 @@ async function getFlightView(flightKey: string, basicAuth: string, apiUrl: strin
 				'Authorization': `Basic ${basicAuth}`,
 				'Api-Version': VYSPA_CONFIG.apiVersion,
 			},
-			body: JSON.stringify([{ key: flightKey }]),
+			body: requestBody,
 		});
-		
-		if (!response.ok) {
-			console.error('❌ FlightView HTTP Error:', response.status, response.statusText);
+
+		const responseText = await response.text();
+		console.log('📥 FlightView Raw Response:', {
+			status: response.status,
+			statusText: response.statusText,
+			responseBody: responseText.substring(0, 500),
+		});
+
+		// Try to parse JSON even if status is not OK (API returns 500 with valid data sometimes)
+		let data: any = null;
+		try {
+			data = JSON.parse(responseText);
+		} catch (parseError) {
+			console.error('❌ FlightView JSON Parse Error:', parseError);
 			return null;
 		}
-		
-		const data = await response.json();
-		console.log('📥 FlightView Response:', {
-			Result_id: data.Result_id,
-			psw_result_id: data.psw_result_id,
-			Total: data.Total,
+
+		// Check if we got a psw_result_id regardless of HTTP status
+		if (data && data.psw_result_id) {
+			console.log('📥 FlightView Parsed Response (extracted psw_result_id):', {
+				Result_id: data.Result_id,
+				psw_result_id: data.psw_result_id,
+				Total: data.Total,
+				httpStatus: response.status,
+			});
+			return data.psw_result_id;
+		}
+
+		// No psw_result_id found
+		console.error('❌ FlightView: No psw_result_id in response', {
+			status: response.status,
+			hasData: !!data,
+			dataKeys: data ? Object.keys(data) : [],
 		});
-		
-		return data.psw_result_id || null;
+		return null;
 	} catch (error) {
 		console.error('❌ FlightView Error:', error);
 		return null;
@@ -53,27 +83,27 @@ export async function POST(req: Request) {
 		const { segmentResultId, flightKey } = await req.json();
 		const segmentIdStr = String(segmentResultId ?? '').trim();
 		const flightKeyStr = String(flightKey ?? '').trim();
-		
+
 		console.log('🔍 Price Check Request:', {
 			segmentResultId,
 			flightKey: flightKeyStr ? flightKeyStr.substring(0, 20) + '...' : 'none',
 			timestamp: new Date().toISOString(),
 		});
-		
+
 		// Build API URL and auth header
 		const basicAuth = Buffer.from(
 			`${VYSPA_CONFIG.credentials.username}:${VYSPA_CONFIG.credentials.password}`
 		).toString('base64');
 		const apiUrl = VYSPA_CONFIG.apiUrl.replace(/\/+$/, '');
-		
+
 		// Determine the psw_result_id to use for price check
 		let pswResultId: number | string | null = null;
-		
+
 		// V3 flow: If we have a flightKey, call FlightView first to get psw_result_id
 		if (flightKeyStr && flightKeyStr !== 'undefined' && flightKeyStr !== 'null') {
 			console.log('🔍 Using V3 flow: FlightKey -> FlightView -> PriceCheck');
-			pswResultId = await getFlightView(flightKeyStr, basicAuth, apiUrl);
-			
+			pswResultId = await getFlightView(flightKeyStr, basicAuth);
+
 			if (!pswResultId) {
 				console.error('❌ FlightView failed to return psw_result_id');
 				const err = createPriceCheckError(
@@ -87,10 +117,10 @@ export async function POST(req: Request) {
 		} else {
 			// V1 flow: Use segmentResultId directly
 			console.log('🔍 Using V1 flow: Direct PriceCheck');
-			
+
 			// Validate: must be non-empty and numeric
 			const isValidNumeric = /^\d+$/.test(segmentIdStr);
-			
+
 			if (!segmentIdStr || segmentIdStr === 'undefined' || segmentIdStr === 'null' || !isValidNumeric) {
 				console.error('❌ Price Check Validation Failed:', { segmentResultId, segmentIdStr });
 				const err = createPriceCheckError(
@@ -101,7 +131,7 @@ export async function POST(req: Request) {
 				);
 				return NextResponse.json(err, { status: 400 });
 			}
-			
+
 			pswResultId = parseInt(segmentIdStr, 10);
 		}
 
@@ -157,7 +187,7 @@ export async function POST(req: Request) {
 		}
 
 		const data: PriceCheckResponse = await response.json();
-		
+
 		console.log('📥 Price Check Raw Response:', {
 			success: data.success,
 			message: data.message,
@@ -167,7 +197,7 @@ export async function POST(req: Request) {
 			sessionId: data.priceCheck?.sessionId,
 			pswResultId: data.priceCheck?.psw_result_id,
 		});
-		
+
 		if (!data.success || !data.priceCheck) {
 			console.error('❌ Price Check API Error: missing success or priceCheck', { data });
 			const err = createPriceCheckError(
@@ -190,7 +220,7 @@ export async function POST(req: Request) {
 		}
 
 		const result: PriceCheckResult = await transformPriceCheckResponse(data);
-		
+
 		console.log('✅ Price Check Success:', {
 			flightId: result.flightDetails?.id,
 			origin: result.flightDetails?.origin,
@@ -205,12 +235,12 @@ export async function POST(req: Request) {
 				isUpgrade: o.isUpgrade,
 			})),
 		});
-		
+
 		// Include raw response in debug mode
 		if (process.env.NEXT_PUBLIC_DEBUG_FLIGHT_IDS === 'true') {
 			result.rawResponse = data;
 		}
-		
+
 		return NextResponse.json(result, { status: 200 });
 	} catch (error: any) {
 		if (error?.name === 'AbortError') {

@@ -127,9 +127,9 @@ function DateSlider({
         >
           {dates.map((datePrice, index) => {
             const active = index === selectedIndex;
-            // Show loading for dates that are loading OR have price 0 (not yet fetched)
-            // Never show loading for the selected date - we already have that data
-            const isLoading = !active && (loadingIndices.has(index) || datePrice.price === 0);
+            // Show loading for dates that are loading OR have no price yet (0, null, undefined)
+            // For selected date: show loading only if explicitly in loadingIndices OR price is 0/not available
+            const isLoading = loadingIndices.has(index) || !datePrice.price;
             return (
               <button
                 type="button"
@@ -140,8 +140,8 @@ function DateSlider({
                 data-index={index}
                 onClick={() => onSelectDate(index)}
                 className={`snap-center flex flex-col items-center justify-between gap-1.5 sm:gap-2 p-2 sm:p-3 border rounded-lg min-w-[90px] sm:min-w-[110px] md:min-w-[120px] lg:min-w-[130px] transition-colors outline-none focus-visible:ring-0 ${active
-                    ? "bg-[#F5F7FF] border-[#3754ED]"
-                    : "bg-white border-[#DFE0E4] hover:bg-gray-50"
+                  ? "bg-[#F5F7FF] border-[#3754ED]"
+                  : "bg-white border-[#DFE0E4] hover:bg-gray-50"
                   }`}
               >
                 <span className="text-[10px] sm:text-xs text-center text-[#010D50] truncate max-w-full px-1">
