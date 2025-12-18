@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
-import { ChevronLeft, Loader2 } from "lucide-react";
+import { ChevronLeft, Loader2, Home, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
@@ -57,6 +57,7 @@ function PaymentContent() {
   const passengers = useBookingStore((state) => state.passengers);
   const contactEmail = useBookingStore((state) => state.contactEmail);
   const contactPhone = useBookingStore((state) => state.contactPhone);
+  const selectedFareType = useBookingStore((state) => state.selectedFareType);
 
   const protectionPlan = addOns.protectionPlan;
   const additionalBaggage = addOns.additionalBaggage;
@@ -83,26 +84,59 @@ function PaymentContent() {
 
   // Track session start for 60-min refresh expiry
   useEffect(() => {
+    // Skip session expiry check if we just came back from a payment redirect
+    // (indicated by pendingOrderId or error query param)
+    const pendingOrderId = sessionStorage.getItem('pendingOrderId');
+    const hasPaymentError = searchParams?.get('error') === 'payment_failed';
+    if (pendingOrderId || hasPaymentError) {
+      // Don't trigger session expired on payment redirect returns
+      return;
+    }
+
     const key = 'paymentSessionStart';
+    const orderKey = 'paymentSessionOrderId';
     const existed = sessionStorage.getItem(key);
+    const previousOrderId = sessionStorage.getItem(orderKey);
     const now = Date.now();
-    if (!existed) {
+
+    // Get current order ID from store
+    const currentOrderId = vyspaFolderNumber || searchRequestId || '';
+
+    // Reset session if this is a different order (new booking flow)
+    if (previousOrderId && currentOrderId && previousOrderId !== currentOrderId) {
       sessionStorage.setItem(key, String(now));
+      sessionStorage.setItem(orderKey, currentOrderId);
       sessionStorage.setItem('paymentVisited', '1');
       return;
     }
+
+    if (!existed) {
+      sessionStorage.setItem(key, String(now));
+      if (currentOrderId) {
+        sessionStorage.setItem(orderKey, currentOrderId);
+      }
+      sessionStorage.setItem('paymentVisited', '1');
+      return;
+    }
+
     const startedAt = parseInt(existed, 10);
     const elapsed = now - startedAt;
     const visitedBefore = sessionStorage.getItem('paymentVisited') === '1';
+
     // Detect reload if possible
     const nav = (performance.getEntriesByType('navigation') as PerformanceNavigationTiming[])[0];
     const isReload = nav ? nav.type === 'reload' : false;
+
     if (visitedBefore && isReload && elapsed > 60 * 60 * 1000) {
       setSessionExpiredOpen(true);
     }
-    // Keep visited flag
+
+    // Keep visited flag and update order ID
     sessionStorage.setItem('paymentVisited', '1');
-  }, []);
+    if (currentOrderId) {
+      sessionStorage.setItem(orderKey, currentOrderId);
+    }
+  }, [searchParams, vyspaFolderNumber, searchRequestId]);
 
   // State for resolved airport names from cache
   const [airportNameCache, setAirportNameCache] = useState<Record<string, string>>({});
@@ -242,7 +276,7 @@ function PaymentContent() {
     if (counts.infants) parts.push(`${counts.infants} Infant${counts.infants > 1 ? 's' : ''}`);
     return parts.join(", ");
   })();
-  const cabinLabel = selectedUpgrade?.cabinClassDisplay || useBookingStore((s) => s.selectedFareType) || 'Economy';
+  const cabinLabel = selectedUpgrade?.cabinClassDisplay || selectedFareType || 'Economy';
   // Web reference: prefer folder number, then search request ID, then fallbacks
   const refNumber = vyspaFolderNumber || searchRequestId || flight.webRef || '—';
   const orderId = refNumber;
@@ -255,6 +289,21 @@ function PaymentContent() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 flex flex-col gap-4">
         {/* Header with Back Link and Progress Steps */}
         <PaymentHeader currentStep={3} />
+
+        {/* Payment Failed Banner */}
+        {searchParams?.get('error') === 'payment_failed' && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+              <AlertCircle className="w-4 h-4 text-red-600" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <h3 className="font-semibold text-red-800">Payment Failed</h3>
+              <p className="text-sm text-red-700">
+                Your payment could not be processed. Please check your card details and try again.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Main Layout */}
         <div className="flex flex-col lg:flex-row gap-4">
@@ -440,10 +489,22 @@ function PaymentContent() {
           <DialogHeader className="sr-only">
             <DialogTitle>Session expired</DialogTitle>
           </DialogHeader>
-          <ErrorMessage
-            title="Your session has expired"
-            message="Your session has been expired, please go Home for new search."
-          />
+          <div className="flex flex-col items-center justify-center gap-4 py-8 px-4 bg-white border border-red-200 rounded-xl">
+            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+              <Home className="w-6 h-6 text-red-600" />
+            </div>
+            <div className="flex flex-col items-center gap-2 text-center max-w-md">
+              <h3 className="text-lg font-semibold text-[#010D50]">Your session has expired</h3>
+              <p className="text-sm text-[#3A478A]">Please start a new search to continue.</p>
+            </div>
+            <Button
+              onClick={() => router.push('/')}
+              className="bg-[#3754ED] hover:bg-[#2942D1] text-white rounded-full px-6 py-2 h-auto text-sm font-medium gap-2"
+            >
+              <Home className="w-4 h-4" />
+              Go to Home
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 

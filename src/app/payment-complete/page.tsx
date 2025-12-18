@@ -562,6 +562,12 @@ function PaymentCompleteContent() {
         const result = await inquirePayment(redirectionResult);
 
         if (result.success && result.payment) {
+          // If payment failed, redirect back to payment page with error
+          if (result.payment.status === "failed") {
+            router.replace('/payment?error=payment_failed');
+            return;
+          }
+
           setPaymentInfo(result.payment);
 
           // Show confetti on success
@@ -800,15 +806,8 @@ function PaymentCompleteContent() {
               {/* Action buttons */}
               <div className="flex items-center justify-center gap-3">
                 <Button
-                  onClick={handleViewTrip}
-                  className="bg-[#3754ED] hover:bg-[#2942D1] text-white px-6"
-                >
-                  View your trip
-                </Button>
-                <Button
                   onClick={handleDownloadReceipt}
-                  variant="outline"
-                  className="border-[#E5E7EB] text-[#010D50] px-6"
+                  className="bg-[#3754ED] hover:bg-[#2942D1] text-white px-6"
                 >
                   Download receipt
                 </Button>
@@ -852,12 +851,60 @@ function PaymentCompleteContent() {
               </div>
             )}
 
+
+            {/* Important Information Sections */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Documents Section */}
+              <div className="bg-white rounded-xl shadow-sm border border-[#E5E7EB] p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-[#EEF2FF] rounded-lg flex items-center justify-center">
+                    <Mail className="w-4 h-4 text-[#3754ED]" />
+                  </div>
+                  <h3 className="font-semibold text-[#3754ED]">Documents</h3>
+                </div>
+                <div className="space-y-3 text-sm text-[#4B5563]">
+                  <p>
+                    Once your payment is approved, you will receive a separate email with your attached receipt and e-tickets.
+                  </p>
+                  <p>
+                    Please don&apos;t forget to check your junk/spam folder or email us back on{' '}
+                    <a href="mailto:documents@globehunters.com" className="text-[#3754ED] hover:underline font-medium">
+                      documents@globehunters.com
+                    </a>
+                  </p>
+                  <p>
+                    Alternatively, you may contact us at{' '}
+                    <a href={`tel:${affiliatePhone}`} className="text-[#3754ED] hover:underline font-semibold">
+                      {affiliatePhone}
+                    </a>
+                  </p>
+                </div>
+              </div>
+
+              {/* Terms and Conditions Section */}
+              <div className="bg-white rounded-xl shadow-sm border border-[#E5E7EB] p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-[#EEF2FF] rounded-lg flex items-center justify-center">
+                    <Info className="w-4 h-4 text-[#3754ED]" />
+                  </div>
+                  <h3 className="font-semibold text-[#3754ED]">Terms and Conditions</h3>
+                </div>
+                <p className="text-xs text-[#4B5563] leading-relaxed">
+                  I acknowledge that passenger information matches the passport or official ID for travel, and that name changes are not allowed. I confirm that I have reviewed the flight itinerary and agree to the Refund &amp; Cancellation Policy. I understand tickets are non-transferable and non-changeable unless stated otherwise. I accept full responsibility for valid travel documentation and understand Globehunters cannot be held responsible for denied boarding due to passport or visa validity. At the time of booking you confirmed that you have read and agreed to our General Terms and Conditions of Carriage. Please{' '}
+                  <a href="https://www.globehunters.com/terms" target="_blank" rel="noopener noreferrer" className="text-[#3754ED] hover:underline font-medium">
+                    Click Here
+                  </a>{' '}
+                  to review these again if necessary.
+                </p>
+              </div>
+            </div>
+
             {/* Footer disclaimer */}
             <div className="text-center">
               <p className="text-xs text-[#6B7280]">
                 *Flight schedule and aircraft type are subject to change per the
                 Contract of Carriage.{" "}
-                <button className="text-[#3754ED] hover:underline">More</button>
+                <a href="https://www.globehunters.com/terms" target="_blank" rel="noopener noreferrer" className="text-[#3754ED] hover:underline">More</a>
               </p>
             </div>
 
@@ -867,14 +914,25 @@ function PaymentCompleteContent() {
               <p className="text-[#6B7280] mb-4">
                 Our customer support team is here to assist you 24/7
               </p>
-              <div className="flex items-center justify-center gap-2">
-                <Phone className="w-5 h-5 text-[#3754ED]" />
-                <a
-                  href={`tel:${affiliatePhone}`}
-                  className="text-lg font-bold text-[#3754ED] hover:underline"
-                >
-                  {affiliatePhone}
-                </a>
+              <div className="flex items-center justify-center gap-4 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Phone className="w-5 h-5 text-[#3754ED]" />
+                  <a
+                    href={`tel:${affiliatePhone}`}
+                    className="text-lg font-bold text-[#3754ED] hover:underline"
+                  >
+                    {affiliatePhone}
+                  </a>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-[#3754ED]" />
+                  <a
+                    href="mailto:documents@globehunters.com"
+                    className="text-[#3754ED] hover:underline font-medium"
+                  >
+                    documents@globehunters.com
+                  </a>
+                </div>
               </div>
             </div>
           </div>

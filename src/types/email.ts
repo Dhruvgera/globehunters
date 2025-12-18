@@ -15,6 +15,7 @@ export interface FlightSegmentEmail {
   duration: string;
   flightNumber: string;
   airline: string;
+  airlineCode?: string;
   cabinClass: string;
   operatedBy?: string;
 }

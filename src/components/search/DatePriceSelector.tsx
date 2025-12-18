@@ -89,9 +89,9 @@ function DateSlider({
   useEffect(() => {
     const el = dateStripRef.current;
     const selectedButton = dateRefs.current[selectedIndex];
-    
+
     if (!el || !selectedButton) return;
-    
+
     // Use setTimeout to ensure DOM has settled and layout is complete
     const timeoutId = setTimeout(() => {
       // Use scrollIntoView with center alignment for more reliable centering
@@ -101,7 +101,7 @@ function DateSlider({
         inline: "center"
       });
     }, 150);
-    
+
     return () => clearTimeout(timeoutId);
   }, [selectedIndex, dates.length]);
 
@@ -127,8 +127,9 @@ function DateSlider({
         >
           {dates.map((datePrice, index) => {
             const active = index === selectedIndex;
+            // Show loading for dates that are loading OR have price 0 (not yet fetched)
             // Never show loading for the selected date - we already have that data
-            const isLoading = !active && loadingIndices.has(index);
+            const isLoading = !active && (loadingIndices.has(index) || datePrice.price === 0);
             return (
               <button
                 type="button"
@@ -138,11 +139,10 @@ function DateSlider({
                 }}
                 data-index={index}
                 onClick={() => onSelectDate(index)}
-                className={`snap-center flex flex-col items-center justify-between gap-1.5 sm:gap-2 p-2 sm:p-3 border rounded-lg min-w-[90px] sm:min-w-[110px] md:min-w-[120px] lg:min-w-[130px] transition-colors outline-none focus-visible:ring-0 ${
-                  active
+                className={`snap-center flex flex-col items-center justify-between gap-1.5 sm:gap-2 p-2 sm:p-3 border rounded-lg min-w-[90px] sm:min-w-[110px] md:min-w-[120px] lg:min-w-[130px] transition-colors outline-none focus-visible:ring-0 ${active
                     ? "bg-[#F5F7FF] border-[#3754ED]"
                     : "bg-white border-[#DFE0E4] hover:bg-gray-50"
-                }`}
+                  }`}
               >
                 <span className="text-[10px] sm:text-xs text-center text-[#010D50] truncate max-w-full px-1">
                   {datePrice.date}
@@ -152,9 +152,8 @@ function DateSlider({
                   {isLoading ? (
                     <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin text-[#3754ED]" />
                   ) : (
-                    <span className={`text-xs sm:text-sm font-medium ${
-                      active ? 'text-[#3754ED]' : 'text-[#010D50]'
-                    }`}>
+                    <span className={`text-xs sm:text-sm font-medium ${active ? 'text-[#3754ED]' : 'text-[#010D50]'
+                      }`}>
                       {formatPrice(datePrice.price, currency)}
                     </span>
                   )}

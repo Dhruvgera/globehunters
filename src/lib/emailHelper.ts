@@ -29,7 +29,7 @@ function getCurrencySymbol(currency: string): string {
  */
 function formatEmailDate(dateString: string): string {
   if (!dateString) return '';
-  
+
   try {
     // Try ISO format first
     const date = parseISO(dateString);
@@ -39,7 +39,7 @@ function formatEmailDate(dateString: string): string {
   } catch {
     // Fall through to return original
   }
-  
+
   // Return original string if parsing fails (might already be formatted)
   return dateString;
 }
@@ -49,7 +49,7 @@ function formatEmailDate(dateString: string): string {
  */
 function formatArrivalDate(dateString: string | undefined): string | undefined {
   if (!dateString) return undefined;
-  
+
   try {
     const date = parseISO(dateString);
     if (!isNaN(date.getTime())) {
@@ -58,7 +58,7 @@ function formatArrivalDate(dateString: string | undefined): string | undefined {
   } catch {
     // Fall through
   }
-  
+
   // Return original if already formatted or parsing fails
   return dateString;
 }
@@ -68,7 +68,7 @@ function formatArrivalDate(dateString: string | undefined): string | undefined {
  */
 function formatDOB(dateString: string): string {
   if (!dateString) return '';
-  
+
   try {
     const date = parseISO(dateString);
     if (!isNaN(date.getTime())) {
@@ -77,7 +77,7 @@ function formatDOB(dateString: string): string {
   } catch {
     // Fall through
   }
-  
+
   // Return original if already formatted
   return dateString;
 }
@@ -95,7 +95,7 @@ function getPassengerFullName(passenger: Passenger): string {
 /**
  * Transform a flight segment to email format
  */
-function transformSegmentToEmail(segment: any, cabinClass: string): FlightSegmentEmail[] {
+function transformSegmentToEmail(segment: any, cabinClass: string, mainAirlineName?: string, mainAirlineCode?: string): FlightSegmentEmail[] {
   const segments: FlightSegmentEmail[] = [];
 
   // Check if segment has individual flights (multi-leg)
@@ -111,7 +111,8 @@ function transformSegmentToEmail(segment: any, cabinClass: string): FlightSegmen
         arrivalTime: flight.arrivalTime,
         duration: flight.duration,
         flightNumber: flight.flightNumber || segment.flightNumber || '',
-        airline: flight.airline || segment.airline?.name || 'Airline',
+        airline: flight.airline || segment.airline?.name || mainAirlineName || 'Airline',
+        airlineCode: flight.carrierCode || segment.carrierCode || mainAirlineCode || '',
         cabinClass: cabinClass || 'Economy',
         operatedBy: flight.operatedBy,
       });
@@ -128,7 +129,8 @@ function transformSegmentToEmail(segment: any, cabinClass: string): FlightSegmen
       arrivalTime: segment.arrivalTime,
       duration: segment.totalJourneyTime || segment.duration || '',
       flightNumber: segment.flightNumber || '',
-      airline: segment.airline?.name || 'Airline',
+      airline: segment.airline?.name || mainAirlineName || 'Airline',
+      airlineCode: segment.carrierCode || mainAirlineCode || '',
       cabinClass: cabinClass || 'Economy',
     });
   }
@@ -196,7 +198,7 @@ export function transformBookingToEmailData(params: {
 
   // Outbound journey
   if (flight.outbound) {
-    const outboundSegments = transformSegmentToEmail(flight.outbound, cabinClass);
+    const outboundSegments = transformSegmentToEmail(flight.outbound, cabinClass, flight.airline?.name, flight.airline?.code);
     const outboundStopovers = transformLayoversToEmail(flight.outbound);
 
     journeys.push({
@@ -212,7 +214,7 @@ export function transformBookingToEmailData(params: {
 
   // Inbound journey (if round trip)
   if (flight.inbound) {
-    const inboundSegments = transformSegmentToEmail(flight.inbound, cabinClass);
+    const inboundSegments = transformSegmentToEmail(flight.inbound, cabinClass, flight.airline?.name, flight.airline?.code);
     const inboundStopovers = transformLayoversToEmail(flight.inbound);
 
     journeys.push({
@@ -226,9 +228,9 @@ export function transformBookingToEmailData(params: {
     });
   }
 
-  // Calculate payment breakdown
-  const creditCardFees = totalAmount * 0.015; // Assuming 1.5% card fee
-  const baseFare = totalAmount - protectionPlanAmount - baggageAmount - creditCardFees;
+  // Payment breakdown - totalAmount already includes everything
+  // baseFare = totalAmount minus add-ons
+  const baseFare = totalAmount - protectionPlanAmount - baggageAmount;
 
   return {
     orderNumber,
@@ -239,7 +241,7 @@ export function transformBookingToEmailData(params: {
     journeys,
     payment: {
       totalFare: baseFare,
-      creditCardFees,
+      creditCardFees: 0, // Credit card fees are included in the total, not itemized separately
       protectionPlan: protectionPlanAmount,
       baggagePlan: baggageAmount,
       totalPaid: totalAmount,

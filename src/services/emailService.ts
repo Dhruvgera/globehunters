@@ -235,7 +235,7 @@ function generateJourneySection(journey: JourneyEmail): string {
   let segmentsHTML = '';
   journey.segments.forEach((segment, index) => {
     segmentsHTML += generateFlightSegmentHTML(segment);
-    
+
     // Add stopover if not the last segment
     if (index < journey.stopovers.length) {
       const stopover = journey.stopovers[index];
@@ -272,14 +272,28 @@ function generateJourneySection(journey: JourneyEmail): string {
  */
 function generateFlightSegmentHTML(segment: FlightSegmentEmail): string {
   const operatedByText = segment.operatedBy ? ` (Operated by ${segment.operatedBy})` : '';
-  
+  const airlineLogoUrl = segment.airlineCode
+    ? `https://images.kiwi.com/airlines/64/${segment.airlineCode}.png`
+    : '';
+
   return `
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 16px;">
       <tr>
         <td style="font-family: 'Inter', Arial, sans-serif; font-weight: 600; font-size: 13px; color: #000000; padding-bottom: 6px;">${segment.from} (${segment.fromCode}) → ${segment.to} (${segment.toCode})</td>
       </tr>
       <tr>
-        <td style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 12px; color: #333333; padding-bottom: 4px;">${segment.airline} Flight ${segment.flightNumber}${operatedByText}</td>
+        <td style="padding-bottom: 8px;">
+          <table cellpadding="0" cellspacing="0">
+            <tr>
+              ${airlineLogoUrl ? `
+              <td style="vertical-align: middle; padding-right: 8px;">
+                <img src="${airlineLogoUrl}" alt="${segment.airline}" style="width: 24px; height: 24px; object-fit: contain;" onerror="this.style.display='none'" />
+              </td>
+              ` : ''}
+              <td style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 12px; color: #333333; vertical-align: middle;">${segment.airline} Flight ${segment.flightNumber}${operatedByText}</td>
+            </tr>
+          </table>
+        </td>
       </tr>
       <tr>
         <td style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 12px; color: #333333; padding-bottom: 4px;">Depart ${segment.departureTime} - Arrive ${segment.arrivalTime}</td>
@@ -314,7 +328,7 @@ export async function sendConfirmationEmail(
     };
 
     const info = await transporter.sendMail(mailOptions);
-    
+
     return {
       success: true,
       messageId: info.messageId,
