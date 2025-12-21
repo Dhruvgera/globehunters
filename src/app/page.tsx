@@ -9,6 +9,7 @@ import { Plane, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useBookingStore } from "@/store/bookingStore";
 import { useAffiliate } from "@/lib/AffiliateContext";
+import { normalizeCabinClass } from "@/lib/utils";
 
 function HomeContent() {
   const t = useTranslations('home');
@@ -85,7 +86,7 @@ function HomeContent() {
             ...data.flight,
             flightKey: key,
           };
-          setSelectedFlight(flightWithKey, data.flight.outbound?.cabinClass || "Economy");
+          setSelectedFlight(flightWithKey, normalizeCabinClass(data.flight.outbound?.cabinClass));
         }
 
         if (data.searchParams) {

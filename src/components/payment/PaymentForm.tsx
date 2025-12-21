@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { MapPin, Shield, CreditCard } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
+import { useBookingStore } from "@/store/bookingStore";
 
 interface PaymentFormProps {
   onSubmit: (billingAddress: BillingAddress) => void;
@@ -15,19 +16,62 @@ interface PaymentFormProps {
   onValidityChange?: (valid: boolean) => void;
 }
 
+// Session storage key for billing address persistence
+const BILLING_ADDRESS_STORAGE_KEY = 'globehunters-billing-address';
+
 export function PaymentForm({ onSubmit, loading = false, onValidityChange }: PaymentFormProps) {
   const t = useTranslations('payment.form');
+  
+  // Get lead passenger info from store to pre-populate names
+  const passengers = useBookingStore((state) => state.passengers);
+  const leadPassenger = passengers[0];
 
-  const [billingAddress, setBillingAddress] = useState<Partial<BillingAddress>>({
-    firstName: "",
-    lastName: "",
-    addressLine1: "",
-    addressLine2: "",
-    city: "",
-    state: "",
-    postalCode: "",
-    country: "",
+  // Initialize from sessionStorage if available, otherwise use passenger data
+  const [billingAddress, setBillingAddress] = useState<Partial<BillingAddress>>(() => {
+    // Try to load from sessionStorage first
+    if (typeof window !== 'undefined') {
+      const stored = sessionStorage.getItem(BILLING_ADDRESS_STORAGE_KEY);
+      if (stored) {
+        try {
+          return JSON.parse(stored);
+        } catch {
+          // Ignore parse errors
+        }
+      }
+    }
+    
+    // Fall back to empty values (will be populated from passenger data in useEffect)
+    return {
+      firstName: "",
+      middleName: "",
+      lastName: "",
+      addressLine1: "",
+      addressLine2: "",
+      city: "",
+      state: "",
+      postalCode: "",
+      country: "",
+    };
   });
+  
+  // Pre-populate names from lead passenger if not already set
+  useEffect(() => {
+    if (leadPassenger && !billingAddress.firstName && !billingAddress.lastName) {
+      setBillingAddress((prev) => ({
+        ...prev,
+        firstName: leadPassenger.firstName || prev.firstName || "",
+        middleName: leadPassenger.middleName || prev.middleName || "",
+        lastName: leadPassenger.lastName || prev.lastName || "",
+      }));
+    }
+  }, [leadPassenger, billingAddress.firstName, billingAddress.lastName]);
+  
+  // Persist billing address to sessionStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(BILLING_ADDRESS_STORAGE_KEY, JSON.stringify(billingAddress));
+    }
+  }, [billingAddress]);
 
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
@@ -107,7 +151,7 @@ export function PaymentForm({ onSubmit, loading = false, onValidityChange }: Pay
 
         <div className="grid grid-cols-1 gap-4">
           {/* Name Fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="firstName">First Name {t('required')}</Label>
               <Input
@@ -121,6 +165,17 @@ export function PaymentForm({ onSubmit, loading = false, onValidityChange }: Pay
               {errors.firstName && (
                 <p className="text-xs text-red-600">{errors.firstName}</p>
               )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="middleName">Middle Name</Label>
+              <Input
+                id="middleName"
+                type="text"
+                value={billingAddress.middleName || ""}
+                onChange={(e) => handleAddressChange("middleName", e.target.value)}
+                placeholder="(optional)"
+              />
             </div>
 
             <div className="space-y-2">

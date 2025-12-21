@@ -18,6 +18,7 @@ import { useBoxPay } from "@/hooks/useBoxPay";
 import { getRegion } from "@/lib/utils/domainMapping";
 import { airportCache } from "@/lib/cache/airportCache";
 import { shortenAirportName } from "@/lib/vyspa/utils";
+import { normalizeCabinClass } from "@/lib/utils";
 
 // Import new modular components
 import { PaymentHeader } from "@/components/payment/PaymentHeader";
@@ -276,7 +277,7 @@ function PaymentContent() {
     if (counts.infants) parts.push(`${counts.infants} Infant${counts.infants > 1 ? 's' : ''}`);
     return parts.join(", ");
   })();
-  const cabinLabel = selectedUpgrade?.cabinClassDisplay || selectedFareType || 'Economy';
+  const cabinLabel = normalizeCabinClass(selectedUpgrade?.cabinClassDisplay || selectedFareType);
   // Web reference: prefer folder number, then search request ID, then fallbacks
   const refNumber = vyspaFolderNumber || searchRequestId || flight.webRef || '—';
   const orderId = refNumber;

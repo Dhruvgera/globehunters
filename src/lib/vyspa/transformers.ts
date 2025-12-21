@@ -100,14 +100,16 @@ export function transformVyspaResponse(
  * V3 format: "79596866-0-0-172" -> "79596866"
  * V1 format: "940769580" -> "940769580"
  */
-function extractRequestIdFromResultId(resultId: string): string {
-  if (!resultId) return '';
+function extractRequestIdFromResultId(resultId: string | number | undefined): string {
+  if (resultId === undefined || resultId === null) return '';
+  // Convert to string to handle cases where API returns number
+  const resultIdStr = String(resultId);
   // V3 format has hyphens, extract first part
-  if (resultId.includes('-')) {
-    return resultId.split('-')[0];
+  if (resultIdStr.includes('-')) {
+    return resultIdStr.split('-')[0];
   }
   // V1 format is just the ID
-  return resultId;
+  return resultIdStr;
 }
 
 /**

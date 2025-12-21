@@ -12,6 +12,7 @@ import { useBookingStore } from "@/store/bookingStore";
 import { filterFlights, parseDurationToMinutes, sortFlights, countByStops, getTimeBounds } from "@/utils/flightFilter";
 import { airportCache } from "@/lib/cache/airportCache";
 import { shortenAirportName } from "@/lib/vyspa/utils";
+import { normalizeCabinClass } from "@/lib/utils";
 import { FilterState, SearchParams } from "@/types/flight";
 import { mockFlights, mockDatePrices, mockAirlines, mockAirports } from "@/data/mockFlights";
 import { useFilterExpansion } from "@/hooks/useFilterExpansion";
@@ -124,7 +125,7 @@ function SearchPageContent() {
               ...data.flight,
               flightKey: flightKey,
             };
-            setSelectedFlight(flightWithKey, data.flight.outbound?.cabinClass || 'Economy');
+            setSelectedFlight(flightWithKey, normalizeCabinClass(data.flight.outbound?.cabinClass));
           }
 
           if (data.searchParams) {

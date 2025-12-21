@@ -262,6 +262,7 @@
       "name": "Name",
       "firstName": "First Name",
       "middleName": "Middle Name",
+      "middleNamePlaceholder": "Middle name (optional)",
       "lastName": "Last Name",
       "dateOfBirth": "Date of Birth",
       "dateOfBirthPlaceholder": "DD/MM/YYYY",

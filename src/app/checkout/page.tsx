@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useBookingStore } from '@/store/bookingStore';
 import { useAffiliate } from '@/lib/AffiliateContext';
+import { normalizeCabinClass } from '@/lib/utils';
 import { Plane, Loader2 } from 'lucide-react';
 import Navbar from '@/components/navigation/Navbar';
 
@@ -97,7 +98,7 @@ function CheckoutContent() {
             ...data.flight,
             flightKey: flightKey,
           };
-          setSelectedFlight(flightWithKey, data.flight.outbound?.cabinClass || 'Economy');
+          setSelectedFlight(flightWithKey, normalizeCabinClass(data.flight.outbound?.cabinClass));
         }
 
         if (data.searchParams) {

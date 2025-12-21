@@ -13,6 +13,8 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Production source maps - disable to avoid source map warnings
+  // productionBrowserSourceMaps: false,
   // Rewrite legacy URLs to Next.js routes
   async rewrites() {
     return [

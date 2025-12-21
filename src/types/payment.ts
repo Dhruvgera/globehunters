@@ -7,6 +7,7 @@ export type CardType = 'visa' | 'mastercard' | 'amex' | 'maestro' | 'discover' |
 
 export interface BillingAddress {
   firstName: string;
+  middleName?: string;
   lastName: string;
   addressLine1: string;
   addressLine2?: string;

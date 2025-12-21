@@ -9,6 +9,7 @@ import { Flight, SearchParams } from '@/types/flight';
 import { Passenger, AddOns, BookingResponse } from '@/types/booking';
 import { PaymentDetails } from '@/types/payment';
 import { PriceCheckResult, TransformedPriceOption } from '@/types/priceCheck';
+import { normalizeCabinClass } from '@/lib/utils';
 
 interface AffiliateData {
   code: string;
@@ -154,7 +155,7 @@ export const useBookingStore = create<BookingState & HydrationState>()(
       setSelectedUpgrade: (option) =>
         set({
           selectedUpgradeOption: option,
-          selectedFareType: option.cabinClassDisplay,
+          selectedFareType: normalizeCabinClass(option.cabinClassDisplay),
         }),
 
       setPriceCheckData: (data) =>

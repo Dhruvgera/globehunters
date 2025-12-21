@@ -80,14 +80,38 @@ export async function POST(req: Request) {
 
     const data: FlightViewResponse = await response.json();
 
-    // Validate response structure
-    if (!data.Total || !data.Segments || data.Segments.length === 0) {
-      console.error('FlightView invalid response:', data);
+    // Validate response structure - segments are required
+    if (!data.Segments || data.Segments.length === 0) {
+      console.error('FlightView invalid response - no segments:', data);
       return NextResponse.json(
         {
           success: false,
           error: 'INVALID_RESPONSE',
           message: 'Flight data is incomplete or expired',
+          userMessage: 'This flight offer may have expired. Please search for flights again.',
+        },
+        { status: 404 }
+      );
+    }
+
+    // If Total is null/missing, compute from Pax_breakdown
+    if (!data.Total && data.Pax_breakdown && data.Pax_breakdown.length > 0) {
+      const computedTotal = data.Pax_breakdown.reduce((sum, pax) => {
+        const fare = typeof pax.total_fare === 'number' ? pax.total_fare : parseFloat(pax.total_fare || '0');
+        const count = pax.pax_count || 1;
+        return sum + (fare * count);
+      }, 0);
+      data.Total = computedTotal > 0 ? String(computedTotal) : null;
+    }
+
+    // Validate we have a price (either Total or computable from Pax_breakdown)
+    if (!data.Total) {
+      console.error('FlightView invalid response - no price:', data);
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'INVALID_RESPONSE',
+          message: 'Flight pricing data is incomplete',
           userMessage: 'This flight offer may have expired. Please search for flights again.',
         },
         { status: 404 }

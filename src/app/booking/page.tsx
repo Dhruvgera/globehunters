@@ -13,6 +13,7 @@ import { useIdleTimer } from "@/hooks/useIdleTimer";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
 import { airportCache } from "@/lib/cache/airportCache";
 import { shortenAirportName } from "@/lib/vyspa/utils";
+import { normalizeCabinClass } from "@/lib/utils";
 
 // Import new modular components
 import { BookingHeader } from "@/components/booking/BookingHeader";
@@ -183,7 +184,7 @@ function BookingContent() {
     if (counts.infants) parts.push(`${counts.infants} Infant${counts.infants > 1 ? 's' : ''}`);
     return parts.join(", ");
   })();
-  const cabinLabel = selectedUpgrade?.cabinClassDisplay || useBookingStore((s) => s.selectedFareType) || 'Economy';
+  const cabinLabel = normalizeCabinClass(selectedUpgrade?.cabinClassDisplay || useBookingStore((s) => s.selectedFareType));
 
   return (
     <div className="min-h-screen bg-white">

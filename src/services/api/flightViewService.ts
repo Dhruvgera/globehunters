@@ -61,7 +61,7 @@ export interface FlightViewSegment {
 }
 
 /**
- * Passenger breakdown from FlightView API
+ * Passenger breakdown from FlightView API (legacy format)
  */
 export interface FlightViewBreakdown {
   pax_type: string; // "ADT", "CHD", "INF"
@@ -73,16 +73,39 @@ export interface FlightViewBreakdown {
 }
 
 /**
+ * Passenger breakdown from FlightView API (newer format with Pax_breakdown)
+ */
+export interface FlightViewPaxBreakdown {
+  pax_type: string; // "ADT", "CHD", "INF"
+  pax_count: number;
+  base_fare: string | number;
+  tax: string | number;
+  total_fare: string | number;
+  markup: number;
+  commission?: string | number;
+  markup_ids?: string;
+  baggage?: unknown[];
+  fare_basis?: unknown[];
+  ticket_designators?: unknown[];
+}
+
+/**
  * FlightView API response structure
  */
 export interface FlightViewResponse {
-  Total: number;
-  Total_fare: number;
-  key: string;
-  Request_id: number;
-  Result_id: number;
-  Breakdown: FlightViewBreakdown[];
+  Total: string | number | null;
+  Total_fare?: number;
+  key?: string;
+  Request_id?: number;
+  Result_id?: string;
+  psw_result_id?: number;
+  Currency_code?: string;
+  Breakdown?: FlightViewBreakdown[];
+  Pax_breakdown?: FlightViewPaxBreakdown[];
   Segments: FlightViewSegment[];
+  Validating_carrier?: string;
+  Journey_type?: string;
+  Last_ticket_date?: string;
 }
 
 // ============================================================================
