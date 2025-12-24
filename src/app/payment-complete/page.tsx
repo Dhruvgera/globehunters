@@ -15,6 +15,7 @@ import {
 } from "@/data/mockBookingConfirmation";
 import { transformBookingToEmailData, sendBookingConfirmationEmail } from "@/lib/emailHelper";
 import { shortenAirportName } from "@/lib/vyspa/utils";
+import { airportCache } from "@/lib/cache/airportCache";
 import {
   CheckCircle2,
   XCircle,
@@ -206,6 +207,9 @@ function FlightLegDisplay({
               <span className="text-sm font-medium text-[#010D50]">
                 {shortenAirportName(departureCity)} ({departureCode})
               </span>
+              <span className="text-xs text-[#3A478A]">
+                {getCityName(departureCode)}
+              </span>
               {departureTerminal && (
                 <span className="text-xs text-[#3A478A]">{departureTerminal}</span>
               )}
@@ -233,6 +237,9 @@ function FlightLegDisplay({
             <div className="flex flex-col gap-0.5">
               <span className="text-sm font-medium text-[#010D50]">
                 {shortenAirportName(arrivalCity)} ({arrivalCode})
+              </span>
+              <span className="text-xs text-[#3A478A]">
+                {getCityName(arrivalCode)}
               </span>
               {arrivalTerminal && (
                 <span className="text-xs text-[#3A478A]">{arrivalTerminal}</span>
@@ -313,6 +320,21 @@ interface FlightCardConfirmationProps {
   onViewDetails: () => void;
 }
 
+// Helper to get city name from airport code using cache or fallback
+function getCityName(airportCode: string): string {
+  // First check static lookup
+  if (airportNames[airportCode]?.city) {
+    return airportNames[airportCode].city;
+  }
+  // Then try airport cache
+  const cached = airportCache.getAirportByCode(airportCode);
+  if (cached?.city) {
+    return cached.city;
+  }
+  // Fallback to the airport code itself
+  return airportCode;
+}
+
 function FlightConfirmationCard({
   title,
   date,
@@ -328,6 +350,16 @@ function FlightConfirmationCard({
 }: FlightCardConfirmationProps) {
   const [showDetails, setShowDetails] = useState(true); // Show details by default per Figma
   const [imgError, setImgError] = useState(false);
+  const [cacheLoaded, setCacheLoaded] = useState(false);
+
+  // Load airport cache on mount
+  useEffect(() => {
+    const loadCache = async () => {
+      await airportCache.getAirports();
+      setCacheLoaded(true);
+    };
+    loadCache();
+  }, []);
 
   const logoUrl = `https://images.kiwi.com/airlines/64/${airlineCode}.png`;
 
@@ -402,18 +434,12 @@ function FlightConfirmationCard({
               <div className="bg-[#F5F7FF] rounded-xl p-4">
                 <FlightLegDisplay
                   departureCode={individualFlights[0].departureAirport}
-                  departureCity={
-                    airportNames[individualFlights[0].departureAirport]?.city ||
-                    individualFlights[0].departureAirport
-                  }
+                  departureCity={getCityName(individualFlights[0].departureAirport)}
                   departureTime={individualFlights[0].departureTime}
                   departureTerminal={segment.departureTerminal}
                   departureDate={segment.date}
                   arrivalCode={individualFlights[0].arrivalAirport}
-                  arrivalCity={
-                    airportNames[individualFlights[0].arrivalAirport]?.city ||
-                    individualFlights[0].arrivalAirport
-                  }
+                  arrivalCity={getCityName(individualFlights[0].arrivalAirport)}
                   arrivalTime={individualFlights[0].arrivalTime}
                   arrivalTerminal={segment.arrivalTerminal}
                   arrivalDate={segment.date}
@@ -439,18 +465,12 @@ function FlightConfirmationCard({
                 <div className="bg-[#F5F7FF] rounded-xl p-4">
                   <FlightLegDisplay
                     departureCode={individualFlights[1].departureAirport}
-                    departureCity={
-                      airportNames[individualFlights[1].departureAirport]?.city ||
-                      individualFlights[1].departureAirport
-                    }
+                    departureCity={getCityName(individualFlights[1].departureAirport)}
                     departureTime={individualFlights[1].departureTime}
                     departureTerminal={segment.departureTerminal}
                     departureDate={segment.date}
                     arrivalCode={individualFlights[1].arrivalAirport}
-                    arrivalCity={
-                      airportNames[individualFlights[1].arrivalAirport]?.city ||
-                      individualFlights[1].arrivalAirport
-                    }
+                    arrivalCity={getCityName(individualFlights[1].arrivalAirport)}
                     arrivalTime={individualFlights[1].arrivalTime}
                     arrivalTerminal={segment.arrivalTerminal}
                     arrivalDate={segment.arrivalDate || segment.date}

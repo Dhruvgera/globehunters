@@ -125,6 +125,19 @@ export default function FlightInfoModal({
     return code;
   };
 
+  // Helper to get city name from airport code using cache
+  const getCityName = (code: string) => {
+    const airport = airportCache.getAirportByCode(code);
+    if (airport?.city && airport.city !== code) {
+      return airport.city;
+    }
+    // Fallback to airport name if city not available
+    if (airport?.name && airport.name !== code) {
+      return shortenAirportName(airport.name);
+    }
+    return code;
+  };
+
   const journeySegments = flight.segments && flight.segments.length > 0
     ? flight.segments
     : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])].filter(
@@ -425,12 +438,12 @@ export default function FlightInfoModal({
                       setSelectedLegIndex(index);
                     }}
                   >
-                    {/* Use airport codes for tab headings to prevent overflow */}
+                    {/* Show city names with airport codes for clarity */}
                     <span className="hidden sm:inline">
-                      {seg.departureAirport.code} - {seg.arrivalAirport.code} - {seg.date}
+                      {getCityName(seg.departureAirport.code)} ({seg.departureAirport.code}) - {getCityName(seg.arrivalAirport.code)} ({seg.arrivalAirport.code}) - {seg.date}
                     </span>
                     <span className="sm:hidden">
-                      {seg.departureAirport.code} - {seg.arrivalAirport.code}
+                      {getCityName(seg.departureAirport.code)} - {getCityName(seg.arrivalAirport.code)}
                     </span>
                   </Button>
                 ))}
@@ -524,6 +537,9 @@ export default function FlightInfoModal({
                             <span className="text-xs sm:text-sm font-semibold text-[#010D50] break-words">
                               {getAirportName(currentLeg.departureAirport.code, currentLeg.departureAirport.name, currentLeg.departureAirport.city)} ({currentLeg.departureAirport.code})
                             </span>
+                            <span className="text-xs text-[#3A478A]">
+                              {getCityName(currentLeg.departureAirport.code)}
+                            </span>
                             {currentLeg?.departureTerminal && (
                               <span className="text-xs sm:text-sm text-[#3A478A]">
                                 Terminal {currentLeg.departureTerminal}
@@ -607,6 +623,9 @@ export default function FlightInfoModal({
                           <div className="flex flex-col gap-1">
                             <span className="text-xs sm:text-sm font-semibold text-[#010D50] break-words">
                               {getAirportName(currentLeg.arrivalAirport.code, currentLeg.arrivalAirport.name, currentLeg.arrivalAirport.city)} ({currentLeg.arrivalAirport.code})
+                            </span>
+                            <span className="text-xs text-[#3A478A]">
+                              {getCityName(currentLeg.arrivalAirport.code)}
                             </span>
                             {currentLeg?.arrivalTerminal && (
                               <span className="text-xs sm:text-sm text-[#3A478A]">
