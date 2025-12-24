@@ -1213,6 +1213,38 @@ export default function FlightInfoModal({
               </Button>
             </div>
           )}
+
+          {/* Footer for booking page - "Done" button to confirm upgrade selection */}
+          {stayOnCurrentPage && selectedUpgradeOption && (
+            <div className="sticky bottom-0 z-20 bg-white rounded-xl px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-3 border border-[#EEF0F7] shadow-[0_-8px_24px_-12px_rgba(2,6,23,0.35)]">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm sm:text-lg font-medium text-[#3754ED] whitespace-nowrap">
+                  {formatPrice(selectedUpgradeOption.totalPrice, selectedUpgradeOption.currency)}
+                </span>
+                <span className="text-xs text-[#3A478A]">
+                  {`${formatPrice(selectedUpgradeOption.pricePerPerson, selectedUpgradeOption.currency)} per person`}
+                </span>
+              </div>
+              <Button
+                onClick={() => {
+                  // Save selected upgrade to store
+                  setSelectedUpgrade(selectedUpgradeOption);
+                  // Update selected flight with new cabin class
+                  setSelectedFlight(flight, selectedUpgradeOption.cabinClassDisplay);
+                  // Save price check data
+                  if (priceCheck) {
+                    setPriceCheckData(priceCheck);
+                  }
+                  // Close the dialog
+                  onOpenChange(false);
+                }}
+                className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-full px-4 sm:px-5 py-2 h-auto gap-1 text-sm font-bold shrink-0"
+              >
+                Done
+                <Check className="w-4 h-4 sm:w-5 sm:h-5" />
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
       {/* Availability Error Popup */}
