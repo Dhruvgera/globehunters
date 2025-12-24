@@ -47,6 +47,15 @@ interface InitFolderRequestBody {
   originAirportCode?: string;
   airlineCode?: string;
   airlineName?: string;
+  // New fields for Portal API integration
+  markupIds?: string;         // Markup IDs for rate_note field (format: "id1|id2")
+  moduleId?: string;          // Module ID from price check
+  cabinClassCode?: string;    // Booking/fare class code (e.g., 'T', 'O', 'V', 'H', 'Z')
+  selectedBrandName?: string; // Brand name (e.g., "ECONOMY LIGHT")
+  baggageInfo?: string;       // Baggage allowance info
+  refundableInfo?: string;    // Refund/cancellation policy
+  baseFare?: number;          // Base fare amount
+  taxes?: number;             // Tax amount
 }
 
 function mapPassengerType(type: string): 'ADT' | 'CHD' | 'INF' {
@@ -145,7 +154,12 @@ export async function POST(req: Request) {
       airlineCode: body.airlineCode,
     });
 
-    const { passengers, currency, pswResultId, destinationAirportCode, departureDate, fareSelectedPrice, cabinClass, affiliateCode, flightSegments, originAirportCode, airlineCode } = body;
+    const {
+      passengers, currency, pswResultId, destinationAirportCode, departureDate, fareSelectedPrice,
+      cabinClass, affiliateCode, flightSegments, originAirportCode, airlineCode,
+      // New Portal API fields
+      markupIds, moduleId, cabinClassCode, selectedBrandName, baggageInfo, refundableInfo, baseFare, taxes
+    } = body;
 
     if (!Array.isArray(passengers) || passengers.length === 0) {
       console.error('❌ Portal init-folder validation failed: missing passengers');
@@ -168,7 +182,8 @@ export async function POST(req: Request) {
     const portalDateFormat = formatDateForPortal(vyspaDepartureDate);
     const regionConfig = getPortalRegionConfig();
     const cabinSubsource = getCabinClassSubsource(cabinClass || 'Economy');
-    const ccClassCode = mapCabinClass(cabinClass);
+    // Use the booking class code from the selected fare if available, otherwise fall back to mapped cabin class
+    const ccClassCode = cabinClassCode || mapCabinClass(cabinClass);
 
     console.log('🔧 Portal init-folder config', {
       apiUrl,
@@ -177,6 +192,11 @@ export async function POST(req: Request) {
       cabinSubsource,
       vyspaDepartureDate,
       portalDateFormat,
+      // New Portal API fields
+      markupIds: markupIds || '(none)',
+      moduleId: moduleId || '(none)',
+      ccClassCode,
+      selectedBrandName: selectedBrandName || '(none)',
     });
 
     // Map passengers to Portal format
@@ -266,7 +286,7 @@ export async function POST(req: Request) {
         start_date_time_tm: firstSeg?.departureTime || '00:00',
         end_date_time_tm: lastSeg?.arrivalTime || '23:59',
         status: 'QU',
-        rate_note: '',
+        rate_note: markupIds || '',  // Markup IDs from price check (format: "id1|id2")
         operating_airline_code: '',
         air_craft_type: '',
         start_point_loc: '',
@@ -289,14 +309,42 @@ export async function POST(req: Request) {
       },
       FolderPricings: [
         {
-          tot_net_amt: String(fareSelectedPrice),
-          tot_sell_amt: String(fareSelectedPrice),
+          tot_net_amt: String(baseFare || fareSelectedPrice),
+          tot_sell_amt: String(baseFare || fareSelectedPrice),
           desc: 'Fare',
           fi_type: 'TKT',
           cu_curr_code: currency,
         },
+        ...(taxes ? [{
+          tot_net_amt: String(taxes),
+          tot_sell_amt: String(taxes),
+          desc: 'Tax',
+          fi_type: 'TKT',
+          cu_curr_code: currency,
+        }] : []),
       ],
     });
+
+    // Build comments array with booking metadata
+    const bookingComments: string[] = [];
+    if (markupIds) {
+      bookingComments.push(`Markup ID: ${markupIds}`);
+    }
+    if (moduleId) {
+      bookingComments.push(`Module ID: ${moduleId}`);
+    }
+    if (selectedBrandName) {
+      bookingComments.push(`Fare Type: ${selectedBrandName}`);
+    }
+    if (baggageInfo) {
+      bookingComments.push(`Baggage: ${baggageInfo}`);
+    }
+    if (refundableInfo) {
+      bookingComments.push(`Cancellation: ${refundableInfo}`);
+    }
+    if (ccClassCode) {
+      bookingComments.push(`Booking Class: ${ccClassCode}`);
+    }
 
     // Build the saveBasketToFolder request
     const createFolderPayload = [{
@@ -318,7 +366,7 @@ export async function POST(req: Request) {
       agencyReference: pswResultId ? String(pswResultId) : '',
       marketsource: affiliateCode || '117',
       marketsubsource: cabinSubsource,
-      comments: [],
+      comments: bookingComments,
       matchAllContacts: 'True', // Required for customer creation/matching
       passengers: portalPassengers,
       manual_items: manualItems,

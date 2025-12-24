@@ -38,22 +38,19 @@ export function PassengersSelector({
     const parts: string[] = [];
     if (passengers.adults > 0) {
       parts.push(
-        `${passengers.adults} ${
-          passengers.adults === 1 ? tPrice('adult') : tPrice('adults')
+        `${passengers.adults} ${passengers.adults === 1 ? tPrice('adult') : tPrice('adults')
         }`
       );
     }
     if (passengers.children > 0) {
       parts.push(
-        `${passengers.children} ${
-          passengers.children === 1 ? tPrice('child') : tPrice('children')
+        `${passengers.children} ${passengers.children === 1 ? tPrice('child') : tPrice('children')
         }`
       );
     }
     if (passengers.infants > 0) {
       parts.push(
-        `${passengers.infants} ${
-          passengers.infants === 1 ? tPrice('infant') : tPrice('infants')
+        `${passengers.infants} ${passengers.infants === 1 ? tPrice('infant') : tPrice('infants')
         }`
       );
     }
@@ -89,7 +86,7 @@ export function PassengersSelector({
           <ChevronDown className="w-5 h-5 text-[#010D50]" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80">
+      <PopoverContent className="w-80" side="bottom" align="start">
         <div className="flex flex-col gap-4">
           {/* Adults */}
           <div className="flex items-center justify-between">
@@ -167,15 +164,15 @@ export function PassengersSelector({
                 { key: 'Business', label: t('business') },
                 { key: 'First', label: t('first') }
               ].map((cls) => (
-                  <Button
-                    key={cls.key}
-                    variant={travelClass === cls.key ? "default" : "ghost"}
-                    className="justify-start"
-                    onClick={() => onTravelClassChange(cls.key)}
-                  >
-                    {cls.label}
-                  </Button>
-                )
+                <Button
+                  key={cls.key}
+                  variant={travelClass === cls.key ? "default" : "ghost"}
+                  className="justify-start"
+                  onClick={() => onTravelClassChange(cls.key)}
+                >
+                  {cls.label}
+                </Button>
+              )
               )}
             </div>
           </div>

@@ -125,8 +125,8 @@ function MonthCalendar({
               disabled={!canGoPrev}
               className={cn(
                 "w-7 h-7 rounded-full flex items-center justify-center transition-colors",
-                canGoPrev 
-                  ? "hover:bg-[#F5F7FF] text-[#010D50]" 
+                canGoPrev
+                  ? "hover:bg-[#F5F7FF] text-[#010D50]"
                   : "text-[#D3D3D3] cursor-not-allowed"
               )}
             >
@@ -134,12 +134,12 @@ function MonthCalendar({
             </button>
           )}
         </div>
-        
+
         {/* Month Year - centered */}
         <div className="text-sm font-semibold text-[#010D50]">
           {MONTHS[month]} {year}
         </div>
-        
+
         {/* Right arrow */}
         <div className="w-7 flex justify-end">
           {(showNavigation === "right" || showNavigation === "both") && (
@@ -148,8 +148,8 @@ function MonthCalendar({
               disabled={!canGoNext}
               className={cn(
                 "w-7 h-7 rounded-full flex items-center justify-center transition-colors",
-                canGoNext 
-                  ? "hover:bg-[#F5F7FF] text-[#010D50]" 
+                canGoNext
+                  ? "hover:bg-[#F5F7FF] text-[#010D50]"
                   : "text-[#D3D3D3] cursor-not-allowed"
               )}
             >
@@ -184,18 +184,18 @@ function MonthCalendar({
           const inRange = selectedStart && selectedEnd ? isInRange(date, selectedStart, selectedEnd) : false;
           const isPast = date < today;
           const isSelected = isStart || isEnd;
-          
+
           // Determine position for range highlighting
           const isAtWeekStart = isWeekStart(date, index);
           const isAtWeekEnd = isWeekEnd(date, index);
-          
+
           // Check if prev/next day is in range for continuous highlighting
           const prevDate = index > 0 ? days[index - 1] : null;
           const nextDate = index < days.length - 1 ? days[index + 1] : null;
-          const prevInRange = prevDate && selectedStart && selectedEnd 
+          const prevInRange = prevDate && selectedStart && selectedEnd
             ? (isInRange(prevDate, selectedStart, selectedEnd) || isSameDay(prevDate, selectedStart))
             : false;
-          const nextInRange = nextDate && selectedStart && selectedEnd 
+          const nextInRange = nextDate && selectedStart && selectedEnd
             ? (isInRange(nextDate, selectedStart, selectedEnd) || isSameDay(nextDate, selectedEnd))
             : false;
 
@@ -218,8 +218,8 @@ function MonthCalendar({
                     // In range - full width with edge handling
                     inRange && !isStart && !isEnd && (
                       isAtWeekStart ? "left-0 right-0 rounded-l-full" :
-                      isAtWeekEnd ? "left-0 right-0 rounded-r-full" :
-                      "left-0 right-0"
+                        isAtWeekEnd ? "left-0 right-0 rounded-r-full" :
+                          "left-0 right-0"
                     ),
                     // Range continuation at week boundaries
                     inRange && isAtWeekStart && "rounded-l-full",
@@ -227,7 +227,7 @@ function MonthCalendar({
                   )}
                 />
               )}
-              
+
               {/* Date button */}
               <button
                 onClick={() => {
@@ -273,30 +273,23 @@ export function DatePicker({
   className,
 }: DatePickerProps) {
   const today = new Date();
-  
+
   // Initialize to the selected start date's month if available, otherwise use today
   const initialDate = startDate || today;
-  
+
   // Skyscanner-style: unified navigation - both months move together
+  // Initialize once based on startDate or today, don't auto-advance when user selects dates
   const [baseMonth, setBaseMonth] = React.useState(initialDate.getMonth());
   const [baseYear, setBaseYear] = React.useState(initialDate.getFullYear());
-  
-  // Sync to selected date's month when startDate changes (e.g., when picker reopens with a selection)
-  React.useEffect(() => {
-    if (startDate) {
-      setBaseMonth(startDate.getMonth());
-      setBaseYear(startDate.getFullYear());
-    }
-  }, [startDate?.getTime()]); // Use getTime() to properly detect date changes
-  
+
   // Calculate second month (always baseMonth + 1)
   const secondMonth = baseMonth === 11 ? 0 : baseMonth + 1;
   const secondYear = baseMonth === 11 ? baseYear + 1 : baseYear;
-  
+
   // Check if we can go back (don't go before current month)
-  const canGoPrev = baseYear > today.getFullYear() || 
+  const canGoPrev = baseYear > today.getFullYear() ||
     (baseYear === today.getFullYear() && baseMonth > today.getMonth());
-  
+
   // Allow going forward up to 12 months
   const maxDate = new Date(today.getFullYear() + 1, today.getMonth(), 1);
   const canGoNext = new Date(secondYear, secondMonth, 1) < maxDate;
@@ -372,13 +365,13 @@ export function DatePicker({
             "text-xs font-medium truncate",
             startDate ? "text-[#010D50]" : "text-[#68778D]"
           )}>
-            {startDate 
+            {startDate
               ? startDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
               : "Select date"
             }
           </div>
         </div>
-        
+
         {isRangeMode && (
           <>
             <div className="w-6 h-[1px] bg-[#D3D3D3] flex-shrink-0" />
@@ -388,7 +381,7 @@ export function DatePicker({
                 "text-xs font-medium truncate",
                 endDate ? "text-[#010D50]" : "text-[#68778D]"
               )}>
-                {endDate 
+                {endDate
                   ? endDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
                   : "Select date"
                 }
@@ -412,7 +405,7 @@ export function DatePicker({
           canGoPrev={canGoPrev}
           canGoNext={canGoNext}
         />
-        
+
         {isRangeMode && (
           <div className="hidden lg:block">
             <MonthCalendar
@@ -430,11 +423,18 @@ export function DatePicker({
       </div>
 
       {/* Done Button - Skyscanner style */}
+      {/* In range mode (round trip), disable until both dates are selected */}
       {onDone && (
         <div className="flex justify-end mt-3 pt-2 border-t border-[#E8E8E8]">
           <Button
             onClick={onDone}
-            className="bg-[#3754ED] hover:bg-[#2942D1] text-white rounded-lg px-6 py-1.5 h-auto text-xs font-medium"
+            disabled={isRangeMode && !endDate}
+            className={cn(
+              "rounded-lg px-6 py-1.5 h-auto text-xs font-medium",
+              isRangeMode && !endDate
+                ? "bg-[#D3D3D3] text-[#68778D] cursor-not-allowed"
+                : "bg-[#3754ED] hover:bg-[#2942D1] text-white"
+            )}
           >
             Done
           </Button>

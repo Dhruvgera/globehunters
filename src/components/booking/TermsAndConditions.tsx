@@ -113,6 +113,75 @@ export function TermsAndConditions({
         }
       }
 
+      // Extract markup_id and other booking info from price check data
+      // Get the raw price check response to extract markup_id
+      const rawPriceCheck = priceCheckData?.rawResponse?.priceCheck;
+      let markupIds = '';
+      let moduleId = '';
+      let baggageInfo = '';
+      let refundableInfo = '';
+      let cabinClassCode = 'Y';  // Default to Economy
+      let selectedBrandName = '';
+
+      // If we have a selected upgrade option, try to find its data in price_data
+      if (rawPriceCheck?.price_data) {
+        const priceDataArray = Array.isArray(rawPriceCheck.price_data)
+          ? rawPriceCheck.price_data
+          : Object.values(rawPriceCheck.price_data);
+
+        // Find the matching price option by comparing brand name or price
+        const matchingOption: any = selectedUpgradeOption
+          ? priceDataArray.find((pd: any) => {
+            const brandName = pd.Total_Fare?.Name || pd.BrandInfo?.[0]?.BrandName || '';
+            const total = parseFloat(pd.Total_Fare?.total || '0');
+            return (
+              brandName === selectedUpgradeOption.cabinClassDisplay ||
+              Math.abs(total - selectedUpgradeOption.totalPrice) < 0.01
+            );
+          })
+          : priceDataArray[0]; // Use first option if no upgrade selected
+
+        if (matchingOption) {
+          // Extract markup_id from pricingArr - format: "markup_id1|markup_id2" for multiple segments
+          const pricingArr = matchingOption.pricingArr || [];
+          const markupIdList = pricingArr
+            .map((p: any) => p.markup_id || '')
+            .filter((id: any) => id !== '' && id !== 0 && id !== '0');
+          if (markupIdList.length > 0) {
+            markupIds = markupIdList.join('|');
+          }
+
+          // Extract cabin class code (e.g., 'T', 'O', 'V', 'H', 'Z')
+          cabinClassCode = pricingArr[0]?.BookingCode || matchingOption.BrandInfo?.[0]?.BookingCode || 'Y';
+
+          // Extract brand name
+          selectedBrandName = matchingOption.Total_Fare?.Name || matchingOption.BrandInfo?.[0]?.BrandName || '';
+
+          // Extract baggage info
+          const baggageTxt = matchingOption.baggageTxt;
+          if (baggageTxt && typeof baggageTxt === 'object') {
+            const baggageEntries = Object.entries(baggageTxt).map(([route, data]: [string, any]) => {
+              return `${route}: ${data?.ADT || 'N/A'}`;
+            });
+            baggageInfo = baggageEntries.join(', ');
+          }
+
+          // Extract refundable info
+          const refundableCode = matchingOption.Total_Fare?.refundable;
+          const refundableText = matchingOption.Total_Fare?.refundable_text;
+          if (refundableText) {
+            refundableInfo = refundableText;
+          } else if (refundableCode) {
+            refundableInfo = `Refundable Code: ${refundableCode}`;
+          }
+        }
+      }
+
+      // Get module_id from the flight result
+      if (rawPriceCheck?.flight_data?.result?.FlightPswResult) {
+        moduleId = String(rawPriceCheck.flight_data.result.FlightPswResult.module_id || '');
+      }
+
       const response = await fetch('/api/vyspa/init-folder', {
         method: 'POST',
         headers: {
@@ -139,6 +208,15 @@ export function TermsAndConditions({
           originAirportCode: selectedFlight.outbound.departureAirport?.code || '',
           airlineCode: selectedFlight.airline.code || '',
           airlineName: selectedFlight.airline.name || '',
+          // New fields for Portal API
+          markupIds,                   // For rate_note field in TKT segment
+          moduleId,                    // For comments
+          cabinClassCode,             // For cc_class_code in segments
+          selectedBrandName,          // Brand name (e.g., "ECONOMY LIGHT")
+          baggageInfo,                // For comments
+          refundableInfo,             // For comments (cancellation policy)
+          baseFare: selectedUpgradeOption?.baseFare || priceCheckData?.priceOptions?.[0]?.baseFare || 0,
+          taxes: selectedUpgradeOption?.taxes || priceCheckData?.priceOptions?.[0]?.taxes || 0,
         }),
       });
 

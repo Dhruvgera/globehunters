@@ -219,19 +219,21 @@ function BookingContent() {
               </p>
             </AlertBanner>
 
-            {/* Price Change Alert */}
-            <AlertBanner type="info" title={t('alerts.priceChange.title')}>
+            {/* Price Change Alert - Temporarily hidden */}
+            {/* <AlertBanner type="info" title={t('alerts.priceChange.title')}>
               <p>
                 {t('alerts.priceChange.message')}
               </p>
-            </AlertBanner>
+            </AlertBanner> */}
 
-            {/* Baggage Alert */}
-            <AlertBanner type="error" title={t('alerts.baggageAlert.title')}>
-              <p>
-                {t('alerts.baggageAlert.message')}
-              </p>
-            </AlertBanner>
+            {/* Baggage Alert - Only show when flights have stopovers */}
+            {journeySegments.some(seg => seg.stops > 0) && (
+              <AlertBanner type="error" title={t('alerts.baggageAlert.title')}>
+                <p>
+                  {t('alerts.baggageAlert.message')}
+                </p>
+              </AlertBanner>
+            )}
 
             {/* Flight Summary Cards */}
             <div className="flex flex-col gap-3">
