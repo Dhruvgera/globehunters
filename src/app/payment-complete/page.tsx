@@ -518,6 +518,70 @@ function PaymentCompleteContent() {
   const resetBooking = useBookingStore((state) => state.resetBooking);
   const [emailSent, setEmailSent] = useState(false);
 
+  // Record payment to Vyspa Portal (non-blocking)
+  const recordPaymentToVyspa = useCallback(async (
+    transactionId: string,
+    amount: number,
+    currency: string
+  ) => {
+    if (!storeVyspaFolderNumber) {
+      console.warn('⚠️ No Vyspa folder number available for payment recording');
+      return;
+    }
+
+    try {
+      console.log('📤 Recording payment to Vyspa Portal', {
+        folderNumber: storeVyspaFolderNumber,
+        transactionId,
+        amount,
+        currency,
+      });
+
+      const response = await fetch('/api/vyspa/save-payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          folderNumber: storeVyspaFolderNumber,
+          transactionId,
+          amount,
+          currency,
+        }),
+      });
+
+      const result = await response.json();
+
+      // Enhanced logging for debugging
+      console.log('📦 Vyspa save-payment response', {
+        status: response.status,
+        ok: response.ok,
+        success: result?.success,
+        folderNumber: result?.folderNumber,
+        paymentRecorded: result?.paymentRecorded,
+        statusUpdated: result?.statusUpdated,
+        paymentResult: result?.paymentResult,
+        statusResult: result?.statusResult,
+      });
+
+      // Print folder data prominently for debugging
+      if (result?.folderDetails) {
+        console.log('📁 FOLDER DATA AFTER PAYMENT RECORDING:');
+        console.log(JSON.stringify(result.folderDetails, null, 2));
+      }
+
+      if (response.ok && result.success) {
+        console.log('✅ Payment recorded to Vyspa successfully');
+      } else {
+        console.error('❌ Failed to record payment to Vyspa', {
+          error: result?.error,
+          message: result?.message,
+        });
+      }
+    } catch (error) {
+      // Non-blocking - payment already succeeded, just log the error
+      console.error('❌ Error recording payment to Vyspa:', error);
+    }
+  }, [storeVyspaFolderNumber]);
+
   // Get email from store or vyspa - use vyspaEmailAddress as fallback
   const effectiveContactEmail = storeContactEmail || storeVyspaEmailAddress;
 
@@ -583,6 +647,13 @@ function PaymentCompleteContent() {
             sessionStorage.removeItem("pendingOrderAmount");
             sessionStorage.removeItem("pendingOrderCurrency");
 
+            // Record payment to Vyspa Portal (non-blocking)
+            recordPaymentToVyspa(
+              result.payment.transactionId || result.payment.orderId,
+              parseFloat(result.payment.amount || sessionStorage.getItem("pendingOrderAmount") || '0'),
+              result.payment.currency || sessionStorage.getItem("pendingOrderCurrency") || 'GBP'
+            );
+
             // Email sending is handled by separate useEffect to ensure data is available
           }
         } else {
@@ -623,7 +694,7 @@ function PaymentCompleteContent() {
     };
 
     checkPaymentStatus();
-  }, [redirectionResult, orderId, inquirePayment]);
+  }, [redirectionResult, orderId, inquirePayment, recordPaymentToVyspa, router]);
 
   // Hide confetti after animation
   useEffect(() => {

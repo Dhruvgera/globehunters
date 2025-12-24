@@ -366,6 +366,89 @@ function PaymentContent() {
               setIsProcessingPayment(true);
 
               try {
+                // Sync extras (insurance/baggage) to Vyspa folder before payment (non-blocking)
+                if (vyspaFolderNumber) {
+                  const extras: Array<{ type: 'insurance' | 'baggage'; planType?: string; price?: number; quantity?: number; pricePerBag?: number }> = [];
+
+                  // Add protection plan if selected
+                  if (protectionPlan && protectionPlanPrices[protectionPlan]) {
+                    extras.push({
+                      type: 'insurance',
+                      planType: protectionPlan,
+                      price: protectionPlanPrices[protectionPlan],
+                    });
+                  }
+
+                  // Add baggage if selected
+                  if (additionalBaggage > 0) {
+                    extras.push({
+                      type: 'baggage',
+                      quantity: additionalBaggage,
+                      pricePerBag: baggagePrice,
+                    });
+                  }
+
+                  // Sync extras to folder if any are selected
+                  if (extras.length > 0) {
+                    const firstSegment = journeySegments[0];
+                    const lastSegment = journeySegments[journeySegments.length - 1];
+                    const startDate = firstSegment?.date || new Date().toISOString().split('T')[0];
+                    const endDate = lastSegment?.date || startDate;
+
+                    console.log('📤 Syncing extras to Vyspa folder', {
+                      folderNumber: vyspaFolderNumber,
+                      extras,
+                      currency,
+                      startDate,
+                      endDate,
+                    });
+
+                    try {
+                      const extrasResponse = await fetch('/api/vyspa/add-extras', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          folderNumber: parseInt(vyspaFolderNumber, 10),
+                          currency,
+                          startDate,
+                          endDate,
+                          extras,
+                        }),
+                      });
+
+                      const extrasResult = await extrasResponse.json();
+
+                      // Enhanced logging for debugging
+                      console.log('📦 Vyspa add-extras response', {
+                        status: extrasResponse.status,
+                        ok: extrasResponse.ok,
+                        success: extrasResult?.success,
+                        folderNumber: vyspaFolderNumber,
+                        results: extrasResult?.results,
+                      });
+
+                      // Print folder data prominently for debugging
+                      if (extrasResult?.folderDetails) {
+                        console.log('📁 FOLDER DATA AFTER EXTRAS SYNC:');
+                        console.log(JSON.stringify(extrasResult.folderDetails, null, 2));
+                      }
+
+                      if (extrasResponse.ok && extrasResult.success) {
+                        console.log('✅ Extras synced to folder successfully');
+                      } else {
+                        console.error('❌ Failed to sync extras to folder', {
+                          error: extrasResult?.error,
+                          message: extrasResult?.message,
+                        });
+                        // Continue to payment even if sync fails
+                      }
+                    } catch (syncError) {
+                      console.error('❌ Error syncing extras to folder:', syncError);
+                      // Continue to payment even if sync fails
+                    }
+                  }
+                }
+
                 // Get shopper info from billing address or passengers
                 const leadPassenger = passengers[0];
                 const firstName = billingAddress.firstName || leadPassenger?.firstName || 'Guest';

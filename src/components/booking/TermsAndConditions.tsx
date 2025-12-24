@@ -71,6 +71,48 @@ export function TermsAndConditions({
       const departureDate = selectedFlight.outbound.date;
       const fareSelectedPrice = selectedUpgradeOption ? selectedUpgradeOption.totalPrice : selectedFlight.price;
 
+      // Build flight segments array for Portal API
+      const flightSegments = [];
+      const allSegments = selectedFlight.segments || [selectedFlight.outbound, selectedFlight.inbound].filter(Boolean);
+
+      for (const segment of allSegments) {
+        if (!segment) continue;
+
+        // If we have individual flights (legs), add each one
+        if (segment.individualFlights && segment.individualFlights.length > 0) {
+          for (const leg of segment.individualFlights) {
+            flightSegments.push({
+              type: 'AIR',
+              airlineCode: leg.carrierCode || segment.carrierCode || selectedFlight.airline.code || '',
+              flightNumber: leg.flightNumber || segment.flightNumber || '',
+              departureAirport: leg.departureAirport || segment.departureAirport?.code || '',
+              arrivalAirport: leg.arrivalAirport || segment.arrivalAirport?.code || '',
+              departureDate: leg.departureDate || segment.date || '',
+              arrivalDate: leg.arrivalDate || segment.arrivalDate || segment.date || '',
+              departureTime: leg.departureTime || segment.departureTime || '',
+              arrivalTime: leg.arrivalTime || segment.arrivalTime || '',
+              duration: leg.duration || '',
+              cabinClass: segment.cabinClass || '',
+            });
+          }
+        } else {
+          // Single segment without individual legs
+          flightSegments.push({
+            type: 'AIR',
+            airlineCode: segment.carrierCode || selectedFlight.airline.code || '',
+            flightNumber: segment.flightNumber || '',
+            departureAirport: segment.departureAirport?.code || '',
+            arrivalAirport: segment.arrivalAirport?.code || '',
+            departureDate: segment.date || '',
+            arrivalDate: segment.arrivalDate || segment.date || '',
+            departureTime: segment.departureTime || '',
+            arrivalTime: segment.arrivalTime || '',
+            duration: segment.duration || '',
+            cabinClass: segment.cabinClass || '',
+          });
+        }
+      }
+
       const response = await fetch('/api/vyspa/init-folder', {
         method: 'POST',
         headers: {
@@ -93,6 +135,10 @@ export function TermsAndConditions({
           destinationAirportCode,
           departureDate,
           fareSelectedPrice,
+          flightSegments,
+          originAirportCode: selectedFlight.outbound.departureAirport?.code || '',
+          airlineCode: selectedFlight.airline.code || '',
+          airlineName: selectedFlight.airline.name || '',
         }),
       });
 

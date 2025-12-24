@@ -452,6 +452,51 @@ function SearchPageContent() {
     }
   }, [apiFilters?.minPrice, apiFilters?.maxPrice]);
 
+  // Track date changes from date slider to reset filters
+  const prevDatesRef = useRef<{ departure: number | null; return: number | null }>({
+    departure: null,
+    return: null,
+  });
+
+  useEffect(() => {
+    const currentDeparture = effectiveSearchParams.departureDate?.getTime() ?? null;
+    const currentReturn = effectiveSearchParams.returnDate?.getTime() ?? null;
+
+    // Skip initial mount - only react to subsequent changes
+    if (prevDatesRef.current.departure === null && prevDatesRef.current.return === null) {
+      prevDatesRef.current = { departure: currentDeparture, return: currentReturn };
+      return;
+    }
+
+    // Check if dates have actually changed
+    const departureDateChanged = prevDatesRef.current.departure !== currentDeparture;
+    const returnDateChanged = prevDatesRef.current.return !== currentReturn;
+
+    if (departureDateChanged || returnDateChanged) {
+      console.log('[Search] Date changed via slider, resetting filters');
+      // Reset filter state to defaults - new bounds will be set by apiFilters effect
+      setFilterState({
+        stops: [0, 1, 2],
+        priceRange: [0, 2000], // Placeholder, will be updated by apiFilters effect
+        departureTimeOutbound: [0, 24],
+        departureTimeInbound: [0, 24],
+        arrivalTimeOutbound: [0, 24],
+        arrivalTimeInbound: [0, 24],
+        timeFilterMode: 'takeoff',
+        journeyTimeOutbound: [0, 35], // Will be updated by journeyTimeBounds effect
+        journeyTimeInbound: [0, 35],
+        departureAirports: [],
+        arrivalAirports: [],
+        airlines: [],
+        extras: [],
+      });
+      // Reset the displayed flights count as well
+      setDisplayedFlightsCount(5);
+    }
+
+    prevDatesRef.current = { departure: currentDeparture, return: currentReturn };
+  }, [effectiveSearchParams.departureDate, effectiveSearchParams.returnDate]);
+
   // Handler for when a date comes into view
   const handleDateInView = (index: number, type: 'departure' | 'return') => {
     // Fetch date price when it comes into view
