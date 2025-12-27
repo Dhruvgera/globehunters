@@ -476,7 +476,7 @@ function SearchPageContent() {
       console.log('[Search] Date changed via slider, resetting filters');
       // Reset filter state to defaults - new bounds will be set by apiFilters effect
       setFilterState({
-        stops: [0, 1, 2],
+        stops: [],
         priceRange: [0, 2000], // Placeholder, will be updated by apiFilters effect
         departureTimeOutbound: [0, 24],
         departureTimeInbound: [0, 24],
@@ -567,7 +567,7 @@ function SearchPageContent() {
 
   // Filter state
   const [filterState, setFilterState] = useState<FilterState>({
-    stops: [0, 1, 2],
+    stops: [],
     priceRange: [0, 2000],
     departureTimeOutbound: [0, 24],
     departureTimeInbound: [0, 24],
@@ -775,7 +775,7 @@ function SearchPageContent() {
       clearForNewSearch();
       // Reset filters
       setFilterState({
-        stops: [0, 1, 2],
+        stops: [],
         priceRange: [0, 2000],
         departureTimeOutbound: [0, 24],
         departureTimeInbound: [0, 24],
@@ -1095,7 +1095,7 @@ function SearchPageContent() {
                   <button
                     onClick={() => {
                       setFilterState({
-                        stops: [0, 1, 2],
+                        stops: [],
                         priceRange: [effectiveFilters.minPrice, effectiveFilters.maxPrice],
                         departureTimeOutbound: [0, 24],
                         departureTimeInbound: [0, 24],
