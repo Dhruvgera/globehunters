@@ -234,7 +234,7 @@ function transformResult(result: VyspaResult): Flight | null {
   const requestIdForWebRef = extractRequestIdFromResultId(result.Result_id);
 
   // Extract flight key from Deep_link (V3) for FlightView API
-  const flightKey = extractFlightKeyFromDeepLink(result.Deep_link);
+  const flightKey = extractFlightKeyFromDeepLink(result.Deep_link ?? (result as any).deep_link);
 
   const flight: Flight = {
     id: result.Result_id,

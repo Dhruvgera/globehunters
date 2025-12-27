@@ -227,7 +227,11 @@ export interface VyspaResult {
   currency_code?: string; // v1 format
   Currency_code?: string; // v3 format
   
-  // Deep_link?: string; // Deep link for booking - contains flight= key for FlightView API
+  // Deep link for booking - contains flight= key for FlightView API (v3)
+  // Some responses may omit this field, so keep it optional.
+  Deep_link?: string;
+  // Defensive alias: some backends may return lowercase casing
+  deep_link?: string;
   Baggage?: string; // Baggage allowance
   
   // Price breakdown - different formats between versions
