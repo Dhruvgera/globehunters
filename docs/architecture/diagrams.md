@@ -45,26 +45,26 @@ mindmap
 
 ```mermaid
 flowchart TB
-  subgraph Browser[Browser (React)]
-    Pages[src/app/** pages]
-    Components[src/components/**]
-    Hooks[src/hooks/**]
-    Store[src/store/bookingStore.ts]
+  subgraph Browser["Browser (React)"]
+    Pages["src/app (pages)"]
+    Components["src/components (UI components)"]
+    Hooks["src/hooks (React hooks)"]
+    Store["src/store/bookingStore.ts (Zustand)"]
   end
 
-  subgraph NextServer[Next.js Server (Node)]
-    ServerActions[src/actions/**]
-    ApiRoutes[src/app/api/**/route.ts]
-    VyspaLib[src/lib/vyspa/**]
-    Services[src/services/**]
-    Config[src/config/**]
+  subgraph NextServer["Next.js Server (Node)"]
+    ServerActions["src/actions (server actions)"]
+    ApiRoutes["src/app/api/*/route.ts (API routes)"]
+    VyspaLib["src/lib/vyspa (Vyspa client + transformers + rules)"]
+    Services["src/services (API + domain services)"]
+    Config["src/config (integration config)"]
   end
 
-  subgraph External[External Systems]
-    VyspaSearch[Vyspa Search API]
-    VyspaPortal[Vyspa Portal API]
-    BoxPay[BoxPay]
-    SMTP[SMTP / Email Provider]
+  subgraph External["External Systems"]
+    VyspaSearch["Vyspa Search API"]
+    VyspaPortal["Vyspa Portal API"]
+    BoxPay["BoxPay"]
+    SMTP["SMTP / Email Provider"]
   end
 
   Pages --> Hooks
@@ -90,11 +90,11 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-  Home[/ (Landing)/] --> Search[/search/]
-  Search --> Booking[/booking/]
-  Booking --> Payment[/payment/]
-  Payment --> BoxPayRedirect[[BoxPay Checkout Redirect]]
-  BoxPayRedirect --> PaymentComplete[/payment-complete/]
+  Home["/ (Landing)"] --> Search["/search (Results)"]
+  Search --> Booking["/booking (Passengers)"]
+  Booking --> Payment["/payment (Add-ons + Pay)"]
+  Payment --> BoxPayRedirect["BoxPay Hosted Checkout (redirect)"]
+  BoxPayRedirect --> PaymentComplete["/payment-complete (Status + Email)"]
 ```
 
 
