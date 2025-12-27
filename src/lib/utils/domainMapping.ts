@@ -25,6 +25,12 @@ const DOMAIN_CONFIG_MAP: Record<string, DomainConfig> = {
     currency: 'USD',
     region: 'US',
   },
+  // AU domain - returns prices in AUD
+  'globehunters.com.au': {
+    username: 'FlightsAU', // Assuming this based on pattern
+    currency: 'AUD',
+    region: 'AU',
+  },
 };
 
 /**
@@ -37,25 +43,33 @@ const DEFAULT_CONFIG: DomainConfig = {
 };
 
 /**
+ * Get region based on hostname (server-side friendly if hostname provided)
+ */
+export function getRegionFromHost(hostname: string): string {
+  // Check for exact domain match
+  if (DOMAIN_CONFIG_MAP[hostname]) {
+    return DOMAIN_CONFIG_MAP[hostname].region;
+  }
+  
+  // Check for partial domain match
+  for (const [domain, config] of Object.entries(DOMAIN_CONFIG_MAP)) {
+    if (hostname.includes(domain)) {
+      return config.region;
+    }
+  }
+  
+  // Default to UK region
+  return DEFAULT_CONFIG.region;
+}
+
+/**
  * Get API username based on current domain
  * @returns Username for API authentication (FlightsUK or FlightsUS)
  */
 export function getApiUsername(): string {
   // Check if running in browser
   if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    
-    // Check for exact domain match
-    if (DOMAIN_CONFIG_MAP[hostname]) {
-      return DOMAIN_CONFIG_MAP[hostname].username;
-    }
-    
-    // Check for partial domain match (e.g., www.globehunters.co.uk)
-    for (const [domain, config] of Object.entries(DOMAIN_CONFIG_MAP)) {
-      if (hostname.includes(domain)) {
-        return config.username;
-      }
-    }
+    return getDomainConfigFromHost(window.location.hostname).username;
   }
   
   // Default to UK for localhost and unknown domains
@@ -69,19 +83,7 @@ export function getApiUsername(): string {
 export function getExpectedCurrency(): string {
   // Check if running in browser
   if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    
-    // Check for exact domain match
-    if (DOMAIN_CONFIG_MAP[hostname]) {
-      return DOMAIN_CONFIG_MAP[hostname].currency;
-    }
-    
-    // Check for partial domain match
-    for (const [domain, config] of Object.entries(DOMAIN_CONFIG_MAP)) {
-      if (hostname.includes(domain)) {
-        return config.currency;
-      }
-    }
+    return getDomainConfigFromHost(window.location.hostname).currency;
   }
   
   // Default to UK currency
@@ -95,23 +97,30 @@ export function getExpectedCurrency(): string {
 export function getRegion(): string {
   // Check if running in browser
   if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    
-    // Check for exact domain match
-    if (DOMAIN_CONFIG_MAP[hostname]) {
-      return DOMAIN_CONFIG_MAP[hostname].region;
-    }
-    
-    // Check for partial domain match
-    for (const [domain, config] of Object.entries(DOMAIN_CONFIG_MAP)) {
-      if (hostname.includes(domain)) {
-        return config.region;
-      }
-    }
+    return getRegionFromHost(window.location.hostname);
   }
   
   // Default to UK region
   return DEFAULT_CONFIG.region;
+}
+
+/**
+ * Get full domain configuration from hostname
+ */
+export function getDomainConfigFromHost(hostname: string): DomainConfig {
+  // Check for exact domain match
+  if (DOMAIN_CONFIG_MAP[hostname]) {
+    return DOMAIN_CONFIG_MAP[hostname];
+  }
+  
+  // Check for partial domain match
+  for (const [domain, config] of Object.entries(DOMAIN_CONFIG_MAP)) {
+    if (hostname.includes(domain)) {
+      return config;
+    }
+  }
+  
+  return DEFAULT_CONFIG;
 }
 
 /**
@@ -121,19 +130,7 @@ export function getRegion(): string {
 export function getDomainConfig(): DomainConfig {
   // Check if running in browser
   if (typeof window !== 'undefined') {
-    const hostname = window.location.hostname;
-    
-    // Check for exact domain match
-    if (DOMAIN_CONFIG_MAP[hostname]) {
-      return DOMAIN_CONFIG_MAP[hostname];
-    }
-    
-    // Check for partial domain match
-    for (const [domain, config] of Object.entries(DOMAIN_CONFIG_MAP)) {
-      if (hostname.includes(domain)) {
-        return config;
-      }
-    }
+    return getDomainConfigFromHost(window.location.hostname);
   }
   
   // Default to UK configuration

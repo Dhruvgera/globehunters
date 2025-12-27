@@ -27,20 +27,7 @@ import { WebRefCard } from "@/components/booking/WebRefCard";
 import UpgradeOptionsModal from "@/components/flights/modals/UpgradeOptionsModal";
 import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
 import { usePriceCheck } from "@/hooks/usePriceCheck";
-
-// Mock reviews data
-const mockReviews = [
-  {
-    name: "Sarah M.",
-    rating: 5,
-    text: "The booking process was incredibly fast and easy to navigate. The price breakdown was clear and I appreciate knowing exactly what I'm paying for.",
-  },
-  {
-    name: "John D.",
-    rating: 5,
-    text: "Excellent service and great prices. Highly recommend!",
-  },
-];
+import { useReviews } from "@/hooks/useReviews";
 
 function BookingContent() {
   const t = useTranslations('booking');
@@ -67,6 +54,9 @@ function BookingContent() {
 
   // Get affiliate phone number
   const { phoneNumber: affiliatePhone } = useAffiliatePhone();
+
+  // Fetch reviews
+  const { reviews, totalReviews, averageRating, isLoading: reviewsLoading } = useReviews();
 
   // Redirect to search if no flight selected (only after store has hydrated)
   useEffect(() => {
@@ -277,9 +267,9 @@ function BookingContent() {
 
             {/* Customer Reviews */}
             <CustomerReviewsCard
-              overallRating={4.5}
-              totalReviews={10000}
-              reviews={mockReviews}
+              overallRating={averageRating || 4.8}
+              totalReviews={totalReviews || 12500}
+              reviews={reviews.length > 0 ? reviews : []}
             />
           </div>
         </div>

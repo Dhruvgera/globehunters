@@ -3,7 +3,8 @@
  * Handles all portal.globehunters.com API calls
  */
 
-import { VYSPA_PORTAL_CONFIG, getPortalRegionConfig, getCabinClassSubsource, CONTACT_TYPES } from '@/config/vyspaPortal';
+import { VYSPA_PORTAL_CONFIG, getPortalRegionConfig, CONTACT_TYPES } from '@/config/vyspaPortal';
+import { getMarketSourceMapping } from '@/lib/utils/affiliateMapping';
 import {
     PortalApiMethod,
     CreateFolderRequest,
@@ -178,6 +179,11 @@ class PortalService {
      */
     async createFolder(params: PortalFolderParams): Promise<CreateFolderResponse> {
         const regionConfig = getPortalRegionConfig();
+        const marketMapping = getMarketSourceMapping(
+            params.affiliateCode,
+            regionConfig.branchCode === 'UKHQ' ? 'UK' : regionConfig.branchCode as any,
+            params.cabinClass || 'Economy'
+        );
         const leadPassenger = params.passengers[0];
 
         // Build passenger array
@@ -303,8 +309,8 @@ class PortalService {
             foldcur: params.flight.currency,
             des_airport_code: params.flight.destinationCode,
             agencyReference: params.searchRequestId || '',
-            marketsource: params.affiliateCode ? '117' : '', // Default affiliate source
-            marketsubsource: getCabinClassSubsource(params.cabinClass || 'Economy'),
+            marketsource: marketMapping.sourceId,
+            marketsubsource: marketMapping.subSourceId,
             comments: [],
             customer_id: params.customerId || '',
             matchAllContacts: !params.customerId, // Check for existing customer if no ID

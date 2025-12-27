@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { VYSPA_PORTAL_CONFIG, getPortalRegionConfig, getCabinClassSubsource } from '@/config/vyspaPortal';
+import { VYSPA_PORTAL_CONFIG, getPortalRegionConfig } from '@/config/vyspaPortal';
+import { getMarketSourceMapping } from '@/lib/utils/affiliateMapping';
+import { getRegionFromHost } from '@/lib/utils/domainMapping';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -180,8 +182,18 @@ export async function POST(req: Request) {
     const lead = passengers[0];
     const vyspaDepartureDate = normaliseDepartureDateForVyspa(departureDate);
     const portalDateFormat = formatDateForPortal(vyspaDepartureDate);
-    const regionConfig = getPortalRegionConfig();
-    const cabinSubsource = getCabinClassSubsource(cabinClass || 'Economy');
+    
+    // Determine region from request host
+    const host = req.headers.get('host') || 'globehunters.co.uk';
+    const region = getRegionFromHost(host);
+    const regionConfig = getPortalRegionConfig(region);
+    const regionCode = regionConfig.branchCode === 'UK' ? 'UK' : regionConfig.branchCode;
+    
+    const { sourceId: marketSourceId, subSourceId: marketSubSourceId } = getMarketSourceMapping(
+      affiliateCode,
+      regionCode,
+      cabinClass || 'Economy'
+    );
     // Use the booking class code from the selected fare if available, otherwise fall back to mapped cabin class
     const ccClassCode = cabinClassCode || mapCabinClass(cabinClass);
 
@@ -189,7 +201,8 @@ export async function POST(req: Request) {
       apiUrl,
       hasUsername: !!credentials.username,
       regionConfig,
-      cabinSubsource,
+      marketSourceId,
+      marketSubSourceId,
       vyspaDepartureDate,
       portalDateFormat,
       // New Portal API fields
@@ -364,8 +377,8 @@ export async function POST(req: Request) {
       foldcur: currency,
       des_airport_code: destinationAirportCode,
       agencyReference: pswResultId ? String(pswResultId) : '',
-      marketsource: affiliateCode || '117',
-      marketsubsource: cabinSubsource,
+      marketsource: marketSourceId,
+      marketsubsource: marketSubSourceId,
       comments: bookingComments,
       matchAllContacts: 'True', // Required for customer creation/matching
       passengers: portalPassengers,

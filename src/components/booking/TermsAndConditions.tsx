@@ -212,6 +212,7 @@ export function TermsAndConditions({
           markupIds,                   // For rate_note field in TKT segment
           moduleId,                    // For comments
           cabinClassCode,             // For cc_class_code in segments
+          affiliateCode: useBookingStore.getState().affiliateData?.code || '',
           selectedBrandName,          // Brand name (e.g., "ECONOMY LIGHT")
           baggageInfo,                // For comments
           refundableInfo,             // For comments (cancellation policy)

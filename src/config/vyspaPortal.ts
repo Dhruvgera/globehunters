@@ -42,8 +42,8 @@ if (process.env.NODE_ENV === 'development') {
 /**
  * Get region-specific configuration for Portal API
  */
-export function getPortalRegionConfig() {
-    const region = getRegion();
+export function getPortalRegionConfig(overrideRegion?: string) {
+    const region = overrideRegion || getRegion();
 
     const regionConfigs: Record<string, {
         websiteName: string;
@@ -72,7 +72,7 @@ export function getPortalRegionConfig() {
         'global': {
             websiteName: 'CMS_UK',
             brand: 'globehunters.com',
-            branchCode: 'UKHQ',
+            branchCode: 'UK',
             currency: 'GBP',
         },
     };
