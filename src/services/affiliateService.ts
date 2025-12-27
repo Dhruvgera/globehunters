@@ -37,7 +37,8 @@ export async function fetchAffiliates(): Promise<Affiliate[]> {
     const response = await fetch('/api/affiliates');
 
     if (!response.ok) {
-      throw new Error(`Failed to fetch affiliates: ${response.status}`);
+      console.warn(`⚠️ Failed to fetch affiliates: ${response.status} ${response.statusText} - Using cached/default data`);
+      return affiliateCache?.data || [];
     }
 
     const data: Affiliate[] = await response.json();

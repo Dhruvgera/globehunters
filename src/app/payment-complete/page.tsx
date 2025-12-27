@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button";
 import { useBookingStore, useSelectedFlight } from "@/store/bookingStore";
 import { useBoxPay } from "@/hooks/useBoxPay";
 import { PaymentCompletionInfo } from "@/types/boxpay";
+import { Flight, FlightSegment } from "@/types/flight";
+import { PriceCheckResult, TransformedPriceOption } from "@/types/priceCheck";
+import FlightDetailedInfo from "@/components/flights/FlightDetailedInfo";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
 import {
   mockBookingConfirmation,
@@ -316,7 +319,10 @@ interface FlightCardConfirmationProps {
   flightNumber: string;
   distance: string;
   aircraftType: string;
-  segment: any;
+  segment: FlightSegment;
+  fullFlight: Flight;
+  priceCheck?: PriceCheckResult | null;
+  selectedUpgradeOption?: TransformedPriceOption | null;
   onViewDetails: () => void;
 }
 
@@ -346,6 +352,9 @@ function FlightConfirmationCard({
   distance,
   aircraftType,
   segment,
+  fullFlight,
+  priceCheck,
+  selectedUpgradeOption,
   onViewDetails,
 }: FlightCardConfirmationProps) {
   const [showDetails, setShowDetails] = useState(true); // Show details by default per Figma
@@ -505,6 +514,16 @@ function FlightConfirmationCard({
               />
             </div>
           )}
+          
+          {/* Detailed Info (Baggage, Fare Rules etc.) */}
+          <div className="mt-4 pt-4 border-t border-gray-100">
+             <FlightDetailedInfo 
+                flight={fullFlight}
+                segment={segment} 
+                priceCheck={priceCheck}
+                selectedUpgradeOption={selectedUpgradeOption}
+             />
+          </div>
         </div>
       )}
     </div>
@@ -920,6 +939,9 @@ function PaymentCompleteContent() {
                   distance={String(flight.outbound.distance || "3123")}
                   aircraftType={flight.outbound.aircraftType || "Airbus A330-200"}
                   segment={flight.outbound}
+                  fullFlight={flight}
+                  priceCheck={storePriceCheckData}
+                  selectedUpgradeOption={storeSelectedUpgrade}
                   onViewDetails={() => { }}
                 />
 
@@ -936,6 +958,9 @@ function PaymentCompleteContent() {
                     distance={String(flight.inbound.distance || "3123")}
                     aircraftType={flight.inbound.aircraftType || "Airbus A330-200"}
                     segment={flight.inbound}
+                    fullFlight={flight}
+                    priceCheck={storePriceCheckData}
+                    selectedUpgradeOption={storeSelectedUpgrade}
                     onViewDetails={() => { }}
                   />
                 )}
