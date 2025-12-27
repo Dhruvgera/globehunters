@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Users, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +31,16 @@ export function PassengersSelector({
 }: PassengersSelectorProps) {
   const t = useTranslations('search.passengers');
   const tPrice = useTranslations('booking.priceSummary');
+  const [open, setOpen] = useState(false);
+
+  // Close popover on scroll to prevent it from overlapping the navbar
+  useEffect(() => {
+    if (!open) return;
+
+    const handleScroll = () => setOpen(false);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [open]);
 
   const totalPassengers =
     passengers.adults + passengers.children + passengers.infants;
@@ -73,7 +84,7 @@ export function PassengersSelector({
   };
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
@@ -86,7 +97,14 @@ export function PassengersSelector({
           <ChevronDown className="w-5 h-5 text-[#010D50]" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80" side="bottom" align="start">
+      <PopoverContent
+        className="w-[min(20rem,calc(100vw-32px))] max-h-[calc(100vh-120px)] overflow-auto overscroll-contain"
+        side="bottom"
+        sideOffset={8}
+        align="start"
+        avoidCollisions={true}
+        collisionPadding={{ top: 80, bottom: 16, left: 16, right: 16 }}
+      >
         <div className="flex flex-col gap-4">
           {/* Adults */}
           <div className="flex items-center justify-between">

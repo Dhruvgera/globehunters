@@ -148,8 +148,12 @@ export default function SearchBar({ compact = false }: SearchBarProps) {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent
-                  className="w-auto p-0 bg-white border shadow-lg max-w-[calc(100vw-16px)]"
+                  className="w-auto p-0 bg-white border shadow-lg max-w-[calc(100vw-32px)] max-h-[calc(100vh-120px)] overflow-auto overscroll-contain"
                   align="start"
+                  side="bottom"
+                  sideOffset={8}
+                  avoidCollisions={true}
+                  collisionPadding={{ top: 80, bottom: 16, left: 16, right: 16 }}
                 >
                   <DatePicker
                     startDate={segment.departureDate}

@@ -552,56 +552,119 @@ export default function FlightInfoModal({
                             {currentLeg.individualFlights && currentLeg.individualFlights.length > 0 ? (
                               <>
                                 {/* Individual Flight Times with Layovers */}
-                                {currentLeg.individualFlights.map((flight, idx) => {
+                            {currentLeg.individualFlights.map((flight, idx) => {
                                   // Find layover after this flight (if not the last flight)
                                   const layover = idx < currentLeg.individualFlights!.length - 1 && currentLeg.layovers
                                     ? currentLeg.layovers.find(lay => lay.viaAirport === flight.arrivalAirport)
                                     : null;
 
                                   return (
-                                    <div key={idx} className="flex flex-col gap-2">
-                                      <div className="flex flex-col gap-0.5">
-                                        <div className="flex items-center gap-2">
-                                          <Plane className="w-3 sm:w-4 h-3 sm:h-4 text-[#3A478A] shrink-0" />
-                                          <div className="flex items-center gap-2 flex-wrap text-xs sm:text-sm">
-                                            <span className="font-bold text-[#010D50]">
-                                              {flight.carrierCode}{flight.flightNumber}
-                                            </span>
-                                            <span className="text-[#3A478A]">
-                                              {getAirportName(flight.departureAirport, undefined, undefined)} → {getAirportName(flight.arrivalAirport, undefined, undefined)}
-                                            </span>
-                                            <span className="text-[#3A478A] opacity-50">•</span>
-                                            <span className="text-[#010D50] font-medium">
-                                              {flight.departureTime} - {flight.arrivalTime}
-                                            </span>
-                                            <span className="text-[#3A478A] opacity-50">•</span>
-                                            <span className="text-[#3A478A]">
-                                              {flight.duration}
-                                            </span>
-                                          </div>
+                                    <div key={idx} className="relative">
+                                      {/* Flight Segment - Grid Layout */}
+                                      <div className="grid grid-cols-[48px_16px_1fr] sm:grid-cols-[64px_24px_1fr] gap-x-3 sm:gap-x-4">
+                                        
+                                        {/* DEPARTURE */}
+                                        <div className="text-right pt-0.5">
+                                          <span className="block text-sm sm:text-lg font-bold text-[#010D50] leading-tight">{flight.departureTime}</span>
                                         </div>
-                                        {/* Debug: Show raw API dates */}
-                                        {process.env.NEXT_PUBLIC_DEBUG_FLIGHT_DATES === 'true' && (
-                                          <div className="ml-4 text-[10px] font-mono text-orange-600 bg-orange-50 px-1 py-0.5 rounded w-fit">
-                                            API: dep={flight.departureDate} → arr={flight.arrivalDate}
-                                          </div>
-                                        )}
-                                      </div>
-                                      {/* Layover indicator between flights */}
-                                      {layover && (
-                                        <div className="flex items-center gap-2 ml-1 py-1">
-                                          <div className="w-3 sm:w-4 h-px bg-[#CBD5E1]" />
-                                          <span className="text-xs text-[#64748B] italic">
-                                            Stopover at {layover.viaAirport} for <span className="font-medium text-[#475569]">{layover.duration}</span>
+                                        <div className="relative flex justify-center pt-1.5">
+                                           <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full border-2 border-[#010D50] bg-white z-10" />
+                                           <div className="absolute top-2.5 bottom-0 w-0.5 bg-slate-200" />
+                                        </div>
+                                        <div className="pb-6">
+                                          <span className="block text-sm sm:text-base font-bold text-[#010D50] leading-tight mb-0.5">
+                                             {getCityName(flight.departureAirport)} ({flight.departureAirport})
                                           </span>
+                                           <span className="text-xs sm:text-sm text-slate-500 block truncate max-w-[200px] sm:max-w-none">
+                                             {getAirportName(flight.departureAirport, undefined, undefined) || flight.departureAirport}
+                                           </span>
                                         </div>
+
+                                        {/* FLIGHT DURATION & INFO */}
+                                        <div className="text-right py-1">
+                                          <span className="text-xs text-slate-500 font-medium">{flight.duration}</span>
+                                        </div>
+                                        <div className="relative flex justify-center">
+                                           <div className="absolute top-0 bottom-0 w-0.5 bg-slate-200" />
+                                        </div>
+                                        <div className="pb-6 flex items-center gap-3">
+                                            <div className="w-5 h-5 sm:w-6 sm:h-6 relative flex-shrink-0 bg-white rounded-sm">
+                                                <Image 
+                                                  src={`https://images.kiwi.com/airlines/64/${flight.carrierCode}.png`} 
+                                                  alt={flight.carrierCode || 'Airline'}
+                                                  width={24}
+                                                  height={24}
+                                                  className="object-contain"
+                                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                />
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-xs sm:text-sm font-medium text-slate-700">
+                                                    {flight.carrierCode}{flight.flightNumber}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* ARRIVAL */}
+                                        <div className="text-right pt-0.5">
+                                          <span className="block text-sm sm:text-lg font-bold text-[#010D50] leading-tight">{flight.arrivalTime}</span>
+                                        </div>
+                                        <div className="relative flex justify-center pt-1.5">
+                                           <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full border-2 border-[#010D50] bg-[#010D50] z-10" />
+                                           {/* Continue line only if there's a layover */}
+                                           {layover && <div className="absolute top-2.5 bottom-0 w-0.5 bg-slate-200" />}
+                                        </div>
+                                        <div className="">
+                                          <span className="block text-sm sm:text-base font-bold text-[#010D50] leading-tight mb-0.5">
+                                             {getCityName(flight.arrivalAirport)} ({flight.arrivalAirport})
+                                          </span>
+                                          <span className="text-xs sm:text-sm text-slate-500 block truncate max-w-[200px] sm:max-w-none">
+                                             {getAirportName(flight.arrivalAirport, undefined, undefined) || flight.arrivalAirport}
+                                          </span>
+                                          
+                                          {/* Debug: Show raw API dates */}
+                                          {process.env.NEXT_PUBLIC_DEBUG_FLIGHT_DATES === 'true' && (
+                                            <div className="mt-1 text-[10px] font-mono text-orange-600 bg-orange-50 px-1 py-0.5 rounded w-fit">
+                                              API: dep={flight.departureDate} → arr={flight.arrivalDate}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* LAYOVER SECTION */}
+                                      {layover && (
+                                        <div className="grid grid-cols-[48px_16px_1fr] sm:grid-cols-[64px_24px_1fr] gap-x-3 sm:gap-x-4 my-6">
+                                          <div className="text-right">
+                                              {/* Empty time col */}
+                                          </div>
+                                          <div className="relative flex justify-center">
+                                              {/* Dashed line for layover */}
+                                              <div className="absolute top-0 bottom-0 w-0.5 border-l-2 border-dashed border-slate-300" />
+                                          </div>
+                                          <div className="py-2">
+                                              <div className="bg-orange-50 border border-orange-100 rounded-lg p-3 sm:p-4 inline-flex flex-col gap-1 w-full sm:w-auto">
+                                                  <div className="flex items-center gap-2 text-[#B91C1C]">
+                                                      <Clock className="w-4 h-4" />
+                                                      <span className="text-sm font-bold">{layover.duration} stopover</span>
+                                                  </div>
+                                                  <div className="text-xs sm:text-sm text-[#7F1D1D]">
+                                                      Connect in <span className="font-semibold">{getCityName(layover.viaAirport)}</span> ({layover.viaAirport})
+                                                  </div>
+                                              </div>
+                                          </div>
+                                        </div>
+                                      )}
+                                      
+                                      {/* Spacer between flights if no layover (shouldn't happen in this logic usually but good safety) */}
+                                      {!layover && idx < currentLeg.individualFlights!.length - 1 && (
+                                        <div className="h-8" />
                                       )}
                                     </div>
                                   );
                                 })}
                                 {/* Total Journey Time */}
                                 {currentLeg.totalJourneyTime && (
-                                  <div className="flex items-center gap-1 mt-1">
+                                  <div className="flex items-center gap-1 mt-4">
                                     <Clock className="w-3 sm:w-4 h-3 sm:h-4 text-[#010D50] shrink-0" />
                                     <span className="text-xs sm:text-sm font-medium text-[#010D50]">
                                       Total journey time: {currentLeg.totalJourneyTime}

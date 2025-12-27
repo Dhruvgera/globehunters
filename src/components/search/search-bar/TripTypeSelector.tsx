@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ArrowLeftRight, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +25,15 @@ export function TripTypeSelector({
 }: TripTypeSelectorProps) {
   const t = useTranslations('search.tripType');
   const [isOpen, setIsOpen] = useState(false);
+
+  // Close popover on scroll to prevent it from overlapping the navbar
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleScroll = () => setIsOpen(false);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [isOpen]);
   
   const getTripTypeLabel = (type: TripType) => {
     switch (type) {
@@ -65,7 +74,14 @@ export function TripTypeSelector({
           <ChevronDown className="w-5 h-5 text-[#010D50]" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-48">
+      <PopoverContent
+        className="w-[min(12rem,calc(100vw-32px))] max-h-[calc(100vh-120px)] overflow-auto overscroll-contain"
+        side="bottom"
+        sideOffset={8}
+        align="start"
+        avoidCollisions={true}
+        collisionPadding={{ top: 80, bottom: 16, left: 16, right: 16 }}
+      >
         <div className="flex flex-col gap-2">
           <Button
             variant="ghost"
