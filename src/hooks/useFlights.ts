@@ -17,6 +17,7 @@ function getTimestamp(date: Date | string | undefined | null): number | undefine
 
 interface UseFlightsOptions {
   enabled?: boolean; // Whether to automatically fetch on mount
+  requestId?: string | null; // Optional request ID to restore previous search session
 }
 
 interface UseFlightsReturn {
@@ -33,7 +34,7 @@ export function useFlights(
   searchParams: SearchParams | null,
   options: UseFlightsOptions = {}
 ): UseFlightsReturn {
-  const { enabled = true } = options;
+  const { enabled = true, requestId: explicitRequestId } = options;
 
   const [flights, setFlights] = useState<Flight[]>([]);
   const [filters, setFilters] = useState<FlightSearchResponse['filters'] | null>(null);
@@ -51,27 +52,21 @@ export function useFlights(
     setLoading(true);
     setError(null);
 
-    // Check cache first
-    const cachedData = flightCache.get(searchParams);
-    if (cachedData) {
-      console.log('🚀 Using cached flight data - no API call needed!');
-      // Use setTimeout to ensure loading state shows briefly (prevents UI flickering)
-      setTimeout(() => {
-        setFlights(cachedData.flights);
-        setFilters(cachedData.filters);
-        setDatePrices(cachedData.datePrices);
-        setRequestId(cachedData.requestId || null);
-        setLoading(false);
-      }, 100); // 100ms delay to show transition
-      return;
-    }
-
+    // Check cache first (pass explicitRequestId if available)
+    // Note: flightCache is separate from FlightService's cache, maybe we should update it too?
+    // FlightService manages its own cache, so calling flightService.searchFlights will hit that.
+    // flightCache imported here seems to be a separate util.
+    // Let's rely on flightService caching logic primarily, or use flightCache if we want client-side caching.
+    // However, if we use explicitRequestId, we should probably bypass simple params-based cache
+    // unless the cache key includes the ID.
+    // For now, let's proceed to flightService call which we updated to handle requestId caching.
+    
     try {
-      console.log('🌐 Fetching fresh flight data from API...');
-      const response = await flightService.searchFlights(searchParams);
+      console.log('🌐 Fetching fresh flight data from API...', explicitRequestId ? `(Using Request ID: ${explicitRequestId})` : '');
+      const response = await flightService.searchFlights(searchParams, explicitRequestId || undefined);
       
-      // Store in cache for future use
-      flightCache.set(searchParams, response);
+      // Store in cache for future use (if we want client-side persistence beyond service instance)
+      // flightCache.set(searchParams, response); // existing cache might not handle requestId
       
       setFlights(response.flights);
       setFilters(response.filters);
@@ -84,7 +79,7 @@ export function useFlights(
     } finally {
       setLoading(false);
     }
-  }, [searchParams]);
+  }, [searchParams, explicitRequestId]);
 
   useEffect(() => {
     if (enabled && searchParams) {
@@ -101,7 +96,8 @@ export function useFlights(
     searchParams?.passengers?.infants,
     searchParams?.class,
     searchParams?.tripType,
-    enabled
+    enabled,
+    explicitRequestId // Add explicitRequestId dependency
   ]);
 
   return {

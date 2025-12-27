@@ -54,6 +54,7 @@ function SearchPageContent() {
   const setStoreSearchParams = useBookingStore((state) => state.setSearchParams);
   const storeSearchParams = useBookingStore((state) => state.searchParams);
   const setSearchRequestId = useBookingStore((state) => state.setSearchRequestId);
+  const searchRequestId = useBookingStore((state) => state.searchRequestId);
   const setSelectedFlight = useBookingStore((state) => state.setSelectedFlight);
   const setAffiliateData = useBookingStore((state) => state.setAffiliateData);
   const setIsFromDeeplink = useBookingStore((state) => state.setIsFromDeeplink);
@@ -285,7 +286,12 @@ function SearchPageContent() {
   // Fetch flights using custom hook - but only after initialization
   const { flights, filters: apiFilters, requestId, loading, error } = useFlights(
     isInitialized ? effectiveSearchParams : null,
-    { enabled: isInitialized }
+    { 
+      enabled: isInitialized,
+      // Pass the searchRequestId from store to restore previous search results
+      // This is crucial for "Back" navigation from booking flow
+      requestId: searchRequestId 
+    }
   );
 
   // Store requestId in booking store when flights are fetched

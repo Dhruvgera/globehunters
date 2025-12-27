@@ -256,7 +256,11 @@ export const useBookingStore = create<BookingState & HydrationState>()(
           vyspaFolderNumber: null,
           vyspaCustomerId: null,
           vyspaEmailAddress: null,
-          // Note: searchRequestId is NOT cleared - it gets updated by the flight search API response
+          // Clear searchRequestId to ensure new searches generate fresh results
+          // (Unless we want to restore specifically, but usually a new search means new ID)
+          // However, the previous implementation comment said "Note: searchRequestId is NOT cleared"
+          // We need to clear it so that we don't accidentally use an old ID for a new search with changed params
+          searchRequestId: null,
           passengers: [],
           passengersSaved: false,
           contactEmail: '',
@@ -271,7 +275,7 @@ export const useBookingStore = create<BookingState & HydrationState>()(
           affiliateData: state.affiliateData,
           isFromDeeplink: state.isFromDeeplink,
           searchParams: state.searchParams,
-          searchRequestId: state.searchRequestId,
+          // searchRequestId: state.searchRequestId, // Removed to clear it
         })),
     }),
     {

@@ -12,15 +12,16 @@
  */
 export interface VyspaSearchParams {
   version: '2' | '3';
-  departure_airport: string;
-  arrival_airport: string;
-  departure_date: string; // YYYY-MM-DD format
+  Request_id?: string; // Request ID for retrieving specific search results (restoring session)
+  departure_airport?: string; // Optional if Request_id is present
+  arrival_airport?: string; // Optional if Request_id is present
+  departure_date?: string; // YYYY-MM-DD format
   return_date?: string; // YYYY-MM-DD format
-  adults: string;
-  children: string;
-  child_ages: string[];
-  infants: string; // Required: Number of infants (API expects string digits)
-  direct_flight_only: '0' | '1';
+  adults?: string;
+  children?: string;
+  child_ages?: string[];
+  infants?: string; // Required: Number of infants (API expects string digits)
+  direct_flight_only?: '0' | '1';
   /**
    * One-letter cabin class code for outbound flight:
    * M - Economy, W - Premium, C - Business, F - First
@@ -80,6 +81,7 @@ export interface VyspaApiRequest {
  * Frontend flight search request (from search form)
  */
 export interface FlightSearchRequest {
+  Request_id?: string; // Request ID for retrieving specific search results (restoring session)
   origin1: string;
   destinationid: string;
   fr: string; // DD/MM/YYYY format
@@ -225,7 +227,7 @@ export interface VyspaResult {
   currency_code?: string; // v1 format
   Currency_code?: string; // v3 format
   
-  Deep_link?: string; // Deep link for booking - contains flight= key for FlightView API
+  // Deep_link?: string; // Deep link for booking - contains flight= key for FlightView API
   Baggage?: string; // Baggage allowance
   
   // Price breakdown - different formats between versions

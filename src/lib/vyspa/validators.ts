@@ -15,6 +15,14 @@ import type { FlightSearchRequest, ValidationResult } from '@/types/vyspa';
 export function validateSearchParams(
   params: FlightSearchRequest
 ): ValidationResult {
+  // If Request_id is provided, we skip normal validation as we're restoring a search session
+  if (params.Request_id) {
+    return {
+      valid: true,
+      errors: [],
+    };
+  }
+
   const errors: string[] = [];
 
   // Required fields

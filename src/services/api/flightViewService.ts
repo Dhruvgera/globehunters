@@ -203,8 +203,19 @@ export function transformFlightViewResponse(data: FlightViewResponse): Transform
     String(firstFlight.Baggage).trim() !== '';
 
   // Extract request ID for web reference
-  // The Request_id is the search request ID from the previous stage, used as web ref
-  const requestId = String(data.Request_id);
+  // FlightView doesn't return Request_id directly, but it's embedded in Result_id
+  // Result_id format: "{requestId}-{segmentIndex}-{resultIndex}-{moduleId}" e.g., "87989749-0-0-172"
+  // The first part is the original search Request_id
+  let requestId: string;
+  if (data.Request_id) {
+    requestId = String(data.Request_id);
+  } else if (data.Result_id) {
+    // Extract request ID from Result_id (first segment before the first hyphen)
+    const resultIdParts = String(data.Result_id).split('-');
+    requestId = resultIdParts[0] || String(data.psw_result_id) || 'unknown';
+  } else {
+    requestId = String(data.psw_result_id) || 'unknown';
+  }
 
   // Build the Flight object
   const flight: Flight = {
