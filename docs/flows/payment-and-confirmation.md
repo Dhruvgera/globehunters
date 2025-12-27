@@ -34,7 +34,7 @@ sequenceDiagram
   participant IF as /api/vyspa/init-folder
   participant AE as /api/vyspa/add-extras
   participant BP as /api/boxpay/session
-  participant Box as BoxPay Hosted Checkout
+  participant BXP as BoxPay Hosted Checkout
   participant PC as /payment-complete (client)
   participant INQ as /api/boxpay/inquiry
   participant SP as /api/vyspa/save-payment
@@ -56,9 +56,9 @@ sequenceDiagram
 
   Pay->>BP: POST { orderId=folderNumber|requestId, amount, currency, shopper }
   BP-->>Pay: { checkoutUrl }
-  Pay->>Box: redirect to checkoutUrl
+  Pay->>BXP: redirect to checkoutUrl
 
-  Box-->>PC: Redirect back with redirectionResult (+ orderId)
+  BXP-->>PC: Redirect back with redirectionResult (+ orderId)
   PC->>INQ: POST { token=redirectionResult }
   INQ-->>PC: { payment: status, transactionId, amount, currency }
 
