@@ -1,19 +1,30 @@
 /**
  * Airport API Route
- * Proxies airport requests to Vyspa API with server-side credentials
+ * Serves static airport data from cache (JSON file)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchAirportsFromVyspa } from '@/lib/vyspa/airports';
+import { airportCache } from '@/lib/cache/airportCache';
+import { searchAirports } from '@/lib/utils/airportSearch';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q') || undefined;
 
-    const airports = await fetchAirportsFromVyspa(query);
+    const allAirports = await airportCache.getAirports();
     
-    return NextResponse.json(airports, {
+    let result = allAirports;
+    
+    if (query) {
+      // Filter locally using search utility
+      const searchResults = searchAirports(allAirports, query, 100);
+      
+      // Map back to Airport type (remove search metadata)
+      result = searchResults.map(({ matchScore, matchedFields, ...airport }) => airport);
+    }
+    
+    return NextResponse.json(result, {
       status: 200,
       headers: {
         // Cache for 24 hours
@@ -28,6 +39,7 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
 
 
 
