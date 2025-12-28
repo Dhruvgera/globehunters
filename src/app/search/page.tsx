@@ -47,6 +47,13 @@ const DEFAULT_SEARCH_PARAMS: SearchParams = {
   tripType: "round-trip",
 };
 
+function safeDateTime(value: unknown): number | null {
+  if (value == null) return null;
+  const d = value instanceof Date ? value : new Date(value as any);
+  const t = d.getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
 function SearchPageContent() {
   const t = useTranslations('search');
   const urlParams = useSearchParams();
@@ -465,8 +472,8 @@ function SearchPageContent() {
   });
 
   useEffect(() => {
-    const currentDeparture = effectiveSearchParams.departureDate?.getTime() ?? null;
-    const currentReturn = effectiveSearchParams.returnDate?.getTime() ?? null;
+    const currentDeparture = safeDateTime(effectiveSearchParams.departureDate);
+    const currentReturn = safeDateTime(effectiveSearchParams.returnDate);
 
     // Skip initial mount - only react to subsequent changes
     if (prevDatesRef.current.departure === null && prevDatesRef.current.return === null) {

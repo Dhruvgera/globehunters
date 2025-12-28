@@ -11,6 +11,44 @@ import { PaymentDetails } from '@/types/payment';
 import { PriceCheckResult, TransformedPriceOption } from '@/types/priceCheck';
 import { normalizeCabinClass } from '@/lib/utils';
 
+type Dateish = Date | string | number | null | undefined;
+
+function reviveDate(value: Dateish): Date | undefined {
+  if (value == null) return undefined;
+  if (value instanceof Date) return value;
+
+  // JSON.stringify(Date) -> ISO string, but be liberal in what we accept.
+  if (typeof value === 'number') return new Date(value);
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    // Handle numeric timestamps stored as strings
+    if (/^\d+$/.test(trimmed)) return new Date(Number(trimmed));
+    return new Date(trimmed);
+  }
+
+  return undefined;
+}
+
+function reviveSearchParams(params: any): SearchParams {
+  const dep = reviveDate(params?.departureDate) ?? new Date();
+  const ret = reviveDate(params?.returnDate);
+
+  const revived: SearchParams = {
+    ...params,
+    departureDate: dep,
+    returnDate: ret,
+  };
+
+  if (Array.isArray(params?.segments)) {
+    revived.segments = params.segments.map((seg: any) => ({
+      ...seg,
+      departureDate: reviveDate(seg?.departureDate) ?? dep,
+    }));
+  }
+
+  return revived;
+}
+
 interface AffiliateData {
   code: string;
   id?: number;
@@ -136,7 +174,7 @@ export const useBookingStore = create<BookingState & HydrationState>()(
       setHasHydrated: (state) => set({ _hasHydrated: state }),
 
       // Search params
-      setSearchParams: (params) => set({ searchParams: params }),
+      setSearchParams: (params) => set({ searchParams: reviveSearchParams(params) }),
 
       // Affiliate data
       setAffiliateData: (data) => set({ affiliateData: data }),
@@ -305,6 +343,10 @@ export const useBookingStore = create<BookingState & HydrationState>()(
       }),
       // Set hydration state when store is rehydrated
       onRehydrateStorage: () => (state) => {
+        // Revive Date objects from persisted JSON (Dates are stored as strings)
+        if (state?.searchParams) {
+          state.setSearchParams(state.searchParams as any);
+        }
         state?.setHasHydrated(true);
       },
     }
