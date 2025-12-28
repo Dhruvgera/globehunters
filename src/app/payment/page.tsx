@@ -469,7 +469,8 @@ function PaymentContent() {
                       address2: billingAddress.addressLine2,
                       city: billingAddress.city,
                       state: billingAddress.state || billingAddress.city,
-                      countryCode: billingAddress.country === 'United Kingdom' ? 'GB' : billingAddress.country?.substring(0, 2).toUpperCase() || 'GB',
+                      // Send the raw country input; server will normalize to ISO2 before calling BoxPay.
+                      countryCode: billingAddress.country || 'GB',
                       postalCode: billingAddress.postalCode,
                     },
                   },
