@@ -182,6 +182,14 @@ export function TermsAndConditions({
         moduleId = String(rawPriceCheck.flight_data.result.FlightPswResult.module_id || '');
       }
 
+      const affiliateCode =
+        useBookingStore.getState().affiliateData?.code ||
+        (typeof window !== 'undefined'
+          ? (sessionStorage.getItem('affiliate_code') ||
+              sessionStorage.getItem('utm_source') ||
+              '')
+          : '');
+
       const response = await fetch('/api/vyspa/init-folder', {
         method: 'POST',
         headers: {
@@ -212,7 +220,7 @@ export function TermsAndConditions({
           markupIds,                   // For rate_note field in TKT segment
           moduleId,                    // For comments
           cabinClassCode,             // For cc_class_code in segments
-          affiliateCode: useBookingStore.getState().affiliateData?.code || '',
+          affiliateCode,
           selectedBrandName,          // Brand name (e.g., "ECONOMY LIGHT")
           baggageInfo,                // For comments
           refundableInfo,             // For comments (cancellation policy)

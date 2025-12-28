@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Flight, SearchParams } from '@/types/flight';
 import { flightService, FlightSearchResponse } from '@/services/api/flightService';
 import { flightCache } from '@/lib/cache/flightCache';
+import { useBookingStore } from '@/store/bookingStore';
 
 // Helper to safely get timestamp from a date that might be a string or Date
 function getTimestamp(date: Date | string | undefined | null): number | undefined {
@@ -36,6 +37,7 @@ export function useFlights(
 ): UseFlightsReturn {
   const { enabled = true, requestId: explicitRequestId } = options;
 
+  const affiliateCodeFromStore = useBookingStore((s) => s.affiliateData?.code);
   const [flights, setFlights] = useState<Flight[]>([]);
   const [filters, setFilters] = useState<FlightSearchResponse['filters'] | null>(null);
   const [datePrices, setDatePrices] = useState<FlightSearchResponse['datePrices']>([]);
@@ -63,7 +65,22 @@ export function useFlights(
     
     try {
       console.log('🌐 Fetching fresh flight data from API...', explicitRequestId ? `(Using Request ID: ${explicitRequestId})` : '');
-      const response = await flightService.searchFlights(searchParams, explicitRequestId || undefined);
+
+      // Affiliate code should persist across the whole journey, including requestId restores.
+      // Prefer Zustand (runtime), fall back to sessionStorage (persistence across reloads).
+      const affiliateCode =
+        affiliateCodeFromStore ||
+        (typeof window !== 'undefined'
+          ? (sessionStorage.getItem('affiliate_code') ||
+              sessionStorage.getItem('utm_source') ||
+              undefined)
+          : undefined);
+
+      const response = await flightService.searchFlights(
+        searchParams,
+        explicitRequestId || undefined,
+        affiliateCode || undefined
+      );
       
       // Store in cache for future use (if we want client-side persistence beyond service instance)
       // flightCache.set(searchParams, response); // existing cache might not handle requestId
@@ -79,7 +96,7 @@ export function useFlights(
     } finally {
       setLoading(false);
     }
-  }, [searchParams, explicitRequestId]);
+  }, [searchParams, explicitRequestId, affiliateCodeFromStore]);
 
   useEffect(() => {
     if (enabled && searchParams) {

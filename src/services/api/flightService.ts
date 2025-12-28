@@ -62,9 +62,10 @@ class FlightService {
   private static CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
   private responseCache: Map<string, { data: FlightSearchResponse; ts: number }> = new Map();
 
-  private makeCacheKey(params: SearchParams, requestId?: string): string {
+  private makeCacheKey(params: SearchParams, requestId?: string, affiliateCode?: string): string {
     if (requestId) {
-      return `REQ_${requestId}`;
+      // Affiliate can affect pricing/availability (markups/attribution), so include it in the key.
+      return `REQ_${requestId}_AFF_${(affiliateCode || '').trim().toLowerCase()}`;
     }
     const format = (d?: Date) => d ? this.formatDate(d) : '';
     const segmentsPart = params.segments && params.segments.length
@@ -82,12 +83,14 @@ class FlightService {
       params.passengers.infants || 0,
       params.class,
       params.tripType,
-      segmentsPart
+      segmentsPart,
+      // Affiliate can affect results; include it to avoid cross-affiliate cache bleed.
+      (affiliateCode || '').trim().toLowerCase()
     ].join('|');
   }
 
-  private getFromCache(params: SearchParams, requestId?: string): FlightSearchResponse | null {
-    const key = this.makeCacheKey(params, requestId);
+  private getFromCache(params: SearchParams, requestId?: string, affiliateCode?: string): FlightSearchResponse | null {
+    const key = this.makeCacheKey(params, requestId, affiliateCode);
     const entry = this.responseCache.get(key);
     if (!entry) return null;
     const isFresh = Date.now() - entry.ts < FlightService.CACHE_TTL_MS;
@@ -98,27 +101,28 @@ class FlightService {
     return entry.data;
   }
 
-  private saveToCache(params: SearchParams, data: FlightSearchResponse, requestId?: string) {
-    const key = this.makeCacheKey(params, requestId);
+  private saveToCache(params: SearchParams, data: FlightSearchResponse, requestId?: string, affiliateCode?: string) {
+    const key = this.makeCacheKey(params, requestId, affiliateCode);
     this.responseCache.set(key, { data, ts: Date.now() });
   }
 
   /**
    * Search for flights using Vyspa API via server action
    */
-  async searchFlights(params: SearchParams, requestId?: string): Promise<FlightSearchResponse> {
+  async searchFlights(params: SearchParams, requestId?: string, affiliateCode?: string): Promise<FlightSearchResponse> {
     try {
       // 1) Return cached result if present (instant render on date you already prefetched)
       // Only use cache if NOT using requestId (fresh request explicitly requested if ID provided?)
       // Actually, if we have a requestId, we might want to check cache for it too? 
       // But usually requestId means "restore session", so maybe we should fetch fresh to be safe?
       // Let's cache it too.
-      const cached = this.getFromCache(params, requestId);
+      const cached = this.getFromCache(params, requestId, affiliateCode);
       if (cached) {
         return cached;
       }
 
       let vyspaParams: FlightSearchRequest;
+      const aff = affiliateCode?.trim();
 
       if (requestId) {
         // Build minimal request for session restoration
@@ -136,7 +140,8 @@ class FlightService {
           chd1: String(params.passengers.children),
           ow: params.tripType === 'one-way' ? '1' : '0',
           dir: '0',
-          cl: '1'
+          cl: '1',
+          ...(aff ? { aff } : {}),
         };
       } else {
         // Normal search params construction
@@ -209,6 +214,7 @@ class FlightService {
           ow,
           dir: '0', // TODO: Add direct flights filter to UI
           cl: this.mapCabinClass(params.class),
+          ...(aff ? { aff } : {}),
           ...multiCityExtras,
         };
       }
@@ -217,7 +223,8 @@ class FlightService {
         tripType: params.tripType,
         segmentCount: params.segments?.length || 1,
         vyspaParams,
-        hasRequestId: !!requestId
+        hasRequestId: !!requestId,
+        hasAffiliate: !!aff,
       });
 
       // Call server action
@@ -238,7 +245,7 @@ class FlightService {
         datePrices: mockDatePrices,
       };
       // 2) Save to cache
-      this.saveToCache(params, result, requestId);
+      this.saveToCache(params, result, requestId, affiliateCode);
       return result;
     } catch (error) {
       console.error('Error searching flights:', error);
