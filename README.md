@@ -1,6 +1,6 @@
 # GlobeHunters - Flight Search Platform
 
-A modern flight search and booking platform built with Next.js 15, TypeScript, and Tailwind CSS.
+A modern flight search and booking platform built with Next.js 16, TypeScript, and Tailwind CSS.
 
 ## Features
 
@@ -12,7 +12,7 @@ A modern flight search and booking platform built with Next.js 15, TypeScript, a
 
 ## Tech Stack
 
-- **Framework**: Next.js 15 with App Router
+- **Framework**: Next.js 16 with App Router
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS v4
 - **UI Components**: shadcn/ui
