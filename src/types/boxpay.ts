@@ -164,6 +164,7 @@ export interface PaymentCompletionInfo {
   amount?: string;
   currency?: string;
   message?: string;
+  error?: string; // Added to support error handling in UI
   paymentMethod?: BoxPayPaymentMethod;
   timestamp?: string;
 }
