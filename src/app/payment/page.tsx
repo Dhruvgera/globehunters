@@ -29,6 +29,8 @@ import { FlightSummaryCard } from "@/components/booking/FlightSummaryCard";
 import { WebRefCard } from "@/components/booking/WebRefCard";
 import { PaymentForm } from "@/components/payment/PaymentForm";
 
+import { FOLDER_STATUS_CODES } from "@/types/portal";
+
 function PaymentContent() {
   const t = useTranslations('payment');
   const router = useRouter();
@@ -487,8 +489,26 @@ function PaymentContent() {
                 } else {
                   throw new Error(result.error || 'Failed to create payment session');
                 }
-              } catch (e) {
+              } catch (e: any) {
                 console.error('BoxPay error:', e);
+                
+                // Update folder status to Payment Failed (56) on initial creation error
+                if (vyspaFolderNumber) {
+                   try {
+                     await fetch("/api/vyspa/update-status", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          folderNumber: vyspaFolderNumber,
+                          statusCode: FOLDER_STATUS_CODES.PAYMENT_FAILURE,
+                          comments: [`BoxPay Session Creation Failed: ${e?.message || 'Unknown error'}`]
+                        }),
+                     });
+                   } catch (err) {
+                     console.error("Failed to update status on error", err);
+                   }
+                }
+
                 // Show affiliate-specific copy
                 if (isSkyscanner) {
                   setPaymentErrorMessage(`There has been a problem processing your order (${orderId}). Please check that all the details are correct and try again`);

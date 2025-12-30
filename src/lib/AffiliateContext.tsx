@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { Affiliate, fetchAffiliates, getAffiliateByCode } from '@/services/affiliateService';
 import { useBookingStore } from '@/store/bookingStore';
+import Cookies from 'js-cookie';
 
 interface AffiliateContextType {
   // Current affiliate code from URL
@@ -38,10 +39,10 @@ export function AffiliateProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const setAffiliateData = useBookingStore((state) => state.setAffiliateData);
 
-  // Load affiliate code from sessionStorage on mount
+  // Load affiliate code from cookies on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const storedCode = sessionStorage.getItem('affiliate_code');
+      const storedCode = Cookies.get('affiliate_code');
       if (storedCode) {
         setAffiliateCodeState(storedCode);
       }
@@ -97,15 +98,16 @@ export function AffiliateProvider({ children }: { children: ReactNode }) {
     }
   }, [affiliateCode, affiliates, setAffiliateData]);
 
-  // Set affiliate code and persist to sessionStorage
+  // Set affiliate code and persist to cookies
   const setAffiliateCode = useCallback((code: string | null) => {
     setAffiliateCodeState(code);
     if (typeof window !== 'undefined') {
       if (code) {
-        sessionStorage.setItem('affiliate_code', code);
-        console.log('💾 Stored affiliate code:', code);
+        // Set cookie for 30 days
+        Cookies.set('affiliate_code', code, { expires: 30 });
+        console.log('💾 Stored affiliate code in cookie:', code);
       } else {
-        sessionStorage.removeItem('affiliate_code');
+        Cookies.remove('affiliate_code');
       }
     }
   }, []);

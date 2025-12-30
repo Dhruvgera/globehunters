@@ -40,6 +40,8 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 
+import { FOLDER_STATUS_CODES } from "@/types/portal";
+
 // Check if mock mode is enabled
 const isMockMode = process.env.NEXT_PUBLIC_MOCK_BOOKING_CONFIRMATION === "true";
 
@@ -530,6 +532,30 @@ function FlightConfirmationCard({
   );
 }
 
+// Move imports to top of file
+// (removed duplicate import)
+
+// Add this helper function outside component
+const updateFolderStatus = async (
+  folderNumber: string,
+  statusCode: string,
+  comments?: string[]
+) => {
+  try {
+    await fetch("/api/vyspa/update-status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        folderNumber,
+        statusCode,
+        comments,
+      }),
+    });
+  } catch (err) {
+    console.error("Failed to update folder status", err);
+  }
+};
+
 function PaymentCompleteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -667,6 +693,14 @@ function PaymentCompleteContent() {
         if (result.success && result.payment) {
           // If payment failed, redirect back to payment page with error
           if (result.payment.status === "failed") {
+            // Update folder status to Payment Failed (56)
+            if (vyspaFolderNumber) {
+              await updateFolderStatus(
+                vyspaFolderNumber,
+                FOLDER_STATUS_CODES.PAYMENT_FAILURE,
+                [`Payment failed: ${result.payment.error || 'Unknown error'}`]
+              );
+            }
             router.replace('/payment?error=payment_failed');
             return;
           }
@@ -694,8 +728,21 @@ function PaymentCompleteContent() {
             );
 
             // Email sending is handled by separate useEffect to ensure data is available
+          } else {
+            // Check if status is explicitly failed/declined
+            if (result.status === "failed" || result.status === "declined") {
+               if (vyspaFolderNumber) {
+                 await updateFolderStatus(
+                   vyspaFolderNumber,
+                   FOLDER_STATUS_CODES.PAYMENT_FAILURE,
+                   [`Payment inquiry failed/declined: ${result.error || result.status}`]
+                 );
+               }
+            }
+            setError(result.error || "Failed to get payment status");
           }
         } else {
+          // Fallback if inquirePayment returned success:false or missing payment object
           setError(result.error || "Failed to get payment status");
         }
       } else {

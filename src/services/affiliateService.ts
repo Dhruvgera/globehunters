@@ -9,6 +9,7 @@ export interface Affiliate {
   Aff_CookieLength: number;
   Aff_Name: string;
   Aff_TelNo: string;
+  Details?: string;
 }
 
 interface CacheEntry {
@@ -18,44 +19,14 @@ interface CacheEntry {
 
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
-// Module-level cache
-let affiliateCache: CacheEntry | null = null;
+import { AFFILIATE_DATA } from '@/data/affiliates';
 
 /**
- * Fetch affiliates via our API route (avoids CORS issues)
+ * Fetch affiliates from local data
  */
 export async function fetchAffiliates(): Promise<Affiliate[]> {
-  // Check cache first
-  if (affiliateCache && Date.now() - affiliateCache.timestamp < CACHE_TTL_MS) {
-    console.log('✅ Using cached affiliate data');
-    return affiliateCache.data;
-  }
-
-  try {
-    console.log('🌐 Fetching affiliate data via API route...');
-    // Use our own API route to avoid CORS issues
-    const response = await fetch('/api/affiliates');
-
-    if (!response.ok) {
-      console.warn(`⚠️ Failed to fetch affiliates: ${response.status} ${response.statusText} - Using cached/default data`);
-      return affiliateCache?.data || [];
-    }
-
-    const data: Affiliate[] = await response.json();
-    
-    // Update cache
-    affiliateCache = {
-      data,
-      timestamp: Date.now(),
-    };
-
-    console.log(`✅ Fetched ${data.length} affiliates`);
-    return data;
-  } catch (error) {
-    console.error('❌ Error fetching affiliates:', error);
-    // Return cached data if available (even if stale), otherwise empty array
-    return affiliateCache?.data || [];
-  }
+  // Use local data instead of API call
+  return AFFILIATE_DATA;
 }
 
 /**

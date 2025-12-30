@@ -217,14 +217,20 @@ export interface UpdateFolderStatusRequest {
     comments?: string[];
 }
 
-// Status codes (common ones)
+// Status codes (from CRM)
 export const FOLDER_STATUS_CODES = {
-    BASKET: '1',
+    BASKET: '51',           // Customer reached query online but payment not done
+    PAYMENT_RECEIVED: '58', // When customer made the online payment
+    PAYMENT_FAILURE: '56',  // When customer try to make the payment but it fail
+    BOOKING_CONFIRMED: '59',// Agent check manually
+    BOOKING_FAILED: '57',   // payment failed forcefully
+    GENERAL_DECLINE: '52',  // authorization not given by customer for 2D payment
+    
+    // Legacy codes (keeping just in case)
     QUOTE: '10',
     BOOKED: '20',
     CONFIRMED: '30',
     TICKETED: '40',
-    PAID: '51',
     CANCELLED: '90',
 } as const;
 

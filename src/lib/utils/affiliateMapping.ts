@@ -42,16 +42,42 @@ const DEFAULT_MAPPING: MarketSourceInfo = {
 };
 
 // Affiliate code to name mapping
+// Strictly based on Globehunters Affiliate.csv and CRM_Affilate Details (1).csv
 const AFFILIATE_CODE_MAP: Record<string, AffiliateName> = {
-  'skyscanner': 'Skyscanner',
+  // Skyscanner
   'skyscannerapi': 'Skyscanner',
-  'kayak': 'Kayak',
-  'momondo': 'Momondo',
-  'cheapflights': 'CheapFlight',
-  'cheapflight': 'CheapFlight',
+  'skyap': 'Skyscanner', // Skyscanner NZ
+  'skapi': 'Skyscanner', // Skyscanner AU
+  'skymx': 'Skyscanner', // Skyscanner MX
+  'skie': 'Skyscanner', // Skyscanner IE
+  'skap': 'Skyscanner', // Skyscanner USA
+  'skyca': 'Skyscanner', // Skyscanner CA
+
+  // Kayak
+  'kuapi': 'Kayak', // Kayak UK
+  'kasa': 'Kayak', // Kayak ZA
+  'kauap': 'Kayak', // Kayak AU
+
+  // Momondo
+  'momondo': 'Momondo', // Momondo UK
+  'monz': 'Momondo', // Momondo NZ
+  'moza': 'Momondo', // Momondo ZA
+  'moau': 'Momondo', // Momondo AU
+
+  // CheapFlights
+  'cheapflightsapi': 'CheapFlight', // Cheapflights UK
+  'cfnz': 'CheapFlight', // Cheapflights NZ
+  'cfza': 'CheapFlight', // Cheapflights ZA
+  'cfau': 'CheapFlight', // Cheapflights AU
+
+  // Jetcost
+  'jetcostuk': 'Jetcost',
+  'jetcostau': 'Jetcost',
+  'jetcostusa': 'Jetcost',
+
+  // GH (From CRM mapping, though not in Affiliate CSV)
   'gh': 'GH',
-  'globehunters': 'GH',
-  'jetcost': 'Jetcost'
+  'gh website': 'GH'
 };
 
 // The main mapping table derived from CRM_Affilate Details.csv
@@ -99,6 +125,12 @@ const AFFILIATE_CONFIG: Record<AffiliateName, {
         'Premium Economy': '43',
         'Business': '44',
         'First': '45'
+      },
+      'UK': {
+        'Economy': '18',
+        'Premium Economy': '19',
+        'Business': '20',
+        'First': '21'
       }
     }
   },
@@ -128,6 +160,12 @@ const AFFILIATE_CONFIG: Record<AffiliateName, {
         'Premium Economy': '81',
         'Business': '82',
         'First': '83'
+      },
+      'UK': {
+        'Economy': '51',
+        'Premium Economy': '52',
+        'Business': '53',
+        'First': '54'
       }
     }
   },
@@ -151,6 +189,12 @@ const AFFILIATE_CONFIG: Record<AffiliateName, {
         'Premium Economy': '114',
         'Business': '115',
         'First': '116'
+      },
+      'UK': {
+        'Economy': '85',
+        'Premium Economy': '86',
+        'Business': '87',
+        'First': '88'
       }
     }
   },
@@ -167,13 +211,19 @@ const AFFILIATE_CONFIG: Record<AffiliateName, {
         'Economy': '126',
         'Premium Economy': '127',
         'Business': '128',
-        'First': '129' // Assuming 129 for First/Default based on CSV ambiguity, or maybe for AU NZ
+        'First': '129'
       },
       'CA': {
         'Economy': '134',
         'Premium Economy': '135',
         'Business': '136',
         'First': '137'
+      },
+      'UK': {
+        'Economy': '118',
+        'Premium Economy': '119',
+        'Business': '120',
+        'First': '121'
       }
     }
   },
@@ -200,10 +250,7 @@ const AFFILIATE_CONFIG: Record<AffiliateName, {
       },
       'IE': {
         'Economy': '176',
-        'Premium Economy': '180', // Note: 180 appears twice in CSV (IE Pre and IE Fir), assuming typo in CSV for Fir or Pre?
-        // CSV Line 79: IE Pre 180
-        // CSV Line 81: IE Fir 180
-        // We will trust the CSV for now.
+        'Premium Economy': '180',
         'Business': '178',
         'First': '180'
       },
@@ -218,6 +265,12 @@ const AFFILIATE_CONFIG: Record<AffiliateName, {
         'Premium Economy': '157',
         'Business': '158',
         'First': '159'
+      },
+      'UK': {
+        'Economy': '184',
+        'Premium Economy': '181',
+        'Business': '182',
+        'First': '183'
       }
     }
   },
@@ -235,6 +288,12 @@ const AFFILIATE_CONFIG: Record<AffiliateName, {
         'Premium Economy': '222',
         'Business': '224',
         'First': '223'
+      },
+      'UK': {
+        'Economy': '221',
+        'Premium Economy': '218',
+        'Business': '220',
+        'First': '219'
       }
     }
   },
@@ -301,15 +360,15 @@ export function getMarketSourceMapping(
   // 4. Look up subsource for region
   let subSources = config.subSources[regionCode];
   
-  // If region not found for this affiliate, try 'AU' or 'US' as fallback if available, 
-  // or use the 'Default' affiliate's subsource if we want to be safe.
-  // However, often 'UK' might default to 'AU' or 'US' buckets in legacy systems if not defined?
-  // Or maybe UK has its own IDs not in this CSV?
-  // For now, if region missing, we return DEFAULT_MAPPING's subsource but keep the affiliate's sourceId?
-  // Or fallback to a default region like 'AU' for that affiliate?
+  // If region not found for this affiliate, try to fallback
   if (!subSources) {
-    // Fallback strategy: Try finding 'AU' or 'US' or 'default'
-    if (config.subSources['AU']) subSources = config.subSources['AU'];
+    // If 'UKHQ' was passed but we only have 'UK', try that (handled by caller mostly, but safe to check)
+    if (regionCode === 'UKHQ' && config.subSources['UK']) {
+      subSources = config.subSources['UK'];
+    }
+    // Fallback strategy: Try finding 'UK', 'AU', 'US'
+    else if (config.subSources['UK']) subSources = config.subSources['UK'];
+    else if (config.subSources['AU']) subSources = config.subSources['AU'];
     else if (config.subSources['US']) subSources = config.subSources['US'];
     else {
       // If absolutely no subsource found, fall back to global default
@@ -327,4 +386,3 @@ export function getMarketSourceMapping(
     subSourceId: subSourceId || DEFAULT_MAPPING.subSourceId
   };
 }
-

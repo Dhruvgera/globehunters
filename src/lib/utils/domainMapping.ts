@@ -46,14 +46,18 @@ const DEFAULT_CONFIG: DomainConfig = {
  * Get region based on hostname (server-side friendly if hostname provided)
  */
 export function getRegionFromHost(hostname: string): string {
+  // Allow overriding domain via env var for testing
+  const simulatedDomain = process.env.SIMULATE_DOMAIN;
+  const targetHost = simulatedDomain || hostname;
+
   // Check for exact domain match
-  if (DOMAIN_CONFIG_MAP[hostname]) {
-    return DOMAIN_CONFIG_MAP[hostname].region;
+  if (DOMAIN_CONFIG_MAP[targetHost]) {
+    return DOMAIN_CONFIG_MAP[targetHost].region;
   }
   
   // Check for partial domain match
   for (const [domain, config] of Object.entries(DOMAIN_CONFIG_MAP)) {
-    if (hostname.includes(domain)) {
+    if (targetHost.includes(domain)) {
       return config.region;
     }
   }

@@ -5,6 +5,7 @@
 
 import { VYSPA_PORTAL_CONFIG, getPortalRegionConfig, CONTACT_TYPES } from '@/config/vyspaPortal';
 import { getMarketSourceMapping } from '@/lib/utils/affiliateMapping';
+import { FOLDER_STATUS_CODES } from '@/types/portal';
 import {
     PortalApiMethod,
     CreateFolderRequest,
@@ -303,7 +304,7 @@ class PortalService {
             branch_code: regionConfig.branchCode,
             booker: `${leadPassenger.firstName} ${leadPassenger.lastName}`,
             departuredate: formatDepartureDateForPortal(params.flight.departureDate),
-            folder_status: 'Basket',
+            folder_status: FOLDER_STATUS_CODES.BASKET,
             customer_type: 'C',
             sell_curr_code: params.flight.currency,
             foldcur: params.flight.currency,

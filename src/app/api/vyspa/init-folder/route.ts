@@ -139,6 +139,8 @@ function mapCabinClass(cabinClass?: string): string {
   return 'Y'; // Economy
 }
 
+import { FOLDER_STATUS_CODES } from '@/types/portal';
+
 export async function POST(req: Request) {
   const { apiUrl, credentials, timeout } = VYSPA_PORTAL_CONFIG;
 
@@ -371,7 +373,7 @@ export async function POST(req: Request) {
       branch_code: regionConfig.branchCode,
       booker: `${lead.firstName} ${lead.lastName}`,
       departuredate: vyspaDepartureDate,
-      folder_status: 'Basket',
+      folder_status: FOLDER_STATUS_CODES.BASKET,
       customer_type: 'C',
       sell_curr_code: currency,
       foldcur: currency,

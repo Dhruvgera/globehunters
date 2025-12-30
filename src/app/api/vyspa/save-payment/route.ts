@@ -101,10 +101,10 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // 2. Update folder status to "Paid"
+        // 2. Update folder status to "Payment Received"
         const statusParams = [{
             folder_no: body.folderNumber,
-            new_folder_status_code: FOLDER_STATUS_CODES.PAID,
+            new_folder_status_code: FOLDER_STATUS_CODES.PAYMENT_RECEIVED,
             comments: [`${body.currency} ${body.amount.toFixed(2)}`],
         }];
 
