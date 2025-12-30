@@ -9,7 +9,7 @@ These are **Next.js Route Handlers** (Node runtime) that encapsulate secrets and
 | Route | Method | Purpose | Used by |
 |------|--------|---------|---------|
 | `/api/airports` | GET | Airport lookup (cached; supports `?q=`) | airport search UI/hooks |
-| `/api/affiliates` | GET | Fetch affiliates list from external CMS API | `AffiliateContext` |
+| `/api/affiliates` | GET | (Legacy/Unused) Affiliate data now static in `src/data/affiliates.ts` | `AffiliateContext` |
 | `/api/reviews` | GET | Fetch + filter reviews from Yotpo (OAuth token + reviews) | booking UI (`useReviews`) |
 | `/api/flight-view` | POST | Resolve deeplink flight key → flight + params | `/`, `/search`, `/checkout` deeplink flows |
 | `/api/price-check` | POST | Price verification + upgrade options (V1+V3 flows) | `/booking` (prefetch) + upgrade modal |
@@ -20,6 +20,7 @@ These are **Next.js Route Handlers** (Node runtime) that encapsulate secrets and
 | `/api/vyspa/add-to-folder` | POST | Add items (flight etc.) to a folder (Vyspa REST v4) | folder services / booking flow |
 | `/api/vyspa/add-extras` | POST | Add insurance/baggage extras (Portal) | `/payment` |
 | `/api/vyspa/save-payment` | POST | Record payment transaction + update folder status (Portal) | `/payment-complete` |
+| `/api/vyspa/update-status` | POST | Explicitly update folder status (e.g. failure) | `/payment`, `/payment-complete` |
 | `/api/vyspa/portal` | POST | Generic Portal method wrapper (form-encoded) | internal/debug/utility use |
 | `/api/send-confirmation-email` | POST | Send confirmation email (nodemailer) | `/payment-complete` |
 | `/api/test-email` | POST | Test email sending | dev tooling |

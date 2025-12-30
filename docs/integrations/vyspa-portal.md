@@ -62,6 +62,32 @@ Responsibilities:
 
 Responsibilities:
 
+- Records the payment transaction ID against the folder (`saveBarclaycardPayments`).
+- Updates the folder status to **58** (`PAYMENT_RECEIVED`).
+- Verifies success by fetching folder details.
+
+### 4) Update status: `POST /api/vyspa/update-status`
+
+- Implementation: `src/app/api/vyspa/update-status/route.ts`
+
+Responsibilities:
+
+- Allows explicit status updates (e.g. failures).
+- Used by the client when:
+  - BoxPay session creation fails -> Status **56** (`PAYMENT_FAILURE`)
+  - Payment inquiry returns 'failed' -> Status **56** (`PAYMENT_FAILURE`)
+
+## Status Codes (CRM)
+
+The integration uses specific status codes defined in `src/types/portal.ts`:
+
+- `51`: Basket (Init folder)
+- `58`: Payment Received (Success)
+- `56`: Payment Failure
+- `59`: Booking Confirmed
+- `57`: Booking Failed
+- `52`: General Decline
+
 - Calls Portal method `saveBarclaycardPayments` to store `transaction_id` against `folder_no`.
 - Also updates folder status (`api_update_folder_status`) using `FOLDER_STATUS_CODES` from `src/types/portal.ts`.
 

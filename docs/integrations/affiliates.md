@@ -22,16 +22,13 @@ This repository supports affiliate attribution and meta-channel tracking (e.g. S
 
 Data sources:
 
-- Loads a persisted code from `sessionStorage` key `affiliate_code`
-- Fetches affiliates from `GET /api/affiliates` (see below)
+- Loads a persisted code from cookie `affiliate_code` (30-day expiry)
+- Loads static affiliate list from `src/data/affiliates.ts` (replaced legacy API fetch)
 - Mirrors data into Zustand store via `setAffiliateData(...)`
 
-## Affiliates API route
+## Affiliate Data
 
-`GET /api/affiliates` → `src/app/api/affiliates/route.ts`
-
-- Calls a remote CMS endpoint (POST)
-- Cached (`revalidate = 600`)
+Affiliate data is now managed statically in `src/data/affiliates.ts`, generated from `Globehunters Affiliate.csv`. This avoids external API dependencies for affiliate metadata.
 
 ## Affiliate mapping to Portal “source/subsource”
 
@@ -41,9 +38,11 @@ Data sources:
 
 This is used by the Portal integration (folder init) to tag bookings with a market source/subsource derived from:
 
-- affiliate code (normalized)
-- region (derived from host)
+- affiliate code (normalized against `AFFILIATE_CODE_MAP`)
+- region (derived from host/domain)
 - cabin class (economy/business/…)
+
+Mappings are strictly defined based on `CRM_Affilate Details (1).csv`. Unsupported codes fallback to default values (CheapFlights UK).
 
 ## Region and domain mapping
 
