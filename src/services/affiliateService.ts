@@ -1,6 +1,6 @@
 /**
  * Affiliate Service
- * Handles affiliate data fetching and caching (10 minutes TTL)
+ * Handles affiliate data from static source
  */
 
 export interface Affiliate {
@@ -12,20 +12,12 @@ export interface Affiliate {
   Details?: string;
 }
 
-interface CacheEntry {
-  data: Affiliate[];
-  timestamp: number;
-}
-
-const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
-
 import { AFFILIATE_DATA } from '@/data/affiliates';
 
 /**
  * Fetch affiliates from local data
  */
 export async function fetchAffiliates(): Promise<Affiliate[]> {
-  // Use local data instead of API call
   return AFFILIATE_DATA;
 }
 
@@ -52,11 +44,4 @@ export async function getAffiliatePhone(code: string | null): Promise<string> {
 
   const affiliate = await getAffiliateByCode(code);
   return affiliate?.Aff_TelNo || DEFAULT_PHONE;
-}
-
-/**
- * Clear the affiliate cache (useful for testing or forced refresh)
- */
-export function clearAffiliateCache(): void {
-  affiliateCache = null;
 }

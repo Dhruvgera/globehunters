@@ -1,39 +1,14 @@
 import { NextResponse } from 'next/server';
+import { AFFILIATE_DATA } from '@/data/affiliates';
 
-const API_URL = 'https://cms-api.travcart.co.uk/api/basket/GetAffilates?hosturl=globehunters.com';
-
-// Cache at the edge for 10 minutes
-export const revalidate = 600;
-
+/**
+ * GET /api/affiliates
+ * Returns affiliate data from static source (no external API call)
+ */
 export async function GET() {
-  try {
-    const response = await fetch(API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({}),
-    });
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: `Failed to fetch affiliates: ${response.status}` },
-        { status: response.status }
-      );
-    }
-
-    const data = await response.json();
-    
-    return NextResponse.json(data, {
-      headers: {
-        'Cache-Control': 'public, s-maxage=600, stale-while-revalidate=300',
-      },
-    });
-  } catch (error) {
-    console.error('Error fetching affiliates:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch affiliates' },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json(AFFILIATE_DATA, {
+    headers: {
+      'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=3600',
+    },
+  });
 }

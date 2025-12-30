@@ -32,8 +32,9 @@ interface CreateSessionResponse {
   error?: string;
 }
 
-interface InquiryResponse {
+export interface InquiryResponse {
   success: boolean;
+  status?: string;
   payment?: PaymentCompletionInfo;
   error?: string;
 }
@@ -110,17 +111,18 @@ export function useBoxPay(): UseBoxPayReturn {
       if (!response.ok || !data.success) {
         const errorMsg = data.error || 'Failed to get payment status';
         setError(errorMsg);
-        return { success: false, error: errorMsg };
+        return { success: false, error: errorMsg, status: data.status };
       }
 
       return {
         success: true,
+        status: data.status,
         payment: data.payment,
       };
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to get payment status';
       setError(errorMsg);
-      return { success: false, error: errorMsg };
+      return { success: false, error: errorMsg, status: 'failed' };
     } finally {
       setLoading(false);
     }

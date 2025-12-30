@@ -5,7 +5,6 @@
 
 import { VYSPA_PORTAL_CONFIG, getPortalRegionConfig, CONTACT_TYPES } from '@/config/vyspaPortal';
 import { getMarketSourceMapping } from '@/lib/utils/affiliateMapping';
-import { FOLDER_STATUS_CODES } from '@/types/portal';
 import {
     PortalApiMethod,
     CreateFolderRequest,
@@ -525,7 +524,7 @@ class PortalService {
     async markFolderAsPaid(folderNumber: string, amount: number, currency: string): Promise<unknown> {
         return this.updateFolderStatus({
             folderNumber,
-            statusCode: FOLDER_STATUS_CODES.PAID,
+            statusCode: FOLDER_STATUS_CODES.PAYMENT_RECEIVED,
             comments: [`${currency} ${amount.toFixed(2)}`],
         });
     }
