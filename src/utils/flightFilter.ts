@@ -237,6 +237,70 @@ export function filterFlights(flights: Flight[], filters: FilterState): Flight[]
   });
 }
 
+/**
+ * Filter flights excluding stops filter - used for calculating available stops counts
+ * This allows the stop counts to update based on other filter selections (e.g., airline)
+ */
+export function filterFlightsExcludingStops(flights: Flight[], filters: FilterState): Flight[] {
+  return flights.filter((flight) => {
+    // Skip stops filter - we want to count all stops for the current filter selection
+
+    // Airline filter
+    if (!matchesAirline(flight, filters.airlines)) {
+      return false;
+    }
+
+    // Price range filter
+    if (!matchesPriceRange(flight, filters.priceRange)) {
+      return false;
+    }
+
+    // Time filters based on mode (takeoff = departure, landing = arrival)
+    if (filters.timeFilterMode === 'landing') {
+      if (!matchesArrivalTime(flight, filters.arrivalTimeOutbound, false)) {
+        return false;
+      }
+      if (flight.inbound && !matchesArrivalTime(flight, filters.arrivalTimeInbound, true)) {
+        return false;
+      }
+    } else {
+      if (!matchesDepartureTime(flight, filters.departureTimeOutbound, false)) {
+        return false;
+      }
+      if (flight.inbound && !matchesDepartureTime(flight, filters.departureTimeInbound, true)) {
+        return false;
+      }
+    }
+
+    // Outbound journey time filter
+    if (!matchesJourneyTime(flight, filters.journeyTimeOutbound, false)) {
+      return false;
+    }
+
+    // Inbound journey time filter (if round trip)
+    if (flight.inbound && !matchesJourneyTime(flight, filters.journeyTimeInbound, true)) {
+      return false;
+    }
+
+    // Departure airport filter
+    if (!matchesDepartureAirport(flight, filters.departureAirports)) {
+      return false;
+    }
+
+    // Arrival airport filter
+    if (!matchesArrivalAirport(flight, filters.arrivalAirports)) {
+      return false;
+    }
+
+    // Extras filter
+    if (!matchesExtras(flight, filters.extras)) {
+      return false;
+    }
+
+    return true;
+  });
+}
+
 export type SortOption = 'best' | 'cheapest' | 'fastest' | 'price-asc' | 'price-desc' | 'duration-asc' | 'duration-desc' | 'departure-asc' | 'departure-desc';
 
 /**

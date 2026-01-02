@@ -9,7 +9,7 @@ import Footer from "@/components/navigation/Footer";
 import { useFlights } from "@/hooks/useFlights";
 import { useDatePrices } from "@/hooks/useDatePrices";
 import { useBookingStore } from "@/store/bookingStore";
-import { filterFlights, parseDurationToMinutes, sortFlights, countByStops, getTimeBounds } from "@/utils/flightFilter";
+import { filterFlights, filterFlightsExcludingStops, parseDurationToMinutes, sortFlights, countByStops, getTimeBounds } from "@/utils/flightFilter";
 import { airportCache } from "@/lib/cache/airportCache";
 import { shortenAirportName } from "@/lib/vyspa/utils";
 import { normalizeCabinClass } from "@/lib/utils";
@@ -737,10 +737,12 @@ function SearchPageContent() {
     return sorted;
   }, [effectiveFlights, resolvedAirportNames, effectiveSearchParams.from]);
 
-  // Compute available stops from flights (for hiding unavailable filter options)
+  // Compute available stops from flights filtered by all OTHER filters (excluding stops)
+  // This makes the stop counts update when user selects airline or other filters
   const availableStops = useMemo(() => {
-    return countByStops(preparedFlights);
-  }, [preparedFlights]);
+    const flightsForStopCounts = filterFlightsExcludingStops(preparedFlights, filterState);
+    return countByStops(flightsForStopCounts);
+  }, [preparedFlights, filterState]);
 
   // Compute time bounds from flights
   const timeBounds = useMemo(() => {
