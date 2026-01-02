@@ -333,6 +333,7 @@ export async function transformPriceCheckResponse(
 
     if (shouldFallbackToFlightResult) {
       console.warn('Price check returned no usable price options, falling back to main flight total_fare');
+      // Use the same refundable info from flightDetails for fallback
       priceOptions = [{
         id: flightResult.id || 'fallback',
         cabinClass: 'Y',
@@ -368,6 +369,10 @@ export async function transformPriceCheckResponse(
         rebookingService: undefined,
         seatServices: [],
         mealsService: undefined,
+        // Use flight details refundable info for fallback
+        refundable: flightDetails.refundable,
+        refundableStatus: flightDetails.refundableStatus,
+        refundableText: flightDetails.refundableText,
       }];
     }
 
@@ -594,6 +599,37 @@ function transformPriceOption(
     (option.BrandInfo?.[0]?.BrandName?.toString().trim()) || 
     '';
 
+  // Extract refundable status from this specific fare option's Total_Fare
+  // Refundable codes: 1=Refundable, 2=Non-Refundable, 3=RefundableWithPenalty, 4=FullyRefundable
+  const optionRefundCode = parseInt(String(totalFare.refundable ?? '2'), 10);
+  let optionRefundableStatus: 'non-refundable' | 'refundable' | 'refundable-with-penalty' | 'fully-refundable';
+  let optionRefundableText: string;
+  let optionRefundable: boolean;
+  
+  switch (optionRefundCode) {
+    case 1:
+      optionRefundableStatus = 'refundable';
+      optionRefundableText = totalFare.refundable_text || 'Ticket can be refunded (fees may apply)';
+      optionRefundable = true;
+      break;
+    case 3:
+      optionRefundableStatus = 'refundable-with-penalty';
+      optionRefundableText = totalFare.refundable_text || 'Refundable with penalty fees';
+      optionRefundable = true;
+      break;
+    case 4:
+      optionRefundableStatus = 'fully-refundable';
+      optionRefundableText = totalFare.refundable_text || 'Fully refundable';
+      optionRefundable = true;
+      break;
+    case 2:
+    default:
+      optionRefundableStatus = 'non-refundable';
+      optionRefundableText = totalFare.refundable_text || "Ticket can't be refunded";
+      optionRefundable = false;
+      break;
+  }
+
   // Calculate price per person
   const pricingArr = option.pricingArr || [];
   const paxCount = pricingArr.reduce(
@@ -720,6 +756,10 @@ function transformPriceOption(
     rebookingService,
     seatServices,
     mealsService,
+    // Refundable status for this specific fare option
+    refundable: optionRefundable,
+    refundableStatus: optionRefundableStatus,
+    refundableText: optionRefundableText,
   };
 }
 

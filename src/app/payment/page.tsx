@@ -223,11 +223,22 @@ function PaymentContent() {
   const baggagePrice = PRICING_CONFIG.baggagePrice;
   const discountPercent = 0; // No automatic discount unless applied explicitly
 
+  // Flight data for summary cards - Use real flight data (supports multi-city)
+  // Moved up to calculate number of ways for baggage pricing
+  const journeySegments = flight.segments && flight.segments.length > 0
+    ? flight.segments
+    : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
+
   const normalizedProtectionPlan = protectionPlan;
   const protectionPlanCost = normalizedProtectionPlan
     ? protectionPlanPrices[normalizedProtectionPlan]
     : 0;
-  const baggageCost = additionalBaggage * baggagePrice;
+  
+  // Calculate number of ways for baggage pricing
+  // For round-trip: 2 ways, for one-way: 1 way, for multi-city: number of segments
+  const numberOfWays = journeySegments.length;
+  // Baggage is charged per person per way (e.g., £90 per way means £180 for round-trip)
+  const baggageCost = additionalBaggage * baggagePrice * numberOfWays;
   const subtotal = baseFare + protectionPlanCost + baggageCost;
   const discountAmount = subtotal * discountPercent;
   const tripTotal = subtotal - discountAmount;
@@ -240,11 +251,6 @@ function PaymentContent() {
         : normalizedProtectionPlan === "all"
           ? "All Included"
           : "None";
-
-  // Flight data for summary cards - Use real flight data (supports multi-city)
-  const journeySegments = flight.segments && flight.segments.length > 0
-    ? flight.segments
-    : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
 
   const summaryLegs = journeySegments.map((seg) => ({
     // Use full airport name from cache or flight data

@@ -94,8 +94,12 @@ export function TicketOptionsPanel({
     }));
   }, [hasUpgrades, priceOptions, ticketOptions, currency]);
 
-  // Check if we have price data but no upgrades - show Book button only
+  // Check if we should show Book button instead of chips:
+  // 1. Price data exists but no upgrades (all same price)
+  // 2. OR no price options AND no ticket options (nothing to show as chips)
   const hasDataNoUpgrades = !!(priceOptions && priceOptions.length > 0 && !hasUpgrades);
+  const hasNoOptionsToShow = !hasUpgrades && chips.length === 0;
+  const shouldShowBookButton = hasDataNoUpgrades || hasNoOptionsToShow;
 
   return (
     <div className="mt-4 pt-4 border-t border-[#EEEEEE] pb-2 animate-fadeIn w-full max-w-full overflow-hidden">
@@ -104,12 +108,21 @@ export function TicketOptionsPanel({
           <Loader2 className="w-6 h-6 animate-spin text-[#3754ED]" />
           <p className="mt-2 text-sm text-[#3A478A]">Loading fare options...</p>
         </div>
-      ) : hasDataNoUpgrades ? (
-        // No upgrades available - show just the Book button
+      ) : shouldShowBookButton ? (
+        // No upgrades available or no options to show - show just the Book button
         <div className="flex items-center gap-3">
           <Button
             className="bg-[#3754ED] hover:bg-[#2a42c9] text-white rounded-full px-6 py-2.5 h-auto text-sm font-semibold"
-            onClick={onViewFlightInfo}
+            onClick={() => {
+              // If there's a single price option, select it and proceed to booking
+              if (priceOptions && priceOptions.length > 0) {
+                setSelectedUpgrade(priceOptions[0]);
+              }
+              // Proceed to booking flow
+              if (onSelectFlight) {
+                onSelectFlight("Eco Value");
+              }
+            }}
           >
             {t("book")}
           </Button>

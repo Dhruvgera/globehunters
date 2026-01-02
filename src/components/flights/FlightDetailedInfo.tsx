@@ -351,10 +351,10 @@ export default function FlightDetailedInfo({
                   </div>
                 );
               }
-              // Fallback
-              const isRefundable = priceCheck?.flightDetails?.refundable ?? flight.refundable ?? false;
-              const refundableStatus = priceCheck?.flightDetails?.refundableStatus;
-              const refundableText = priceCheck?.flightDetails?.refundableText || flight.refundableText || (isRefundable ? 'Ticket can be refunded (fees may apply)' : 'Ticket can\'t be refunded');
+              // Use selected option's refundable status first, then fallback to priceCheck.flightDetails or flight data
+              const isRefundable = selectedUpgradeOption?.refundable ?? priceCheck?.flightDetails?.refundable ?? flight.refundable ?? false;
+              const refundableStatus = selectedUpgradeOption?.refundableStatus ?? priceCheck?.flightDetails?.refundableStatus;
+              const refundableText = selectedUpgradeOption?.refundableText ?? priceCheck?.flightDetails?.refundableText ?? flight.refundableText ?? (isRefundable ? 'Ticket can be refunded (fees may apply)' : 'Ticket can\'t be refunded');
               let displayLabel = 'Non-Refundable';
               if (refundableStatus === 'fully-refundable') displayLabel = 'Fully Refundable';
               else if (refundableStatus === 'refundable-with-penalty') displayLabel = 'Refundable with Penalty';
@@ -373,8 +373,10 @@ export default function FlightDetailedInfo({
                       </span>
                     </div>
                   </div>
-                  {isRefundable ? (
+                  {refundableStatus === 'fully-refundable' ? (
                     <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
+                  ) : refundableStatus === 'refundable-with-penalty' || refundableStatus === 'refundable' ? (
+                    <Info className="w-5 h-5 sm:w-6 sm:h-6 text-[#F59E0B] shrink-0" />
                   ) : (
                     <XIcon className="w-5 h-5 sm:w-6 sm:h-6 text-[#DC2626] shrink-0" />
                   )}

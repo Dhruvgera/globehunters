@@ -411,6 +411,11 @@ export interface TransformedPriceOption {
   
   // Meals from OptionalService tags
   mealsService?: OptionalServiceItem;      // Tag: "Meals and Beverages"
+  
+  // Refundable status for this specific fare option
+  refundable: boolean;
+  refundableStatus: 'non-refundable' | 'refundable' | 'refundable-with-penalty' | 'fully-refundable';
+  refundableText: string;
 }
 
 /**

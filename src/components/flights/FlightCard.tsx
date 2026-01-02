@@ -26,6 +26,12 @@ export default function FlightCard({
   const setSelectedFlight = useBookingStore(
     (state) => state.setSelectedFlight
   );
+  const setPriceCheckData = useBookingStore(
+    (state) => state.setPriceCheckData
+  );
+  const setVyspaFolderInfo = useBookingStore(
+    (state) => state.setVyspaFolderInfo
+  );
   const [showTicketOptions, setShowTicketOptions] = useState(false);
   const [showFlightInfo, setShowFlightInfo] = useState(false);
 
@@ -48,6 +54,14 @@ export default function FlightCard({
   const handleSelectFlight = (
     fareType: "Eco Value" | "Eco Classic" | "Eco Flex"
   ) => {
+    // Clear any previous folder info when selecting a new flight
+    setVyspaFolderInfo({ folderNumber: '', customerId: null, emailAddress: null });
+    
+    // Save price check data if available
+    if (priceCheckData) {
+      setPriceCheckData(priceCheckData);
+    }
+    
     setSelectedFlight(flight, fareType);
     router.push("/booking");
   };

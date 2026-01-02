@@ -48,13 +48,13 @@ export function CountryCodeSelector({
                     role="combobox"
                     aria-expanded={open}
                     disabled={disabled}
-                    className="w-[100px] md:w-[140px] justify-between px-3 h-12 border-[#DFE0E4] rounded-xl bg-white hover:bg-gray-50 text-[#010D50]"
+                    className="w-[120px] sm:w-[140px] justify-between px-3 h-12 border-[#DFE0E4] rounded-xl bg-white hover:bg-gray-50 text-[#010D50]"
                 >
-                    <div className="flex items-center gap-2 overflow-hidden">
+                    <div className="flex items-center gap-2">
                         {selectedCountry && (
                             <span className={cn("fi", `fi-${selectedCountry.isoCode}`, "flex-shrink-0 w-4 h-3")} />
                         )}
-                        <span className="font-medium truncate">{value || "+44"}</span>
+                        <span className="font-medium whitespace-nowrap">{value || "+44"}</span>
                     </div>
                     <ChevronsUpDown className="ml-1 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
@@ -64,6 +64,7 @@ export function CountryCodeSelector({
                 align="start"
                 side="bottom"
                 sideOffset={4}
+                data-lenis-prevent
             >
                 <div className="flex items-center border-b border-[#DFE0E4] px-3 py-2">
                     <Search className="mr-2 h-4 w-4 shrink-0 opacity-50 text-[#3A478A]" />
@@ -75,7 +76,10 @@ export function CountryCodeSelector({
                         autoFocus
                     />
                 </div>
-                <div className="h-[300px] overflow-y-auto overflow-x-hidden py-1">
+                <div 
+                    className="h-[300px] overflow-y-auto overflow-x-hidden py-1 overscroll-contain"
+                    data-lenis-prevent
+                >
                     {filteredCountries.length === 0 ? (
                         <div className="py-6 text-center text-sm text-gray-500">
                             No country found.
