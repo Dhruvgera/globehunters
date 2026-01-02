@@ -31,9 +31,27 @@ interface FeatureItem {
 function buildFeaturesFromOption(option: TransformedPriceOption): FeatureItem[] {
   const features: FeatureItem[] = [];
   
-  // Checked Baggage from OptionalService
-  if (option.checkedBaggageServices && option.checkedBaggageServices.length > 0) {
-    option.checkedBaggageServices.forEach((svc) => {
+  // Checked Baggage - prefer perLeg data (has route info) for multi-segment flights
+  const perLeg = option.baggage?.perLeg;
+  const checkedServices = option.checkedBaggageServices || [];
+  const chargeableStatus = checkedServices[0]?.chargeable || 'included';
+  
+  if (perLeg && perLeg.length > 0) {
+    // Show per-leg baggage with route info
+    perLeg.forEach((leg) => {
+      features.push({
+        icon: chargeableStatus === 'included' ? 'check' : 'info',
+        iconComponent: Package,
+        title: leg.allowance,
+        description: `${leg.route} · ${chargeableStatus === 'included' ? 'Included in fare' : 'Available for a charge'}`,
+      });
+    });
+  } else if (checkedServices.length > 0) {
+    // Deduplicate by text to avoid showing duplicates
+    const uniqueServices = checkedServices.filter((svc, idx, arr) => 
+      arr.findIndex(s => s.text === svc.text) === idx
+    );
+    uniqueServices.forEach((svc) => {
       features.push({
         icon: svc.chargeable === 'included' ? 'check' : 'info',
         iconComponent: Package,
@@ -51,9 +69,13 @@ function buildFeaturesFromOption(option: TransformedPriceOption): FeatureItem[] 
     });
   }
   
-  // Carry-on Baggage from OptionalService
+  // Carry-on Baggage from OptionalService - deduplicate
   if (option.carryOnBaggageServices && option.carryOnBaggageServices.length > 0) {
-    option.carryOnBaggageServices.forEach((svc) => {
+    // Deduplicate by text
+    const uniqueCarryOn = option.carryOnBaggageServices.filter((svc, idx, arr) => 
+      arr.findIndex(s => s.text === svc.text) === idx
+    );
+    uniqueCarryOn.forEach((svc) => {
       features.push({
         icon: svc.chargeable === 'included' ? 'check' : 'info',
         iconComponent: Briefcase,

@@ -843,14 +843,48 @@ export default function FlightInfoModal({
                     Baggage
                   </span>
                   <div className="flex flex-col gap-3">
-                    {/* Checked Baggage from OptionalService - "Checked Baggage" tag */}
+                    {/* Checked Baggage - prefer perLeg data (has route info) for multi-segment flights */}
                     {(() => {
-                      // Use OptionalService data if available
                       const checkedBaggageServices = selectedUpgradeOption?.checkedBaggageServices || [];
-
+                      const perLeg = selectedUpgradeOption?.baggage?.perLeg;
+                      
+                      // Get chargeable status from OptionalService if available
+                      const chargeableStatus = checkedBaggageServices[0]?.chargeable || 'included';
+                      const isIncluded = chargeableStatus === 'included';
+                      
+                      // If we have perLeg data (route-based baggage), prefer showing it
+                      // This gives better UX for multi-city showing LGW-DXB, DXB-DEL etc.
+                      if (perLeg && perLeg.length > 0) {
+                        return perLeg.map((leg, idx) => (
+                          <div key={idx} className="flex items-start justify-between gap-2">
+                            <div className="flex items-start gap-3 flex-1 min-w-0">
+                              <Package className="w-5 h-5 sm:w-6 sm:h-6 text-[#010D50] shrink-0 mt-0.5" />
+                              <div className="flex flex-col gap-0.5 min-w-0">
+                                <span className="text-xs sm:text-sm font-medium text-[#010D50]">
+                                  {leg.allowance}
+                                </span>
+                                <span className="text-xs sm:text-sm text-[#3A478A]">
+                                  {leg.route} · {isIncluded ? 'Included in fare' : 'Available for a charge'}
+                                </span>
+                              </div>
+                            </div>
+                            {isIncluded ? (
+                              <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
+                            ) : (
+                              <Info className="w-5 h-5 sm:w-6 sm:h-6 text-[#F59E0B] shrink-0" />
+                            )}
+                          </div>
+                        ));
+                      }
+                      
+                      // If no perLeg but we have OptionalService data, deduplicate by text and show
                       if (checkedBaggageServices.length > 0) {
-                        // Show checked baggage from OptionalService (already filtered to exclude "Not offered")
-                        return checkedBaggageServices.map((svc, idx) => (
+                        // Deduplicate by text to avoid showing "Checked Baggage 25kgs" multiple times
+                        const uniqueServices = checkedBaggageServices.filter((svc, idx, arr) => 
+                          arr.findIndex(s => s.text === svc.text) === idx
+                        );
+                        
+                        return uniqueServices.map((svc, idx) => (
                           <div key={`checked-${idx}`} className="flex items-start justify-between gap-2">
                             <div className="flex items-start gap-3 flex-1 min-w-0">
                               <Package className="w-5 h-5 sm:w-6 sm:h-6 text-[#010D50] shrink-0 mt-0.5" />
@@ -872,31 +906,8 @@ export default function FlightInfoModal({
                         ));
                       }
 
-                      // Fallback to old baggage data
+                      // Fallback to baggage description
                       if (selectedUpgradeOption) {
-                        const perLeg = selectedUpgradeOption.baggage.perLeg;
-                        const hasDifferentBaggage = perLeg && perLeg.length > 1 &&
-                          !perLeg.every(leg => leg.allowance === perLeg[0].allowance);
-
-                        if (hasDifferentBaggage && perLeg) {
-                          return perLeg.map((leg, idx) => (
-                            <div key={idx} className="flex items-start justify-between gap-2">
-                              <div className="flex items-start gap-3 flex-1 min-w-0">
-                                <Package className="w-5 h-5 sm:w-6 sm:h-6 text-[#010D50] shrink-0 mt-0.5" />
-                                <div className="flex flex-col gap-0.5 min-w-0">
-                                  <span className="text-xs sm:text-sm font-medium text-[#010D50]">
-                                    {leg.allowance}
-                                  </span>
-                                  <span className="text-xs sm:text-sm text-[#3A478A]">
-                                    {leg.route}
-                                  </span>
-                                </div>
-                              </div>
-                              <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
-                            </div>
-                          ));
-                        }
-
                         return (
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -938,7 +949,12 @@ export default function FlightInfoModal({
                       const carryOnServices = selectedUpgradeOption?.carryOnBaggageServices || [];
 
                       if (carryOnServices.length > 0) {
-                        return carryOnServices.map((svc, idx) => (
+                        // Deduplicate by text to avoid showing "Hand Luggage" multiple times
+                        const uniqueServices = carryOnServices.filter((svc, idx, arr) => 
+                          arr.findIndex(s => s.text === svc.text) === idx
+                        );
+                        
+                        return uniqueServices.map((svc, idx) => (
                           <div key={`carryon-${idx}`} className="flex items-start justify-between gap-2">
                             <div className="flex items-start gap-3 flex-1 min-w-0">
                               <Briefcase className="w-5 h-5 sm:w-6 sm:h-6 text-[#010D50] shrink-0 mt-0.5" />
