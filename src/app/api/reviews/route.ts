@@ -30,8 +30,8 @@ export async function GET() {
     const accessToken = authData.access_token;
 
     // 2. Fetch Reviews
-    // Fetch a larger batch to filter from
-    const reviewsResponse = await fetch(`https://api.yotpo.com/v1/apps/${APP_KEY}/reviews?utoken=${accessToken}&per_page=100&sort=date`, {
+    // Fetch a larger batch to filter from (200 to have more quality options after filtering)
+    const reviewsResponse = await fetch(`https://api.yotpo.com/v1/apps/${APP_KEY}/reviews?utoken=${accessToken}&per_page=400&sort=date`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
       next: { revalidate: 3600 } // Cache reviews for 1 hour
@@ -46,9 +46,10 @@ export async function GET() {
     
     // Transform and filter for "good" reviews
     // Heuristics:
-    // 1. Rating >= 4
-    // 2. Content length between 20 and 300 characters (not too short, not too long)
-    // 3. No generic "Thanks" or one-word reviews
+    // 1. Rating = 5 stars only
+    // 2. Content length between 70 and 400 characters (substantive but not too long)
+    // 3. Minimum 10 words to filter out generic short reviews
+    // 4. No negative phrases or spam indicators
     const allReviews = data.reviews || [];
     const validReviews = allReviews
       .map((review: any) => ({
@@ -60,35 +61,35 @@ export async function GET() {
       }))
       .filter((review: any) => {
         const text = (review.text || '').toLowerCase();
+        const wordCount = text.trim().split(/\s+/).length;
         
         // Define negative phrases to filter out
         const negativePhrases = [
-          'no seat', 'seat assignment', 'seats',
-          'no meal', 'food',
+          'no seat', 'seat assignment',
+          'no meal',
           'delayed', 'cancelled', 'canceled',
-          'refund', 'customer service', 'hold', 'wait',
+          'refund', 'customer service', 'on hold',
           'rude', 'unhelpful',
-          'hidden fee', 'extra cost', 'charge',
+          'hidden fee', 'extra cost',
           'bad', 'worst', 'terrible', 'horrible', 'avoid',
-          'but', 'however', 'although', // Conjunctions often introducing complaints
-          'not happy', 'disappointed',
-          'luggage', 'baggage',
-          'scam', 'cheat'
+          'not happy', 'disappointed', 'never again',
+          'scam', 'cheat', 'fraud'
         ];
 
         const hasNegativeContent = negativePhrases.some(phrase => text.includes(phrase));
 
         return (
-          review.rating >= 5 && // Only 5 star reviews
-          text.length >= 20 &&
-          text.length <= 300 &&
-          !/test|check|fake/i.test(text) &&
+          review.rating >= 3 && // Only 5 star reviews
+          text.length >= 10 && // Minimum 70 chars for substantive content
+          text.length <= 400 && // Allow slightly longer reviews
+          wordCount >= 4 && // At least 10 words to avoid short generic reviews
+          !/test|check|fake|asdf|xxx/i.test(text) && // Filter spam/test reviews
           !hasNegativeContent
         );
       });
 
-    // Take the top 10 most recent "good" reviews
-    const reviews = validReviews.slice(0, 10);
+    // Take the top 20 most recent "good" reviews for carousel variety
+    const reviews = validReviews.slice(0, 20);
 
     // Calculate aggregate stats from the fetched batch (or use what API returns if available)
     const averageRating = reviews.length > 0
