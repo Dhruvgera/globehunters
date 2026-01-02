@@ -151,8 +151,9 @@ function BookingContent() {
     date: seg.date,
     duration: seg.totalJourneyTime || seg.duration,
     stops: seg.stopDetails || `${seg.stops} Stop${seg.stops !== 1 ? 's' : ''}`,
-    airline: flight.airline.name,
-    airlineCode: flight.airline.code,
+    // Use segment's airline info for multi-city support, fallback to flight's airline
+    airline: seg.carrierName || flight.airline.name,
+    airlineCode: seg.carrierCode || flight.airline.code,
   }));
 
   const passengerLabel = (() => {

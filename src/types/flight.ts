@@ -28,6 +28,8 @@ export interface FlightSegment {
   stops: number;
   stopDetails?: string;
   carrierCode?: string;
+  carrierName?: string; // Airline name for this segment (multi-city support)
+  carrierLogo?: string; // Airline logo URL for this segment
   flightNumber?: string;
   cabinClass?: string;
   aircraftType?: string;

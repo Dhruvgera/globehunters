@@ -14,6 +14,7 @@ import { getAircraftName } from '@/lib/vyspa/aircraftTypes';
 
 /**
  * Individual flight within a segment from FlightView API
+ * Note: API may return properties in either snake_case or CamelCase format
  */
 export interface FlightViewFlight {
   airline_code: string;
@@ -31,32 +32,42 @@ export interface FlightViewFlight {
   arrival_time: number | string; // HHMM format
   dep_arr_date_diff: string | null;
   aircraft_type: string;
-  number_stops: number | string;
-  etk_eligible: number | string;
+  number_stops?: number | string;
+  etk_eligible?: number | string;
   code_share_info: string;
-  operating_carrier: string;
-  cabin_class: string; // e.g., "Y" for economy
+  operating_carrier?: string;
+  operating_airline_code?: string; // API returns this in snake_case
+  operating_airline_name?: string; // API returns this in snake_case
+  cabin_class: string; // e.g., "Y" or "M" for economy
+  cabin_type?: string; // API also returns numeric cabin type
   airline_name: string;
-  op_airline_name: string;
-  Baggage: string;
+  op_airline_name?: string;
+  Baggage?: string; // CamelCase format
+  baggage?: string; // snake_case format (e.g., "2p")
   class_name: string; // e.g., "Economy"
   available_seats: number | string;
   refundable: number | string; // 1=Refundable, 2=Non-Refundable, 3=RefundableWithPenalty, 4=FullyRefundable
   refundable_text: string;
-  FareCat: string; // e.g., "PU"
-  segment_flying_time: number | string;
-  depart_airport_name: string;
-  arrive_airport_name: string;
+  FareCat?: string; // e.g., "PU"
+  fare_basis?: string; // API returns fare basis code
+  segment_flying_time?: number | string;
+  depart_airport_name?: string;
+  arrive_airport_name?: string;
 }
 
 /**
  * Segment from FlightView API
+ * Note: API returns snake_case properties (Flying_time, Segment_number) but may also return CamelCase
  */
 export interface FlightViewSegment {
-  SegmentNo: number;
+  SegmentNo?: number;
+  Segment_number?: number | string; // API returns this in snake_case
   Route: string; // e.g., "LHREWR"
   Stops: number;
-  FlyingTime: number; // total flying time in minutes
+  FlyingTime?: number; // total flying time in minutes (CamelCase format)
+  Flying_time?: number; // total flying time in minutes (snake_case from API)
+  Total_travel_time?: number; // API also returns this
+  Majority_carrier?: string; // API returns carrier code
   Flights: FlightViewFlight[];
 }
 
@@ -152,21 +163,40 @@ export function transformFlightViewResponse(data: FlightViewResponse): Transform
   const flightSegments: FlightSegment[] = segments.map(transformSegment);
 
   // Calculate total passengers from breakdown
+  // Supports both legacy 'Breakdown' format and newer 'Pax_breakdown' format
   let totalPassengers = 0;
   let adults = 0;
   let children = 0;
   let infants = 0;
 
-  for (const breakdown of data.Breakdown || []) {
-    const count = parseIntSafe(breakdown.total_pax, 0);
-    totalPassengers += count;
+  // Try Pax_breakdown first (newer format with pax_count)
+  if (data.Pax_breakdown && data.Pax_breakdown.length > 0) {
+    for (const pax of data.Pax_breakdown) {
+      const count = pax.pax_count || 0;
+      totalPassengers += count;
 
-    if (breakdown.pax_type === 'ADT') {
-      adults = count;
-    } else if (breakdown.pax_type === 'CHD') {
-      children = count;
-    } else if (breakdown.pax_type === 'INF') {
-      infants = count;
+      if (pax.pax_type === 'ADT') {
+        adults = count;
+      } else if (pax.pax_type === 'CHD') {
+        children = count;
+      } else if (pax.pax_type === 'INF') {
+        infants = count;
+      }
+    }
+  }
+  // Fallback to legacy Breakdown format (with total_pax)
+  else if (data.Breakdown && data.Breakdown.length > 0) {
+    for (const breakdown of data.Breakdown) {
+      const count = parseIntSafe(breakdown.total_pax, 0);
+      totalPassengers += count;
+
+      if (breakdown.pax_type === 'ADT') {
+        adults = count;
+      } else if (breakdown.pax_type === 'CHD') {
+        children = count;
+      } else if (breakdown.pax_type === 'INF') {
+        infants = count;
+      }
     }
   }
 
@@ -181,15 +211,26 @@ export function transformFlightViewResponse(data: FlightViewResponse): Transform
   const pricePerPerson = totalPrice / totalPassengers;
 
   // Determine trip type
-  const tripType = (() => {
+  // Journey_type from API: "1" = one-way, "2" = round-trip, "3" = multi-city
+  const tripType = ((): 'one-way' | 'round-trip' | 'multi-city' => {
+    // First, check the Journey_type field from the API
+    const journeyType = data.Journey_type;
+    if (journeyType === '1') return 'one-way';
+    if (journeyType === '3') return 'multi-city';
+    if (journeyType === '2') return 'round-trip';
+
+    // Fallback: infer from segments
     if (segments.length === 1) return 'one-way';
+    if (segments.length >= 3) return 'multi-city';
     if (segments.length === 2) {
       // Check if it's a round trip (return to origin)
       const firstOrigin = segments[0].Flights[0]?.departure_airport;
       const lastDestination = segments[1].Flights[segments[1].Flights.length - 1]?.arrival_airport;
       if (firstOrigin === lastDestination) return 'round-trip';
+      // If not returning to origin with 2 segments, it could be multi-city
+      return 'multi-city';
     }
-    return segments.length > 2 ? 'multi-city' : 'round-trip';
+    return 'round-trip';
   })();
 
   // Get refundable status from first flight
@@ -197,10 +238,12 @@ export function transformFlightViewResponse(data: FlightViewResponse): Transform
   const refundable = refundableCode === 1 || refundableCode === 3 || refundableCode === 4 ? true :
     refundableCode === 2 ? false : null;
 
-  // Check for baggage
-  const hasBaggage = firstFlight.Baggage &&
-    String(firstFlight.Baggage).toLowerCase() !== 'none' &&
-    String(firstFlight.Baggage).trim() !== '';
+  // Check for baggage - API returns either 'baggage' (snake_case) or 'Baggage' (CamelCase)
+  const baggageValue = firstFlight.baggage || firstFlight.Baggage;
+  const hasBaggage = baggageValue &&
+    String(baggageValue).toLowerCase() !== 'none' &&
+    String(baggageValue).trim() !== '' &&
+    String(baggageValue) !== '0p';
 
   // Extract request ID for web reference
   // FlightView doesn't return Request_id directly, but it's embedded in Result_id
@@ -227,9 +270,9 @@ export function transformFlightViewResponse(data: FlightViewResponse): Transform
     tripType,
     price: Math.round(totalPrice),
     pricePerPerson: Math.round(pricePerPerson),
-    currency: 'GBP', // FlightView typically returns GBP for UK market
+    currency: (data.Currency_code || 'GBP').toUpperCase(), // Use API currency or default to GBP
     webRef: requestId, // Use Request_id as web ref (older stage ID)
-    baggage: firstFlight.Baggage,
+    baggage: baggageValue,
     refundable,
     refundableText: firstFlight.refundable_text,
     hasBaggage: hasBaggage || false,
@@ -276,13 +319,13 @@ function transformSegment(segment: FlightViewSegment): FlightSegment {
   const departureAirport: Airport = {
     code: firstFlight.departure_airport,
     name: firstFlight.depart_airport_name ? shortenAirportName(firstFlight.depart_airport_name) : firstFlight.departure_airport,
-    city: extractCityFromAirportName(firstFlight.depart_airport_name) || firstFlight.departure_airport,
+    city: extractCityFromAirportName(firstFlight.depart_airport_name || '') || firstFlight.departure_airport,
   };
 
   const arrivalAirport: Airport = {
     code: lastFlight.arrival_airport,
     name: lastFlight.arrive_airport_name ? shortenAirportName(lastFlight.arrive_airport_name) : lastFlight.arrival_airport,
-    city: extractCityFromAirportName(lastFlight.arrive_airport_name) || lastFlight.arrival_airport,
+    city: extractCityFromAirportName(lastFlight.arrive_airport_name || '') || lastFlight.arrival_airport,
   };
 
   // Format times
@@ -295,8 +338,8 @@ function transformSegment(segment: FlightViewSegment): FlightSegment {
     ? formatDate(lastFlight.arrival_date)
     : undefined;
 
-  // Calculate duration
-  const totalFlyingTime = parseIntSafe(segment.FlyingTime, 0);
+  // Calculate duration - API returns Flying_time (snake_case) but may also return FlyingTime
+  const totalFlyingTime = parseIntSafe(segment.Flying_time ?? segment.FlyingTime, 0);
   const duration = formatDuration(totalFlyingTime);
 
   // Calculate layovers for total journey time
@@ -359,6 +402,8 @@ function transformSegment(segment: FlightViewSegment): FlightSegment {
     stops,
     stopDetails,
     carrierCode: firstFlight.airline_code,
+    carrierName: firstFlight.airline_name || firstFlight.airline_code,
+    carrierLogo: `/airlines/${firstFlight.airline_code.toLowerCase()}.png`,
     flightNumber: String(firstFlight.flight_number || '').trim() || undefined,
     cabinClass: firstFlight.cabin_class,
     aircraftType: aircraftName || undefined,
@@ -367,7 +412,7 @@ function transformSegment(segment: FlightViewSegment): FlightSegment {
     arrivalTerminal: lastFlight.arrival_terminal || undefined,
     layovers: layovers.length > 0 ? layovers : undefined,
     individualFlights: individualFlights.length > 1 ? individualFlights : undefined,
-    segmentBaggage: firstFlight.Baggage,
+    segmentBaggage: firstFlight.baggage || firstFlight.Baggage,
   };
 }
 

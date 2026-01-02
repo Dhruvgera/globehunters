@@ -71,6 +71,20 @@ export default function FlightInfoModal({
   const [availabilityErrorOpen, setAvailabilityErrorOpen] = useState(false);
   const [returnWarnOpen, setReturnWarnOpen] = useState(false);
 
+  // Reset state when modal opens or flight changes (new search/different flight selected)
+  useEffect(() => {
+    if (open) {
+      setSelectedLegIndex(0);
+      setImgError(false);
+      setSelectedUpgradeOption(null);
+    }
+  }, [open, flight.id]);
+
+  // Reset image error state when switching segments (different airlines may have different logo availability)
+  useEffect(() => {
+    setImgError(false);
+  }, [selectedLegIndex]);
+
   // Price check integration
   const { priceCheck, isLoading, error, checkPrice, clearError } = usePriceCheck();
 
@@ -483,14 +497,14 @@ export default function FlightInfoModal({
 
                   {/* Flight Card */}
                   <div className="bg-[#F5F7FF] rounded-xl p-3 sm:p-4 flex flex-col gap-4 sm:gap-6 max-w-full overflow-hidden">
-                    {/* Airline Info */}
+                    {/* Airline Info - use segment's airline for multi-city, fallback to flight's airline */}
                     <div className="flex flex-col justify-center gap-3">
                       <div className="flex items-center gap-2">
                         {!imgError ? (
                           <div className="w-10 h-10 relative flex items-center justify-center">
                             <Image
-                              src={`https://images.kiwi.com/airlines/64/${flight.airline.code}.png`}
-                              alt={`${flight.airline.name} logo`}
+                              src={`https://images.kiwi.com/airlines/64/${currentLeg?.carrierCode || flight.airline.code}.png`}
+                              alt={`${currentLeg?.carrierName || flight.airline.name} logo`}
                               width={40}
                               height={40}
                               className="object-contain"
@@ -499,11 +513,11 @@ export default function FlightInfoModal({
                           </div>
                         ) : (
                           <div className="w-10 h-10 bg-[#DA0E29] rounded flex items-center justify-center">
-                            <span className="text-white text-xs font-bold">{flight.airline.code}</span>
+                            <span className="text-white text-xs font-bold">{currentLeg?.carrierCode || flight.airline.code}</span>
                           </div>
                         )}
                         <span className="text-sm font-semibold text-[#010D50]">
-                          {flight.airline.name}
+                          {currentLeg?.carrierName || flight.airline.name}
                         </span>
                       </div>
                       {(currentLeg?.carrierCode || currentLeg?.flightNumber || currentLeg?.cabinClass || currentLeg?.distance || currentLeg?.aircraftType) && (

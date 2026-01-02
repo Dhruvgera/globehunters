@@ -391,6 +391,8 @@ function transformSegmentToFlightSegment(segment: VyspaSegment): FlightSegment {
     stops,
     stopDetails,
     carrierCode: firstFlight.airline_code,
+    carrierName: firstFlight.airline_name || firstFlight.airline_code,
+    carrierLogo: `/airlines/${firstFlight.airline_code.toLowerCase()}.png`,
     flightNumber: String(firstFlight.flight_number || '').trim() || undefined,
     cabinClass: firstFlight.cabin_class,
     aircraftType: aircraftName || undefined,
