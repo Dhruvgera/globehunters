@@ -949,8 +949,8 @@ function SearchPageContent() {
         resultCount={filteredFlights.length}
       />
 
-      {/* Date Price Selector - Always show when not in error state */}
-      {!error && departureDates.length > 0 && (
+      {/* Date Price Selector - Show for one-way and round-trip only (not multi-city) */}
+      {!error && departureDates.length > 0 && effectiveSearchParams.tripType !== 'multi-city' && (
         <div className="relative">
           <DatePriceSelector
             departureDates={departureDates}

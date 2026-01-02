@@ -53,6 +53,8 @@ export function useFlights(
     // Always set loading to true first to show UI update
     setLoading(true);
     setError(null);
+    // Clear stale flights immediately to prevent showing old prices in date slider
+    setFlights([]);
 
     // Check cache first (pass explicitRequestId if available)
     // Note: flightCache is separate from FlightService's cache, maybe we should update it too?

@@ -97,15 +97,27 @@ export default function FlightCard({
           rightContent={<ShareButton flight={flight} />}
         />
 
-        {/* Outbound Flight */}
-        <FlightLegMobile leg={flight.outbound} />
-        <FlightLegDesktop leg={flight.outbound} />
-
-        {/* Return Flight */}
-        {showReturn && flight.inbound && (
+        {/* Multi-city: Render all segments */}
+        {flight.tripType === 'multi-city' && flight.segments && flight.segments.length > 0 ? (
+          flight.segments.map((segment, index) => (
+            <div key={index}>
+              <FlightLegMobile leg={segment} />
+              <FlightLegDesktop leg={segment} />
+            </div>
+          ))
+        ) : (
           <>
-            <FlightLegMobile leg={flight.inbound} />
-            <FlightLegDesktop leg={flight.inbound} />
+            {/* Outbound Flight */}
+            <FlightLegMobile leg={flight.outbound} />
+            <FlightLegDesktop leg={flight.outbound} />
+
+            {/* Return Flight */}
+            {showReturn && flight.inbound && (
+              <>
+                <FlightLegMobile leg={flight.inbound} />
+                <FlightLegDesktop leg={flight.inbound} />
+              </>
+            )}
           </>
         )}
       </div>

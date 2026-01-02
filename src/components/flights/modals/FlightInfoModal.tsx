@@ -409,7 +409,7 @@ export default function FlightInfoModal({
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
-          className="w-[min(100vw-24px,960px)] max-w-full max-h-[90vh] overflow-y-auto overflow-x-clip p-4 sm:p-6 gap-6 sm:gap-8 [&>button]:hidden bg-white rounded-3xl border-0 box-border"
+          className="w-[min(100vw-24px,960px)] max-w-full max-h-[90vh] overflow-y-auto overflow-x-hidden p-4 sm:p-6 gap-6 sm:gap-8 [&>button]:hidden bg-white rounded-3xl border-0 box-border"
           aria-describedby="flight-details-description"
         >
           <DialogHeader className="sr-only">
@@ -420,33 +420,45 @@ export default function FlightInfoModal({
           </DialogHeader>
           {/* Header with Flight Leg Selector */}
           <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between gap-3">
-              {/* Flight Leg Tabs (supports multi-city) */}
-              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 flex-1">
-                {journeySegments.map((seg, index) => (
-                  <Button
-                    key={`${seg.departureAirport.code}-${seg.arrivalAirport.code}-${index}`}
-                    variant={normalizedIndex === index ? "default" : "outline"}
-                    className={`${normalizedIndex === index
-                      ? "bg-[#E0E7FF] text-[#010D50] hover:bg-[#D0D7EF]"
-                      : "bg-[#F6F6F6] text-[#3754ED] border-[#3754ED] hover:bg-[#EEEEEE]"
-                      } rounded-full px-3 sm:px-4 py-2.5 h-auto text-xs sm:text-sm font-medium whitespace-nowrap shrink-0 leading-normal`}
-                    onClick={() => {
-                      if (index > 0 && passengersInStore && passengersInStore.length > 0) {
-                        setReturnWarnOpen(true);
-                      }
-                      setSelectedLegIndex(index);
-                    }}
-                  >
-                    {/* Show city names with airport codes for clarity */}
-                    <span className="hidden sm:inline">
-                      {getCityName(seg.departureAirport.code)} ({seg.departureAirport.code}) - {getCityName(seg.arrivalAirport.code)} ({seg.arrivalAirport.code}) - {seg.date}
-                    </span>
-                    <span className="sm:hidden">
-                      {getCityName(seg.departureAirport.code)} - {getCityName(seg.arrivalAirport.code)}
-                    </span>
-                  </Button>
-                ))}
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              {/* Flight Leg Tabs (supports multi-city) - scrollable container */}
+              <div className="relative flex-1 min-w-0 overflow-hidden">
+                <div 
+                  className="flex items-center gap-2 overflow-x-auto py-1 px-0.5 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent hover:scrollbar-thumb-slate-400"
+                  style={{ scrollbarWidth: 'thin' }}
+                >
+                  {journeySegments.map((seg, index) => (
+                    <Button
+                      key={`${seg.departureAirport.code}-${seg.arrivalAirport.code}-${index}`}
+                      variant={normalizedIndex === index ? "default" : "outline"}
+                      className={`${normalizedIndex === index
+                        ? "bg-[#E0E7FF] text-[#010D50] hover:bg-[#D0D7EF]"
+                        : "bg-[#F6F6F6] text-[#3754ED] border-[#3754ED] hover:bg-[#EEEEEE]"
+                        } rounded-full px-2.5 sm:px-3 py-2 h-auto text-[11px] sm:text-xs font-medium whitespace-nowrap shrink-0 leading-normal min-w-0`}
+                      onClick={() => {
+                        if (index > 0 && passengersInStore && passengersInStore.length > 0) {
+                          setReturnWarnOpen(true);
+                        }
+                        setSelectedLegIndex(index);
+                      }}
+                    >
+                      {/* Compact format for multi-city: Airport codes with date */}
+                      <span className="hidden sm:inline">
+                        {seg.departureAirport.code} → {seg.arrivalAirport.code} • {seg.date.split(', ')[1] || seg.date}
+                      </span>
+                      <span className="sm:hidden">
+                        {seg.departureAirport.code} → {seg.arrivalAirport.code}
+                      </span>
+                    </Button>
+                  ))}
+                </div>
+                {/* Gradient fade indicators for scroll */}
+                {journeySegments.length > 2 && (
+                  <>
+                    <div className="absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-white to-transparent pointer-events-none opacity-0 transition-opacity" />
+                    <div className="absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-l from-white to-transparent pointer-events-none" />
+                  </>
+                )}
               </div>
 
               {/* Close Button */}
@@ -454,7 +466,7 @@ export default function FlightInfoModal({
                 variant="ghost"
                 size="icon"
                 onClick={() => onOpenChange(false)}
-                className="rounded-full h-6 w-6"
+                className="rounded-full h-7 w-7 shrink-0"
               >
                 <X className="h-5 w-5" />
               </Button>
