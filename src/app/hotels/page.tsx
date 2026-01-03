@@ -65,7 +65,7 @@ export default function HotelsPage() {
     accessibility: true,
   });
 
-  const [viewMode, setViewMode] = useState<HotelViewMode>("list");
+  const [viewMode, setViewMode] = useState<HotelViewMode>("grid");
   const [sortMode, setSortMode] = useState<HotelSortMode>("recommended");
   const [selectedHotelId, setSelectedHotelId] = useState<string>(mockHotels[0]?.id || "");
 
@@ -160,17 +160,32 @@ export default function HotelsPage() {
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col gap-4">
-                {filteredHotels.map((hotel) => (
-                  <HotelResultCard
-                    key={hotel.id}
-                    hotel={hotel}
-                    view="list"
-                    selected={hotel.id === selectedHotelId}
-                    onSelect={() => setSelectedHotelId(hotel.id)}
-                  />
-                ))}
-              </div>
+              <>
+                {/* On mobile, show grid layout since list looks the same */}
+                <div className="grid grid-cols-1 gap-4 sm:hidden">
+                  {filteredHotels.map((hotel) => (
+                    <HotelResultCard
+                      key={hotel.id}
+                      hotel={hotel}
+                      view="grid"
+                      selected={hotel.id === selectedHotelId}
+                      onSelect={() => setSelectedHotelId(hotel.id)}
+                    />
+                  ))}
+                </div>
+                {/* On desktop, show list layout */}
+                <div className="hidden sm:flex flex-col gap-4">
+                  {filteredHotels.map((hotel) => (
+                    <HotelResultCard
+                      key={hotel.id}
+                      hotel={hotel}
+                      view="list"
+                      selected={hotel.id === selectedHotelId}
+                      onSelect={() => setSelectedHotelId(hotel.id)}
+                    />
+                  ))}
+                </div>
+              </>
             )}
           </main>
         </div>

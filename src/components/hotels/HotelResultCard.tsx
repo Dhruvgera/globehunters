@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { Check, ChevronRight, Heart, PawPrint, Bus, Coffee, X } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -144,10 +145,12 @@ export function HotelResultCard({
             </div>
 
             {/* CTA Button */}
-            <Button className="rounded-full py-3 h-auto gap-2 text-sm font-semibold w-full bg-[#3754ED] hover:bg-[#2A3FB8] text-white">
-              Check Rooms
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+            <Link href={`/hotels/${hotel.id}`} className="w-full">
+              <Button className="rounded-full py-3 h-auto gap-2 text-sm font-semibold w-full bg-[#3754ED] hover:bg-[#2A3FB8] text-white">
+                Check Rooms
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </Link>
           </div>
         </div>
       ) : (
@@ -230,10 +233,12 @@ export function HotelResultCard({
               </div>
 
               <div className="mt-auto w-full flex justify-end">
-                <Button className="rounded-full px-4 py-2 h-auto gap-1.5 text-sm font-medium bg-[#3754ED] hover:bg-[#2A3FB8] text-white w-[170px]">
-                  Check Rooms
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+                <Link href={`/hotels/${hotel.id}`}>
+                  <Button className="rounded-full px-4 py-2 h-auto gap-1.5 text-sm font-medium bg-[#3754ED] hover:bg-[#2A3FB8] text-white w-[170px]">
+                    Check Rooms
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </Link>
               </div>
             </div>
           </div>

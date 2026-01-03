@@ -68,11 +68,12 @@ export function HotelResultsToolbar({
         )}
 
         <div className="flex items-center gap-2 bg-white">
+          {/* List button - hidden on mobile since it's same as Grid */}
           <Button
             type="button"
             onClick={() => onViewModeChange("list")}
             className={[
-              "h-9 rounded-xl px-3 text-sm",
+              "hidden sm:flex h-9 rounded-xl px-3 text-sm",
               viewMode === "list"
                 ? "bg-[#E0E7FF] text-[#010D50] hover:bg-[#D7E0FF]"
                 : "bg-white text-[#3754ED] border border-[#3754ED] hover:bg-[#F5F7FF]",
@@ -86,7 +87,7 @@ export function HotelResultsToolbar({
             onClick={() => onViewModeChange("grid")}
             className={[
               "h-9 rounded-xl px-3 text-sm",
-              viewMode === "grid"
+              viewMode === "grid" || (viewMode === "list" && typeof window !== "undefined" && window.innerWidth < 640)
                 ? "bg-[#E0E7FF] text-[#010D50] hover:bg-[#D7E0FF]"
                 : "bg-white text-[#3754ED] border border-[#3754ED] hover:bg-[#F5F7FF]",
             ].join(" ")}
