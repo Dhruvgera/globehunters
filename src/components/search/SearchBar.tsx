@@ -164,7 +164,7 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
     <div className={
       embedded
         ? "w-full"
-        : `w-full bg-white rounded-[24px] ${compact ? "p-3 shadow-sm" : "p-5 border border-[#DFE0E4] shadow-md"}`
+        : `w-full bg-white rounded-[32px] ${compact ? "p-3 shadow-sm" : "p-5 border border-[#E8E8EE] shadow-[0px_16px_44px_rgba(0,0,0,0.18)]"}`
     }>
       {/* Product Tabs */}
       <div className={compact ? "mb-3" : "mb-5"}>
@@ -200,118 +200,126 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
 
       {productFromUrl === "flight" && (
         <>
-          {/* Top Row - Trip Type and Passengers */}
-          <div className="flex flex-wrap items-center gap-4 sm:gap-6 mb-4">
-            <TripTypeSelector
-              tripType={tripType}
-              onTripTypeChange={setTripType}
-              onRoundTripSelected={() => setIsDatePickerOpen(true)}
-            />
-            <PassengersSelector
-              passengers={passengers}
-              travelClass={travelClass}
-              onPassengersChange={setPassengers}
-              onTravelClassChange={setTravelClass}
-            />
-          </div>
-
-          {/* Main Search Row */}
-          {tripType !== "multi-city" ? (
-            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
-              <AirportAutocomplete value={from} onChange={setFrom} />
-              <SwapLocationsButton onSwap={swapLocations} />
-              <AirportAutocomplete value={to} onChange={setTo} />
-              <DateSelector
+          <div className="border border-[#E8E8EE] rounded-[28px] p-4 sm:p-5">
+            {/* Top Row - Trip Type (pill) */}
+            <div className="flex flex-wrap items-center gap-4 sm:gap-6 mb-4">
+              <TripTypeSelector
                 tripType={tripType}
-                departureDate={departureDate}
-                returnDate={returnDate}
-                onDepartureDateChange={setDepartureDate}
-                onReturnDateChange={setReturnDate}
-                isOpen={isDatePickerOpen}
-                onOpenChange={setIsDatePickerOpen}
+                onTripTypeChange={setTripType}
+                onRoundTripSelected={() => setIsDatePickerOpen(true)}
               />
-              <SearchButton onClick={handleSearch} disabled={!isSearchValid()} />
             </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {multiCitySegments.map((segment, index) => (
-                <div
-                  key={index}
-                  className="flex flex-col md:flex-row items-stretch md:items-center gap-3"
-                >
-                  <AirportAutocomplete
-                    value={segment.from}
-                    onChange={(airport) =>
-                      updateMultiCitySegment(index, { from: airport })
-                    }
-                  />
-                  <AirportAutocomplete
-                    value={segment.to}
-                    onChange={(airport) =>
-                      updateMultiCitySegment(index, { to: airport })
-                    }
-                  />
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="flex items-center gap-2 flex-1 border-[#D3D3D3] rounded-xl px-3 py-2.5 h-auto justify-start hover:bg-transparent hover:border-[#D3D3D3]"
-                      >
-                        <Calendar className="w-5 h-5 text-[#010D50]" />
-                        <span className="text-sm font-medium text-[#010D50]">
-                          {segment.departureDate
-                            ? format(segment.departureDate, "EEE, dd MMM yyyy")
-                            : "Select date"}
-                        </span>
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      className="w-auto p-0 bg-white border shadow-lg max-w-[calc(100vw-32px)] max-h-[calc(100vh-120px)] overflow-auto overscroll-contain"
-                      align="start"
-                      side="bottom"
-                      sideOffset={8}
-                      avoidCollisions={true}
-                      collisionPadding={{ top: 80, bottom: 16, left: 16, right: 16 }}
-                    >
-                      <DatePicker
-                        startDate={segment.departureDate}
-                        onStartDateChange={(date) =>
-                          updateMultiCitySegment(index, { departureDate: date })
-                        }
-                        onDone={() => {
-                          // Popover will close automatically on outside click; no-op here
-                        }}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  {multiCitySegments.length > 2 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="md:w-10 md:h-10 w-full justify-center text-red-500 hover:text-red-600 hover:bg-red-50"
-                      onClick={() => removeMultiCitySegment(index)}
-                    >
-                      <X className="w-4 h-4" />
-                      <span className="sr-only">Remove segment</span>
-                    </Button>
-                  )}
-                </div>
-              ))}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex-1 justify-center border-dashed"
-                  onClick={addMultiCitySegment}
-                  disabled={multiCitySegments.length >= 6}
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add flight
-                </Button>
+
+            {/* Main Search Row */}
+            {tripType !== "multi-city" ? (
+              <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+                <AirportAutocomplete value={from} onChange={setFrom} />
+                <SwapLocationsButton onSwap={swapLocations} />
+                <AirportAutocomplete value={to} onChange={setTo} />
+                <DateSelector
+                  tripType={tripType}
+                  departureDate={departureDate}
+                  returnDate={returnDate}
+                  onDepartureDateChange={setDepartureDate}
+                  onReturnDateChange={setReturnDate}
+                  isOpen={isDatePickerOpen}
+                  onOpenChange={setIsDatePickerOpen}
+                />
+                <PassengersSelector
+                  passengers={passengers}
+                  travelClass={travelClass}
+                  onPassengersChange={setPassengers}
+                  onTravelClassChange={setTravelClass}
+                />
                 <SearchButton onClick={handleSearch} disabled={!isSearchValid()} />
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="flex flex-col gap-3">
+                {multiCitySegments.map((segment, index) => (
+                  <div
+                    key={index}
+                    className="flex flex-col md:flex-row items-stretch md:items-center gap-3"
+                  >
+                    <AirportAutocomplete
+                      value={segment.from}
+                      onChange={(airport) =>
+                        updateMultiCitySegment(index, { from: airport })
+                      }
+                    />
+                    <AirportAutocomplete
+                      value={segment.to}
+                      onChange={(airport) =>
+                        updateMultiCitySegment(index, { to: airport })
+                      }
+                    />
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="flex items-center gap-2 flex-1 border-[#DFE0E4] rounded-2xl px-3 py-2.5 h-auto justify-start bg-white hover:bg-white hover:border-[#3754ED] focus:border-[#3754ED] transition-colors"
+                        >
+                          <Calendar className="w-5 h-5 text-[#3754ED]" />
+                          <span className="text-sm font-medium text-[#010D50]">
+                            {segment.departureDate
+                              ? format(segment.departureDate, "EEE, dd MMM yyyy")
+                              : "Select date"}
+                          </span>
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        className="w-auto p-0 bg-white border shadow-lg max-w-[calc(100vw-32px)] max-h-[calc(100vh-120px)] overflow-auto overscroll-contain"
+                        align="start"
+                        side="bottom"
+                        sideOffset={8}
+                        avoidCollisions={true}
+                        collisionPadding={{ top: 80, bottom: 16, left: 16, right: 16 }}
+                      >
+                        <DatePicker
+                          startDate={segment.departureDate}
+                          onStartDateChange={(date) =>
+                            updateMultiCitySegment(index, { departureDate: date })
+                          }
+                          onDone={() => {
+                            // Popover will close automatically on outside click; no-op here
+                          }}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    {multiCitySegments.length > 2 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="md:w-10 md:h-10 w-full justify-center text-red-500 hover:text-red-600 hover:bg-red-50"
+                        onClick={() => removeMultiCitySegment(index)}
+                      >
+                        <X className="w-4 h-4" />
+                        <span className="sr-only">Remove segment</span>
+                      </Button>
+                    )}
+                  </div>
+                ))}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1 justify-center border-dashed"
+                    onClick={addMultiCitySegment}
+                    disabled={multiCitySegments.length >= 6}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add flight
+                  </Button>
+                  <PassengersSelector
+                    passengers={passengers}
+                    travelClass={travelClass}
+                    onPassengersChange={setPassengers}
+                    onTravelClassChange={setTravelClass}
+                  />
+                  <SearchButton onClick={handleSearch} disabled={!isSearchValid()} />
+                </div>
+              </div>
+            )}
+          </div>
         </>
       )}
 

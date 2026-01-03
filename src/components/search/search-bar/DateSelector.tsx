@@ -58,7 +58,7 @@ export function DateSelector({
       <PopoverTrigger asChild>
         <Button
           variant="outline"
-          className="flex items-center gap-2 flex-1 border-[#D3D3D3] rounded-xl px-3 py-2.5 h-auto justify-start hover:bg-transparent hover:border-[#3754ED] focus:border-[#3754ED] transition-colors"
+          className="flex items-center gap-2 flex-1 border-[#DFE0E4] rounded-full px-4 py-2.5 h-auto justify-start bg-white hover:bg-white hover:border-[#3754ED] focus:border-[#3754ED] transition-colors"
         >
           <Calendar className="w-5 h-5 text-[#3754ED]" />
           <span className="text-sm font-medium text-[#010D50]">

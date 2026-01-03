@@ -1,13 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { ArrowLeftRight, ChevronDown } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { useTranslations } from "next-intl";
 
 type TripType = "round-trip" | "one-way" | "multi-city";
@@ -24,16 +16,6 @@ export function TripTypeSelector({
   onRoundTripSelected,
 }: TripTypeSelectorProps) {
   const t = useTranslations('search.tripType');
-  const [isOpen, setIsOpen] = useState(false);
-
-  // Close popover on scroll to prevent it from overlapping the navbar
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleScroll = () => setIsOpen(false);
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [isOpen]);
   
   const getTripTypeLabel = (type: TripType) => {
     switch (type) {
@@ -49,7 +31,6 @@ export function TripTypeSelector({
   const handleSelect = (type: TripType) => {
     const wasNotRoundTrip = tripType !== "round-trip";
     onTripTypeChange(type);
-    setIsOpen(false); // Close the popover
     
     // If switching TO round-trip, trigger the callback to open date picker
     if (type === "round-trip" && wasNotRoundTrip && onRoundTripSelected) {
@@ -61,51 +42,36 @@ export function TripTypeSelector({
   };
 
   return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          className="flex items-center gap-2 rounded-[40px] px-0 hover:bg-transparent h-auto"
-        >
-          <ArrowLeftRight className="w-5 h-5 text-[#010D50]" />
-          <span className="text-sm font-medium text-[#010D50]">
-            {getTripTypeLabel(tripType)}
-          </span>
-          <ChevronDown className="w-5 h-5 text-[#010D50]" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        className="w-[min(12rem,calc(100vw-32px))] max-h-[calc(100vh-120px)] overflow-auto overscroll-contain"
-        side="bottom"
-        sideOffset={8}
-        align="start"
-        avoidCollisions={true}
-        collisionPadding={{ top: 80, bottom: 16, left: 16, right: 16 }}
-      >
-        <div className="flex flex-col gap-2">
-          <Button
-            variant="ghost"
-            className="justify-start"
-            onClick={() => handleSelect("round-trip")}
+    <div className="inline-flex items-center rounded-full bg-[#F5F7FF] p-1">
+      {([
+        { key: "round-trip" as const, label: t('roundTrip') },
+        { key: "one-way" as const, label: t('oneWay') },
+        { key: "multi-city" as const, label: t('multiCity') },
+      ]).map((opt) => {
+        const active = tripType === opt.key;
+        return (
+          <button
+            key={opt.key}
+            type="button"
+            onClick={() => handleSelect(opt.key)}
+            className={[
+              "flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors",
+              active ? "bg-white text-[#010D50] shadow-sm" : "text-[#010D50]/80 hover:text-[#010D50]",
+            ].join(" ")}
           >
-            {t('roundTrip')}
-          </Button>
-          <Button
-            variant="ghost"
-            className="justify-start"
-            onClick={() => handleSelect("one-way")}
-          >
-            {t('oneWay')}
-          </Button>
-          <Button
-            variant="ghost"
-            className="justify-start"
-            onClick={() => handleSelect("multi-city")}
-          >
-            {t('multiCity')}
-          </Button>
-        </div>
-      </PopoverContent>
-    </Popover>
+            <span
+              className={[
+                "w-4 h-4 rounded-full border flex items-center justify-center",
+                active ? "border-[#3754ED]" : "border-[#010D50]/30",
+              ].join(" ")}
+              aria-hidden="true"
+            >
+              <span className={active ? "w-2 h-2 rounded-full bg-[#3754ED]" : "w-2 h-2 rounded-full bg-transparent"} />
+            </span>
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }

@@ -113,7 +113,7 @@ export function AirportAutocomplete({
 
   return (
     <div ref={containerRef} className="relative flex-1 min-w-0">
-      <div className="flex items-center gap-2 border border-[#D3D3D3] rounded-xl px-3 py-2.5 bg-white">
+      <div className="flex items-center gap-2 border border-[#DFE0E4] hover:border-[#3754ED] focus-within:border-[#3754ED] transition-colors rounded-full px-4 py-2.5 bg-white">
         <MapPin className="w-5 h-5 text-[#010D50] flex-shrink-0" />
         <input
           ref={inputRef}

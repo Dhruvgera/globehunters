@@ -88,7 +88,7 @@ export function PassengersSelector({
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
-          className="flex items-center gap-2 rounded-[40px] px-0 hover:bg-transparent h-auto"
+          className="flex items-center gap-2 rounded-full px-4 py-2.5 h-auto border border-[#DFE0E4] bg-white hover:bg-white hover:border-[#3754ED] focus:border-[#3754ED] transition-colors w-full md:w-auto justify-start"
         >
           <Users className="w-5 h-5 text-[#010D50]" />
           <span className="text-sm font-medium text-[#010D50]">

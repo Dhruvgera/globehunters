@@ -16,10 +16,10 @@ export function SearchButton({ onClick, disabled = false }: SearchButtonProps) {
     <Button
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-xl px-5 py-2.5 h-auto gap-2 text-sm font-medium w-full md:w-auto transition-all ${
+      className={`rounded-full px-5 py-2.5 h-auto gap-2 text-sm font-medium w-full md:w-auto transition-all ${
         disabled 
           ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-          : 'bg-[#3754ED] hover:bg-[#2A3FB8] text-white'
+          : 'bg-gradient-to-r from-[#0B229E] to-[#3754ED] hover:opacity-90 text-white shadow-[0px_10px_24px_rgba(55,84,237,0.35)]'
       }`}
     >
       <Search className="w-5 h-5" />

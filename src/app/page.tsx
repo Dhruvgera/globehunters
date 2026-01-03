@@ -2,20 +2,228 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import Image from "next/image";
+import Link from "next/link";
 import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
 import SearchBar from "@/components/search/SearchBar";
-import { Plane, Loader2 } from "lucide-react";
+import { Plane, Loader2, MapPin, Phone, ChevronRight } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useBookingStore } from "@/store/bookingStore";
-import { useAffiliate } from "@/lib/AffiliateContext";
+import { useAffiliate, useAffiliatePhone } from "@/lib/AffiliateContext";
 import { normalizeCabinClass } from "@/lib/utils";
+
+// Airline logos for the "Why Book With Us" section
+const airlineLogos = [
+  { name: "Lufthansa", src: "/figma/homepage/lufthansa.svg", width: 100, height: 24 },
+  { name: "Emirates", src: "/figma/homepage/emirates.svg", width: 90, height: 24 },
+  { name: "Austrian", src: "/figma/homepage/austrian.svg", width: 120, height: 24 },
+  { name: "United", src: "/figma/homepage/united.svg", width: 90, height: 24 },
+  { name: "Air Canada", src: "/figma/homepage/air-canada.svg", width: 130, height: 24 },
+  { name: "Ethiopian", src: "/figma/homepage/ethiopian.svg", width: 110, height: 24 },
+];
+
+// Destination cards data
+const destinationCards = [
+  {
+    id: "usa",
+    title: "USA Offers",
+    description: "A sweeping fusion of scale and spirit—USA delivers soaring city skylines, iconic landmarks, vast landscapes, and flavors shaped by every culture.",
+    image: "/figma/homepage/usa-card.jpg",
+    theme: "light",
+    destinations: [
+      { name: "New York, United States", price: "~$403" },
+      { name: "Los Angeles, United States", price: "~$457" },
+      { name: "Washington, DC, United States", price: "~$559" },
+    ],
+  },
+  {
+    id: "asia",
+    title: "Asia Offers",
+    description: "A vibrant tapestry of cultures and contrasts—Asia blends ancient wisdom, futuristic cities, serene landscapes, and flavors that ignite every sense.",
+    image: "/figma/homepage/asia-card.jpg",
+    theme: "light",
+    destinations: [
+      { name: "New Delhi, India", price: "~$489" },
+      { name: "Manila, Philippines", price: "~$527" },
+      { name: "Hong Kong, Hong Kong", price: "~$1138" },
+    ],
+  },
+  {
+    id: "australia",
+    title: "Australia Offers",
+    description: "A blend of wild beauty and urban charm—Australia offers sunlit beaches, vibrant cities, and unforgettable wildlife.",
+    image: "/figma/homepage/australia-card.jpg",
+    theme: "light",
+    destinations: [
+      { name: "Auckland, New Zealand", price: "~$754" },
+      { name: "Sydney, Australia", price: "~$818" },
+      { name: "Melbourne, Australia", price: "~$843" },
+    ],
+  },
+];
+
+// Featured destination cards
+const featuredDestinations = [
+  {
+    id: "new-york",
+    title: "New York Flights",
+    image: "/figma/homepage/new-york.jpg",
+  },
+  {
+    id: "johannesburg",
+    title: "Johannesburg Flights",
+    image: "/figma/homepage/johannesburg.jpg",
+  },
+];
+
+// Flight class deals
+const flightClassDeals = [
+  {
+    id: "first-class",
+    title: "First Class Flight Deals",
+    image: "/figma/homepage/first-class-cabin.jpg",
+    benefits: [
+      "Exclusive airport lounges",
+      "Lie-flat beds & premium bedding",
+      "Gourmet dining & fine wines",
+      "Priority boarding & baggage",
+    ],
+  },
+  {
+    id: "business-class",
+    title: "Business Class Flight Deals",
+    image: "/figma/homepage/business-class-cabin.jpg",
+    benefits: [
+      "Extra legroom & comfort",
+      "Priority check-in & boarding",
+      "Enhanced meal service",
+      "Lounge access worldwide",
+    ],
+  },
+];
+
+function DestinationCard({ card }: { card: typeof destinationCards[0] }) {
+  return (
+    <div className="group flex flex-col rounded-[18px] border border-[#DFE0E4] overflow-hidden bg-white transition-colors duration-200 hover:bg-black transform-gpu transition-transform hover:scale-[1.02]">
+      {/* Image Section */}
+      <div className="relative h-[200px] sm:h-[280px] overflow-hidden m-1 rounded-[14px]">
+        <Image
+          src={card.image}
+          alt={card.title}
+          fill
+          className="object-cover"
+        />
+        {/* Image pagination dots */}
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1">
+          <div className="w-3 h-1 bg-white rounded-full" />
+          <div className="w-1 h-1 bg-white/40 rounded-full" />
+          <div className="w-1 h-1 bg-white/40 rounded-full" />
+          <div className="w-1 h-1 bg-white/40 rounded-full" />
+          <div className="w-1 h-1 bg-white/40 rounded-full" />
+        </div>
+      </div>
+      
+      {/* Content Section */}
+      <div className="p-4 flex flex-col gap-3">
+        <h3 className="text-xl font-bold text-[#010D50] transition-colors group-hover:text-white">
+          {card.title}
+        </h3>
+        <p className="text-sm leading-relaxed text-[#3A478A] transition-colors group-hover:text-white/80">
+          {card.description}
+        </p>
+        
+        {/* Divider */}
+        <div className="h-px bg-[#DFE0E4] transition-colors group-hover:bg-white/20" />
+        
+        {/* Destinations List */}
+        <div className="flex flex-col gap-2">
+          {card.destinations.map((dest, idx) => (
+            <div
+              key={idx}
+              className="flex items-center justify-between px-3 py-2 rounded-xl bg-white transition-colors group-hover:bg-[#323232]"
+            >
+              <div className="flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-[#3754ED] transition-colors group-hover:text-white/70" />
+                <span className="text-sm font-medium text-[#010D50] transition-colors group-hover:text-white">
+                  {dest.name}
+                </span>
+              </div>
+              <span className="text-sm font-medium text-[#010D50] transition-colors group-hover:text-white">
+                {dest.price}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FeaturedDestinationCard({ destination }: { destination: typeof featuredDestinations[0] }) {
+  return (
+    <div className="flex flex-col rounded-[18px] overflow-hidden border border-[#DFE0E4] bg-white">
+      <div className="relative h-[280px] sm:h-[340px]">
+        <Image
+          src={destination.image}
+          alt={destination.title}
+          fill
+          className="object-cover"
+        />
+      </div>
+      <div className="p-4 flex items-center justify-between bg-white">
+        <h3 className="text-lg sm:text-xl font-bold text-[#010D50]">{destination.title}</h3>
+        <Link
+          href={`/search?to=${destination.id}`}
+          className="flex items-center gap-1 bg-[#3754ED] text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-[#2942D1] transition-colors"
+        >
+          Explore
+          <ChevronRight className="w-4 h-4" />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function FlightClassDealCard({ deal }: { deal: typeof flightClassDeals[0] }) {
+  return (
+    <div className="relative rounded-[18px] overflow-hidden group h-[280px] sm:h-[320px]">
+      <Image
+        src={deal.image}
+        alt={deal.title}
+        fill
+        className="object-cover"
+      />
+      {/* Benefits overlay */}
+      <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-sm rounded-xl p-4 max-w-[200px]">
+        <p className="text-[#010D50] font-semibold text-sm mb-2">Benefits:</p>
+        <ul className="space-y-1">
+          {deal.benefits.map((benefit, idx) => (
+            <li key={idx} className="text-[#3A478A] text-xs flex items-start gap-1">
+              <span className="text-[#3754ED] mt-0.5">•</span>
+              {benefit}
+            </li>
+          ))}
+        </ul>
+      </div>
+      {/* CTA Button */}
+      <Link
+        href={`/search?class=${deal.id}`}
+        className="absolute bottom-4 right-4 flex items-center gap-1 bg-[#010D50] text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-[#0B229E] transition-colors"
+      >
+        {deal.title}
+        <ChevronRight className="w-4 h-4" />
+      </Link>
+    </div>
+  );
+}
 
 function HomeContent() {
   const t = useTranslations('home');
   const searchParams = useSearchParams();
   const router = useRouter();
   const { setAffiliateCode } = useAffiliate();
+  const { phoneNumber } = useAffiliatePhone();
   const setSelectedFlight = useBookingStore((state) => state.setSelectedFlight);
   const setSearchParams = useBookingStore((state) => state.setSearchParams);
   const setAffiliateData = useBookingStore((state) => state.setAffiliateData);
@@ -150,67 +358,168 @@ function HomeContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+    <div className="min-h-screen bg-white">
       <Navbar />
       
-      {/* Hero Section */}
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 xl:px-12 py-12 sm:py-16 lg:py-20">
-        <div className="text-center mb-10 sm:mb-12">
-          <div className="flex items-center justify-center gap-3 mb-4 sm:mb-6">
-            <Plane className="w-10 h-10 sm:w-12 sm:h-12 text-[#3754ED]" />
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold text-[#010D50]">
-              {t('hero.title')}
-            </h1>
-          </div>
-          <p className="text-base sm:text-lg lg:text-xl text-[#3A478A] max-w-2xl mx-auto">
-            {t('hero.subtitle')}
-          </p>
+      {/* Hero Section with Background Image */}
+      <section className="relative min-h-[500px] sm:min-h-[600px] lg:min-h-[700px] flex items-center justify-center">
+        {/* Background Image */}
+        <div className="absolute inset-0 z-0">
+          <Image
+            src="/figma/homepage/hero-bg.jpg"
+            alt="Beautiful mountain landscape"
+            fill
+            className="object-cover"
+            priority
+          />
+          <div className="absolute inset-0 bg-black/30" />
         </div>
-
-        {/* Search Bar */}
-        <div className="mb-10 sm:mb-16">
+        
+        {/* Search Bar Container */}
+        <div className="relative z-10 w-full max-w-[1564px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <SearchBar />
         </div>
+        
+        {/* Location Badge */}
+        <div className="absolute bottom-6 right-6 z-10 hidden sm:flex items-center gap-2 bg-black/40 backdrop-blur-sm text-white px-4 py-2 rounded-full">
+          <MapPin className="w-5 h-5" />
+          <span className="text-sm font-medium">Ciucaș Peak, Romania</span>
+        </div>
+      </section>
 
-        {/* Features */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 mt-12 lg:mt-20">
-          <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-md border border-[#DFE0E4]">
-            <div className="w-16 h-16 bg-[rgba(55,84,237,0.12)] rounded-full flex items-center justify-center mb-4">
-              <svg className="w-8 h-8 text-[#3754ED]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h3 className="text-xl font-semibold text-[#010D50] mb-2">{t('features.bestPrice.title')}</h3>
-            <p className="text-[#3A478A]">
-              {t('features.bestPrice.description')}
+      {/* Why Book With Us Section */}
+      <section className="py-12 sm:py-16 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-8">
+            <h2 className="text-2xl sm:text-3xl font-semibold text-[#010D50] mb-2">
+              Why Book With Us?
+            </h2>
+            <p className="text-sm text-[#3A478A]">
+              Book cheap flights over 100 of the World&apos;s leading Airlines...
             </p>
           </div>
-
-          <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-md border border-[#DFE0E4]">
-            <div className="w-16 h-16 bg-[rgba(55,84,237,0.12)] rounded-full flex items-center justify-center mb-4">
-              <svg className="w-8 h-8 text-[#3754ED]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-            </div>
-            <h3 className="text-xl font-semibold text-[#010D50] mb-2">{t('features.secureBooking.title')}</h3>
-            <p className="text-[#3A478A]">
-              {t('features.secureBooking.description')}
-            </p>
-          </div>
-
-          <div className="bg-white p-6 lg:p-8 rounded-2xl shadow-md border border-[#DFE0E4]">
-            <div className="w-16 h-16 bg-[rgba(55,84,237,0.12)] rounded-full flex items-center justify-center mb-4">
-              <svg className="w-8 h-8 text-[#3754ED]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-            </div>
-            <h3 className="text-xl font-semibold text-[#010D50] mb-2">{t('features.support.title')}</h3>
-            <p className="text-[#3A478A]">
-              {t('features.support.description')}
-            </p>
+          
+          {/* Airline Logos */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {airlineLogos.map((logo) => (
+              <div
+                key={logo.name}
+                className="flex items-center justify-center p-4 sm:p-6 bg-white border border-[#DFE0E4] rounded-2xl shadow-[0px_2px_8px_0px_rgba(0,0,0,0.12)] hover:shadow-md transition-shadow min-h-[72px]"
+              >
+                <Image
+                  src={logo.src}
+                  alt={logo.name}
+                  width={logo.width}
+                  height={logo.height}
+                  className={`h-5 sm:h-6 w-auto object-contain max-w-full ${logo.name === "Lufthansa" ? "rotate-180 -scale-x-100" : ""}`}
+                />
+              </div>
+            ))}
           </div>
         </div>
-      </main>
+      </section>
+
+      {/* Compare Cheap Flights Section */}
+      <section className="py-12 sm:py-16 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-10">
+            <h2 className="text-2xl sm:text-3xl font-semibold text-[#010D50] mb-2">
+              Compare Cheap Flights To Worldwide Destinations
+            </h2>
+            <p className="text-sm text-[#3A478A]">
+              Find the best deals, compare prices instantly, and book your next adventure with ease
+            </p>
+          </div>
+          
+          {/* Destination Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {destinationCards.map((card) => (
+              <DestinationCard key={card.id} card={card} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* First Class & Business Class Flight Deals Section */}
+      <section className="py-12 sm:py-16 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {flightClassDeals.map((deal) => (
+              <FlightClassDealCard key={deal.id} deal={deal} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Great Deals Section */}
+      <section className="py-12 sm:py-16 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-10">
+            <h2 className="text-2xl sm:text-3xl font-semibold text-[#010D50] mb-3">
+              Great deals on flights and more from Globehunters
+            </h2>
+            <p className="text-sm text-[#3A478A] max-w-4xl mx-auto leading-relaxed">
+              Compare cheap flights to worldwide destinations over the phone or online! Call us now to speak to our experienced and helpful flight experts for tailor made itineraries and personalised quotes. We&apos;ll even aim to price match any flight offers you may have received elsewhere! Take a look at our amazing flight deals and book now!
+            </p>
+          </div>
+          
+          {/* Featured Destination Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {featuredDestinations.map((dest) => (
+              <FeaturedDestinationCard key={dest.id} destination={dest} />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Call Now Save Big Section */}
+      <section className="py-12 sm:py-16 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Full-width container with background image */}
+          <div 
+            className="relative rounded-[24px] overflow-hidden min-h-[400px] sm:min-h-[450px] flex items-center"
+            style={{
+              backgroundImage: 'url(/woman.png)',
+              backgroundSize: 'cover',
+              backgroundPosition: 'left center',
+            }}
+          >
+            {/* Call CTA Card - Positioned on the right */}
+            <div className="ml-auto mr-4 sm:mr-8 lg:mr-12 w-[90%] sm:w-[400px] lg:w-[420px] bg-white rounded-[24px] p-6 sm:p-8 shadow-xl">
+              <h2 className="text-2xl sm:text-3xl font-bold text-[#010D50] mb-6 text-center">
+                CALL NOW SAVE BIG
+              </h2>
+              
+              {/* Phone CTA */}
+              <a
+                href={`tel:${phoneNumber.replace(/\s/g, '')}`}
+                className="flex items-center gap-3 bg-gradient-to-r from-[#0B229E] to-[#3754ED] rounded-full px-5 py-3 mb-4 hover:opacity-90 transition-opacity w-full justify-center"
+              >
+                <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0">
+                  <Phone className="w-5 h-5 text-[#0B229E]" />
+                </div>
+                <div className="text-left">
+                  <p className="text-white/80 text-[10px]">24/7 Toll-Free</p>
+                  <p className="text-white text-xl font-bold">{phoneNumber}</p>
+                </div>
+              </a>
+              
+              <p className="text-[#3754ED] text-sm text-center italic mb-6">
+                Call to unlock unlisted fares & personalized offers!
+              </p>
+              
+              <div className="text-center">
+                <p className="text-[#010D50] text-base mb-1">
+                  Not all deals are online. Get in touch for exclusive
+                </p>
+                <p className="text-2xl sm:text-3xl font-bold text-[#FF6B35]">
+                  Discount Offers
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <Footer />
     </div>
