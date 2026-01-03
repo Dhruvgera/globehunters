@@ -17,7 +17,7 @@ export function ContactCard({ webRef }: ContactCardProps) {
   const displayWebRef = webRef ? `${webRef}` : null;
   
   return (
-    <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-3 sticky top-20">
+    <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-3 sticky top-20 z-20 shadow-sm">
       {displayWebRef && (
         <span className="text-base font-semibold text-[#3754ED]">
           {t('webRef')}: {displayWebRef}
