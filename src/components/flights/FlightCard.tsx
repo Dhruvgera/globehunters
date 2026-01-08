@@ -36,7 +36,7 @@ export default function FlightCard({
   const [showFlightInfo, setShowFlightInfo] = useState(false);
 
   // Prefetch price check for this flight on intent (hover) to speed up modal/options
-  // V3 flow: Use flightKey for FlightView -> psw_result_id -> PriceCheck
+  // Uses flightKey directly with price check API (no FlightView needed)
   const { checkPrice, priceCheck, isLoading } = usePriceCheck();
   const prefetchOptions = () => {
     if (flight.flightKey || flight.segmentResultId) {

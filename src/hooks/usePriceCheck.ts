@@ -103,8 +103,8 @@ export function usePriceCheck(): UsePriceCheckReturn {
 
   /**
    * Check price for a segment
-   * @param segmentId - Result_id from flight search (V1 numeric, or V3 compound format)
-   * @param flightKey - Optional: Base64 flight key from Deep_link for V3 FlightView flow
+   * @param segmentId - Result_id from flight search (V1 numeric fallback)
+   * @param flightKey - Optional: Base64 flight key from Deep_link - used directly with price check API
    */
   const checkPrice = useCallback(async (segmentId: string, flightKey?: string) => {
     // Use flightKey as cache key if available, otherwise segmentId

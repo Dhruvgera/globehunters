@@ -6,78 +6,6 @@ import { transformPriceCheckResponse, createPriceCheckError } from '@/services/a
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-/**
- * Call FlightView API to get psw_result_id from flight key
- * V3 flow: flightKey -> FlightView -> psw_result_id
- * 
- * NOTE: The Vyspa FlightView API sometimes returns HTTP 500 but still includes
- * valid data with psw_result_id in the response body. We handle this quirk by
- * parsing the body regardless of status code.
- */
-async function getFlightView(flightKey: string, basicAuth: string): Promise<number | null> {
-	// Use the FlightView-specific URL
-	const flightViewUrl = process.env.VYSPA_FLIGHTVIEW_URL || VYSPA_CONFIG.apiUrl.replace(/\/+$/, '');
-	const endpoint = `${flightViewUrl}/rest/v4/FlightView/`;
-	const requestBody = JSON.stringify([{ key: flightKey }]);
-
-	console.log('🔍 FlightView API Call:', {
-		endpoint,
-		flightKey,
-		apiVersion: VYSPA_CONFIG.apiVersion,
-		requestBody,
-	});
-
-	try {
-		const response = await fetch(endpoint, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'Authorization': `Basic ${basicAuth}`,
-				'Api-Version': VYSPA_CONFIG.apiVersion,
-			},
-			body: requestBody,
-		});
-
-		const responseText = await response.text();
-		console.log('📥 FlightView Raw Response:', {
-			status: response.status,
-			statusText: response.statusText,
-			responseBody: responseText.substring(0, 500),
-		});
-
-		// Try to parse JSON even if status is not OK (API returns 500 with valid data sometimes)
-		let data: any = null;
-		try {
-			data = JSON.parse(responseText);
-		} catch (parseError) {
-			console.error('❌ FlightView JSON Parse Error:', parseError);
-			return null;
-		}
-
-		// Check if we got a psw_result_id regardless of HTTP status
-		if (data && data.psw_result_id) {
-			console.log('📥 FlightView Parsed Response (extracted psw_result_id):', {
-				Result_id: data.Result_id,
-				psw_result_id: data.psw_result_id,
-				Total: data.Total,
-				httpStatus: response.status,
-			});
-			return data.psw_result_id;
-		}
-
-		// No psw_result_id found
-		console.error('❌ FlightView: No psw_result_id in response', {
-			status: response.status,
-			hasData: !!data,
-			dataKeys: data ? Object.keys(data) : [],
-		});
-		return null;
-	} catch (error) {
-		console.error('❌ FlightView Error:', error);
-		return null;
-	}
-}
-
 export async function POST(req: Request) {
 	try {
 		const { segmentResultId, flightKey } = await req.json();
@@ -96,27 +24,18 @@ export async function POST(req: Request) {
 		).toString('base64');
 		const apiUrl = VYSPA_CONFIG.apiUrl.replace(/\/+$/, '');
 
-		// Determine the psw_result_id to use for price check
-		let pswResultId: number | string | null = null;
+		// Determine how to call price check:
+		// - If flightKey is provided, use it directly with the "key" parameter (no FlightView needed)
+		// - Otherwise fall back to segmentResultId (V1 flow)
+		let requestBody: any[];
 
-		// V3 flow: If we have a flightKey, call FlightView first to get psw_result_id
 		if (flightKeyStr && flightKeyStr !== 'undefined' && flightKeyStr !== 'null') {
-			console.log('🔍 Using V3 flow: FlightKey -> FlightView -> PriceCheck');
-			pswResultId = await getFlightView(flightKeyStr, basicAuth);
-
-			if (!pswResultId) {
-				console.error('❌ FlightView failed to return psw_result_id');
-				const err = createPriceCheckError(
-					'API_ERROR',
-					'FlightView failed to return psw_result_id',
-					'Unable to load flight details. Please try searching again.',
-					{ flightKey: flightKeyStr }
-				);
-				return NextResponse.json(err, { status: 502 });
-			}
+			// Direct key flow: Use flightKey directly with price check API
+			console.log('🔍 Using direct key flow: flightKey -> PriceCheck');
+			requestBody = [{ key: flightKeyStr }];
 		} else {
 			// V1 flow: Use segmentResultId directly
-			console.log('🔍 Using V1 flow: Direct PriceCheck');
+			console.log('🔍 Using V1 flow: Direct PriceCheck with segment_psw_result1');
 
 			// Validate: must be non-empty and numeric
 			const isValidNumeric = /^\d+$/.test(segmentIdStr);
@@ -132,19 +51,15 @@ export async function POST(req: Request) {
 				return NextResponse.json(err, { status: 400 });
 			}
 
-			pswResultId = parseInt(segmentIdStr, 10);
+			requestBody = [{
+				segment_psw_result1: parseInt(segmentIdStr, 10)
+			}];
 		}
-
-		// Now call price check with the psw_result_id
-		const requestBody: PriceCheckRequest[] = [{
-			segment_psw_result1: pswResultId
-		}] as any;
 
 		const endpoint = `${apiUrl}/rest/v4/price_check/`;
 
 		console.log('🔍 Price Check API Call:', {
 			endpoint,
-			pswResultId,
 			requestBody: JSON.stringify(requestBody),
 		});
 

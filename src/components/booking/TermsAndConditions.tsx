@@ -4,24 +4,27 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useBookingStore } from "@/store/bookingStore";
 
 interface TermsAndConditionsProps {
   onUpgradeClick: () => void;
   hasUpgradeOptions?: boolean;
+  isCreatingFolder?: boolean;
+  setIsCreatingFolder?: (value: boolean) => void;
 }
 
 export function TermsAndConditions({
   onUpgradeClick,
   hasUpgradeOptions = false,
+  isCreatingFolder = false,
+  setIsCreatingFolder,
 }: TermsAndConditionsProps) {
   const t = useTranslations('booking.terms');
   const router = useRouter();
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [marketingConsent, setMarketingConsent] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const passengers = useBookingStore((s) => s.passengers);
   const searchParams = useBookingStore((s) => s.searchParams);
   const selectedFlight = useBookingStore((s) => s.selectedFlight);
@@ -58,7 +61,7 @@ export function TermsAndConditions({
     }
 
     try {
-      setIsSubmitting(true);
+      setIsCreatingFolder?.(true);
 
       const currency = selectedUpgradeOption?.currency || selectedFlight.currency;
       const pswResultId =
@@ -116,12 +119,63 @@ export function TermsAndConditions({
       // Extract markup_id and other booking info from price check data
       // Get the raw price check response to extract markup_id
       const rawPriceCheck = priceCheckData?.rawResponse?.priceCheck;
+      const supplierGds = String(rawPriceCheck?.gds || '').trim();
+      const supplierChoose = String(rawPriceCheck?.ChooseSupplier || '').trim();
       let markupIds = '';
       let moduleId = '';
       let baggageInfo = '';
       let refundableInfo = '';
       let cabinClassCode = 'Y';  // Default to Economy
       let selectedBrandName = '';
+      let galileoNotes: string[] = [];
+
+      // Build Galileo "notes tags" from OptionalService (transformed price option if available)
+      // Format includes actual chargeable status from price check:
+      // 1) meal & beverages -> Type: MealOrBeverage - [text] ([status])
+      // 2) seat info -> Tag: Seat Assignment - [text] ([status])
+      // 3) date change -> Tag: Rebooking - [text] ([status])
+      // Status values: "Included in the brand", "Available for a charge", "Not offered"
+      const optionForNotes = selectedUpgradeOption || priceCheckData?.priceOptions?.[0];
+      if (optionForNotes) {
+        // Helper to map chargeable status to display text
+        const getChargeableText = (chargeable?: 'included' | 'chargeable' | 'not_offered'): string => {
+          switch (chargeable) {
+            case 'included': return 'Included in the brand';
+            case 'chargeable': return 'Available for a charge';
+            case 'not_offered': return 'Not offered';
+            default: return '';
+          }
+        };
+
+        // Meals
+        if ((optionForNotes as any).mealsService) {
+          const svc = (optionForNotes as any).mealsService;
+          const type = svc.type || 'MealOrBeverage';
+          const text = svc.text || 'Meals & Beverages';
+          const status = getChargeableText(svc.chargeable);
+          galileoNotes.push(`Type: ${type} - ${text}${status ? ` (${status})` : ''}`);
+        }
+
+        // Seat assignment
+        const seatServices = (optionForNotes as any).seatServices || [];
+        if (Array.isArray(seatServices) && seatServices.length > 0) {
+          const svc = seatServices[0];
+          const text = svc.text || 'Preferred Seat';
+          const status = getChargeableText(svc.chargeable);
+          galileoNotes.push(`Tag: Seat Assignment - ${text}${status ? ` (${status})` : ''}`);
+        }
+
+        // Rebooking / date change
+        if ((optionForNotes as any).rebookingService) {
+          const svc = (optionForNotes as any).rebookingService;
+          const text = svc.text || 'Changes';
+          const status = getChargeableText(svc.chargeable);
+          galileoNotes.push(`Tag: Rebooking - ${text}${status ? ` (${status})` : ''}`);
+        }
+
+        // Deduplicate
+        galileoNotes = Array.from(new Set(galileoNotes)).filter(Boolean);
+      }
 
       // If we have a selected upgrade option, try to find its data in price_data
       if (rawPriceCheck?.price_data) {
@@ -190,6 +244,22 @@ export function TermsAndConditions({
               '')
           : '');
 
+      // Build per-passenger pricing from price check data
+      // This creates separate TKT segments for each passenger type with individual pricing
+      const passengerPricing: { paxType: 'ADT' | 'CHD' | 'INF'; count: number; baseFare: number; taxes: number; totalFare: number }[] = [];
+      const selectedOption = selectedUpgradeOption || priceCheckData?.priceOptions?.[0];
+      if (selectedOption?.passengerBreakdown && selectedOption.passengerBreakdown.length > 0) {
+        for (const breakdown of selectedOption.passengerBreakdown) {
+          passengerPricing.push({
+            paxType: breakdown.type as 'ADT' | 'CHD' | 'INF',
+            count: breakdown.count,
+            baseFare: breakdown.basePrice,
+            taxes: breakdown.taxesPerPerson,
+            totalFare: breakdown.totalPrice,
+          });
+        }
+      }
+
       const response = await fetch('/api/vyspa/init-folder', {
         method: 'POST',
         headers: {
@@ -226,6 +296,10 @@ export function TermsAndConditions({
           refundableInfo,             // For comments (cancellation policy)
           baseFare: selectedUpgradeOption?.baseFare || priceCheckData?.priceOptions?.[0]?.baseFare || 0,
           taxes: selectedUpgradeOption?.taxes || priceCheckData?.priceOptions?.[0]?.taxes || 0,
+          galileoNotes,               // Galileo tag notes (Meals/Seat/Rebooking) with status
+          gds: supplierGds,
+          chooseSupplier: supplierChoose,
+          passengerPricing,           // Per-passenger pricing for separate TKT segments
         }),
       });
 
@@ -245,7 +319,7 @@ export function TermsAndConditions({
     } catch (error) {
       alert('We were unable to set up your booking folder. You can still proceed to payment; please keep your reference number handy.');
     } finally {
-      setIsSubmitting(false);
+      setIsCreatingFolder?.(false);
       router.push("/payment");
     }
   };
@@ -287,11 +361,20 @@ export function TermsAndConditions({
         )}
         <Button
           onClick={handleProceed}
-          disabled={!termsAccepted || !passengersSaved || !canProceedToPayment() || isSubmitting}
+          disabled={!termsAccepted || !passengersSaved || !canProceedToPayment() || isCreatingFolder}
           className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-full px-5 py-2 h-auto text-sm font-bold disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {t('book')}
-          <ChevronLeft className="w-5 h-5 rotate-180" />
+          {isCreatingFolder ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Creating...
+            </>
+          ) : (
+            <>
+              {t('book')}
+              <ChevronLeft className="w-5 h-5 rotate-180" />
+            </>
+          )}
         </Button>
       </div>
     </div>

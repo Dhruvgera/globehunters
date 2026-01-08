@@ -19,6 +19,7 @@ import {
 import { transformBookingToEmailData, sendBookingConfirmationEmail } from "@/lib/emailHelper";
 import { shortenAirportName } from "@/lib/vyspa/utils";
 import { airportCache } from "@/lib/cache/airportCache";
+import { formatPrice } from "@/lib/currency";
 import {
   CheckCircle2,
   XCircle,
@@ -582,6 +583,20 @@ function PaymentCompleteContent() {
   const storeSelectedUpgrade = useBookingStore((state) => state.selectedUpgradeOption);
   const resetBooking = useBookingStore((state) => state.resetBooking);
   const [emailSent, setEmailSent] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+
+  const [bookingContext, setBookingContext] = useState<any>(null);
+
+  const loadBookingContext = useCallback((id: string) => {
+    try {
+      const raw = sessionStorage.getItem(`bookingContext_${id}`);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (e) {
+      console.warn("Failed to parse bookingContext snapshot", e);
+      return null;
+    }
+  }, []);
 
   // Record payment to Vyspa Portal (non-blocking)
   const recordPaymentToVyspa = useCallback(async (
@@ -782,6 +797,20 @@ function PaymentCompleteContent() {
     checkPaymentStatus();
   }, [redirectionResult, orderId, inquirePayment, recordPaymentToVyspa, router]);
 
+  // When we know the payment order id, load the correct snapshot for this order to avoid stale data
+  useEffect(() => {
+    if (isMockMode) return;
+    const id =
+      paymentInfo?.orderId ||
+      sessionStorage.getItem("pendingOrderId") ||
+      storeVyspaFolderNumber ||
+      orderId ||
+      "";
+    if (!id) return;
+    const ctx = loadBookingContext(id);
+    if (ctx) setBookingContext(ctx);
+  }, [isMockMode, paymentInfo?.orderId, storeVyspaFolderNumber, orderId, loadBookingContext]);
+
   // Hide confetti after animation
   useEffect(() => {
     if (showConfetti) {
@@ -829,63 +858,116 @@ function PaymentCompleteContent() {
     if (emailSent) return;
 
     try {
-      const totalAmount = parseFloat(amount || sessionStorage.getItem("pendingOrderAmount") || "0");
-      const currencyCode = currency || sessionStorage.getItem("pendingOrderCurrency") || "GBP";
+      setEmailError(null);
 
-      // Get add-on amounts from store
-      const protectionPlanAmount = storeAddOns?.protectionPlan ? totalAmount * 0.05 : 0; // Approximate
-      const baggageAmount = (storeAddOns?.additionalBaggage || 0) * 45; // Approximate per bag
+      const ctx = bookingContext || loadBookingContext(orderId);
+      const totalPaid = parseFloat(
+        amount ||
+          sessionStorage.getItem("pendingOrderAmount") ||
+          String(ctx?.pricing?.tripTotal || "0")
+      );
+      const currencyCode =
+        currency ||
+        sessionStorage.getItem("pendingOrderCurrency") ||
+        ctx?.pricing?.currency ||
+        "GBP";
 
-      if (storeSelectedFlight && effectiveContactEmail) {
-        console.log('Building email data for:', effectiveContactEmail);
+      const flightForEmail = ctx?.flight || storeSelectedFlight;
+      const passengersForEmail = ctx?.passengers || storePassengers;
+      const contactEmailForEmail = ctx?.contactEmail || effectiveContactEmail;
+      const contactPhoneForEmail =
+        ctx?.contactPhone ||
+        storeContactPhone ||
+        passengersForEmail?.[0]?.phone ||
+        "";
 
-        const emailData = transformBookingToEmailData({
-          orderNumber: orderId,
-          flight: storeSelectedFlight,
-          passengers: storePassengers,
-          contactEmail: effectiveContactEmail,
-          contactPhone: storeContactPhone || '',
-          totalAmount,
-          protectionPlanAmount,
-          baggageAmount,
-          currency: currencyCode,
-          cabinClass: storeSelectedUpgrade?.cabinClassDisplay || 'Economy',
+      if (!flightForEmail || !contactEmailForEmail) {
+        console.error("Cannot send email - missing data:", {
+          hasFlightData: !!flightForEmail,
+          email: contactEmailForEmail,
         });
+        return;
+      }
 
-        const result = await sendBookingConfirmationEmail(effectiveContactEmail, emailData);
+      // Prefer the stored checkout pricing snapshot (exact at time of checkout)
+      const baseFareAtCheckout =
+        typeof ctx?.pricing?.baseFare === "number" ? ctx.pricing.baseFare : undefined;
+      const protectionPlanAmount =
+        typeof ctx?.pricing?.protectionPlanCost === "number" ? ctx.pricing.protectionPlanCost : 0;
+      const baggageAmount =
+        typeof ctx?.pricing?.baggageCost === "number" ? ctx.pricing.baggageCost : 0;
 
-        if (result.success) {
-          setEmailSent(true);
-          sessionStorage.setItem(`emailSent_${orderId}`, 'true');
-          console.log('Confirmation email sent successfully to:', effectiveContactEmail);
-        } else {
-          console.error('Failed to send confirmation email:', result.error);
-        }
+      // If the gateway charged a slightly different amount, show the delta as "Other fees"
+      const rawDelta =
+        totalPaid - (Number(baseFareAtCheckout || 0) + protectionPlanAmount + baggageAmount);
+      const otherFees = rawDelta > 0.01 ? rawDelta : 0;
+      const baseFareAdjusted =
+        typeof baseFareAtCheckout === "number"
+          ? Math.max(0, baseFareAtCheckout)
+          : Math.max(0, totalPaid - protectionPlanAmount - baggageAmount - otherFees);
+
+      console.log("Building email data for:", contactEmailForEmail);
+      const emailData = transformBookingToEmailData({
+        orderNumber: orderId,
+        flight: flightForEmail,
+        passengers: passengersForEmail,
+        contactEmail: contactEmailForEmail,
+        contactPhone: contactPhoneForEmail,
+        totalAmount: totalPaid,
+        protectionPlanAmount,
+        baggageAmount,
+        creditCardFeesAmount: otherFees,
+        baseFareAmount: baseFareAdjusted,
+        currency: currencyCode,
+        cabinClass: (ctx?.selectedUpgradeOption?.cabinClassDisplay || storeSelectedUpgrade?.cabinClassDisplay || "Economy"),
+      });
+
+      const result = await sendBookingConfirmationEmail(contactEmailForEmail, emailData);
+
+      if (result.success) {
+        setEmailSent(true);
+        sessionStorage.setItem(`emailSent_${orderId}`, "true");
+        console.log("Confirmation email sent successfully to:", contactEmailForEmail);
       } else {
-        console.error('Cannot send email - missing data:', {
-          hasFlightData: !!storeSelectedFlight,
-          email: effectiveContactEmail
-        });
+        setEmailError(result.error || "Failed to send confirmation email");
+        console.error("Failed to send confirmation email:", result.error);
       }
     } catch (error) {
+      setEmailError(error instanceof Error ? error.message : "Failed to send confirmation email");
       console.error('Error sending confirmation email:', error);
     }
-  }, [emailSent, storeSelectedFlight, storePassengers, effectiveContactEmail, storeContactPhone, storeSelectedUpgrade, storeAddOns]);
+  }, [emailSent, bookingContext, loadBookingContext, storeSelectedFlight, storePassengers, effectiveContactEmail, storeContactPhone, storeSelectedUpgrade]);
 
   // Send confirmation email when payment is successful and data is available
   useEffect(() => {
-    if (paymentInfo?.status === "success" && storeSelectedFlight && effectiveContactEmail && !emailSent) {
+    if (paymentInfo?.status === "success" && (bookingContext?.flight || storeSelectedFlight) && (bookingContext?.contactEmail || effectiveContactEmail) && !emailSent) {
       const emailAlreadySent = sessionStorage.getItem(`emailSent_${paymentInfo.orderId}`);
       if (!emailAlreadySent) {
         console.log('Triggering confirmation email:', {
           orderId: paymentInfo.orderId,
-          email: effectiveContactEmail,
-          hasFlightData: !!storeSelectedFlight
+          email: bookingContext?.contactEmail || effectiveContactEmail,
+          hasFlightData: !!(bookingContext?.flight || storeSelectedFlight)
         });
         sendConfirmationEmailAsync(paymentInfo.orderId, paymentInfo.amount, paymentInfo.currency);
       }
     }
-  }, [paymentInfo, storeSelectedFlight, effectiveContactEmail, emailSent, sendConfirmationEmailAsync]);
+  }, [paymentInfo, bookingContext, storeSelectedFlight, effectiveContactEmail, emailSent, sendConfirmationEmailAsync]);
+
+  // Prevent browser back once payment is confirmed (avoids duplicate/looping payment state)
+  useEffect(() => {
+    if (paymentInfo?.status !== "success") return;
+    const preventBack = () => {
+      try {
+        window.history.pushState(null, "", window.location.href);
+      } catch {
+        // ignore
+      }
+    };
+    preventBack();
+    const onPopState = () => preventBack();
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [paymentInfo?.status]);
 
   // Flight summary data
   const refNumber =
@@ -895,6 +977,19 @@ function PaymentCompleteContent() {
   const isFailed = paymentInfo?.status === "failed";
   const isPending = paymentInfo?.status === "pending";
   const isCancelled = paymentInfo?.status === "cancelled";
+
+  const ctx = bookingContext;
+  const displayEmail = (isMockMode ? contactEmail : (ctx?.contactEmail || effectiveContactEmail)) || "—";
+  const displayPhone =
+    (isMockMode ? contactPhone : (ctx?.contactPhone || storeContactPhone || passengers?.[0]?.phone)) || "—";
+  const displayPassengers = (ctx?.passengers || passengers) || [];
+  const chargedCurrency = paymentInfo?.currency || ctx?.pricing?.currency || (typeof window !== 'undefined' ? sessionStorage.getItem("pendingOrderCurrency") : null) || "GBP";
+  const chargedAmount = (() => {
+    const a = paymentInfo?.amount || (typeof window !== 'undefined' ? sessionStorage.getItem("pendingOrderAmount") : null) || (ctx?.pricing?.tripTotal != null ? String(ctx.pricing.tripTotal) : "0");
+    const n = parseFloat(a || "0");
+    return Number.isFinite(n) ? n : 0;
+  })();
+  const fareAtCheckout = typeof ctx?.pricing?.baseFare === "number" ? ctx.pricing.baseFare : null;
 
   return (
     <div className="min-h-screen bg-[#F9FAFB]">
@@ -956,9 +1051,19 @@ function PaymentCompleteContent() {
                 Booking Confirmed
               </h1>
               <p className="text-[#6B7280] mb-6">
-                We&apos;ll email your confirmation shortly. Thank you for
-                choosing Globehunters
+                {emailSent ? (
+                  <>Confirmation email sent to <span className="font-semibold text-[#010D50]">{displayEmail}</span>.</>
+                ) : (
+                  <>We&apos;ll email your confirmation to <span className="font-semibold text-[#010D50]">{displayEmail}</span> shortly.</>
+                )}{" "}
+                Thank you for choosing Globehunters.
               </p>
+
+              {emailError && (
+                <div className="mt-2 text-sm text-red-600">
+                  Email error: {emailError}
+                </div>
+              )}
 
               {/* Action buttons */}
               <div className="flex items-center justify-center gap-3">
@@ -970,6 +1075,87 @@ function PaymentCompleteContent() {
                 </Button>
               </div>
             </div>
+
+            {/* Booking / Traveller / Payment info */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-white rounded-xl shadow-sm border border-[#E5E7EB] p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-[#EEF2FF] rounded-lg flex items-center justify-center">
+                    <Users className="w-4 h-4 text-[#3754ED]" />
+                  </div>
+                  <h3 className="font-semibold text-[#3754ED]">Traveller Information</h3>
+                </div>
+                <div className="space-y-2 text-sm text-[#4B5563]">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[#6B7280]">Booking reference</span>
+                    <span className="font-semibold text-[#010D50]">{refNumber}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[#6B7280]">Email</span>
+                    <span className="font-semibold text-[#010D50]">{displayEmail}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[#6B7280]">Telephone</span>
+                    <span className="font-semibold text-[#010D50]">{displayPhone}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-[#E5E7EB] p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-[#EEF2FF] rounded-lg flex items-center justify-center">
+                    <CreditCard className="w-4 h-4 text-[#3754ED]" />
+                  </div>
+                  <h3 className="font-semibold text-[#3754ED]">Payment Details</h3>
+                </div>
+                <div className="space-y-2 text-sm text-[#4B5563]">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[#6B7280]">Amount charged</span>
+                    <span className="font-semibold text-[#010D50]">
+                      {formatPrice(chargedAmount, chargedCurrency)}
+                    </span>
+                  </div>
+                  {fareAtCheckout != null && (
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-[#6B7280]">Fare at checkout</span>
+                      <span className="font-semibold text-[#010D50]">
+                        {formatPrice(fareAtCheckout, chargedCurrency)}
+                      </span>
+                    </div>
+                  )}
+                  {!!paymentInfo?.transactionId && (
+                    <div className="flex items-center justify-between gap-4">
+                      <span className="text-[#6B7280]">Transaction ID</span>
+                      <span className="font-semibold text-[#010D50]">{paymentInfo.transactionId}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Passenger details */}
+            {displayPassengers.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-[#E5E7EB] p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-[#EEF2FF] rounded-lg flex items-center justify-center">
+                    <Users className="w-4 h-4 text-[#3754ED]" />
+                  </div>
+                  <h3 className="font-semibold text-[#3754ED]">Passenger Details</h3>
+                </div>
+                <div className="divide-y divide-[#E5E7EB]">
+                  {displayPassengers.map((p: any, idx: number) => (
+                    <div key={`${p?.firstName || "p"}-${idx}`} className="py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <div className="font-semibold text-[#010D50]">
+                        {[p?.title, p?.firstName, p?.middleName, p?.lastName].filter(Boolean).join(" ") || `Passenger ${idx + 1}`}
+                      </div>
+                      <div className="text-sm text-[#6B7280]">
+                        {p?.dateOfBirth ? `DOB: ${p.dateOfBirth}` : ""}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Flight Cards */}
             {flight && (

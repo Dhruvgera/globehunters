@@ -13,7 +13,7 @@ import { useIdleTimer } from "@/hooks/useIdleTimer";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
 import { airportCache } from "@/lib/cache/airportCache";
 import { shortenAirportName } from "@/lib/vyspa/utils";
-import { normalizeCabinClass } from "@/lib/utils";
+import { formatFareLabel } from "@/lib/utils";
 
 // Import new modular components
 import { BookingHeader } from "@/components/booking/BookingHeader";
@@ -35,6 +35,7 @@ function BookingContent() {
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showFlightInfo, setShowFlightInfo] = useState(false);
   const [idleTimeoutOpen, setIdleTimeoutOpen] = useState(false);
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
   // Check if store has been hydrated from sessionStorage
   const hasHydrated = useStoreHydration();
@@ -47,6 +48,7 @@ function BookingContent() {
   const setPriceCheckData = useBookingStore((s) => s.setPriceCheckData);
   const vyspaFolderNumber = useBookingStore((s) => s.vyspaFolderNumber);
   const searchRequestId = useBookingStore((s) => s.searchRequestId);
+  const selectedFareType = useBookingStore((s) => s.selectedFareType);
   const { checkPrice, priceCheck } = usePriceCheck();
 
   // Web reference: prefer folder number, then request ID, then flight's webRef
@@ -66,7 +68,7 @@ function BookingContent() {
   }, [hasHydrated, flight, router]);
 
   // Prefetch price check for booking if missing
-  // V3 flow: Use flightKey for FlightView -> psw_result_id -> PriceCheck
+  // Uses flightKey directly with price check API (no FlightView needed)
   useEffect(() => {
     if ((flight?.flightKey || flight?.segmentResultId) && !priceCheckData) {
       checkPrice(String(flight.segmentResultId || ''), flight.flightKey);
@@ -175,7 +177,7 @@ function BookingContent() {
     if (counts.infants) parts.push(`${counts.infants} Infant${counts.infants > 1 ? 's' : ''}`);
     return parts.join(", ");
   })();
-  const cabinLabel = normalizeCabinClass(selectedUpgrade?.cabinClassDisplay || useBookingStore((s) => s.selectedFareType));
+  const cabinLabel = formatFareLabel(selectedUpgrade?.cabinClassDisplay || selectedFareType);
 
   return (
     <div className="min-h-screen bg-white">
@@ -246,6 +248,8 @@ function BookingContent() {
             <TermsAndConditions
               onUpgradeClick={() => setShowUpgradeModal(true)}
               hasUpgradeOptions={priceCheckData?.priceOptions && priceCheckData.priceOptions.length > 1}
+              isCreatingFolder={isCreatingFolder}
+              setIsCreatingFolder={setIsCreatingFolder}
             />
           </div>
 
@@ -277,6 +281,23 @@ function BookingContent() {
       </div>
 
       <Footer />
+
+      {/* Loading Overlay - Shows when folder is being created */}
+      {isCreatingFolder && (
+        <div className="fixed inset-0 bg-white/95 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="flex flex-col items-center justify-center gap-4">
+            <Loader2 className="w-12 h-12 text-[#3754ED] animate-spin" />
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-[#010D50] mb-2">
+                Creating your booking folder...
+              </h3>
+              <p className="text-sm text-[#3A478A]">
+                This may take a few moments. Please don't close this page.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modals */}
       <UpgradeOptionsModal

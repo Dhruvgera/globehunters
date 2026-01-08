@@ -193,7 +193,8 @@ export const useBookingStore = create<BookingState & HydrationState>()(
       setSelectedUpgrade: (option) =>
         set({
           selectedUpgradeOption: option,
-          selectedFareType: normalizeCabinClass(option.cabinClassDisplay),
+          // Preserve the raw fare/cabin label so UI can display the selected brand (e.g. "Economy Flex")
+          selectedFareType: option.cabinClassDisplay || option.cabinName || 'Economy',
         }),
 
       setPriceCheckData: (data) =>

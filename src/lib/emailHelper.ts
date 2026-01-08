@@ -165,6 +165,8 @@ export function transformBookingToEmailData(params: {
   totalAmount: number;
   protectionPlanAmount: number;
   baggageAmount: number;
+  creditCardFeesAmount?: number;
+  baseFareAmount?: number;
   currency: string;
   cabinClass?: string;
 }): BookingConfirmationEmailData {
@@ -177,6 +179,8 @@ export function transformBookingToEmailData(params: {
     totalAmount,
     protectionPlanAmount,
     baggageAmount,
+    creditCardFeesAmount,
+    baseFareAmount,
     currency,
     cabinClass = 'Economy',
   } = params;
@@ -229,8 +233,12 @@ export function transformBookingToEmailData(params: {
   }
 
   // Payment breakdown - totalAmount already includes everything
-  // baseFare = totalAmount minus add-ons
-  const baseFare = totalAmount - protectionPlanAmount - baggageAmount;
+  // baseFare = totalAmount minus add-ons and any fees delta (if provided)
+  const fees = Math.max(0, creditCardFeesAmount || 0);
+  const baseFare =
+    typeof baseFareAmount === 'number'
+      ? baseFareAmount
+      : totalAmount - protectionPlanAmount - baggageAmount - fees;
 
   return {
     orderNumber,
@@ -241,7 +249,7 @@ export function transformBookingToEmailData(params: {
     journeys,
     payment: {
       totalFare: baseFare,
-      creditCardFees: 0, // Credit card fees are included in the total, not itemized separately
+      creditCardFees: fees, // We treat any delta between fare components and total paid as "fees"
       protectionPlan: protectionPlanAmount,
       baggagePlan: baggageAmount,
       totalPaid: totalAmount,

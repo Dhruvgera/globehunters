@@ -9,6 +9,7 @@ import { MapPin, Shield, CreditCard } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { useBookingStore } from "@/store/bookingStore";
+import { CountrySelector } from "@/components/payment/CountrySelector";
 
 interface PaymentFormProps {
   onSubmit: (billingAddress: BillingAddress) => void;
@@ -273,13 +274,11 @@ export function PaymentForm({ onSubmit, loading = false, onValidityChange }: Pay
           {/* Country */}
           <div className="space-y-2">
             <Label htmlFor="country">{t('country')} {t('required')}</Label>
-            <Input
-              id="country"
-              type="text"
-              value={billingAddress.country}
-              onChange={(e) => handleAddressChange("country", e.target.value)}
+            <CountrySelector
+              value={billingAddress.country || ""}
+              onChange={(value) => handleAddressChange("country", value)}
               placeholder={t('countryPlaceholder')}
-              className={errors.country ? "border-red-500" : ""}
+              error={!!errors.country}
             />
             {errors.country && (
               <p className="text-xs text-red-600">{errors.country}</p>

@@ -18,7 +18,7 @@ import { useBoxPay } from "@/hooks/useBoxPay";
 import { getRegion } from "@/lib/utils/domainMapping";
 import { airportCache } from "@/lib/cache/airportCache";
 import { shortenAirportName } from "@/lib/vyspa/utils";
-import { normalizeCabinClass } from "@/lib/utils";
+import { formatFareLabel } from "@/lib/utils";
 
 // Import new modular components
 import { PaymentHeader } from "@/components/payment/PaymentHeader";
@@ -30,6 +30,7 @@ import { WebRefCard } from "@/components/booking/WebRefCard";
 import { PaymentForm } from "@/components/payment/PaymentForm";
 
 import { FOLDER_STATUS_CODES } from "@/types/portal";
+import { countryCodes } from "@/lib/utils/countryCodes";
 
 function PaymentContent() {
   const t = useTranslations('payment');
@@ -200,6 +201,38 @@ function PaymentContent() {
   const region = getRegion();
   const isUK = region === "UK";
 
+  const normalizePhoneForBoxPay = (raw: string, fallbackDialCode: string) => {
+    const input = (raw || "").trim();
+    const fallback = (fallbackDialCode || "").trim();
+    if (!input && !fallback) return "";
+
+    // Already international
+    if (input.startsWith("+")) return `+${input.slice(1).replace(/[^\d]/g, "")}`;
+    if (input.startsWith("00")) return `+${input.slice(2).replace(/[^\d]/g, "")}`;
+
+    const digits = input.replace(/[^\d]/g, "");
+    const dialDigits = fallback.replace(/[^\d]/g, "");
+    if (!digits) return dialDigits ? `+${dialDigits}` : "";
+
+    // If user already included dial code without '+'
+    if (dialDigits && digits.startsWith(dialDigits)) return `+${digits}`;
+
+    // Strip trunk zeros
+    const national = digits.replace(/^0+/, "");
+    return dialDigits ? `+${dialDigits}${national}` : `+${national}`;
+  };
+
+  const dialFromBillingCountry = (country: string) => {
+    const c = (country || "").trim().toLowerCase();
+    if (!c) return "";
+    const byIso = countryCodes.find((cc) => cc.isoCode.toLowerCase() === c);
+    if (byIso) return byIso.code;
+    const byName = countryCodes.find((cc) => cc.name.toLowerCase() === c);
+    if (byName) return byName.code;
+    const byIncludes = countryCodes.find((cc) => cc.name.toLowerCase().includes(c) || c.includes(cc.name.toLowerCase()));
+    return byIncludes?.code || "";
+  };
+
   const protectionPlanPercentages = (() => {
     // Fallback to global config if base fare is not available
     if (!baseFare) {
@@ -285,7 +318,7 @@ function PaymentContent() {
     if (counts.infants) parts.push(`${counts.infants} Infant${counts.infants > 1 ? 's' : ''}`);
     return parts.join(", ");
   })();
-  const cabinLabel = normalizeCabinClass(selectedUpgrade?.cabinClassDisplay || selectedFareType);
+  const cabinLabel = formatFareLabel(selectedUpgrade?.cabinClassDisplay || selectedFareType);
   // Web reference: prefer folder number, then search request ID, then fallbacks
   const refNumber = vyspaFolderNumber || searchRequestId || flight.webRef || '—';
   const orderId = refNumber;
@@ -461,6 +494,15 @@ function PaymentContent() {
                 const leadPassenger = passengers[0];
                 const firstName = billingAddress.firstName || leadPassenger?.firstName || 'Guest';
                 const lastName = billingAddress.lastName || leadPassenger?.lastName || 'User';
+                const fallbackDial =
+                  leadPassenger?.countryCode ||
+                  dialFromBillingCountry(billingAddress.country) ||
+                  (isUK ? "+44" : "+1");
+                const rawPhone =
+                  contactPhone ||
+                  (leadPassenger?.countryCode ? `${leadPassenger.countryCode}${leadPassenger.phone}` : leadPassenger?.phone) ||
+                  "";
+                const shopperPhone = normalizePhoneForBoxPay(rawPhone, fallbackDial) || (isUK ? "+442089444555" : "+12089444555");
 
                 // Create BoxPay session
                 const result = await createSession({
@@ -471,7 +513,7 @@ function PaymentContent() {
                     firstName,
                     lastName,
                     email: contactEmail || 'customer@globehunters.com',
-                    phone: contactPhone || '442089444555',
+                    phone: shopperPhone,
                     address: {
                       address1: billingAddress.addressLine1,
                       address2: billingAddress.addressLine2,
@@ -489,6 +531,36 @@ function PaymentContent() {
                   sessionStorage.setItem('pendingOrderId', orderId);
                   sessionStorage.setItem('pendingOrderAmount', tripTotal.toString());
                   sessionStorage.setItem('pendingOrderCurrency', currency);
+
+                  // Persist a per-order snapshot so the confirmation page/email can't pick up stale store data
+                  // (e.g. multi-tab or navigating around during payment redirects).
+                  try {
+                    const bookingContext = {
+                      orderId,
+                      createdAt: new Date().toISOString(),
+                      vyspaFolderNumber,
+                      searchRequestId,
+                      contactEmail,
+                      contactPhone: shopperPhone,
+                      passengers,
+                      flight,
+                      selectedUpgradeOption: selectedUpgrade,
+                      addOns,
+                      pricing: {
+                        baseFare,
+                        protectionPlanCost,
+                        baggageCost,
+                        tripTotal,
+                        currency,
+                      },
+                    };
+                    sessionStorage.setItem(
+                      `bookingContext_${orderId}`,
+                      JSON.stringify(bookingContext)
+                    );
+                  } catch (e) {
+                    console.warn('Failed to persist bookingContext snapshot', e);
+                  }
 
                   // Redirect to BoxPay checkout
                   redirectToCheckout(result.checkoutUrl);

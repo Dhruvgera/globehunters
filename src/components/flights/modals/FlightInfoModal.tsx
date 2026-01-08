@@ -76,9 +76,13 @@ export default function FlightInfoModal({
     if (open) {
       setSelectedLegIndex(0);
       setImgError(false);
-      setSelectedUpgradeOption(null);
+      // Only reset selected upgrade if there's no persisted selection in the store
+      // This preserves the user's previous selection when re-opening the modal
+      if (!selectedUpgradeInStore) {
+        setSelectedUpgradeOption(null);
+      }
     }
-  }, [open, flight.id]);
+  }, [open, flight.id, selectedUpgradeInStore]);
 
   // Reset image error state when switching segments (different airlines may have different logo availability)
   useEffect(() => {
@@ -206,8 +210,10 @@ export default function FlightInfoModal({
     }
   }, [open, clearError]);
 
-  // Set default selected option when price check loads
+  // Set default selected option when price check loads or modal opens
   useEffect(() => {
+    // Only run when modal is open
+    if (!open) return;
     if (!priceCheck || priceCheck.priceOptions.length === 0) return;
 
     // If user has already selected an option locally, do not override
@@ -263,7 +269,7 @@ export default function FlightInfoModal({
 
     // Fallback: default to the first option (usually the cheapest/base fare)
     setSelectedUpgradeOption(priceCheck.priceOptions[0]);
-  }, [priceCheck, selectedUpgradeOption, selectedUpgradeInStore, hasUpgradeOptions, searchParams?.class]);
+  }, [open, priceCheck, selectedUpgradeOption, selectedUpgradeInStore, hasUpgradeOptions, searchParams?.class]);
 
   function prettifyCabinName(name: string) {
     if (!name) return '';

@@ -146,6 +146,7 @@ export default function UpgradeOptionsModal({
   const [highlightedFare, setHighlightedFare] = useState<string>("");
   const [isApplying, setIsApplying] = useState(false);
   const setSelectedUpgrade = useBookingStore((s) => s.setSelectedUpgrade);
+  const selectedUpgradeInStore = useBookingStore((s) => s.selectedUpgradeOption);
   const priceCheckData = usePriceCheckData();
 
   const apiOptions: TransformedPriceOption[] = priceCheckData?.priceOptions || [];
@@ -162,17 +163,39 @@ export default function UpgradeOptionsModal({
     _raw: o,
   }));
 
-  // Initialize selected/highlighted when opening with API data
+  // Initialize selected/highlighted when opening - prefer currently selected upgrade from store
   useEffect(() => {
     if (!open) return;
     if (!hasApiOptions) return;
-    if (highlightedFare) return;
+    
+    // Check if there's a previously selected upgrade in the store
+    if (selectedUpgradeInStore) {
+      // Find matching option by id or cabinClassDisplay
+      const match = apiOptions.find((o) => o.id === selectedUpgradeInStore.id) ||
+        apiOptions.find((o) => o.cabinClassDisplay === selectedUpgradeInStore.cabinClassDisplay);
+      if (match) {
+        setHighlightedFare(match.id);
+        setSelectedFare(match.id);
+        return;
+      }
+    }
+    
+    // Fallback to first option if no match found
     const first = apiOptions[0];
     if (first?.id) {
       setHighlightedFare(first.id);
       setSelectedFare(first.id);
     }
-  }, [open, hasApiOptions, apiOptions, highlightedFare, setHighlightedFare, setSelectedFare]);
+  }, [open, hasApiOptions, apiOptions, selectedUpgradeInStore]);
+
+  // Reset state when modal closes so it re-initializes on next open
+  useEffect(() => {
+    if (!open) {
+      setSelectedFare("");
+      setHighlightedFare("");
+      setIsApplying(false);
+    }
+  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

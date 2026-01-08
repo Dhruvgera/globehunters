@@ -60,6 +60,35 @@ export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData
   // Format currency
   const formatCurrency = (amount: number) => `${payment.currencySymbol}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${payment.currency}`;
 
+  const hasFees = (payment.creditCardFees || 0) > 0.005;
+  const hasProtection = (payment.protectionPlan || 0) > 0.005;
+  const hasBaggage = (payment.baggagePlan || 0) > 0.005;
+
+  const paymentRows = `
+      <tr>
+        <td width="250" style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; padding: 6px 0;">Total Fare, Taxes, Fees &amp; Charges</td>
+        <td style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; padding: 6px 0; text-align: right;">${formatCurrency(payment.totalFare)}</td>
+      </tr>
+      ${hasFees ? `
+      <tr>
+        <td width="250" style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; padding: 6px 0;">Other fees</td>
+        <td style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; padding: 6px 0; text-align: right;">${formatCurrency(payment.creditCardFees)}</td>
+      </tr>
+      ` : ''}
+      ${hasProtection ? `
+      <tr>
+        <td width="250" style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; padding: 6px 0;">iAssure Protection Plan</td>
+        <td style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; padding: 6px 0; text-align: right;">${formatCurrency(payment.protectionPlan)}</td>
+      </tr>
+      ` : ''}
+      ${hasBaggage ? `
+      <tr>
+        <td width="250" style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; padding: 6px 0;">Baggage Plan</td>
+        <td style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; padding: 6px 0; text-align: right;">${formatCurrency(payment.baggagePlan)}</td>
+      </tr>
+      ` : ''}
+  `;
+
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -108,11 +137,11 @@ export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData
                 </tr>
               </table>
 
-              <!-- Travel Information Section -->
+              <!-- Traveller Information Section -->
               <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F8F9FA; border-radius: 12px; margin-bottom: 24px;">
                 <tr>
                   <td style="padding: 16px;">
-                    <div style="font-family: 'Inter', Arial, sans-serif; font-weight: 600; font-size: 14px; color: #555555; margin-bottom: 16px;">Travel Information:</div>
+                    <div style="font-family: 'Inter', Arial, sans-serif; font-weight: 600; font-size: 14px; color: #555555; margin-bottom: 16px;">Traveller Information:</div>
                     <table width="100%" cellpadding="0" cellspacing="0">
                       <tr>
                         <td width="120" style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; padding: 6px 0; vertical-align: top;">Name</td>
@@ -151,22 +180,7 @@ export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData
                   <td style="padding: 16px;">
                     <div style="font-family: 'Inter', Arial, sans-serif; font-weight: 700; font-size: 14px; color: #3754ED; margin-bottom: 16px;">Payment Details</div>
                     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 16px;">
-                      <tr>
-                        <td width="250" style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; padding: 6px 0;">Total Fare, Taxes, Fees &amp; Charges</td>
-                        <td style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; padding: 6px 0; text-align: right;">${formatCurrency(payment.totalFare)}</td>
-                      </tr>
-                      <tr>
-                        <td width="250" style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; padding: 6px 0;">Credit Card Fees</td>
-                        <td style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; padding: 6px 0; text-align: right;">${formatCurrency(payment.creditCardFees)}</td>
-                      </tr>
-                      <tr>
-                        <td width="250" style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; padding: 6px 0;">iAssure Protection Plan</td>
-                        <td style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; padding: 6px 0; text-align: right;">${formatCurrency(payment.protectionPlan)}</td>
-                      </tr>
-                      <tr>
-                        <td width="250" style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; padding: 6px 0;">Baggage Plan</td>
-                        <td style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; padding: 6px 0; text-align: right;">${formatCurrency(payment.baggagePlan)}</td>
-                      </tr>
+                      ${paymentRows}
                     </table>
                     <div style="border-top: 2px solid #3754ED; padding-top: 12px;">
                       <table width="100%" cellpadding="0" cellspacing="0">

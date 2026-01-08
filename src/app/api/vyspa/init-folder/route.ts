@@ -36,6 +36,15 @@ interface FlightSegmentData {
   cabinClass?: string;
 }
 
+// Per-passenger pricing breakdown from price check
+interface PassengerPricing {
+  paxType: 'ADT' | 'CHD' | 'INF';
+  count: number;
+  baseFare: number;       // Base fare per passenger of this type
+  taxes: number;          // Taxes per passenger of this type
+  totalFare: number;      // Total fare per passenger of this type
+}
+
 interface InitFolderRequestBody {
   passengers: InitFolderPassenger[];
   currency: string;
@@ -56,8 +65,13 @@ interface InitFolderRequestBody {
   selectedBrandName?: string; // Brand name (e.g., "ECONOMY LIGHT")
   baggageInfo?: string;       // Baggage allowance info
   refundableInfo?: string;    // Refund/cancellation policy
-  baseFare?: number;          // Base fare amount
-  taxes?: number;             // Tax amount
+  baseFare?: number;          // Base fare amount (total for all passengers - fallback)
+  taxes?: number;             // Tax amount (total for all passengers - fallback)
+  galileoNotes?: string[];    // Notes tags for Galileo (MealOrBeverage / Seat Assignment / Rebooking)
+  gds?: string;               // Supplier/GDS from price check (e.g. "Galileo")
+  chooseSupplier?: string;    // Supplier code from price check (e.g. "GALNEW")
+  // Per-passenger pricing from price check (for separate TKT segments per passenger)
+  passengerPricing?: PassengerPricing[];
 }
 
 function mapPassengerType(type: string): 'ADT' | 'CHD' | 'INF' {
@@ -141,6 +155,47 @@ function mapCabinClass(cabinClass?: string): string {
 
 import { FOLDER_STATUS_CODES } from '@/types/portal';
 
+function normalizeDialCode(code?: string): string {
+  if (!code) return '';
+  const trimmed = code.trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('+')) return `+${trimmed.slice(1).replace(/[^\d]/g, '')}`;
+  return `+${trimmed.replace(/[^\d]/g, '')}`;
+}
+
+function normalizePhoneWithCountryCode(countryCode: string | undefined, phone: string | undefined): string {
+  const rawPhone = (phone || '').trim();
+  const dial = normalizeDialCode(countryCode);
+  if (!rawPhone) return dial || '';
+
+  if (rawPhone.startsWith('+')) return `+${rawPhone.slice(1).replace(/[^\d]/g, '')}`;
+  if (rawPhone.startsWith('00')) return `+${rawPhone.slice(2).replace(/[^\d]/g, '')}`;
+
+  const digits = rawPhone.replace(/[^\d]/g, '');
+  const dialDigits = dial.replace(/[^\d]/g, '');
+  if (!digits) return dial || '';
+
+  // If already includes dial code (but missing '+')
+  if (dialDigits && digits.startsWith(dialDigits)) return `+${digits}`;
+
+  // Strip leading trunk 0s when adding dial code
+  const national = digits.replace(/^0+/, '');
+  return dialDigits ? `+${dialDigits}${national}` : `+${national}`;
+}
+
+function resolveBookedVia(gds?: string, chooseSupplier?: string): string {
+  const g = String(gds || '').trim();
+  const c = String(chooseSupplier || '').trim();
+  if (g && c) {
+    // If gds already includes a supplier code (e.g. "Galileo-GALNEW"), keep it
+    if (g.includes('-') || g.toLowerCase().includes(c.toLowerCase())) return g;
+    return `${g}-${c}`;
+  }
+  if (g) return g;
+  if (c) return c;
+  return VYSPA_PORTAL_CONFIG.defaultBookedVia;
+}
+
 export async function POST(req: Request) {
   const { apiUrl, credentials, timeout } = VYSPA_PORTAL_CONFIG;
 
@@ -156,13 +211,18 @@ export async function POST(req: Request) {
       flightSegmentCount: body.flightSegments?.length || 0,
       originAirportCode: body.originAirportCode,
       airlineCode: body.airlineCode,
+      passengerPricingCount: body.passengerPricing?.length || 0,
+      galileoNotesCount: body.galileoNotes?.length || 0,
     });
 
     const {
       passengers, currency, pswResultId, destinationAirportCode, departureDate, fareSelectedPrice,
       cabinClass, affiliateCode, flightSegments, originAirportCode, airlineCode,
       // New Portal API fields
-      markupIds, moduleId, cabinClassCode, selectedBrandName, baggageInfo, refundableInfo, baseFare, taxes
+      markupIds, moduleId, cabinClassCode, selectedBrandName, baggageInfo, refundableInfo, baseFare, taxes,
+      galileoNotes,
+      gds,
+      chooseSupplier
     } = body;
 
     if (!Array.isArray(passengers) || passengers.length === 0) {
@@ -198,6 +258,16 @@ export async function POST(req: Request) {
     );
     // Use the booking class code from the selected fare if available, otherwise fall back to mapped cabin class
     const ccClassCode = cabinClassCode || mapCabinClass(cabinClass);
+    const bookedVia = resolveBookedVia(gds, chooseSupplier);
+
+    const mealNote =
+      Array.isArray(galileoNotes)
+        ? galileoNotes.find((n) => String(n).toLowerCase().includes('type: mealorbeverage'))
+        : undefined;
+    const seatNote =
+      Array.isArray(galileoNotes)
+        ? galileoNotes.find((n) => String(n).toLowerCase().includes('tag: seat assignment'))
+        : undefined;
 
     console.log('🔧 Portal init-folder config', {
       apiUrl,
@@ -224,7 +294,7 @@ export async function POST(req: Request) {
       last_name: p.lastName,
       api_gender: mapGenderFromTitle(p.title),
       email: p.email,
-      telephone: p.phone,
+      telephone: normalizePhoneWithCountryCode(p.countryCode, p.phone),
       api_document_expiry_date: '',
       api_document_number: '',
       api_document_type: '',
@@ -266,11 +336,11 @@ export async function POST(req: Request) {
             num_stop: '0',
             booking_ref: '',
             conf_no: '',
-            booked_via: VYSPA_PORTAL_CONFIG.defaultBookedVia,
+            booked_via: bookedVia,
             cc_class_code: ccClassCode,
             baggage_allow: '',
-            meal_note: '',
-            seat_note: '',
+            meal_note: mealNote ? String(mealNote).trim().slice(0, 250) : '',
+            seat_note: seatNote ? String(seatNote).trim().slice(0, 250) : '',
             fare_basis: '',
             link_id_key: linkIdCounter === 0 ? 'null' : String(linkIdCounter - 1),
             gds_pax_type_code: 'ADT',
@@ -287,58 +357,124 @@ export async function POST(req: Request) {
     const tktStartDate = formatDateForPortal(normaliseDepartureDateForVyspa(firstSeg?.departureDate || departureDate));
     const tktEndDate = lastSeg ? formatDateForPortal(normaliseDepartureDateForVyspa(lastSeg.arrivalDate || lastSeg.departureDate)) : tktStartDate;
 
-    // Add TKT segment with pricing
-    manualItems.push({
-      Segment: {
-        fi_type: 'TKT',
-        airline_code: airlineCode || firstSeg?.airlineCode || '',
-        finan_vend_id: 0,
-        route_no: '',
-        start_point_code: originAirportCode || firstSeg?.departureAirport || '',
-        end_point_code: destinationAirportCode,
-        start_date_time_dt: tktStartDate,
-        end_date_time_dt: tktEndDate,
-        start_date_time_tm: firstSeg?.departureTime || '00:00',
-        end_date_time_tm: lastSeg?.arrivalTime || '23:59',
-        status: 'QU',
-        rate_note: markupIds || '',  // Markup IDs from price check (format: "id1|id2")
-        operating_airline_code: '',
-        air_craft_type: '',
-        start_point_loc: '',
-        end_point_loc: '',
-        journey_time: '',
-        journey_dist: '',
-        num_stop: '',
-        booking_ref: '',
-        conf_no: '',
-        booked_via: VYSPA_PORTAL_CONFIG.defaultBookedVia,
-        cc_class_code: ccClassCode,
-        baggage_allow: '',
-        meal_note: '',
-        seat_note: '',
-        fare_basis: '',
-        link_id_key: '0',
-        gds_pax_type_code: 'ADT',
-        num_bum: String(passengers.length),
-        pax_no: '1',
-      },
-      FolderPricings: [
-        {
-          tot_net_amt: String(baseFare || fareSelectedPrice),
-          tot_sell_amt: String(baseFare || fareSelectedPrice),
-          desc: 'Fare',
+    // Add TKT segments - one per passenger with individual pricing
+    // If passengerPricing is provided, create separate TKT for each passenger
+    // Otherwise fallback to single TKT with total pricing
+    if (body.passengerPricing && body.passengerPricing.length > 0) {
+      // Create TKT segment for each passenger with their individual pricing
+      let paxNoCounter = 1;
+      
+      for (const paxPricing of body.passengerPricing) {
+        // For each passenger of this type, create a TKT segment
+        for (let i = 0; i < paxPricing.count; i++) {
+          manualItems.push({
+            Segment: {
+              fi_type: 'TKT',
+              airline_code: airlineCode || firstSeg?.airlineCode || '',
+              finan_vend_id: 0,
+              route_no: '',
+              start_point_code: originAirportCode || firstSeg?.departureAirport || '',
+              end_point_code: destinationAirportCode,
+              start_date_time_dt: tktStartDate,
+              end_date_time_dt: tktEndDate,
+              start_date_time_tm: firstSeg?.departureTime || '00:00',
+              end_date_time_tm: lastSeg?.arrivalTime || '23:59',
+              status: 'QU',
+              rate_note: markupIds || '',  // Markup IDs from price check (format: "id1|id2")
+              operating_airline_code: '',
+              air_craft_type: '',
+              start_point_loc: '',
+              end_point_loc: '',
+              journey_time: '',
+              journey_dist: '',
+              num_stop: '',
+              booking_ref: '',
+              conf_no: '',
+              booked_via: bookedVia,
+              cc_class_code: ccClassCode,
+              baggage_allow: '',
+              meal_note: '',
+              seat_note: '',
+              fare_basis: '',
+              link_id_key: '0',
+              gds_pax_type_code: paxPricing.paxType,
+              num_bum: '1',  // One passenger per TKT segment
+              pax_no: String(paxNoCounter),
+            },
+            FolderPricings: [
+              {
+                tot_net_amt: String(paxPricing.baseFare),
+                tot_sell_amt: String(paxPricing.baseFare),
+                desc: 'Fare',
+                fi_type: 'TKT',
+                cu_curr_code: currency,
+              },
+              ...(paxPricing.taxes > 0 ? [{
+                tot_net_amt: String(paxPricing.taxes),
+                tot_sell_amt: String(paxPricing.taxes),
+                desc: 'Tax',
+                fi_type: 'TKT',
+                cu_curr_code: currency,
+              }] : []),
+            ],
+          });
+          paxNoCounter++;
+        }
+      }
+    } else {
+      // Fallback: Single TKT segment with total pricing (legacy behavior)
+      manualItems.push({
+        Segment: {
           fi_type: 'TKT',
-          cu_curr_code: currency,
+          airline_code: airlineCode || firstSeg?.airlineCode || '',
+          finan_vend_id: 0,
+          route_no: '',
+          start_point_code: originAirportCode || firstSeg?.departureAirport || '',
+          end_point_code: destinationAirportCode,
+          start_date_time_dt: tktStartDate,
+          end_date_time_dt: tktEndDate,
+          start_date_time_tm: firstSeg?.departureTime || '00:00',
+          end_date_time_tm: lastSeg?.arrivalTime || '23:59',
+          status: 'QU',
+          rate_note: markupIds || '',  // Markup IDs from price check (format: "id1|id2")
+          operating_airline_code: '',
+          air_craft_type: '',
+          start_point_loc: '',
+          end_point_loc: '',
+          journey_time: '',
+          journey_dist: '',
+          num_stop: '',
+          booking_ref: '',
+          conf_no: '',
+          booked_via: bookedVia,
+          cc_class_code: ccClassCode,
+          baggage_allow: '',
+          meal_note: '',
+          seat_note: '',
+          fare_basis: '',
+          link_id_key: '0',
+          gds_pax_type_code: 'ADT',
+          num_bum: String(passengers.length),
+          pax_no: '1',
         },
-        ...(taxes ? [{
-          tot_net_amt: String(taxes),
-          tot_sell_amt: String(taxes),
-          desc: 'Tax',
-          fi_type: 'TKT',
-          cu_curr_code: currency,
-        }] : []),
-      ],
-    });
+        FolderPricings: [
+          {
+            tot_net_amt: String(baseFare || fareSelectedPrice),
+            tot_sell_amt: String(baseFare || fareSelectedPrice),
+            desc: 'Fare',
+            fi_type: 'TKT',
+            cu_curr_code: currency,
+          },
+          ...(taxes ? [{
+            tot_net_amt: String(taxes),
+            tot_sell_amt: String(taxes),
+            desc: 'Tax',
+            fi_type: 'TKT',
+            cu_curr_code: currency,
+          }] : []),
+        ],
+      });
+    }
 
     // Build comments array with booking metadata
     const bookingComments: string[] = [];
@@ -359,6 +495,14 @@ export async function POST(req: Request) {
     }
     if (ccClassCode) {
       bookingComments.push(`Booking Class: ${ccClassCode}`);
+    }
+
+    // Galileo tag notes (requested)
+    if (Array.isArray(galileoNotes) && galileoNotes.length > 0) {
+      for (const note of galileoNotes) {
+        const n = String(note || '').trim();
+        if (n) bookingComments.push(n);
+      }
     }
 
     // Build the saveBasketToFolder request
@@ -387,10 +531,12 @@ export async function POST(req: Request) {
       manual_items: manualItems,
     }];
 
+    const tktSegmentsCount = manualItems.filter(m => m.Segment?.fi_type === 'TKT').length;
+    
     console.log('➡️ Calling Portal saveBasketToFolder (create folder)', {
       segmentCount: manualItems.length,
       airSegments: manualItems.filter(m => m.Segment?.fi_type === 'AIR').length,
-      payload: JSON.stringify(createFolderPayload, null, 2),
+      tktSegments: tktSegmentsCount,
     });
 
     const formData = new URLSearchParams();
