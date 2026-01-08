@@ -284,7 +284,7 @@ function BookingContent() {
 
       {/* Loading Overlay - Shows when folder is being created */}
       {isCreatingFolder && (
-        <div className="fixed inset-0 bg-white/95 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div className="fixed inset-0 w-screen h-screen bg-white z-50 flex items-center justify-center overflow-hidden">
           <div className="flex flex-col items-center justify-center gap-4">
             <Loader2 className="w-12 h-12 text-[#3754ED] animate-spin" />
             <div className="text-center">
