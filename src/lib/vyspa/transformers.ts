@@ -268,6 +268,7 @@ function transformResult(result: VyspaResult): Flight | null {
     segmentResultId: result.Result_id,
     flightKey: flightKey, // V3: Base64 key for FlightView API
     moduleId: moduleId,
+    gds: result.Gds ? String(result.Gds) : undefined,
   };
 
   return flight;

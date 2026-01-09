@@ -277,6 +277,7 @@ export function transformFlightViewResponse(data: FlightViewResponse): Transform
     refundableText: firstFlight.refundable_text,
     hasBaggage: hasBaggage || false,
     segmentResultId: String(data.Result_id),
+    gds: (data as any).Gds ? String((data as any).Gds) : undefined,
   };
 
   // Build search params from flight data

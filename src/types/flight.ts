@@ -88,6 +88,11 @@ export interface Flight {
   segmentResultId?: string;    // Result_id from API (V1 fallback) for price check
   flightKey?: string;          // Base64 flight key from Deep_link - used directly with price check API
   moduleId?: string;           // module_id from API for debugging
+  /**
+   * Optional GDS source from upstream (often one-letter code like "G" or "X").
+   * Used for CMS/Portal booked_via normalization when price-check data isn't available.
+   */
+  gds?: string;
 }
 
 export interface MultiCitySegmentSearch {

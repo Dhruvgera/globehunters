@@ -119,7 +119,8 @@ export function TermsAndConditions({
       // Extract markup_id and other booking info from price check data
       // Get the raw price check response to extract markup_id
       const rawPriceCheck = priceCheckData?.rawResponse?.priceCheck;
-      const supplierGds = String(rawPriceCheck?.gds || '').trim();
+      // Prefer price-check GDS (most accurate), but fall back to search-result/flightview GDS when present.
+      const supplierGds = String(rawPriceCheck?.gds || selectedFlight?.gds || '').trim();
       const supplierChoose = String(rawPriceCheck?.ChooseSupplier || '').trim();
       let markupIds = '';
       let moduleId = '';

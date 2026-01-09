@@ -154,6 +154,7 @@ function mapCabinClass(cabinClass?: string): string {
 }
 
 import { FOLDER_STATUS_CODES } from '@/types/portal';
+import { canonicalizeGdsName } from '@/lib/utils/gdsMapping';
 
 function normalizeDialCode(code?: string): string {
   if (!code) return '';
@@ -184,16 +185,18 @@ function normalizePhoneWithCountryCode(countryCode: string | undefined, phone: s
 }
 
 function resolveBookedVia(gds?: string, chooseSupplier?: string): string {
-  const g = String(gds || '').trim();
-  const c = String(chooseSupplier || '').trim();
-  if (g && c) {
-    // If gds already includes a supplier code (e.g. "Galileo-GALNEW"), keep it
-    if (g.includes('-') || g.toLowerCase().includes(c.toLowerCase())) return g;
-    return `${g}-${c}`;
-  }
-  if (g) return g;
-  if (c) return c;
-  return VYSPA_PORTAL_CONFIG.defaultBookedVia;
+  const gRaw = String(gds || '').trim();
+
+  // IMPORTANT: CMS expects ONLY the GDS name (no supplier suffix).
+  // Map one-letter codes:
+  // - "G" -> "Galileo"
+  // - "X" -> "Sabre"
+  const gdsName = canonicalizeGdsName(gRaw);
+  if (gdsName) return gdsName;
+
+  // Ignore chooseSupplier entirely per requirement (no second word).
+  // Fall back to default (also canonicalized to strip any suffix).
+  return canonicalizeGdsName(VYSPA_PORTAL_CONFIG.defaultBookedVia) || VYSPA_PORTAL_CONFIG.defaultBookedVia;
 }
 
 export async function POST(req: Request) {
