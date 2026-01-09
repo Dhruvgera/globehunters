@@ -361,68 +361,104 @@ export async function POST(req: Request) {
     const tktEndDate = lastSeg ? formatDateForPortal(normaliseDepartureDateForVyspa(lastSeg.arrivalDate || lastSeg.departureDate)) : tktStartDate;
 
     // Add TKT segments - one per passenger with individual pricing
-    // If passengerPricing is provided, create separate TKT for each passenger
-    // Otherwise fallback to single TKT with total pricing
+    // If passengerPricing is provided, create separate TKT for each passenger.
+    // IMPORTANT: Map TKT pax_no to the actual passenger ordering (not grouped by pax type),
+    // otherwise CMS can attach the wrong ticket/pricing to passengers when user input order varies.
+    // Otherwise fallback to single TKT with total pricing.
     if (body.passengerPricing && body.passengerPricing.length > 0) {
-      // Create TKT segment for each passenger with their individual pricing
-      let paxNoCounter = 1;
-      
-      for (const paxPricing of body.passengerPricing) {
-        // For each passenger of this type, create a TKT segment
-        for (let i = 0; i < paxPricing.count; i++) {
-          manualItems.push({
-            Segment: {
+      const pricingByType = new Map<string, { baseFare: number; taxes: number; totalFare: number; count: number }>();
+      for (const p of body.passengerPricing) {
+        pricingByType.set(p.paxType, {
+          baseFare: Number(p.baseFare) || 0,
+          taxes: Number(p.taxes) || 0,
+          totalFare: Number(p.totalFare) || 0,
+          count: Number(p.count) || 0,
+        });
+      }
+
+      // Validate counts (best-effort). If mismatch, we still proceed but log a warning.
+      const paxCountsFromPassengers = portalPassengers.reduce<Record<string, number>>((acc, p) => {
+        const t = p.pax_type;
+        acc[t] = (acc[t] || 0) + 1;
+        return acc;
+      }, {});
+      const paxCountsFromPricing = body.passengerPricing.reduce<Record<string, number>>((acc, p) => {
+        const t = p.paxType;
+        acc[t] = (acc[t] || 0) + (Number(p.count) || 0);
+        return acc;
+      }, {});
+      const hasCountMismatch = (['ADT', 'CHD', 'INF'] as const).some((t) => (paxCountsFromPassengers[t] || 0) !== (paxCountsFromPricing[t] || 0));
+      if (hasCountMismatch) {
+        console.warn('⚠️ Portal init-folder passengerPricing count mismatch; mapping TKT by passenger order', {
+          paxCountsFromPassengers,
+          paxCountsFromPricing,
+        });
+      }
+
+      for (let idx = 0; idx < portalPassengers.length; idx++) {
+        const pax = portalPassengers[idx];
+        const paxType = pax.pax_type;
+        const pricing = pricingByType.get(paxType);
+
+        // If pricing is missing for a pax type, fall back to 0 (CMS will still get a per-pax TKT entry).
+        const baseFarePerPax = pricing?.baseFare ?? 0;
+        const taxesPerPax = pricing?.taxes ?? 0;
+
+        manualItems.push({
+          Segment: {
+            fi_type: 'TKT',
+            airline_code: airlineCode || firstSeg?.airlineCode || '',
+            finan_vend_id: 0,
+            route_no: '',
+            start_point_code: originAirportCode || firstSeg?.departureAirport || '',
+            end_point_code: destinationAirportCode,
+            start_date_time_dt: tktStartDate,
+            end_date_time_dt: tktEndDate,
+            start_date_time_tm: firstSeg?.departureTime || '00:00',
+            end_date_time_tm: lastSeg?.arrivalTime || '23:59',
+            status: 'QU',
+            rate_note: markupIds || '', // Markup IDs from price check (format: "id1|id2")
+            operating_airline_code: '',
+            air_craft_type: '',
+            start_point_loc: '',
+            end_point_loc: '',
+            journey_time: '',
+            journey_dist: '',
+            num_stop: '',
+            booking_ref: '',
+            conf_no: '',
+            booked_via: bookedVia,
+            cc_class_code: ccClassCode,
+            baggage_allow: '',
+            meal_note: '',
+            seat_note: '',
+            fare_basis: '',
+            link_id_key: '0',
+            gds_pax_type_code: paxType,
+            num_bum: '1', // One passenger per TKT segment
+            pax_no: String(idx + 1),
+          },
+          FolderPricings: [
+            {
+              tot_net_amt: String(baseFarePerPax),
+              tot_sell_amt: String(baseFarePerPax),
+              desc: 'Fare',
               fi_type: 'TKT',
-              airline_code: airlineCode || firstSeg?.airlineCode || '',
-              finan_vend_id: 0,
-              route_no: '',
-              start_point_code: originAirportCode || firstSeg?.departureAirport || '',
-              end_point_code: destinationAirportCode,
-              start_date_time_dt: tktStartDate,
-              end_date_time_dt: tktEndDate,
-              start_date_time_tm: firstSeg?.departureTime || '00:00',
-              end_date_time_tm: lastSeg?.arrivalTime || '23:59',
-              status: 'QU',
-              rate_note: markupIds || '',  // Markup IDs from price check (format: "id1|id2")
-              operating_airline_code: '',
-              air_craft_type: '',
-              start_point_loc: '',
-              end_point_loc: '',
-              journey_time: '',
-              journey_dist: '',
-              num_stop: '',
-              booking_ref: '',
-              conf_no: '',
-              booked_via: bookedVia,
-              cc_class_code: ccClassCode,
-              baggage_allow: '',
-              meal_note: '',
-              seat_note: '',
-              fare_basis: '',
-              link_id_key: '0',
-              gds_pax_type_code: paxPricing.paxType,
-              num_bum: '1',  // One passenger per TKT segment
-              pax_no: String(paxNoCounter),
+              cu_curr_code: currency,
             },
-            FolderPricings: [
-              {
-                tot_net_amt: String(paxPricing.baseFare),
-                tot_sell_amt: String(paxPricing.baseFare),
-                desc: 'Fare',
-                fi_type: 'TKT',
-                cu_curr_code: currency,
-              },
-              ...(paxPricing.taxes > 0 ? [{
-                tot_net_amt: String(paxPricing.taxes),
-                tot_sell_amt: String(paxPricing.taxes),
-                desc: 'Tax',
-                fi_type: 'TKT',
-                cu_curr_code: currency,
-              }] : []),
-            ],
-          });
-          paxNoCounter++;
-        }
+            ...(taxesPerPax > 0
+              ? [
+                  {
+                    tot_net_amt: String(taxesPerPax),
+                    tot_sell_amt: String(taxesPerPax),
+                    desc: 'Tax',
+                    fi_type: 'TKT',
+                    cu_curr_code: currency,
+                  },
+                ]
+              : []),
+          ],
+        });
       }
     } else {
       // Fallback: Single TKT segment with total pricing (legacy behavior)
