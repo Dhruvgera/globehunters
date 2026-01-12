@@ -10,6 +10,8 @@ import { Passenger, AddOns, BookingResponse } from '@/types/booking';
 import { PaymentDetails } from '@/types/payment';
 import { PriceCheckResult, TransformedPriceOption } from '@/types/priceCheck';
 import { normalizeCabinClass } from '@/lib/utils';
+import type { Hotel } from '@/types/hotel';
+import type { VyspaCityHotelLookupItem } from '@/types/vyspaHotels';
 
 type Dateish = Date | string | number | null | undefined;
 
@@ -65,6 +67,85 @@ interface BookingState {
   // Search state
   searchParams: SearchParams | null;
   setSearchParams: (params: SearchParams) => void;
+
+  // Hotels (Vyspa) search state
+  hotelSearch: {
+    location: string;
+    hidden_id: string;
+    hidden_key: string;
+    checkIn: string; // YYYY-MM-DD
+    checkOut: string; // YYYY-MM-DD
+    rooms: number;
+    adults: number;
+    children: number;
+    branches?: string;
+    searchCriteriaId?: number;
+    arrivalPointCode?: string;
+  } | null;
+  setHotelSearch: (search: BookingState['hotelSearch']) => void;
+  clearHotelSearch: () => void;
+
+  // Persisted hotel location selection (for SearchBar hydration like flights)
+  hotelLocationSelection: VyspaCityHotelLookupItem | null;
+  setHotelLocationSelection: (item: VyspaCityHotelLookupItem | null) => void;
+
+  // Cache the latest hotel results so back-navigation doesn't look empty
+  hotelResultsCache: {
+    queryKey: string;
+    hotels: Hotel[];
+    selectedHotelId?: string;
+  } | null;
+  setHotelResultsCache: (cache: BookingState['hotelResultsCache']) => void;
+  clearHotelResultsCache: () => void;
+
+  // Mapping from hotelId to metadata needed for booking
+  hotelResultsMeta: Record<
+    string,
+    {
+      hotelId: string;
+      hotelName?: string;
+      searchResultId?: string; // used as ApiAddToFolder.search_result_id when available
+      srId?: string; // some responses call this srId
+    }
+  >;
+  setHotelResultsMeta: (meta: BookingState['hotelResultsMeta']) => void;
+  clearHotelResultsMeta: () => void;
+
+  selectedHotel: { hotelId: string; hotelName?: string } | null;
+  setSelectedHotel: (hotel: BookingState['selectedHotel']) => void;
+  selectedHotelRoomIds: string[];
+  setSelectedHotelRoomIds: (roomIds: string[]) => void;
+
+  // Cached hotel details (so back navigation doesn't flash mock content)
+  hotelDetailsCache: Record<
+    string,
+    {
+      hotelId: string;
+      hotelName?: string;
+      hotelRating?: number;
+      mainImage?: string;
+      address?: string;
+      galleryImages?: string[];
+      rooms?: any[];
+      detailsText?: string;
+      cancellationText?: string;
+      fetchedAt: number;
+    }
+  >;
+  setHotelDetailsCache: (hotelId: string, data: BookingState['hotelDetailsCache'][string]) => void;
+
+  // Selected room summary for checkout display
+  selectedHotelRoomSummary: {
+    hotelId: string;
+    roomId: string;
+    roomName?: string;
+    mealName?: string;
+    isRefundable?: boolean;
+    currency?: string;
+    total?: number;
+    nightly?: number;
+  } | null;
+  setSelectedHotelRoomSummary: (summary: BookingState['selectedHotelRoomSummary']) => void;
 
   // Affiliate data
   affiliateData: AffiliateData | null;
@@ -135,6 +216,14 @@ interface BookingState {
 
 const initialState = {
   searchParams: null,
+  hotelSearch: null,
+  hotelLocationSelection: null,
+  hotelResultsCache: null,
+  hotelResultsMeta: {},
+  selectedHotel: null,
+  selectedHotelRoomIds: [],
+  hotelDetailsCache: {},
+  selectedHotelRoomSummary: null,
   affiliateData: null,
   isFromDeeplink: false,
   selectedFlight: null,
@@ -176,6 +265,33 @@ export const useBookingStore = create<BookingState & HydrationState>()(
       // Search params
       setSearchParams: (params) => set({ searchParams: reviveSearchParams(params) }),
 
+      // Hotels (Vyspa) search
+      setHotelSearch: (search) => set({ hotelSearch: search }),
+      clearHotelSearch: () =>
+        set({
+          hotelSearch: null,
+          hotelLocationSelection: null,
+          hotelResultsCache: null,
+          hotelResultsMeta: {},
+          selectedHotel: null,
+          selectedHotelRoomIds: [],
+        }),
+      setHotelLocationSelection: (item) => set({ hotelLocationSelection: item }),
+      setHotelResultsCache: (cache) => set({ hotelResultsCache: cache }),
+      clearHotelResultsCache: () => set({ hotelResultsCache: null }),
+      setHotelResultsMeta: (meta) => set({ hotelResultsMeta: meta }),
+      clearHotelResultsMeta: () => set({ hotelResultsMeta: {} }),
+      setSelectedHotel: (hotel) => set({ selectedHotel: hotel }),
+      setSelectedHotelRoomIds: (roomIds) => set({ selectedHotelRoomIds: roomIds }),
+      setHotelDetailsCache: (hotelId, data) =>
+        set((state) => ({
+          hotelDetailsCache: {
+            ...state.hotelDetailsCache,
+            [hotelId]: data,
+          },
+        })),
+      setSelectedHotelRoomSummary: (summary) => set({ selectedHotelRoomSummary: summary }),
+
       // Affiliate data
       setAffiliateData: (data) => set({ affiliateData: data }),
 
@@ -210,6 +326,10 @@ export const useBookingStore = create<BookingState & HydrationState>()(
           vyspaCustomerId: null,
           vyspaEmailAddress: null,
           searchRequestId: null,
+          // Also clear any hotel selection when starting a new booking
+          selectedHotel: null,
+          selectedHotelRoomIds: [],
+          selectedHotelRoomSummary: null,
         }),
 
       // Passengers
@@ -323,6 +443,15 @@ export const useBookingStore = create<BookingState & HydrationState>()(
       // Only persist certain fields
       partialize: (state) => ({
         searchParams: state.searchParams,
+        // Hotels: persist so back navigation and refresh behave like flight journey
+        hotelSearch: state.hotelSearch,
+        hotelLocationSelection: state.hotelLocationSelection,
+        hotelResultsCache: state.hotelResultsCache,
+        hotelResultsMeta: state.hotelResultsMeta,
+        selectedHotel: state.selectedHotel,
+        selectedHotelRoomIds: state.selectedHotelRoomIds,
+        hotelDetailsCache: state.hotelDetailsCache,
+        selectedHotelRoomSummary: state.selectedHotelRoomSummary,
         affiliateData: state.affiliateData,
         isFromDeeplink: state.isFromDeeplink,
         selectedFlight: state.selectedFlight,

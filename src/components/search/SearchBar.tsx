@@ -2,11 +2,13 @@
 
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useSearchForm } from "@/hooks/useSearchForm";
 import { TripTypeSelector } from "./search-bar/TripTypeSelector";
 import { PassengersSelector } from "./search-bar/PassengersSelector";
 import { AirportAutocomplete } from "./search-bar/AirportAutocomplete";
+import { HotelLocationAutocomplete } from "./search-bar/HotelLocationAutocomplete";
 import { SwapLocationsButton } from "./search-bar/SwapLocationsButton";
 import { DateSelector } from "./search-bar/DateSelector";
 import { SearchButton } from "./search-bar/SearchButton";
@@ -19,7 +21,8 @@ import {
 } from "@/components/ui/popover";
 import { DatePicker } from "@/components/ui/date-picker";
 import { format } from "date-fns";
-import { Input } from "@/components/ui/input";
+import type { VyspaCityHotelLookupItem } from "@/types/vyspaHotels";
+import { useBookingStore } from "@/store/bookingStore";
 
 interface SearchBarProps {
   compact?: boolean;
@@ -77,13 +80,73 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
     return "flight";
   }, [pathname, urlParams]);
 
-  const [hotelLocation, setHotelLocation] = useState("Hong Kong");
+  // Animated, in-place switching between flight/hotel forms.
+  // We still navigate on search, but tab switches don't hard-navigate.
+  const [activeProduct, setActiveProduct] = useState<Product>(productFromUrl);
+  useEffect(() => {
+    setActiveProduct(productFromUrl);
+  }, [productFromUrl]);
+
+  const [hotelLocationItem, setHotelLocationItem] = useState<VyspaCityHotelLookupItem | null>(null);
   const [hotelStartDate, setHotelStartDate] = useState<Date | undefined>(undefined);
   const [hotelEndDate, setHotelEndDate] = useState<Date | undefined>(undefined);
   const [hotelGuests, setHotelGuests] = useState(2);
   const [hotelRooms, setHotelRooms] = useState(1);
   const [isHotelDatesOpen, setIsHotelDatesOpen] = useState(false);
   const [isHotelGuestsOpen, setIsHotelGuestsOpen] = useState(false);
+
+  const savedHotelLocation = useBookingStore((s) => s.hotelLocationSelection);
+  const setHotelLocationSelection = useBookingStore((s) => s.setHotelLocationSelection);
+  const savedHotelSearch = useBookingStore((s) => s.hotelSearch);
+
+  // Hydrate hotel location selection from URL (preferred) or store (like flights).
+  useEffect(() => {
+    const urlLocation = urlParams.get("location");
+    const hid = urlParams.get("hidden_id");
+    const hkey = urlParams.get("hidden_key");
+    const apc = urlParams.get("arrival_point_code");
+
+    // Prefer URL when on /hotels
+    if (pathname?.startsWith("/hotels") && urlLocation && hid && hkey) {
+      setHotelLocationItem({
+        id: Number(hid),
+        label: urlLocation,
+        loc: hkey,
+        arrival_point_code: apc || undefined,
+      } as VyspaCityHotelLookupItem);
+    } else if (!hotelLocationItem) {
+      // Otherwise hydrate from store (homepage tab switch)
+      if (savedHotelLocation) {
+        setHotelLocationItem(savedHotelLocation);
+      } else if (savedHotelSearch?.location && savedHotelSearch?.hidden_id && savedHotelSearch?.hidden_key) {
+        setHotelLocationItem({
+          id: Number(savedHotelSearch.hidden_id),
+          label: savedHotelSearch.location,
+          loc: savedHotelSearch.hidden_key,
+          arrival_point_code: savedHotelSearch.arrivalPointCode,
+        } as VyspaCityHotelLookupItem);
+      }
+    }
+
+    // Hydrate dates/guests/rooms (like flights journey) when on /hotels
+    if (pathname?.startsWith("/hotels")) {
+      const inStr = urlParams.get("checkIn") || savedHotelSearch?.checkIn || "";
+      const outStr = urlParams.get("checkOut") || savedHotelSearch?.checkOut || "";
+      const adults = Number(urlParams.get("adults") || savedHotelSearch?.adults || "") || undefined;
+      const rms = Number(urlParams.get("rooms") || savedHotelSearch?.rooms || "") || undefined;
+
+      if (inStr) {
+        const d = new Date(inStr);
+        if (!Number.isNaN(d.getTime())) setHotelStartDate(d);
+      }
+      if (outStr) {
+        const d = new Date(outStr);
+        if (!Number.isNaN(d.getTime())) setHotelEndDate(d);
+      }
+      if (adults) setHotelGuests(adults);
+      if (rms) setHotelRooms(rms);
+    }
+  }, [pathname, savedHotelLocation, savedHotelSearch, urlParams]);
 
   const {
     tripType,
@@ -111,15 +174,7 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
   } = useSearchForm();
 
   const setProduct = (next: Product) => {
-    if (next === "flight") {
-      router.push("/");
-      return;
-    }
-    if (next === "hotel") {
-      router.push("/hotels");
-      return;
-    }
-    router.push("/hotels?type=package");
+    setActiveProduct(next);
   };
 
   // Validation: Check if all required fields are filled
@@ -142,9 +197,23 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
   };
 
   const handleSearch = () => {
-    if (productFromUrl === "hotel" || productFromUrl === "package") {
-      // Mock-only for now: keep results on /hotels, later wire to hotel search API.
-      setProduct(productFromUrl);
+    if (activeProduct === "hotel" || activeProduct === "package") {
+      // Hotels: navigate to /hotels with query params so results page can call Vyspa
+      const loc = hotelLocationItem?.label?.trim() || "London";
+      const checkIn = hotelStartDate ? format(hotelStartDate, "yyyy-MM-dd") : "";
+      const checkOut = hotelEndDate ? format(hotelEndDate, "yyyy-MM-dd") : "";
+      const params = new URLSearchParams();
+      params.set("location", loc);
+      if (checkIn) params.set("checkIn", checkIn);
+      if (checkOut) params.set("checkOut", checkOut);
+      params.set("adults", String(Math.max(1, hotelGuests)));
+      params.set("rooms", String(Math.max(1, hotelRooms)));
+      if (hotelLocationItem?.id != null) params.set("hidden_id", String(hotelLocationItem.id));
+      if (hotelLocationItem?.loc) params.set("hidden_key", String(hotelLocationItem.loc));
+      if (hotelLocationItem?.arrival_point_code) params.set("arrival_point_code", String(hotelLocationItem.arrival_point_code));
+      // Persist selection for back-navigation (like flights).
+      if (hotelLocationItem) setHotelLocationSelection(hotelLocationItem);
+      router.push(`/hotels?${params.toString()}`);
       return;
     }
     if (!isSearchValid()) {
@@ -170,21 +239,21 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
       <div className={compact ? "mb-3" : "mb-5"}>
         <div className="flex flex-wrap items-center gap-4">
           <ProductTab
-            active={productFromUrl === "flight"}
+            active={activeProduct === "flight"}
             onClick={() => setProduct("flight")}
             icon={<Plane className="h-4 w-4 text-[#3754ED]" />}
             label="Flight"
             compact={compact}
           />
           <ProductTab
-            active={productFromUrl === "hotel"}
+            active={activeProduct === "hotel"}
             onClick={() => setProduct("hotel")}
             icon={<Building2 className="h-4 w-4 text-[#3754ED]" />}
             label="Hotel"
             compact={compact}
           />
           <ProductTab
-            active={productFromUrl === "package"}
+            active={activeProduct === "package"}
             onClick={() => setProduct("package")}
             icon={
               <span className="flex items-center gap-1">
@@ -198,9 +267,16 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
         </div>
       </div>
 
-      {productFromUrl === "flight" && (
-        <>
-          <div className="border border-[#E8E8EE] rounded-[28px] p-4 sm:p-5">
+      <AnimatePresence mode="wait" initial={false}>
+        {activeProduct === "flight" ? (
+          <motion.div
+            key="flight-form"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.22 }}
+          >
+            <div className="border border-[#E8E8EE] rounded-[28px] p-4 sm:p-5">
             {/* Top Row - Trip Type (pill) */}
             <div className="flex flex-wrap items-center gap-4 sm:gap-6 mb-4">
               <TripTypeSelector
@@ -320,27 +396,22 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
               </div>
             )}
           </div>
-        </>
-      )}
-
-      {(productFromUrl === "hotel" || productFromUrl === "package") && (
-        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+          </motion.div>
+        ) : (
+          <motion.div
+            key="hotel-form"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.22 }}
+          >
+            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
           {/* Location */}
-          <div className="flex items-center gap-2 flex-1 border border-[#D3D3D3] rounded-xl px-3 py-2.5 bg-white">
-            <Image
-              src="/figma/hotels/icon-location.svg"
-              alt=""
-              width={16}
-              height={20}
-              className="opacity-80 flex-shrink-0"
-            />
-            <Input
-              value={hotelLocation}
-              onChange={(e) => setHotelLocation(e.target.value)}
-              placeholder="Find Location"
-              className="h-auto min-h-0 border-0 px-0 py-0 shadow-none focus-visible:ring-0 text-sm font-medium text-[#010D50] placeholder:text-gray-400 truncate"
-            />
-          </div>
+          <HotelLocationAutocomplete
+            value={hotelLocationItem}
+            onChange={setHotelLocationItem}
+            placeholder="Find Location"
+          />
 
           {/* Dates */}
           <Popover open={isHotelDatesOpen} onOpenChange={setIsHotelDatesOpen}>
@@ -484,8 +555,10 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
           >
             Search
           </Button>
-        </div>
-      )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

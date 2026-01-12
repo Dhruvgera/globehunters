@@ -106,11 +106,15 @@ export function HotelResultCard({
             {/* Review score row - score badge on left, label/count stacked on right */}
             <div className="flex items-center gap-2">
               <div className="w-10 h-10 rounded-lg bg-[#008234] text-white grid place-content-center font-bold text-sm">
-                {hotel.reviews.score.toFixed(1)}
+                {hotel.reviews.score > 0 ? hotel.reviews.score.toFixed(1) : "—"}
               </div>
               <div className="flex flex-col">
-                <span className="text-sm font-semibold text-[#010D50]">{hotel.reviews.label}</span>
-                <span className="text-xs text-[#3A478A]">{hotel.reviews.count} reviews</span>
+                <span className="text-sm font-semibold text-[#010D50]">
+                  {hotel.reviews.label || "Content missing from API: rating"}
+                </span>
+                <span className="text-xs text-[#3A478A]">
+                  {hotel.reviews.count > 0 ? `${hotel.reviews.count} reviews` : "—"}
+                </span>
               </div>
             </div>
 

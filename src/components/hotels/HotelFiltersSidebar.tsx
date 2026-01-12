@@ -67,6 +67,9 @@ export function HotelFiltersSidebar({
   expanded: Record<string, boolean>;
   onToggleExpanded: (key: string) => void;
 }) {
+  const unsupportedNote =
+    "Note: Only Property name, Price, and Star rating are currently powered by the hotel API. Other filters are shown for UI parity but may not affect results yet.";
+
   const priceText = useMemo(() => {
     const [min, max] = value.priceRange;
     return { min: `$${min}`, max: `$${max}${max >= 250 ? " +" : ""}` };
@@ -74,6 +77,9 @@ export function HotelFiltersSidebar({
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="text-xs text-[#3A478A] bg-[#F5F7FF] border border-[#DFE0E4] rounded-xl p-3">
+        {unsupportedNote}
+      </div>
       {/* Property name search */}
       <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
         <div className="text-sm font-semibold text-[#010D50]">Search by property name</div>
@@ -99,9 +105,11 @@ export function HotelFiltersSidebar({
         isExpanded={!!expanded.popular}
         onToggle={() => onToggleExpanded("popular")}
       >
+        <div className="text-xs text-[#3A478A] mb-2">Content missing from API: popular filter flags</div>
         <div className="flex flex-col gap-2">
           <label className="flex items-center gap-3">
             <Checkbox
+              disabled
               checked={value.popular.breakfastIncluded}
               onCheckedChange={(c) =>
                 onChange({
@@ -114,6 +122,7 @@ export function HotelFiltersSidebar({
           </label>
           <label className="flex items-center gap-3">
             <Checkbox
+              disabled
               checked={value.popular.reserveWithoutCard}
               onCheckedChange={(c) =>
                 onChange({
@@ -126,6 +135,7 @@ export function HotelFiltersSidebar({
           </label>
           <label className="flex items-center gap-3">
             <Checkbox
+              disabled
               checked={value.popular.reserveNowPayLater}
               onCheckedChange={(c) =>
                 onChange({
@@ -138,6 +148,7 @@ export function HotelFiltersSidebar({
           </label>
           <label className="flex items-center gap-3">
             <Checkbox
+              disabled
               checked={value.popular.airportShuttle}
               onCheckedChange={(c) =>
                 onChange({
@@ -202,11 +213,13 @@ export function HotelFiltersSidebar({
         isExpanded={!!expanded.neighborhood}
         onToggle={() => onToggleExpanded("neighborhood")}
       >
+        <div className="text-xs text-[#3A478A] mb-2">Content missing from API: neighborhood data</div>
         <div className="flex flex-col gap-2">
           {["Central", "Kowloon", "Mong Kok", "Tsim Sha Tsui", "Jordan"].map((n) => (
             <label key={n} className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <Checkbox
+                  disabled
                   checked={value.neighborhoods.includes(n)}
                   onCheckedChange={(c) => {
                     const next = Boolean(c)
@@ -265,8 +278,10 @@ export function HotelFiltersSidebar({
         isExpanded={!!expanded.refund}
         onToggle={() => onToggleExpanded("refund")}
       >
+        <div className="text-xs text-[#3A478A] mb-2">Content missing from API: refundable flag in list results</div>
         <label className="flex items-center gap-3">
           <Checkbox
+            disabled
             checked={value.fullyRefundableOnly}
             onCheckedChange={(c) => onChange({ ...value, fullyRefundableOnly: Boolean(c) })}
           />
@@ -280,6 +295,7 @@ export function HotelFiltersSidebar({
         isExpanded={!!expanded.amenities}
         onToggle={() => onToggleExpanded("amenities")}
       >
+        <div className="text-xs text-[#3A478A] mb-2">Content missing from API: amenities list</div>
         <div className="grid grid-cols-2 gap-2">
           {AMENITIES_WITH_ICONS.map(({ key, icon: Icon }) => {
             const isSelected = value.amenities.includes(key);
@@ -288,6 +304,7 @@ export function HotelFiltersSidebar({
                 key={key}
                 type="button"
                 onClick={() => {
+                  // UI-only for now
                   const next = isSelected
                     ? value.amenities.filter((x) => x !== key)
                     : [...value.amenities, key];
@@ -314,10 +331,12 @@ export function HotelFiltersSidebar({
         isExpanded={!!expanded.mealPlans}
         onToggle={() => onToggleExpanded("mealPlans")}
       >
+        <div className="text-xs text-[#3A478A] mb-2">Content missing from API: normalized meal plan labels</div>
         <div className="flex flex-col gap-2">
           {["Breakfast included", "All-inclusive", "Full board", "Half board"].map((plan) => (
             <label key={plan} className="flex items-center gap-3">
               <Checkbox
+                disabled
                 checked={value.mealPlans?.includes(plan) ?? false}
                 onCheckedChange={(c) => {
                   const current = value.mealPlans ?? [];
@@ -339,6 +358,7 @@ export function HotelFiltersSidebar({
         isExpanded={!!expanded.bedrooms}
         onToggle={() => onToggleExpanded("bedrooms")}
       >
+        <div className="text-xs text-[#3A478A] mb-2">Content missing from API: bedroom count</div>
         <div className="flex flex-wrap gap-2">
           {["Studio", "1", "2", "3"].map((opt) => {
             const isSelected = value.bedrooms === opt;
@@ -347,6 +367,7 @@ export function HotelFiltersSidebar({
                 key={opt}
                 type="button"
                 onClick={() => onChange({ ...value, bedrooms: isSelected ? null : opt })}
+                disabled
                 className={[
                   "px-4 py-2 rounded-full border text-sm font-medium transition-colors",
                   isSelected
@@ -367,10 +388,12 @@ export function HotelFiltersSidebar({
         isExpanded={!!expanded.accessibility}
         onToggle={() => onToggleExpanded("accessibility")}
       >
+        <div className="text-xs text-[#3A478A] mb-2">Content missing from API: accessibility attributes</div>
         <div className="flex flex-col gap-2">
           {["Lift", "In-room accessibility", "Stair-free path to entrance"].map((acc) => (
             <label key={acc} className="flex items-center gap-3">
               <Checkbox
+                disabled
                 checked={value.accessibility?.includes(acc) ?? false}
                 onCheckedChange={(c) => {
                   const current = value.accessibility ?? [];

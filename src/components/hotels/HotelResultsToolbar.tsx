@@ -36,12 +36,12 @@ export function HotelResultsToolbar({
         <div className="w-full sm:w-[260px]">
           <Select value={sortMode} onValueChange={(v) => onSortModeChange(v as HotelSortMode)}>
             <SelectTrigger className="h-9 min-h-9 rounded-xl border border-[#DFE0E4] bg-white px-3 text-sm">
-              <SelectValue placeholder="Sort by recommendation" />
+              <SelectValue placeholder="Price (low to high)" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="recommended">Sort by recommendation</SelectItem>
+              <SelectItem value="recommended">Recommended</SelectItem>
               <SelectItem value="price_low">Price (low to high)</SelectItem>
-              <SelectItem value="review_score">Review score</SelectItem>
+              <SelectItem value="review_score">Rating</SelectItem>
             </SelectContent>
           </Select>
         </div>

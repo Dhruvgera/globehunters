@@ -13,6 +13,16 @@ const nextConfig: NextConfig = {
         hostname: 'images.kiwi.com',
         pathname: '/airlines/**',
       },
+      {
+        protocol: 'http' as const,
+        hostname: 'api.stuba.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https' as const,
+        hostname: 'api.stuba.com',
+        pathname: '/**',
+      },
     ],
   },
   // Production source maps - disable to avoid source map warnings
