@@ -5,8 +5,8 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useAffiliate } from '@/lib/AffiliateContext';
 import { useBookingStore } from '@/store/bookingStore';
 import { normalizeCabinClass } from '@/lib/utils';
-import { Plane, Loader2 } from 'lucide-react';
 import Navbar from '@/components/navigation/Navbar';
+import { FlightSearchLoading } from '@/components/flights/FlightSearchLoading';
 
 function FlightSearchContent() {
   const searchParams = useSearchParams();
@@ -243,13 +243,11 @@ function FlightSearchContent() {
               </>
             ) : (
               <>
-                <div className="relative mb-6">
-                  <div className="w-20 h-20 mx-auto bg-[rgba(55,84,237,0.1)] rounded-full flex items-center justify-center">
-                    <Plane className="w-10 h-10 text-[#3754ED] animate-pulse" />
-                  </div>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Loader2 className="w-24 h-24 text-[#3754ED]/20 animate-spin" />
-                  </div>
+                <div className="mb-6">
+                  <FlightSearchLoading
+                    showText={false}
+                    lottieClassName="w-[280px] max-w-full mx-auto"
+                  />
                 </div>
                 <h1 className="text-2xl font-bold text-[#010D50] mb-3">
                   Loading Your Flight
@@ -273,7 +271,9 @@ function FlightSearchContent() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="flex flex-col items-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+        <div className="mb-4">
+          <FlightSearchLoading showText={false} lottieClassName="w-[220px] max-w-full" />
+        </div>
         <p className="text-gray-600 text-lg font-medium text-center px-4">
           {loadingMessage}
         </p>
@@ -307,7 +307,7 @@ export default function FlightSearchPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <FlightSearchLoading showText={false} lottieClassName="w-[220px] max-w-full" />
       </div>
     }>
       <FlightSearchContent />

@@ -23,6 +23,11 @@ const nextConfig: NextConfig = {
         hostname: 'api.stuba.com',
         pathname: '/**',
       },
+      {
+        protocol: 'https' as const,
+        hostname: 'photos.hotelbeds.com',
+        pathname: '/**',
+      },
     ],
   },
   // Production source maps - disable to avoid source map warnings

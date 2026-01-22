@@ -58,12 +58,22 @@ export function HotelFiltersSidebar({
   resultCount,
   value,
   onChange,
+  onPriceModeChange,
+  onPriceRangeChange,
+  minPrice = 0,
+  maxPrice = 250,
+  currencySymbol = "$",
   expanded,
   onToggleExpanded,
 }: {
   resultCount: number;
   value: HotelFiltersState;
   onChange: (next: HotelFiltersState) => void;
+  onPriceModeChange?: (mode: HotelFiltersState["priceMode"]) => void;
+  onPriceRangeChange?: (range: [number, number]) => void;
+  minPrice?: number;
+  maxPrice?: number;
+  currencySymbol?: string;
   expanded: Record<string, boolean>;
   onToggleExpanded: (key: string) => void;
 }) {
@@ -72,8 +82,12 @@ export function HotelFiltersSidebar({
 
   const priceText = useMemo(() => {
     const [min, max] = value.priceRange;
-    return { min: `$${min}`, max: `$${max}${max >= 250 ? " +" : ""}` };
-  }, [value.priceRange]);
+    const maxSuffix = max >= maxPrice ? " +" : "";
+    return {
+      min: `${currencySymbol}${min}`,
+      max: `${currencySymbol}${max}${maxSuffix}`,
+    };
+  }, [currencySymbol, maxPrice, value.priceRange]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -105,11 +119,12 @@ export function HotelFiltersSidebar({
         isExpanded={!!expanded.popular}
         onToggle={() => onToggleExpanded("popular")}
       >
-        <div className="text-xs text-[#3A478A] mb-2">Content missing from API: popular filter flags</div>
+        <div className="text-xs text-[#3A478A] mb-2">
+          Breakfast is powered by meal plan data. Other popular filters are not yet available from the hotel list API.
+        </div>
         <div className="flex flex-col gap-2">
           <label className="flex items-center gap-3">
             <Checkbox
-              disabled
               checked={value.popular.breakfastIncluded}
               onCheckedChange={(c) =>
                 onChange({
@@ -171,7 +186,9 @@ export function HotelFiltersSidebar({
                 type="radio"
                 name="priceMode"
                 checked={value.priceMode === "total"}
-                onChange={() => onChange({ ...value, priceMode: "total" })}
+                onChange={() =>
+                  onPriceModeChange ? onPriceModeChange("total") : onChange({ ...value, priceMode: "total" })
+                }
                 className="h-4 w-4 accent-[#3754ED]"
               />
               <span className="text-sm text-[#010D50]">Total price</span>
@@ -181,7 +198,9 @@ export function HotelFiltersSidebar({
                 type="radio"
                 name="priceMode"
                 checked={value.priceMode === "nightly"}
-                onChange={() => onChange({ ...value, priceMode: "nightly" })}
+                onChange={() =>
+                  onPriceModeChange ? onPriceModeChange("nightly") : onChange({ ...value, priceMode: "nightly" })
+                }
                 className="h-4 w-4 accent-[#3754ED]"
               />
               <span className="text-sm text-[#010D50]">Nightly price</span>
@@ -190,10 +209,13 @@ export function HotelFiltersSidebar({
 
           <Slider
             value={value.priceRange}
-            min={20}
-            max={250}
+            min={minPrice}
+            max={maxPrice}
             step={1}
-            onValueChange={(v) => onChange({ ...value, priceRange: [v[0]!, v[1]!] })}
+            onValueChange={(v) => {
+              const next: [number, number] = [v[0]!, v[1]!];
+              onPriceRangeChange ? onPriceRangeChange(next) : onChange({ ...value, priceRange: next });
+            }}
             className="w-full"
           />
           <div className="flex items-center justify-between w-full">

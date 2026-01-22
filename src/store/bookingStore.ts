@@ -12,6 +12,7 @@ import { PriceCheckResult, TransformedPriceOption } from '@/types/priceCheck';
 import { normalizeCabinClass } from '@/lib/utils';
 import type { Hotel } from '@/types/hotel';
 import type { VyspaCityHotelLookupItem } from '@/types/vyspaHotels';
+import type { HotelFiltersState } from '@/components/hotels/HotelFiltersSidebar';
 
 type Dateish = Date | string | number | null | undefined;
 
@@ -97,6 +98,14 @@ interface BookingState {
   } | null;
   setHotelResultsCache: (cache: BookingState['hotelResultsCache']) => void;
   clearHotelResultsCache: () => void;
+
+  // Cache the latest hotel filters per search query (so back-navigation doesn't reset the UI)
+  hotelFiltersCache: {
+    queryKey: string;
+    filters: HotelFiltersState;
+  } | null;
+  setHotelFiltersCache: (cache: BookingState['hotelFiltersCache']) => void;
+  clearHotelFiltersCache: () => void;
 
   // Mapping from hotelId to metadata needed for booking
   hotelResultsMeta: Record<
@@ -219,6 +228,7 @@ const initialState = {
   hotelSearch: null,
   hotelLocationSelection: null,
   hotelResultsCache: null,
+  hotelFiltersCache: null,
   hotelResultsMeta: {},
   selectedHotel: null,
   selectedHotelRoomIds: [],
@@ -272,6 +282,7 @@ export const useBookingStore = create<BookingState & HydrationState>()(
           hotelSearch: null,
           hotelLocationSelection: null,
           hotelResultsCache: null,
+          hotelFiltersCache: null,
           hotelResultsMeta: {},
           selectedHotel: null,
           selectedHotelRoomIds: [],
@@ -279,6 +290,8 @@ export const useBookingStore = create<BookingState & HydrationState>()(
       setHotelLocationSelection: (item) => set({ hotelLocationSelection: item }),
       setHotelResultsCache: (cache) => set({ hotelResultsCache: cache }),
       clearHotelResultsCache: () => set({ hotelResultsCache: null }),
+      setHotelFiltersCache: (cache) => set({ hotelFiltersCache: cache }),
+      clearHotelFiltersCache: () => set({ hotelFiltersCache: null }),
       setHotelResultsMeta: (meta) => set({ hotelResultsMeta: meta }),
       clearHotelResultsMeta: () => set({ hotelResultsMeta: {} }),
       setSelectedHotel: (hotel) => set({ selectedHotel: hotel }),
@@ -447,6 +460,7 @@ export const useBookingStore = create<BookingState & HydrationState>()(
         hotelSearch: state.hotelSearch,
         hotelLocationSelection: state.hotelLocationSelection,
         hotelResultsCache: state.hotelResultsCache,
+        hotelFiltersCache: state.hotelFiltersCache,
         hotelResultsMeta: state.hotelResultsMeta,
         selectedHotel: state.selectedHotel,
         selectedHotelRoomIds: state.selectedHotelRoomIds,

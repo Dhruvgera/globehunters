@@ -2,7 +2,6 @@
 
 import { useState, Suspense, useMemo, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Plane, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
@@ -31,6 +30,7 @@ import { FlightsList } from "@/components/search/FlightsList";
 import { ContactCard } from "@/components/search/ContactCard";
 import { FlightSortTabs } from "@/components/search/FlightSortTabs";
 import { SortOption } from "@/utils/flightFilter";
+import { FlightSearchLoading } from "@/components/flights/FlightSearchLoading";
 
 // Default search params
 const DEFAULT_SEARCH_PARAMS: SearchParams = {
@@ -914,13 +914,11 @@ function SearchPageContent() {
         <Navbar />
         <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
           <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
-            <div className="relative mb-6">
-              <div className="w-20 h-20 mx-auto bg-[rgba(55,84,237,0.1)] rounded-full flex items-center justify-center">
-                <Plane className="w-10 h-10 text-[#3754ED] animate-pulse" />
-              </div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Loader2 className="w-24 h-24 text-[#3754ED]/20 animate-spin" />
-              </div>
+            <div className="mb-6">
+              <FlightSearchLoading
+                showText={false}
+                lottieClassName="w-[280px] max-w-full mx-auto"
+              />
             </div>
             <h1 className="text-2xl font-bold text-[#010D50] mb-3">
               Loading Your Flight
@@ -970,7 +968,7 @@ function SearchPageContent() {
       {(!isInitialized || loading || isDateChanging || (isInitialized && !loading && flights.length === 0 && !hasAttemptedFetch)) && (
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
           <div className="flex flex-col items-center justify-center gap-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <FlightSearchLoading showText={false} lottieClassName="w-[220px] max-w-full" />
             <p className="text-gray-600">{t('states.loading.title')}</p>
           </div>
         </div>
