@@ -65,6 +65,8 @@ export function HotelFiltersSidebar({
   currencySymbol = "$",
   expanded,
   onToggleExpanded,
+  availableMealPlans = [],
+  minPriceByStarRating = {},
 }: {
   resultCount: number;
   value: HotelFiltersState;
@@ -76,6 +78,10 @@ export function HotelFiltersSidebar({
   currencySymbol?: string;
   expanded: Record<string, boolean>;
   onToggleExpanded: (key: string) => void;
+  /** Available meal plans from current hotel data */
+  availableMealPlans?: string[];
+  /** Minimum price per star rating from current hotel data */
+  minPriceByStarRating?: Record<number, number>;
 }) {
   const unsupportedNote =
     "Note: Only Property name, Price, and Star rating are currently powered by the hotel API. Other filters are shown for UI parity but may not affect results yet.";
@@ -266,6 +272,7 @@ export function HotelFiltersSidebar({
         <div className="flex flex-col gap-2">
           {[5, 4, 3, 2, 1].map((s) => {
             const checked = value.starRatings.includes(s);
+            const minPriceForRating = minPriceByStarRating[s];
             return (
               <label key={s} className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
@@ -285,9 +292,11 @@ export function HotelFiltersSidebar({
                     {s} star{s === 1 ? "" : "s"}
                   </span>
                 </div>
-                <span className="text-sm font-medium text-[#010D50]">
-                  ${[613, 394, 210, 144, 168][5 - s]}
-                </span>
+                {minPriceForRating !== undefined && (
+                  <span className="text-sm font-medium text-[#010D50]">
+                    from {currencySymbol}{Math.round(minPriceForRating).toLocaleString()}
+                  </span>
+                )}
               </label>
             );
           })}
@@ -353,25 +362,27 @@ export function HotelFiltersSidebar({
         isExpanded={!!expanded.mealPlans}
         onToggle={() => onToggleExpanded("mealPlans")}
       >
-        <div className="text-xs text-[#3A478A] mb-2">Content missing from API: normalized meal plan labels</div>
-        <div className="flex flex-col gap-2">
-          {["Breakfast included", "All-inclusive", "Full board", "Half board"].map((plan) => (
-            <label key={plan} className="flex items-center gap-3">
-              <Checkbox
-                disabled
-                checked={value.mealPlans?.includes(plan) ?? false}
-                onCheckedChange={(c) => {
-                  const current = value.mealPlans ?? [];
-                  const next = Boolean(c)
-                    ? Array.from(new Set([...current, plan]))
-                    : current.filter((x) => x !== plan);
-                  onChange({ ...value, mealPlans: next });
-                }}
-              />
-              <span className="text-sm text-[#010D50]">{plan}</span>
-            </label>
-          ))}
-        </div>
+        {availableMealPlans.length === 0 ? (
+          <div className="text-xs text-[#3A478A]">No meal plans available in current results</div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {availableMealPlans.map((plan) => (
+              <label key={plan} className="flex items-center gap-3">
+                <Checkbox
+                  checked={value.mealPlans?.includes(plan) ?? false}
+                  onCheckedChange={(c) => {
+                    const current = value.mealPlans ?? [];
+                    const next = Boolean(c)
+                      ? Array.from(new Set([...current, plan]))
+                      : current.filter((x) => x !== plan);
+                    onChange({ ...value, mealPlans: next });
+                  }}
+                />
+                <span className="text-sm text-[#010D50]">{plan}</span>
+              </label>
+            ))}
+          </div>
+        )}
       </FilterSection>
 
       {/* Number of bedrooms */}

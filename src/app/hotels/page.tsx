@@ -248,9 +248,15 @@ export default function HotelsPage() {
       setBreakfastEnriching(false);
 
       // Hydrate from cache immediately to preserve results on back-navigation.
-      // Important: if cache matches, we stop here to avoid background refresh "popping" results.
+      // Only use cache if:
+      // 1. queryKey matches
+      // 2. Cache is recent (< 2 minutes old) - for back-navigation, not stale refreshes
       const cache = hotelResultsCacheRef.current;
-      if (cache?.queryKey === queryKey && cache.hotels.length > 0) {
+      const cacheAge = cache?.fetchedAt ? Date.now() - cache.fetchedAt : Infinity;
+      const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+      const isCacheFresh = cacheAge < CACHE_TTL;
+      
+      if (cache?.queryKey === queryKey && cache.hotels.length > 0 && isCacheFresh) {
         if (!cancelled && requestSeq === activeRequestSeq.current) {
           setHotels(cache.hotels);
           setSelectedHotelId(cache.selectedHotelId || cache.hotels[0]?.id || "");
@@ -321,6 +327,11 @@ export default function HotelsPage() {
             amenities.push("Breakfast included");
           }
 
+          const totalReviews = Number(r?.total_reviews ?? 0) || 0;
+          const cityName = r?.cityName || r?.city_name || "";
+          const countryName = r?.countryName || r?.country_name || "";
+          const quickDesc = r?.quickDescription || "";
+
           return {
             id: hotelId,
             name: r?.hotel_name || r?.hotelName || "Content missing from API: hotel name",
@@ -328,7 +339,7 @@ export default function HotelsPage() {
               r?.address1 || r?.address2
                 ? [r?.address1, r?.address2].filter(Boolean).join(", ")
                 : "Content missing from API: address",
-            neighborhood: undefined,
+            neighborhood: cityName && countryName ? `${cityName}, ${countryName}` : cityName || countryName || undefined,
             starRating: clampStar(r?.hotel_rating ?? r?.hotelRating),
             amenities,
             room: {
@@ -343,8 +354,8 @@ export default function HotelsPage() {
             },
             reviews: {
               score: reviewsRating,
-              label: reviewsRating > 0 ? "Rating" : "Content missing from API: rating",
-              count: 0,
+              label: reviewsRating > 0 ? "Rating" : "No rating",
+              count: totalReviews,
             },
             price: {
               currency: currencySymbol(sellCur),
@@ -354,6 +365,10 @@ export default function HotelsPage() {
               rooms: resolvedSearch.rooms,
             },
             imageSrc: r?.image_name || "/figma/hotels/hotel-card-image.png",
+            description: quickDesc,
+            cityName,
+            countryName,
+            mealPlans,
           };
         });
 
@@ -381,7 +396,7 @@ export default function HotelsPage() {
           return next;
         });
         setSelectedHotelId(mapped[0]?.id || "");
-        setHotelResultsCache({ queryKey, hotels: mapped, selectedHotelId: mapped[0]?.id || "" });
+        setHotelResultsCache({ queryKey, hotels: mapped, selectedHotelId: mapped[0]?.id || "", fetchedAt: Date.now() });
 
         // If user hasn't interacted yet, set price slider bounds from real data (total).
         setFilters((prev) => {
@@ -619,9 +634,17 @@ export default function HotelsPage() {
         if (!h.neighborhood || !filters.neighborhoods.includes(h.neighborhood)) return false;
       }
 
-      // Amenities/mealPlans/neighborhood currently not backed by availability response in a consistent way.
+      // Amenities not consistently available in list response; UI-only for now
       if (filters.amenities.length > 0) return true;
-      if (filters.mealPlans.length > 0) return true;
+
+      // Meal plans filter - match if hotel has any of the selected meal plans
+      if (filters.mealPlans.length > 0) {
+        const hotelMeals = h.mealPlans || [];
+        const hasMatchingMeal = filters.mealPlans.some((filterMeal) =>
+          hotelMeals.some((hotelMeal) => hotelMeal.toLowerCase().includes(filterMeal.toLowerCase()))
+        );
+        if (!hasMatchingMeal) return false;
+      }
 
       if (filters.popular.breakfastIncluded) {
         const status = breakfastByHotelId[h.id] || "unknown";
@@ -654,6 +677,30 @@ export default function HotelsPage() {
 
   const hasMoreHotels = displayedHotelsCount < filteredHotels.length;
 
+  // Calculate available meal plans from all hotels
+  const availableMealPlans = useMemo(() => {
+    const planSet = new Set<string>();
+    for (const h of hotels) {
+      for (const p of h.mealPlans || []) {
+        if (p) planSet.add(p);
+      }
+    }
+    return Array.from(planSet).sort();
+  }, [hotels]);
+
+  // Calculate min price per star rating
+  const minPriceByStarRating = useMemo(() => {
+    const minByRating: Record<number, number> = {};
+    for (const h of hotels) {
+      const rating = h.starRating;
+      const price = filters.priceMode === "nightly" ? h.price.nightly : h.price.total;
+      if (minByRating[rating] === undefined || price < minByRating[rating]) {
+        minByRating[rating] = price;
+      }
+    }
+    return minByRating;
+  }, [hotels, filters.priceMode]);
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
@@ -682,6 +729,8 @@ export default function HotelsPage() {
               currencySymbol={currency}
               expanded={expanded}
               onToggleExpanded={(key) => setExpanded((prev) => ({ ...prev, [key]: !prev[key] }))}
+              availableMealPlans={availableMealPlans}
+              minPriceByStarRating={minPriceByStarRating}
             />
           </aside>
 

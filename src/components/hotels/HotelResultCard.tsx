@@ -93,15 +93,23 @@ export function HotelResultCard({
 
           {/* Content padded; CTA pinned to bottom so all cards align */}
           <div className="flex flex-col gap-4 p-5 flex-1">
-            {/* Hotel name + distance on left, review score on right */}
+            {/* Hotel name + location */}
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <h3 className="text-lg font-semibold text-[#010D50] leading-tight">
                   {hotel.name}
                 </h3>
                 <p className="text-sm text-[#3A478A] mt-0.5">{hotel.distanceLabel}</p>
+                {hotel.neighborhood && (
+                  <p className="text-xs text-[#3A478A] mt-0.5">{hotel.neighborhood}</p>
+                )}
               </div>
             </div>
+
+            {/* Quick description */}
+            {hotel.description && (
+              <p className="text-xs text-[#3A478A] line-clamp-2">{hotel.description}</p>
+            )}
 
             {/* Review score row - score badge on left, label/count stacked on right */}
             <div className="flex items-center gap-2">
@@ -188,7 +196,15 @@ export function HotelResultCard({
                   {hotel.name}
                 </div>
                 <div className="text-xs text-[#3A478A] truncate">{hotel.distanceLabel}</div>
+                {hotel.neighborhood && (
+                  <div className="text-xs text-[#3A478A]">{hotel.neighborhood}</div>
+                )}
               </div>
+
+              {/* Quick description */}
+              {hotel.description && (
+                <p className="text-xs text-[#3A478A] line-clamp-2">{hotel.description}</p>
+              )}
 
               <div className="flex flex-wrap items-center gap-2">
                 {hotel.amenities.slice(0, 2).map((a) => (

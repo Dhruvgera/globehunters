@@ -95,6 +95,8 @@ interface BookingState {
     queryKey: string;
     hotels: Hotel[];
     selectedHotelId?: string;
+    /** Timestamp when results were fetched - used to invalidate stale cache */
+    fetchedAt?: number;
   } | null;
   setHotelResultsCache: (cache: BookingState['hotelResultsCache']) => void;
   clearHotelResultsCache: () => void;

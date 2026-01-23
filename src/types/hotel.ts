@@ -35,6 +35,14 @@ export interface Hotel {
   reviews: HotelReviewSummary;
   price: HotelPriceSummary;
   imageSrc: string;
+  /** Short hotel description from initial search */
+  description?: string;
+  /** City name, e.g. "Dubai" */
+  cityName?: string;
+  /** Country name, e.g. "United Arab Emirates" */
+  countryName?: string;
+  /** Meal plan codes, e.g. ["Room Only", "Bed and Breakfast"] */
+  mealPlans?: string[];
 }
 
 

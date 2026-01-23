@@ -73,6 +73,35 @@ function getAmenityIcon(iconName: string) {
   return Icon ? <Icon className="w-[18px] h-[18px] text-[#010D50]" /> : null;
 }
 
+// Map raw amenity text from API to { label, icon } format
+function mapAmenityTextToIcon(text: string): string {
+  const lowered = text.toLowerCase();
+  if (lowered.includes("wi-fi") || lowered.includes("wifi") || lowered.includes("internet")) return "wifi";
+  if (lowered.includes("pool") || lowered.includes("swim")) return "pool";
+  if (lowered.includes("gym") || lowered.includes("fitness")) return "gym";
+  if (lowered.includes("spa") || lowered.includes("massage") || lowered.includes("sauna")) return "spa";
+  if (lowered.includes("restaurant") || lowered.includes("dining") || lowered.includes("breakfast")) return "restaurant";
+  if (lowered.includes("parking") || lowered.includes("car park")) return "parking";
+  if (lowered.includes("shuttle") || lowered.includes("transfer") || lowered.includes("airport")) return "shuttle";
+  if (lowered.includes("pet") || lowered.includes("animal")) return "pets";
+  if (lowered.includes("air condition") || lowered.includes("a/c") || lowered.includes("cooling")) return "ac";
+  if (lowered.includes("hot tub") || lowered.includes("jacuzzi") || lowered.includes("whirlpool")) return "hot_tub";
+  if (lowered.includes("bath") || lowered.includes("shower")) return "bathtub";
+  if (lowered.includes("kitchen") || lowered.includes("cooking")) return "kitchen";
+  if (lowered.includes("bed") || lowered.includes("room")) return "bed";
+  if (lowered.includes("city") || lowered.includes("urban")) return "city";
+  if (lowered.includes("garden") || lowered.includes("nature") || lowered.includes("outdoor")) return "nature";
+  if (lowered.includes("group") || lowered.includes("conference") || lowered.includes("meeting")) return "group";
+  return ""; // No icon match
+}
+
+function transformAmenities(rawAmenities: string[]): { label: string; icon: string }[] {
+  return rawAmenities.map((text) => ({
+    label: text,
+    icon: mapAmenityTextToIcon(text),
+  }));
+}
+
 // Navigation sections
 const navSections = ["Overview", "About", "Rooms", "Accessibilities", "Policies"];
 
@@ -102,12 +131,165 @@ export default function HotelRoomsPage() {
   } | null>(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
+  const [roomImages, setRoomImages] = useState<Record<string, string[]>>({});
   const [detailsText, setDetailsText] = useState<string>("");
   const [cancellationText, setCancellationText] = useState<string>("");
+  const [remoteAmenities, setRemoteAmenities] = useState<string[]>([]);
   const [remoteRooms, setRemoteRooms] = useState<any[]>([]);
+  const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [roomsLoading, setRoomsLoading] = useState(false);
   const [roomsError, setRoomsError] = useState<string | null>(null);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+
+  function parseRemoteDataXml(remoteData: string, fallbackImageUrl?: string) {
+    try {
+      if (typeof window === "undefined") return null;
+      const xml = String(remoteData || "").trim();
+      if (!xml) return null;
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(xml, "text/xml");
+
+      // Hotelbeds images are hosted at photos.hotelbeds.com
+      const HOTELBEDS_CDN = "https://photos.hotelbeds.com/giata/";
+
+      const normalizeUrl = (u: string) => {
+        const s = String(u || "").trim();
+        if (!s) return "";
+        if (s.startsWith("http://") || s.startsWith("https://")) return s;
+        // For Hotelbeds-style paths like "15/156652/156652a_hb_l_015.jpeg"
+        if (/^\d+\/\d+\//.test(s)) return `${HOTELBEDS_CDN}${s}`;
+        if (s.startsWith("/")) return `https://photos.hotelbeds.com${s}`;
+        return s;
+      };
+
+      // Try both formats: <Photo><Url> and <images><image path="...">
+      let photos: string[] = [];
+      // Room-specific images: { roomCode: string, images: string[] }
+      const roomImages: Record<string, string[]> = {};
+      
+      // Format 1: <Photo><Url>...</Url></Photo> (older XML)
+      const photoUrlNodes = Array.from(doc.querySelectorAll("Photo > Url"));
+      if (photoUrlNodes.length > 0) {
+        photos = photoUrlNodes
+          .map((n) => normalizeUrl(n.textContent || ""))
+          .filter(Boolean);
+      }
+      
+      // Format 2: <images><image path="..."> (Hotelbeds XML)
+      if (photos.length === 0) {
+        const imageNodes = Array.from(doc.querySelectorAll("images > image"));
+        imageNodes.forEach((img) => {
+          const path = normalizeUrl(img.getAttribute("path") || "");
+          if (!path) return;
+          
+          const roomCode = img.getAttribute("roomCode");
+          if (roomCode) {
+            // This is a room-specific image
+            if (!roomImages[roomCode]) roomImages[roomCode] = [];
+            roomImages[roomCode].push(path);
+          } else {
+            // General hotel image
+            photos.push(path);
+          }
+        });
+      }
+
+      // Try both formats for amenities: <Amenity><Text> and <facilities><facility><description>
+      let amenities: string[] = [];
+      
+      // Format 1: <Amenity><Text>...</Text></Amenity>
+      const amenityTextNodes = Array.from(doc.querySelectorAll("Amenity > Text"));
+      if (amenityTextNodes.length > 0) {
+        amenities = amenityTextNodes
+          .map((n) => String(n.textContent || "").trim())
+          .filter(Boolean);
+      }
+      
+      // Format 2: <facilities><facility><description>...</description></facility></facilities>
+      if (amenities.length === 0) {
+        const facilityNodes = Array.from(doc.querySelectorAll("facilities > facility > description"));
+        amenities = facilityNodes
+          .map((n) => String(n.textContent || "").trim())
+          .filter(Boolean);
+      }
+
+      // Try both formats for description
+      let descriptions: string[] = [];
+      
+      // Format 1: <Description><Text>...</Text></Description>
+      const descTextNodes = Array.from(doc.querySelectorAll("Description > Text"));
+      if (descTextNodes.length > 0) {
+        descriptions = descTextNodes
+          .map((n) =>
+            String(n.textContent || "")
+              .replace(/<br\s*\/?\s*>/gi, "\n")
+              .replace(/<[^>]+>/g, "")
+              .trim()
+          )
+          .filter(Boolean);
+      }
+      
+      // Format 2: <hotel><description>...</description></hotel> (Hotelbeds)
+      if (descriptions.length === 0) {
+        const hotelDesc = doc.querySelector("hotel > description");
+        if (hotelDesc?.textContent) {
+          descriptions = [
+            String(hotelDesc.textContent)
+              .replace(/<br\s*\/?\s*>/gi, "\n")
+              .replace(/<[^>]+>/g, "")
+              .trim()
+          ].filter(Boolean);
+        }
+      }
+
+      const getText = (sel: string) => (doc.querySelector(sel)?.textContent || "").trim();
+      
+      // Try both address formats
+      let address = "";
+      
+      // Format 1: <Address><Address1>...
+      const addr1 = getText("Address > Address1");
+      const addr2 = getText("Address > Address2");
+      const city1 = getText("Address > City");
+      const zip1 = getText("Address > Zip");
+      const country1 = getText("Address > Country");
+      address = [addr1, addr2, city1, zip1, country1].filter(Boolean).join(", ");
+      
+      // Format 2: <address street="...">...</address> + <city> + <postalCode>
+      if (!address) {
+        const addressNode = doc.querySelector("address");
+        const streetAttr = addressNode?.getAttribute("street") || "";
+        const addressText = addressNode?.textContent?.trim() || "";
+        const city2 = getText("city");
+        const zip2 = getText("postalCode");
+        const countryDesc = getText("country > description");
+        address = [streetAttr || addressText, city2, zip2, countryDesc].filter(Boolean).join(", ");
+      }
+
+      // Extract coordinates from XML: <coordinates latitude="..." longitude="..."/>
+      let coords: { lat: number; lng: number } | null = null;
+      const coordsNode = doc.querySelector("coordinates");
+      if (coordsNode) {
+        const lat = parseFloat(coordsNode.getAttribute("latitude") || "");
+        const lng = parseFloat(coordsNode.getAttribute("longitude") || "");
+        if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
+          coords = { lat, lng };
+        }
+      }
+
+      return {
+        photos: Array.from(new Set(photos)),
+        roomImages, // Room-specific images keyed by roomCode
+        amenities: Array.from(new Set(amenities)),
+        descriptions,
+        address: address || undefined,
+        coordinates: coords,
+      };
+    } catch {
+      return null;
+    }
+  }
 
   // Refs for sections
   const overviewRef = useRef<HTMLDivElement>(null);
@@ -129,6 +311,7 @@ export default function HotelRoomsPage() {
       });
     }
     if (Array.isArray(cached.galleryImages)) setGalleryImages(cached.galleryImages);
+    if (Array.isArray((cached as any).amenities)) setRemoteAmenities((cached as any).amenities);
     if (Array.isArray(cached.rooms)) setRemoteRooms(cached.rooms);
     if (typeof cached.detailsText === "string") setDetailsText(cached.detailsText);
     if (typeof cached.cancellationText === "string") setCancellationText(cached.cancellationText);
@@ -149,11 +332,15 @@ export default function HotelRoomsPage() {
       about: {
         description: detailsText || "",
       },
-      amenities: [] as any[],
+      amenities: transformAmenities(remoteAmenities || []),
       reviews: { score: 0, label: "", count: 0, breakdown: {} as Record<string, number> },
       policies: cancellationText || "",
+      mapUrl: coordinates
+        ? `https://www.google.com/maps/search/?api=1&query=${coordinates.lat},${coordinates.lng}`
+        : base.mapUrl || "#",
+      coordinates,
     };
-  }, [cancellationText, detailsText, galleryImages, remoteHotelHeader]);
+  }, [cancellationText, coordinates, detailsText, galleryImages, remoteAmenities, remoteHotelHeader]);
   const rooms = useMemo(() => {
     return remoteRooms;
   }, [remoteRooms]);
@@ -190,6 +377,13 @@ export default function HotelRoomsPage() {
           image: headerImage,
           address: headerAddress,
         });
+
+        // Extract coordinates from API response (geo_loc_latitude/longitude or latitude/longitude)
+        const lat = respAny?.geo_loc_latitude || respAny?.latitude;
+        const lng = respAny?.geo_loc_longitude || respAny?.longitude;
+        if (lat && lng && lat !== 0 && lng !== 0) {
+          setCoordinates({ lat: Number(lat), lng: Number(lng) });
+        }
 
         // Use available image(s) for gallery/thumbnails. Typically only one image URL is provided.
         const imgs = headerImage ? [headerImage] : [];
@@ -282,21 +476,46 @@ export default function HotelRoomsPage() {
                       .trim()
                   );
 
+                  const remoteData = d?.liveDetails?.SupplierMapVendor?.remoteData;
+                  const parsed = remoteData ? parseRemoteDataXml(String(remoteData), headerImage) : null;
+                  const nextGallery = parsed?.photos?.length ? parsed.photos : imgs;
+                  if (parsed?.amenities?.length) setRemoteAmenities(parsed.amenities);
+                  if (parsed?.roomImages && Object.keys(parsed.roomImages).length > 0) {
+                    setRoomImages(parsed.roomImages);
+                  }
+                  if (parsed?.descriptions?.length && !desc) {
+                    setDetailsText(parsed.descriptions.slice(0, 3).join("\n\n"));
+                  }
+                  if (parsed?.address && !headerAddress) {
+                    setRemoteHotelHeader((prev) =>
+                      prev
+                        ? { ...prev, address: parsed.address }
+                        : { name: headerName, rating: headerRating, image: headerImage, address: parsed.address }
+                    );
+                  }
+                  if (nextGallery.length > 0) setGalleryImages(nextGallery);
+                  // Update coordinates from XML if not already set
+                  if (parsed?.coordinates && !coordinates) {
+                    setCoordinates(parsed.coordinates);
+                  }
+
                   // Persist details in store cache
                   setHotelDetailsCache(hotelId, {
                     hotelId,
                     hotelName: headerName,
                     hotelRating: headerRating,
                     mainImage: headerImage,
-                    address: headerAddress,
-                    galleryImages: imgs,
+                    address: (parsed?.address || headerAddress),
+                    galleryImages: nextGallery,
                     rooms: flattened,
-                    detailsText: desc,
+                    detailsText: desc || (parsed?.descriptions?.slice(0, 3).join("\n\n") || ""),
                     cancellationText:
                       policy
                         .replace(/<br\s*\/?\s*>/gi, "\n")
                         .replace(/<[^>]+>/g, "")
                         .trim(),
+                    // Also persist parsed amenity texts for UI display
+                    amenities: parsed?.amenities || [],
                     fetchedAt: Date.now(),
                   });
                 })
@@ -580,13 +799,23 @@ export default function HotelRoomsPage() {
                 {/* Map Card */}
                 <div className="border border-[#DFE0E4] rounded-2xl overflow-hidden">
                   <div className="relative aspect-[4/3] bg-gray-200">
-                    <Image
-                      src="/figma/hotels/hotel-card-image.png"
-                      alt="Map"
-                      fill
-                      className="object-cover opacity-60"
-                    />
-                    <div className="absolute inset-0 flex items-end p-6">
+                    {hotel.coordinates ? (
+                      <iframe
+                        src={`https://www.openstreetmap.org/export/embed.html?bbox=${hotel.coordinates.lng - 0.01}%2C${hotel.coordinates.lat - 0.008}%2C${hotel.coordinates.lng + 0.01}%2C${hotel.coordinates.lat + 0.008}&layer=mapnik&marker=${hotel.coordinates.lat}%2C${hotel.coordinates.lng}`}
+                        className="absolute inset-0 w-full h-full border-0"
+                        style={{ border: 0 }}
+                        loading="lazy"
+                        title={`Map showing ${hotel.name}`}
+                      />
+                    ) : (
+                      <Image
+                        src="/figma/hotels/hotel-card-image.png"
+                        alt="Map"
+                        fill
+                        className="object-cover opacity-60"
+                      />
+                    )}
+                    <div className="absolute inset-x-0 bottom-0 flex items-end p-6 bg-gradient-to-t from-black/50 to-transparent">
                       <Link
                         href={hotel.mapUrl}
                         target="_blank"
@@ -664,17 +893,39 @@ export default function HotelRoomsPage() {
                 {roomsLoading && (
                   <div className="lg:col-span-3 text-sm text-[#3A478A]">Loading room options…</div>
                 )}
-                {rooms.map((room) => (
+                {rooms.map((room) => {
+                  // Get room-specific image if available
+                  const roomCode = room._raw?.room_code || "";
+                  // Try exact match first, then match on room type prefix (e.g., "DBT" from "DBT.ST")
+                  const roomTypePrefix = roomCode.split(".")[0];
+                  const roomImgList = roomImages[roomCode] || 
+                    (roomTypePrefix ? Object.entries(roomImages).find(([k]) => k.startsWith(roomTypePrefix + "."))?.[1] : undefined) ||
+                    [];
+                  // Only show image if room-specific image is available
+                  const roomImage = roomImgList[0] || "";
+                  
+                  return (
                   <div
                     key={room.id}
                     className={[
-                      "border rounded-[32px] bg-white p-6 flex flex-col h-full cursor-pointer",
+                      "border rounded-[32px] bg-white overflow-hidden flex flex-col h-full cursor-pointer",
                       selectedRoomId === room.id ? "border-[#3754ED]" : "border-[#DFE0E4]",
                     ].join(" ")}
                     onClick={() => setSelectedRoomId(room.id)}
                   >
+                    {/* Room Image */}
+                    {roomImage && (
+                      <div className="relative w-full h-40 bg-gray-100">
+                        <img
+                          src={roomImage}
+                          alt={room.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                    
                     {/* Room Info */}
-                    <div className="flex-1 space-y-4">
+                    <div className="flex-1 space-y-4 p-6">
                       {/* Room Name & Bed Type */}
                       <div className="space-y-2">
                         <h3 className="text-lg font-semibold text-[#010D50]">
@@ -732,48 +983,49 @@ export default function HotelRoomsPage() {
                       <button className="text-sm text-[#3754ED] font-medium">
                         More
                       </button>
-                    </div>
 
-                    {/* Pricing & CTA */}
-                    <div className="mt-6 space-y-4">
-                      <div className="flex flex-col items-end gap-1">
-                        <span className="text-base text-[#010D50]">
-                          {room.price.currency}{room.price.nightly.toLocaleString()} nightly
-                        </span>
-                        <span className="text-xl font-semibold text-[#010D50]">
-                          {room.price.currency}{room.price.total.toLocaleString()} total
-                        </span>
-                        <span className="text-xs text-[#3A478A]">
-                          * Locally payable taxes
-                        </span>
+                      {/* Pricing & CTA */}
+                      <div className="mt-6 space-y-4">
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-base text-[#010D50]">
+                            {room.price.currency}{room.price.nightly.toLocaleString()} nightly
+                          </span>
+                          <span className="text-xl font-semibold text-[#010D50]">
+                            {room.price.currency}{room.price.total.toLocaleString()} total
+                          </span>
+                          <span className="text-xs text-[#3A478A]">
+                            * Locally payable taxes
+                          </span>
+                        </div>
+
+                        <Button
+                          className="w-full rounded-full py-3 h-auto gap-2 bg-[#3754ED] hover:bg-[#2A3FB8] text-white font-bold"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const rid = selectedRoomId || room.id;
+                            setSelectedHotelRoomIds([String(rid)]);
+                            // Persist summary for checkout display
+                            setSelectedHotelRoomSummary({
+                              hotelId,
+                              roomId: String(rid),
+                              roomName: room?.name,
+                              mealName: room?.bedType,
+                              isRefundable: room?.isRefundable,
+                              currency: room?.price?.currency,
+                              total: room?.price?.total,
+                              nightly: room?.price?.nightly,
+                            });
+                            router.push("/hotels/checkout");
+                          }}
+                        >
+                          Reserve
+                          <ChevronRight className="w-5 h-5" />
+                        </Button>
                       </div>
-
-                      <Button
-                        className="w-full rounded-full py-3 h-auto gap-2 bg-[#3754ED] hover:bg-[#2A3FB8] text-white font-bold"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const rid = selectedRoomId || room.id;
-                          setSelectedHotelRoomIds([String(rid)]);
-                          // Persist summary for checkout display
-                          setSelectedHotelRoomSummary({
-                            hotelId,
-                            roomId: String(rid),
-                            roomName: room?.name,
-                            mealName: room?.bedType,
-                            isRefundable: room?.isRefundable,
-                            currency: room?.price?.currency,
-                            total: room?.price?.total,
-                            nightly: room?.price?.nightly,
-                          });
-                          router.push("/hotels/checkout");
-                        }}
-                      >
-                        Reserve
-                        <ChevronRight className="w-5 h-5" />
-                      </Button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
