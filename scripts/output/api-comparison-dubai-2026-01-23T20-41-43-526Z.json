@@ -1,0 +1,1031 @@
+{
+  "searchParams": {
+    "city": "dubai",
+    "checkIn": "2026-02-22",
+    "checkOut": "2026-02-24"
+  },
+  "timestamp": "2026-01-23T20:41:43.525Z",
+  "vyspa": {
+    "provider": "Vyspa (Concorde)",
+    "city": "Dubai",
+    "country": "United Arab Emirates",
+    "checkIn": "2026-02-22",
+    "checkOut": "2026-02-24",
+    "nights": 2,
+    "totalHotels": 3,
+    "responseTime": 18233,
+    "searchCriteriaId": 52014786,
+    "sampleHotels": [
+      {
+        "id": 5118,
+        "name": "Sun And Sands Downtown",
+        "rating": 3,
+        "address": "Al Jaazira Street, off Al Rigga Road ",
+        "city": "Dubai",
+        "country": "United Arab Emirates",
+        "minPrice": 66.52,
+        "maxPrice": 670,
+        "currency": "GBP",
+        "image": "https://photos.hotelbeds.com/giata/15/156652/156652a_hb_l_015.jpeg",
+        "description": "Located in Deira's heart on Al Rigga Street, this family-friendly hotel is a 15-minute drive from the airport and within walking distance of Al Ghureir Mall and the Gold Souk. Attractions like Burj Kh",
+        "mealPlans": [
+          "RO"
+        ],
+        "suppliers": [
+          "100~Hotelbeds"
+        ],
+        "coordinates": {
+          "lat": 25.2644852,
+          "lng": 55.3190208
+        },
+        "refundableOptions": false,
+        "nonRefundableOptions": true,
+        "reviewsRating": 0,
+        "totalReviews": null
+      },
+      {
+        "id": 5092,
+        "name": "Admiral Plaza",
+        "rating": 3,
+        "address": "P.O.Box 26888, Khalid Bin Walid Road ",
+        "city": "DUBAI",
+        "country": "United Arab Emirates",
+        "minPrice": 85.92,
+        "maxPrice": 391,
+        "currency": "GBP",
+        "image": "https://photos.hotelbeds.com/giata/05/059241/059241a_hb_r_001.jpg",
+        "description": "Enjoy numerous amenities at this hotel, including an indoor pool, sauna, and fitness center. Additional conveniences include complimentary Wi-Fi, concierge services, and babysitting (surcharge). The h",
+        "mealPlans": [
+          "RO"
+        ],
+        "suppliers": [
+          "100~Hotelbeds"
+        ],
+        "coordinates": {
+          "lat": 25.260079,
+          "lng": 55.291219
+        },
+        "refundableOptions": true,
+        "nonRefundableOptions": true,
+        "reviewsRating": 0,
+        "totalReviews": null
+      },
+      {
+        "id": 5007,
+        "name": "Rose Rayhaan by Rotana",
+        "rating": 4,
+        "address": "Sheikh Zayed Road, Dubai, United Arab Emirates",
+        "city": "DUBAI",
+        "country": "United Arab Emirates",
+        "minPrice": 291.89,
+        "maxPrice": 470,
+        "currency": "GBP",
+        "image": "https://photos.hotelbeds.com/giata/12/127557/127557a_hb_r_001.jpg",
+        "description": "Welcome to Rose Rayhaan by Rotana - the world's third tallest hotelSetting a benchmark for comfort and style in Dubai, soaring 333 metres, 72 storeys and the World's third tallest hotel, Rose Rayhaan ",
+        "mealPlans": [
+          "RO"
+        ],
+        "suppliers": [
+          "100~Hotelbeds"
+        ],
+        "coordinates": {
+          "lat": 25.211783,
+          "lng": 55.276646
+        },
+        "refundableOptions": true,
+        "nonRefundableOptions": false,
+        "reviewsRating": 0,
+        "totalReviews": null
+      }
+    ],
+    "roomDetails": {
+      "hotelName": "Sun And Sands Downtown",
+      "roomCount": 7,
+      "sampleRooms": [
+        {
+          "name": "Double or Twin STANDARD",
+          "mealPlan": "ROOM ONLY",
+          "price": 66.52,
+          "currency": "GBP",
+          "refundable": false,
+          "allocationStatus": "Limited Rooms"
+        },
+        {
+          "name": "Double or Twin STANDARD",
+          "mealPlan": "BED AND BREAKFAST",
+          "price": 92.12,
+          "currency": "GBP",
+          "refundable": false,
+          "allocationStatus": "Limited Rooms"
+        },
+        {
+          "name": "TRIPLE STANDARD",
+          "mealPlan": "ROOM ONLY",
+          "price": 175.46,
+          "currency": "GBP",
+          "refundable": false,
+          "allocationStatus": "Limited Rooms"
+        }
+      ]
+    },
+    "rawSampleHotel": {
+      "id": 2062698400,
+      "hotel_id": 5118,
+      "hotel_name": "Sun And Sands Downtown",
+      "quickDescription": "Located in Deira's heart on Al Rigga Street, this family-friendly hotel is a 15-minute drive from the airport and within walking distance of Al Ghureir Mall and the Gold Souk. Attractions like Burj Kh...",
+      "hotel_rating": 3,
+      "searchCriteriaId": 52014786,
+      "result_type": 1,
+      "hotel_classification": null,
+      "geo_loc_latitude": 25.2644852,
+      "geo_loc_longitude": 55.3190208,
+      "address1": "Al Jaazira Street, off Al Rigga Road ",
+      "address2": "..",
+      "post_code": 187168,
+      "cityId": 0,
+      "hide_address": 0,
+      "prefered_vendor": 0,
+      "tripadvisor_id": 0,
+      "platinum_hotel": 0,
+      "transfer_point_id": 0,
+      "SellCur": "GBP",
+      "moduleId": 192,
+      "VmapId": 6535257,
+      "image_name": "https://photos.hotelbeds.com/giata/15/156652/156652a_hb_l_015.jpeg",
+      "CDN_image_name": "%2Fz4NP1p%2B9bahGdamserYCvUoDcecfqO7BIO4ZUBWFc6FO%2F9o8og39AGRP6psU5VIiZfMk%2BkERsSP%0As%2F%2Bs%2FFbKRef70QQpgWOMeg%3D%3D",
+      "MealPlans": [
+        "RO"
+      ],
+      "Prices": [
+        66.52,
+        92.12,
+        175.46,
+        194.95,
+        614.04,
+        639.63,
+        670.35
+      ],
+      "RefPrices": [],
+      "NonRefPrices": [
+        66.52,
+        92.12,
+        175.46,
+        194.95,
+        614.04,
+        639.63,
+        670.35
+      ],
+      "supplierIds": [
+        100
+      ],
+      "AvailabilityStatuses": 2,
+      "suppliers": [
+        "100~Hotelbeds"
+      ],
+      "directContracts": [],
+      "modules": [
+        "100~192~HotelBeds B2C - Live Creds"
+      ],
+      "reviews_rating": 0,
+      "MinSC": null,
+      "MinRO": 66.52,
+      "MinBB": null,
+      "MinHB": null,
+      "MinFB": null,
+      "MinAI": null,
+      "minPrice": 66.52,
+      "maxPrice": 670,
+      "nonrefoptions": 1,
+      "MinHoneymoon": null,
+      "MinWedding": null,
+      "MinWeddingAnniv": null,
+      "MinRepeatClient": null,
+      "honeymoonOptions": 0,
+      "weddingOptions": 0,
+      "weddingAnnivOptions": 0,
+      "repeatClientOptions": 0,
+      "RoomItems": [
+        "RO~0~0~0~0",
+        "RO~0~0~0~0",
+        "RO~0~0~0~0",
+        "RO~0~0~0~0",
+        "RO~0~0~0~0",
+        "RO~0~0~0~0",
+        "RO~0~0~0~0"
+      ],
+      "NetPrices": [
+        66.52,
+        92.12,
+        175.46,
+        194.95,
+        614.04,
+        639.63,
+        670.35
+      ],
+      "resort_name": null,
+      "total_reviews": null,
+      "internal_name": "",
+      "remoteAddress": "Al Jaazira Street, off Al Rigga Road ",
+      "cityName": "Dubai",
+      "countryName": "United Arab Emirates",
+      "otherDetail": null,
+      "attributes": [],
+      "interest": [],
+      "preferred": 0,
+      "show": 1,
+      "online_bookable": 0,
+      "site_code": "UK",
+      "vendor_rate": false,
+      "hotoffer": 0,
+      "construction": 0
+    }
+  },
+  "hotelbeds": {
+    "provider": "HotelBeds Direct",
+    "city": "dubai",
+    "checkIn": "2026-02-22",
+    "checkOut": "2026-02-24",
+    "nights": 2,
+    "totalHotels": 398,
+    "responseTime": 2462,
+    "sampleHotels": [
+      {
+        "id": 666425,
+        "name": "TIME Express Hotel Al Khan",
+        "rating": 3,
+        "categoryName": "3 STARS",
+        "address": null,
+        "city": "Sharjah",
+        "minPrice": 95.04,
+        "maxPrice": 3174.84,
+        "currency": "GBP",
+        "image": "https://photos.hotelbeds.com/giata/666425/666425a_hb_a_001.jpg",
+        "description": null,
+        "mealPlans": [
+          "ROOM ONLY",
+          "BED AND BREAKFAST",
+          "HALF BOARD",
+          "FULL BOARD"
+        ],
+        "coordinates": {
+          "lat": "25.33027100000000000000",
+          "lng": "55.36757400000000000000"
+        },
+        "refundableOptions": false,
+        "nonRefundableOptions": true,
+        "roomCount": 4
+      },
+      {
+        "id": 162651,
+        "name": "Golden Sands Hotel & Residences",
+        "rating": 4,
+        "categoryName": "4 STARS",
+        "address": null,
+        "city": "Sharjah",
+        "minPrice": 99.06,
+        "maxPrice": 275.12,
+        "currency": "GBP",
+        "image": "https://photos.hotelbeds.com/giata/162651/162651a_hb_a_001.jpg",
+        "description": null,
+        "mealPlans": [
+          "ROOM ONLY",
+          "BED AND BREAKFAST",
+          "HALF BOARD",
+          "FULL BOARD"
+        ],
+        "coordinates": {
+          "lat": "25.29848400000000000000",
+          "lng": "55.37209700000000000000"
+        },
+        "refundableOptions": false,
+        "nonRefundableOptions": false,
+        "roomCount": 12
+      },
+      {
+        "id": 7659,
+        "name": "Towers Rotana",
+        "rating": 4,
+        "categoryName": "4 STARS",
+        "address": null,
+        "city": "Dubai",
+        "minPrice": 306.59,
+        "maxPrice": 516.23,
+        "currency": "GBP",
+        "image": "https://photos.hotelbeds.com/giata/7659/7659a_hb_a_001.jpg",
+        "description": null,
+        "mealPlans": [
+          "BED AND BREAKFAST",
+          "HALF BOARD",
+          "ALL INCLUSIVE"
+        ],
+        "coordinates": {
+          "lat": "25.21299400000000000000",
+          "lng": "55.27534400000000000000"
+        },
+        "refundableOptions": false,
+        "nonRefundableOptions": false,
+        "roomCount": 4
+      },
+      {
+        "id": 180657,
+        "name": "TIME Ruby Hotel Apartment",
+        "rating": "APTH4",
+        "categoryName": "APARTHOTEL 4*",
+        "address": null,
+        "city": "Sharjah",
+        "minPrice": 141.76,
+        "maxPrice": 322.42,
+        "currency": "GBP",
+        "image": "https://photos.hotelbeds.com/giata/180657/180657a_hb_a_001.jpg",
+        "description": null,
+        "mealPlans": [
+          "ROOM ONLY",
+          "BED AND BREAKFAST",
+          "HALF BOARD",
+          "FULL BOARD"
+        ],
+        "coordinates": {
+          "lat": "25.33304100000000000000",
+          "lng": "55.36121300000000000000"
+        },
+        "refundableOptions": false,
+        "nonRefundableOptions": false,
+        "roomCount": 4
+      },
+      {
+        "id": 161485,
+        "name": "Citymax Sharjah",
+        "rating": 3,
+        "categoryName": "3 STARS",
+        "address": null,
+        "city": "Sharjah",
+        "minPrice": 68.78,
+        "maxPrice": 101.29,
+        "currency": "GBP",
+        "image": "https://photos.hotelbeds.com/giata/161485/161485a_hb_a_001.jpg",
+        "description": null,
+        "mealPlans": [
+          "ROOM ONLY",
+          "BED AND BREAKFAST"
+        ],
+        "coordinates": {
+          "lat": "25.33701302937603000000",
+          "lng": "55.40039822459221000000"
+        },
+        "refundableOptions": false,
+        "nonRefundableOptions": true,
+        "roomCount": 2
+      }
+    ],
+    "roomDetails": {
+      "hotelName": "TIME Express Hotel Al Khan",
+      "roomCount": 4,
+      "sampleRooms": [
+        {
+          "name": "Deluxe Express Twin",
+          "rates": [
+            {
+              "mealPlan": "ROOM ONLY",
+              "price": "95.04",
+              "currency": "GBP",
+              "refundable": false,
+              "cancellationDeadline": "2026-01-23T23:59:00+04:00"
+            },
+            {
+              "mealPlan": "ROOM ONLY",
+              "price": "105.61",
+              "currency": "GBP",
+              "refundable": true,
+              "cancellationDeadline": "2026-02-20T23:59:00+04:00"
+            }
+          ]
+        },
+        {
+          "name": "Deluxe Express King",
+          "rates": [
+            {
+              "mealPlan": "ROOM ONLY",
+              "price": "105.61",
+              "currency": "GBP",
+              "refundable": true,
+              "cancellationDeadline": "2026-02-20T23:59:00+04:00"
+            },
+            {
+              "mealPlan": "BED AND BREAKFAST",
+              "price": "124.34",
+              "currency": "GBP",
+              "refundable": true,
+              "cancellationDeadline": "2026-02-19T23:59:00+04:00"
+            }
+          ]
+        },
+        {
+          "name": "Executive Express King",
+          "rates": [
+            {
+              "mealPlan": "ROOM ONLY",
+              "price": "165.05",
+              "currency": "GBP",
+              "refundable": false,
+              "cancellationDeadline": "2026-01-23T23:59:00+04:00"
+            },
+            {
+              "mealPlan": "BED AND BREAKFAST",
+              "price": "182.20",
+              "currency": "GBP",
+              "refundable": true,
+              "cancellationDeadline": "2026-02-19T23:59:00+04:00"
+            }
+          ]
+        }
+      ]
+    },
+    "rawSampleHotel": {
+      "code": 666425,
+      "name": "TIME Express Hotel Al Khan",
+      "categoryCode": "3EST",
+      "categoryName": "3 STARS",
+      "destinationCode": "SHJ",
+      "destinationName": "Sharjah",
+      "zoneCode": 1,
+      "zoneName": "Sharjah",
+      "latitude": "25.33027100000000000000",
+      "longitude": "55.36757400000000000000",
+      "rooms": [
+        {
+          "code": "TWN.DX",
+          "name": "Deluxe Express Twin",
+          "rates": [
+            {
+              "rateKey": "20260222|20260224|W|148|666425|TWN.DX|DYNAPRO  |RO||1~2~0||N@07~A-SIC~2526f~-759836437~S~~~NRF~~D31217278EC2421176920088604506AAUK039803680017102045f",
+              "rateClass": "NRF",
+              "rateType": "BOOKABLE",
+              "net": "95.04",
+              "sellingRate": "111.82",
+              "hotelMandatory": true,
+              "allotment": 10,
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "95.04",
+                  "from": "2026-01-23T23:59:00+04:00"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "promotions": [
+                {
+                  "code": "073",
+                  "name": "Non-refundable rate. No amendments permitted",
+                  "remark": "Non-refundable rate. No amendments permitted"
+                }
+              ],
+              "offers": [
+                {
+                  "code": "9005",
+                  "name": "Exclusive discount",
+                  "amount": "-10.57"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|148|666425|TWN.DX|DYNRO|RO||1~2~0||N@07~A-SIC~2187c~1148882002~S~~~NOR~~D31217278EC2421176920088604506AAUK0398036800171023d69",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "105.61",
+              "sellingRate": "124.24",
+              "hotelMandatory": true,
+              "allotment": 33,
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "52.32",
+                  "from": "2026-02-20T23:59:00+04:00"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9005",
+                  "name": "Exclusive discount",
+                  "amount": "-11.73"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|148|666425|TWN.DX|DYNAPBB  |BB||1~2~0||N@07~A-SIC~24f86~-864189864~S~~~NRF~~D31217278EC2421176920088604506AAUK0398036800171023772",
+              "rateClass": "NRF",
+              "rateType": "BOOKABLE",
+              "net": "114.55",
+              "sellingRate": "134.79",
+              "hotelMandatory": true,
+              "allotment": 10,
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "BB",
+              "boardName": "BED AND BREAKFAST",
+              "cancellationPolicies": [
+                {
+                  "amount": "114.55",
+                  "from": "2026-01-23T23:59:00+04:00"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "promotions": [
+                {
+                  "code": "073",
+                  "name": "Non-refundable rate. No amendments permitted",
+                  "remark": "Non-refundable rate. No amendments permitted"
+                }
+              ],
+              "offers": [
+                {
+                  "code": "9005",
+                  "name": "Exclusive discount",
+                  "amount": "-12.74"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|148|666425|TWN.DX|DYNBB|BB||1~2~0||N@07~A-SIC~24d95~-614348582~S~~~NOR~~D31217278EC2421176920088604506AAUK0398036800171021e7f",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "127.30",
+              "sellingRate": "149.77",
+              "hotelMandatory": true,
+              "allotment": 10,
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "BB",
+              "boardName": "BED AND BREAKFAST",
+              "cancellationPolicies": [
+                {
+                  "amount": "63.16",
+                  "from": "2026-02-20T23:59:00+04:00"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9005",
+                  "name": "Exclusive discount",
+                  "amount": "-14.14"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|148|666425|TWN.DX|DYNRO|HB||1~2~0||N@07~A-SIC~251a8~2074480973~S~~~NOR~~D31217278EC2421176920088604506AAUK039803680017102318f",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "143.49",
+              "sellingRate": "168.81",
+              "hotelMandatory": true,
+              "allotment": 33,
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "HB",
+              "boardName": "HALF BOARD",
+              "cancellationPolicies": [
+                {
+                  "amount": "71.26",
+                  "from": "2026-02-20T23:59:00+04:00"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9005",
+                  "name": "Exclusive discount",
+                  "amount": "-11.73"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|148|666425|TWN.DX|DYNRO|FB||1~2~0||N@07~A-SIC~226d5~-1172421289~S~~~NOR~~D31217278EC2421176920088604506AAUK03980368001710225b5",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "181.37",
+              "sellingRate": "213.38",
+              "hotelMandatory": true,
+              "allotment": 33,
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "FB",
+              "boardName": "FULL BOARD",
+              "cancellationPolicies": [
+                {
+                  "amount": "90.20",
+                  "from": "2026-02-20T23:59:00+04:00"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9005",
+                  "name": "Exclusive discount",
+                  "amount": "-11.73"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "DBL.DX",
+          "name": "Deluxe Express King",
+          "rates": [
+            {
+              "rateKey": "20260222|20260224|W|148|666425|DBL.DX|DYNRO|RO||1~2~0||N@07~A-SIC~2187c~-1780509489~S~~~NOR~~D31217278EC2421176920088604506AAUK0398036800171023d69",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "105.61",
+              "sellingRate": "124.24",
+              "hotelMandatory": true,
+              "allotment": 33,
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "52.32",
+                  "from": "2026-02-20T23:59:00+04:00"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9005",
+                  "name": "Exclusive discount",
+                  "amount": "-11.73"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|148|666425|DBL.DX|FIT BB|BB||1~2~0||N@07~A-SIC~2227c~1089211369~N~~~NOR~~D31217278EC2421176920088604506AAUK039803680017102227c",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "124.34",
+              "allotment": 5,
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "BB",
+              "boardName": "BED AND BREAKFAST",
+              "cancellationPolicies": [
+                {
+                  "amount": "124.34",
+                  "from": "2026-02-19T23:59:00+04:00"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "promotions": [
+                {
+                  "code": "515",
+                  "name": "New Year Sales"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|148|666425|DBL.DX|DYNRO|HB||1~2~0||N@07~A-SIC~251a8~-854910518~S~~~NOR~~D31217278EC2421176920088604506AAUK039803680017102318f",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "143.49",
+              "sellingRate": "168.81",
+              "hotelMandatory": true,
+              "allotment": 33,
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "HB",
+              "boardName": "HALF BOARD",
+              "cancellationPolicies": [
+                {
+                  "amount": "71.26",
+                  "from": "2026-02-20T23:59:00+04:00"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9005",
+                  "name": "Exclusive discount",
+                  "amount": "-11.73"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|148|666425|DBL.DX|DYNRO|FB||1~2~0||N@07~A-SIC~226d5~193154516~S~~~NOR~~D31217278EC2421176920088604506AAUK03980368001710225b5",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "181.37",
+              "sellingRate": "213.38",
+              "hotelMandatory": true,
+              "allotment": 33,
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "FB",
+              "boardName": "FULL BOARD",
+              "cancellationPolicies": [
+                {
+                  "amount": "90.20",
+                  "from": "2026-02-20T23:59:00+04:00"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9005",
+                  "name": "Exclusive discount",
+                  "amount": "-11.73"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "DBL.EJ",
+          "name": "Executive Express King",
+          "rates": [
+            {
+              "rateKey": "20260222|20260224|W|148|666425|DBL.EJ|DYNAPRO  |RO||1~2~0||N@07~A-SIC~213c2~612751009~S~~~NRF~~D31217278EC2421176920088604506AAUK03980368001710205a5",
+              "rateClass": "NRF",
+              "rateType": "BOOKABLE",
+              "net": "165.05",
+              "sellingRate": "194.19",
+              "hotelMandatory": true,
+              "allotment": 5,
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "165.05",
+                  "from": "2026-01-23T23:59:00+04:00"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "promotions": [
+                {
+                  "code": "073",
+                  "name": "Non-refundable rate. No amendments permitted",
+                  "remark": "Non-refundable rate. No amendments permitted"
+                }
+              ],
+              "offers": [
+                {
+                  "code": "9005",
+                  "name": "Exclusive discount",
+                  "amount": "-18.34"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|148|666425|DBL.EJ|FIT BB|BB||1~2~0||N@07~A-SIC~214b6~-928175474~N~~~NOR~~D31217278EC2421176920088604506AAUK03980368001710214b6",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "182.20",
+              "allotment": 5,
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "BB",
+              "boardName": "BED AND BREAKFAST",
+              "cancellationPolicies": [
+                {
+                  "amount": "182.20",
+                  "from": "2026-02-19T23:59:00+04:00"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "promotions": [
+                {
+                  "code": "515",
+                  "name": "New Year Sales"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|148|666425|DBL.EJ|FIT BB|HB||1~2~0||N@07~A-SIC~250dc~-278442790~N~~~NOR~~D31217278EC2421176920088604506AAUK03980368001710250dc",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "220.80",
+              "allotment": 5,
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "HB",
+              "boardName": "HALF BOARD",
+              "cancellationPolicies": [
+                {
+                  "amount": "220.80",
+                  "from": "2026-02-19T23:59:00+04:00"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "promotions": [
+                {
+                  "code": "515",
+                  "name": "New Year Sales"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|148|666425|DBL.EJ|DYNRO|RO||1~2~0||N@07~A-SIC~261e3d~658855698~S~~~NOR~~D31217278EC2421176920088604506AAUK03980368001710208c1b",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "3099.08",
+              "sellingRate": "3645.97",
+              "hotelMandatory": true,
+              "allotment": 1,
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "1549.54",
+                  "from": "2026-02-20T23:59:00+04:00"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9005",
+                  "name": "Exclusive discount",
+                  "amount": "-344.34"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|148|666425|DBL.EJ|DYNRO|FB||1~2~0||N@07~A-SIC~20ae97~-725419212~S~~~NOR~~D31217278EC2421176920088604506AAUK03980368001710254c66",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "3174.84",
+              "sellingRate": "3735.10",
+              "hotelMandatory": true,
+              "allotment": 1,
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "FB",
+              "boardName": "FULL BOARD",
+              "cancellationPolicies": [
+                {
+                  "amount": "1587.42",
+                  "from": "2026-02-20T23:59:00+04:00"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9005",
+                  "name": "Exclusive discount",
+                  "amount": "-344.34"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "SUI.EJ",
+          "name": "Suite executive",
+          "rates": [
+            {
+              "rateKey": "20260222|20260224|W|148|666425|SUI.EJ|DYNRO|RO||1~2~0||N@07~A-SIC~24dd7~-1664505665~S~~~NOR~~D31217278EC2421176920088604506AAUK03980368001710229b7",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "183.41",
+              "sellingRate": "215.77",
+              "hotelMandatory": true,
+              "allotment": 5,
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "91.22",
+                  "from": "2026-02-20T23:59:00+04:00"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9005",
+                  "name": "Exclusive discount",
+                  "amount": "-20.37"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|148|666425|SUI.EJ|DYNRO|HB||1~2~0||N@07~A-SIC~221104~-1625792548~S~~~NOR~~D31217278EC2421176920088604506AAUK0398036800171021ddd",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "221.29",
+              "sellingRate": "260.33",
+              "hotelMandatory": true,
+              "allotment": 5,
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "HB",
+              "boardName": "HALF BOARD",
+              "cancellationPolicies": [
+                {
+                  "amount": "110.16",
+                  "from": "2026-02-20T23:59:00+04:00"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9005",
+                  "name": "Exclusive discount",
+                  "amount": "-20.37"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|148|666425|SUI.EJ|DYNRO|FB||1~2~0||N@07~A-SIC~25a130~1291274075~S~~~NOR~~D31217278EC2421176920088604506AAUK03980368001710211103",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "259.17",
+              "sellingRate": "304.90",
+              "hotelMandatory": true,
+              "allotment": 5,
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "FB",
+              "boardName": "FULL BOARD",
+              "cancellationPolicies": [
+                {
+                  "amount": "129.10",
+                  "from": "2026-02-20T23:59:00+04:00"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9005",
+                  "name": "Exclusive discount",
+                  "amount": "-20.37"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "minRate": "95.04",
+      "maxRate": "3174.84",
+      "currency": "GBP"
+    }
+  },
+  "comparison": {
+    "hotelCount": {
+      "vyspa": 3,
+      "hotelbeds": 398,
+      "winner": "HotelBeds"
+    },
+    "responseTime": {
+      "vyspa": 18233,
+      "hotelbeds": 2462,
+      "winner": "HotelBeds"
+    }
+  }
+}

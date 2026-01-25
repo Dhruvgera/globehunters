@@ -85,7 +85,7 @@ export async function fetchAllLiveProperties(
   while (nextUrl && pageCount < maxPages) {
     pageCount++;
     
-    const url = nextUrl.startsWith('http')
+    const url: string = nextUrl.startsWith('http')
       ? nextUrl
       : `${getBaseUrl()}${nextUrl}`;
 

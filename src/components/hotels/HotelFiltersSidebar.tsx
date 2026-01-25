@@ -293,9 +293,9 @@ export function HotelFiltersSidebar({
                   </span>
                 </div>
                 {minPriceForRating !== undefined && (
-                  <span className="text-sm font-medium text-[#010D50]">
+                <span className="text-sm font-medium text-[#010D50]">
                     from {currencySymbol}{Math.round(minPriceForRating).toLocaleString()}
-                  </span>
+                </span>
                 )}
               </label>
             );
@@ -365,23 +365,23 @@ export function HotelFiltersSidebar({
         {availableMealPlans.length === 0 ? (
           <div className="text-xs text-[#3A478A]">No meal plans available in current results</div>
         ) : (
-          <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2">
             {availableMealPlans.map((plan) => (
-              <label key={plan} className="flex items-center gap-3">
-                <Checkbox
-                  checked={value.mealPlans?.includes(plan) ?? false}
-                  onCheckedChange={(c) => {
-                    const current = value.mealPlans ?? [];
-                    const next = Boolean(c)
-                      ? Array.from(new Set([...current, plan]))
-                      : current.filter((x) => x !== plan);
-                    onChange({ ...value, mealPlans: next });
-                  }}
-                />
-                <span className="text-sm text-[#010D50]">{plan}</span>
-              </label>
-            ))}
-          </div>
+            <label key={plan} className="flex items-center gap-3">
+              <Checkbox
+                checked={value.mealPlans?.includes(plan) ?? false}
+                onCheckedChange={(c) => {
+                  const current = value.mealPlans ?? [];
+                  const next = Boolean(c)
+                    ? Array.from(new Set([...current, plan]))
+                    : current.filter((x) => x !== plan);
+                  onChange({ ...value, mealPlans: next });
+                }}
+              />
+              <span className="text-sm text-[#010D50]">{plan}</span>
+            </label>
+          ))}
+        </div>
         )}
       </FilterSection>
 

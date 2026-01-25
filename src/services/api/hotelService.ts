@@ -121,7 +121,7 @@ export class HotelService {
     });
   }
 
-  async createCustomerFolder(params: CreateHotelFolderParams): Promise<VyspaCreateCustomerFolderResponseItem | VyspaCreateCustomerFolderResponseItem[]> {
+  async createCustomerFolder(params: CreateHotelFolderParams): Promise<VyspaCreateCustomerFolderResponse> {
     const payload = [
       {
         customer_type: 'C',

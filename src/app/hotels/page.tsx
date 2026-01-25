@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import Navbar from "@/components/navigation/Navbar";
@@ -95,7 +95,7 @@ function matchesPopular(hotel: Hotel, filters: HotelFiltersState) {
   return true;
 }
 
-export default function HotelsPage() {
+function HotelsPageInner() {
   const urlParams = useSearchParams();
   const urlParamsKey = urlParams.toString();
   const setHotelSearch = useBookingStore((s) => s.setHotelSearch);
@@ -130,6 +130,7 @@ export default function HotelsPage() {
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
   const [displayedHotelsCount, setDisplayedHotelsCount] = useState(12);
   const activeRequestSeq = useRef(0);
   const hotelResultsCacheRef = useRef(hotelResultsCache);
@@ -203,6 +204,12 @@ export default function HotelsPage() {
     };
   }, [urlParamsKey, savedHotelSearch]);
 
+  // Ref to access resolvedSearch in effects without causing re-triggers
+  const resolvedSearchRef = useRef(resolvedSearch);
+  useEffect(() => {
+    resolvedSearchRef.current = resolvedSearch;
+  }, [resolvedSearch]);
+
   const queryKey = useMemo(() => {
     return JSON.stringify({
       location: resolvedSearch.location,
@@ -248,9 +255,7 @@ export default function HotelsPage() {
       setBreakfastEnriching(false);
 
       // Hydrate from cache immediately to preserve results on back-navigation.
-      // Only use cache if:
-      // 1. queryKey matches
-      // 2. Cache is recent (< 2 minutes old) - for back-navigation, not stale refreshes
+      // Only use cache if queryKey matches and cache has results and is fresh (< 2 min).
       const cache = hotelResultsCacheRef.current;
       const cacheAge = cache?.fetchedAt ? Date.now() - cache.fetchedAt : Infinity;
       const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
@@ -266,19 +271,21 @@ export default function HotelsPage() {
       }
 
       try {
-        const urlHiddenId = resolvedSearch.hidden_id;
-        const urlHiddenKey = resolvedSearch.hidden_key;
-        const urlArrivalPointCode = resolvedSearch.arrival_point_code || undefined;
+        // Use ref to avoid infinite loop (setHotelSearch updates savedHotelSearch which would re-trigger this effect)
+        const search = resolvedSearchRef.current;
+        const urlHiddenId = search.hidden_id;
+        const urlHiddenKey = search.hidden_key;
+        const urlArrivalPointCode = search.arrival_point_code || undefined;
 
         const pick = urlHiddenId && urlHiddenKey
           ? {
               id: Number(urlHiddenId),
-              label: resolvedSearch.location,
+              label: search.location,
               loc: urlHiddenKey,
               arrival_point_code: urlArrivalPointCode,
             }
           : (await (async () => {
-              const lookup = await hotelService.lookupCities(resolvedSearch.location);
+              const lookup = await hotelService.lookupCities(search.location);
               return lookup.find((x) => String(x.loc).toLowerCase() === "city") || lookup[0];
             })());
 
@@ -290,25 +297,30 @@ export default function HotelsPage() {
           location: pick.label,
           hidden_id: String(pick.id),
           hidden_key: String(pick.loc),
-          checkIn: resolvedSearch.checkIn,
-          checkOut: resolvedSearch.checkOut,
-          rooms: resolvedSearch.rooms,
-          adults: resolvedSearch.adults,
+          checkIn: search.checkIn,
+          checkOut: search.checkOut,
+          rooms: search.rooms,
+          adults: search.adults,
           children: 0,
-          branches: resolvedSearch.branches,
+          branches: search.branches,
         });
 
-        const results = availability?.Results || [];
+        const rawResults = availability?.Results || [];
         const criteria = availability?.Criteria;
         const criteriaId =
           typeof (criteria as any)?.searchCriteriaId === "number" ? (criteria as any).searchCriteriaId : null;
         setSearchCriteriaId(criteriaId);
 
+        // Filter out non-object results (e.g. [true, "No hotels found"] becomes empty array)
+        const results = rawResults.filter(
+          (r: any) => r && typeof r === "object" && !Array.isArray(r) && (r.hotel_id || r.hotelId || r.id)
+        );
+
         const nights =
           Math.max(
             1,
             Math.round(
-              (new Date(resolvedSearch.checkOut).getTime() - new Date(resolvedSearch.checkIn).getTime()) / (1000 * 60 * 60 * 24)
+              (new Date(search.checkOut).getTime() - new Date(search.checkIn).getTime()) / (1000 * 60 * 60 * 24)
             )
           ) || 1;
 
@@ -362,7 +374,7 @@ export default function HotelsPage() {
               nightly: nights > 0 ? Math.round((total / nights) * 100) / 100 : total,
               total,
               nights,
-              rooms: resolvedSearch.rooms,
+              rooms: search.rooms,
             },
             imageSrc: r?.image_name || "/figma/hotels/hotel-card-image.png",
             description: quickDesc,
@@ -396,7 +408,10 @@ export default function HotelsPage() {
           return next;
         });
         setSelectedHotelId(mapped[0]?.id || "");
-        setHotelResultsCache({ queryKey, hotels: mapped, selectedHotelId: mapped[0]?.id || "", fetchedAt: Date.now() });
+        // Only cache if we have actual results (don't cache empty "no results" responses)
+        if (mapped.length > 0) {
+          setHotelResultsCache({ queryKey, hotels: mapped, selectedHotelId: mapped[0]?.id || "", fetchedAt: Date.now() });
+        }
 
         // If user hasn't interacted yet, set price slider bounds from real data (total).
         setFilters((prev) => {
@@ -417,12 +432,12 @@ export default function HotelsPage() {
           location: pick.label,
           hidden_id: String(pick.id),
           hidden_key: String(pick.loc),
-          checkIn: resolvedSearch.checkIn,
-          checkOut: resolvedSearch.checkOut,
-          rooms: resolvedSearch.rooms,
-          adults: resolvedSearch.adults,
+          checkIn: search.checkIn,
+          checkOut: search.checkOut,
+          rooms: search.rooms,
+          adults: search.adults,
           children: 0,
-          branches: resolvedSearch.branches,
+          branches: search.branches,
           searchCriteriaId:
             typeof (criteria as any)?.searchCriteriaId === "number"
               ? (criteria as any).searchCriteriaId
@@ -437,7 +452,10 @@ export default function HotelsPage() {
         setSearchCriteriaId(null);
         setBreakfastByHotelId({});
       } finally {
-        if (!cancelled && requestSeq === activeRequestSeq.current) setLoading(false);
+        if (!cancelled && requestSeq === activeRequestSeq.current) {
+          setLoading(false);
+          setHasAttemptedFetch(true);
+        }
       }
     }
 
@@ -445,7 +463,8 @@ export default function HotelsPage() {
     return () => {
       cancelled = true;
     };
-  }, [queryKey, resolvedSearch, setHotelResultsCache, setHotelResultsMeta, setHotelSearch]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- resolvedSearch accessed via ref to avoid loop
+  }, [queryKey, setHotelResultsCache, setHotelResultsMeta, setHotelSearch]);
 
   // On-demand breakfast enrichment: when user enables breakfast filter, use getRoomsV3 to detect breakfast
   // for hotels where availability doesn't expose meal plans reliably.
@@ -748,6 +767,24 @@ export default function HotelsPage() {
             {error && (
               <div className="text-sm text-red-600">{error}</div>
             )}
+
+            {/* No Results State */}
+            {hasAttemptedFetch && !loading && !error && hotels.length === 0 && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
+                <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">No Hotels Found</h3>
+                <p className="text-gray-600 mb-4">We couldn&apos;t find any hotels for your search. Try adjusting your dates or destination.</p>
+                <button
+                  onClick={() => window.location.href = '/'}
+                  className="px-6 py-2 bg-[#3754ED] text-white rounded-lg hover:bg-[#2a45d6] transition-colors"
+                >
+                  New Search
+                </button>
+              </div>
+            )}
+
             {filters.popular.breakfastIncluded && breakfastEnriching && (
               <div className="text-xs text-[#3A478A]">
                 Checking breakfast availability…
@@ -819,6 +856,14 @@ export default function HotelsPage() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function HotelsPage() {
+  return (
+    <Suspense fallback={<HotelSearchLoading />}>
+      <HotelsPageInner />
+    </Suspense>
   );
 }
 

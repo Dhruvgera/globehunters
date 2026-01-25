@@ -1,0 +1,1418 @@
+{
+  "searchParams": {
+    "city": "london",
+    "checkIn": "2026-02-22",
+    "checkOut": "2026-02-24"
+  },
+  "timestamp": "2026-01-23T20:42:05.237Z",
+  "vyspa": {
+    "provider": "Vyspa (Concorde)",
+    "city": "London",
+    "country": "United Kingdom",
+    "checkIn": "2026-02-22",
+    "checkOut": "2026-02-24",
+    "nights": 2,
+    "totalHotels": 0,
+    "responseTime": 17750,
+    "searchCriteriaId": 52014788,
+    "sampleHotels": [],
+    "roomDetails": null,
+    "rawSampleHotel": null
+  },
+  "hotelbeds": {
+    "provider": "HotelBeds Direct",
+    "city": "london",
+    "checkIn": "2026-02-22",
+    "checkOut": "2026-02-24",
+    "nights": 2,
+    "totalHotels": 397,
+    "responseTime": 1722,
+    "sampleHotels": [
+      {
+        "id": 6605,
+        "name": "Royal Lancaster London",
+        "rating": 5,
+        "categoryName": "5 STARS",
+        "address": null,
+        "city": "London",
+        "minPrice": 490.18,
+        "maxPrice": 3025.8,
+        "currency": "GBP",
+        "image": "https://photos.hotelbeds.com/giata/6605/6605a_hb_a_001.jpg",
+        "description": null,
+        "mealPlans": [
+          "ROOM ONLY",
+          "BED AND BREAKFAST"
+        ],
+        "coordinates": {
+          "lat": "51.51239119075020000000",
+          "lng": "-0.17499670386314400000"
+        },
+        "refundableOptions": false,
+        "nonRefundableOptions": true,
+        "roomCount": 10
+      },
+      {
+        "id": 9472,
+        "name": "Jumeirah Carlton Tower London",
+        "rating": 5,
+        "categoryName": "5 STARS",
+        "address": null,
+        "city": "London",
+        "minPrice": 1214.75,
+        "maxPrice": 1552.06,
+        "currency": "GBP",
+        "image": "https://photos.hotelbeds.com/giata/9472/9472a_hb_a_001.jpg",
+        "description": null,
+        "mealPlans": [
+          "ROOM ONLY",
+          "CONTINENTAL BREAKFAST"
+        ],
+        "coordinates": {
+          "lat": "51.49845300000000000000",
+          "lng": "-0.15835800000000000000"
+        },
+        "refundableOptions": false,
+        "nonRefundableOptions": true,
+        "roomCount": 2
+      },
+      {
+        "id": 13901,
+        "name": "STG Hotel Oxford Street",
+        "rating": 3,
+        "categoryName": "3 STARS",
+        "address": null,
+        "city": "London",
+        "minPrice": 148.74,
+        "maxPrice": 366.98,
+        "currency": "GBP",
+        "image": "https://photos.hotelbeds.com/giata/13901/13901a_hb_a_001.jpg",
+        "description": null,
+        "mealPlans": [
+          "ROOM ONLY",
+          "BED AND BREAKFAST"
+        ],
+        "coordinates": {
+          "lat": "51.51786760000000000000",
+          "lng": "-0.13006810000000000000"
+        },
+        "refundableOptions": false,
+        "nonRefundableOptions": true,
+        "roomCount": 9
+      },
+      {
+        "id": 6607,
+        "name": "Royal National",
+        "rating": 3,
+        "categoryName": "3 STARS",
+        "address": null,
+        "city": "London",
+        "minPrice": 174.51,
+        "maxPrice": 396.18,
+        "currency": "GBP",
+        "image": "https://photos.hotelbeds.com/giata/6607/6607a_hb_a_001.jpg",
+        "description": null,
+        "mealPlans": [
+          "ROOM ONLY",
+          "BED AND BREAKFAST"
+        ],
+        "coordinates": {
+          "lat": "51.52335900000000000000",
+          "lng": "-0.12778800000000000000"
+        },
+        "refundableOptions": false,
+        "nonRefundableOptions": true,
+        "roomCount": 6
+      },
+      {
+        "id": 7602,
+        "name": "Thistle London Heathrow Terminal 5",
+        "rating": 3,
+        "categoryName": "3 STARS",
+        "address": null,
+        "city": "London",
+        "minPrice": 98.24,
+        "maxPrice": 484.64,
+        "currency": "GBP",
+        "image": "https://photos.hotelbeds.com/giata/7602/7602a_hb_a_001.jpg",
+        "description": null,
+        "mealPlans": [
+          "ROOM ONLY",
+          "BED AND BREAKFAST"
+        ],
+        "coordinates": {
+          "lat": "51.48052196997982000000",
+          "lng": "-0.48397359101563400000"
+        },
+        "refundableOptions": false,
+        "nonRefundableOptions": true,
+        "roomCount": 6
+      }
+    ],
+    "roomDetails": {
+      "hotelName": "Royal Lancaster London",
+      "roomCount": 10,
+      "sampleRooms": [
+        {
+          "name": "Classic Room",
+          "rates": [
+            {
+              "mealPlan": "ROOM ONLY",
+              "price": "490.18",
+              "currency": "GBP",
+              "refundable": false,
+              "cancellationDeadline": "2026-01-22T23:59:00Z"
+            },
+            {
+              "mealPlan": "ROOM ONLY",
+              "price": "544.64",
+              "currency": "GBP",
+              "refundable": true,
+              "cancellationDeadline": "2026-02-20T23:59:00Z"
+            }
+          ]
+        },
+        {
+          "name": "Deluxe View Room",
+          "rates": [
+            {
+              "mealPlan": "ROOM ONLY",
+              "price": "549.96",
+              "currency": "GBP",
+              "refundable": false,
+              "cancellationDeadline": "2026-01-22T23:59:00Z"
+            },
+            {
+              "mealPlan": "ROOM ONLY",
+              "price": "611.06",
+              "currency": "GBP",
+              "refundable": true,
+              "cancellationDeadline": "2026-02-20T23:59:00Z"
+            }
+          ]
+        },
+        {
+          "name": "Deluxe Superior",
+          "rates": [
+            {
+              "mealPlan": "ROOM ONLY",
+              "price": "563.24",
+              "currency": "GBP",
+              "refundable": false,
+              "cancellationDeadline": "2026-01-22T23:59:00Z"
+            }
+          ]
+        }
+      ]
+    },
+    "rawSampleHotel": {
+      "code": 6605,
+      "name": "Royal Lancaster London",
+      "categoryCode": "5EST",
+      "categoryName": "5 STARS",
+      "destinationCode": "LON",
+      "destinationName": "London",
+      "zoneCode": 20,
+      "zoneName": "Bayswater",
+      "latitude": "51.51239119075020000000",
+      "longitude": "-0.17499670386314400000",
+      "rooms": [
+        {
+          "code": "DBT.AS",
+          "name": "Classic Room",
+          "rates": [
+            {
+              "rateKey": "20260222|20260224|W|164|6605|DBT.AS|NRFRO|RO||1~2~0||N@07~A-SIC~24e255~506023145~S~~~NRF~~6DCD3D297DE5472176920090787706AAUK039702570013102121ea",
+              "rateClass": "NRF",
+              "rateType": "BOOKABLE",
+              "net": "490.18",
+              "sellingRate": "597.78",
+              "hotelMandatory": true,
+              "allotment": 114,
+              "rateCommentsId": "164|59058|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "490.18",
+                  "from": "2026-01-22T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "promotions": [
+                {
+                  "code": "073",
+                  "name": "Non-refundable rate. No amendments permitted",
+                  "remark": "Non-refundable rate. No amendments permitted"
+                }
+              ],
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-54.46"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|DBT.AS|BAR RO|RO||1~2~0||N@07~A-SIC~214298~85278804~S~~~NOR~~6DCD3D297DE5472176920090787706AAUK03970257001310240220",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "544.64",
+              "sellingRate": "664.20",
+              "hotelMandatory": true,
+              "allotment": 115,
+              "rateCommentsId": "164|54591|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "272.32",
+                  "from": "2026-02-20T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-60.52"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|DBT.AS|NRFBB|BB||1~2~0||N@07~A-SIC~2122c7~1309811983~S~~~NRF~~6DCD3D297DE5472176920090787706AAUK03970257001310210247",
+              "rateClass": "NRF",
+              "rateType": "BOOKABLE",
+              "net": "583.16",
+              "sellingRate": "711.18",
+              "hotelMandatory": true,
+              "allotment": 115,
+              "rateCommentsId": "164|59240|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "BB",
+              "boardName": "BED AND BREAKFAST",
+              "cancellationPolicies": [
+                {
+                  "amount": "583.16",
+                  "from": "2026-01-22T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-64.80"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|DBT.AS|BAR BB|BB||1~2~0||N@07~A-SIC~214316~-1948537584~S~~~NOR~~6DCD3D297DE5472176920090787706AAUK03970257001310260287",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "647.96",
+              "sellingRate": "790.20",
+              "hotelMandatory": true,
+              "allotment": 115,
+              "rateCommentsId": "164|59239|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "BB",
+              "boardName": "BED AND BREAKFAST",
+              "cancellationPolicies": [
+                {
+                  "amount": "323.98",
+                  "from": "2026-02-20T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-72.00"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "DBT.DX",
+          "name": "Deluxe View Room",
+          "rates": [
+            {
+              "rateKey": "20260222|20260224|W|164|6605|DBT.DX|NRFRO|RO||1~2~0||N@07~A-SIC~24429e~1544862621~S~~~NRF~~6DCD3D297DE5472176920090787706AAUK03970257001310260225",
+              "rateClass": "NRF",
+              "rateType": "BOOKABLE",
+              "net": "549.96",
+              "sellingRate": "670.68",
+              "hotelMandatory": true,
+              "allotment": 135,
+              "rateCommentsId": "164|59058|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "549.96",
+                  "from": "2026-01-22T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "promotions": [
+                {
+                  "code": "073",
+                  "name": "Non-refundable rate. No amendments permitted",
+                  "remark": "Non-refundable rate. No amendments permitted"
+                }
+              ],
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-61.10"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|DBT.DX|BAR RO|RO||1~2~0||N@07~A-SIC~2142e9~-396726478~S~~~NOR~~6DCD3D297DE5472176920090787706AAUK03970257001310206263",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "611.06",
+              "sellingRate": "745.20",
+              "hotelMandatory": true,
+              "allotment": 135,
+              "rateCommentsId": "164|54591|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "305.53",
+                  "from": "2026-02-20T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-67.90"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|DBT.DX|NRFBB|BB||1~2~0||N@07~A-SIC~208310~-1659529518~S~~~NRF~~6DCD3D297DE5472176920090787706AAUK0397025700131025e282",
+              "rateClass": "NRF",
+              "rateType": "BOOKABLE",
+              "net": "642.94",
+              "sellingRate": "784.08",
+              "hotelMandatory": true,
+              "allotment": 135,
+              "rateCommentsId": "164|59240|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "BB",
+              "boardName": "BED AND BREAKFAST",
+              "cancellationPolicies": [
+                {
+                  "amount": "642.94",
+                  "from": "2026-01-22T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-71.44"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|DBT.DX|BAR BB|BB||1~2~0||N@07~A-SIC~214367~-190380441~S~~~NOR~~6DCD3D297DE5472176920090787706AAUK039702570013102262ca",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "714.38",
+              "sellingRate": "871.20",
+              "hotelMandatory": true,
+              "allotment": 135,
+              "rateCommentsId": "164|59239|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "BB",
+              "boardName": "BED AND BREAKFAST",
+              "cancellationPolicies": [
+                {
+                  "amount": "357.19",
+                  "from": "2026-02-20T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-79.38"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "DBT.DX-PV",
+          "name": "Deluxe Superior",
+          "rates": [
+            {
+              "rateKey": "20260222|20260224|W|164|6605|DBT.DX-PV|NRFRO|RO||1~2~0||N@07~A-SIC~2582ae~81145189~S~~~NRF~~6DCD3D297DE5472176920090787706AAUK03970257001310218233",
+              "rateClass": "NRF",
+              "rateType": "BOOKABLE",
+              "net": "563.24",
+              "sellingRate": "686.88",
+              "hotelMandatory": true,
+              "allotment": 4,
+              "rateCommentsId": "164|59058|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "563.24",
+                  "from": "2026-01-22T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "promotions": [
+                {
+                  "code": "073",
+                  "name": "Non-refundable rate. No amendments permitted",
+                  "remark": "Non-refundable rate. No amendments permitted"
+                }
+              ],
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-62.58"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "DBT.SU",
+          "name": "Deluxe Corner",
+          "rates": [
+            {
+              "rateKey": "20260222|20260224|W|164|6605|DBT.SU|NRFRO|RO||1~2~0||N@07~A-SIC~2082bf~-1941987539~S~~~NRF~~6DCD3D297DE5472176920090787706AAUK03970257001310234240",
+              "rateClass": "NRF",
+              "rateType": "BOOKABLE",
+              "net": "576.52",
+              "sellingRate": "703.08",
+              "hotelMandatory": true,
+              "allotment": 4,
+              "rateCommentsId": "164|59058|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "576.52",
+                  "from": "2026-01-22T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "promotions": [
+                {
+                  "code": "073",
+                  "name": "Non-refundable rate. No amendments permitted",
+                  "remark": "Non-refundable rate. No amendments permitted"
+                }
+              ],
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-64.06"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|DBT.SU|BAR RO|RO||1~2~0||N@07~A-SIC~21430d~1977193334~S~~~NOR~~6DCD3D297DE5472176920090787706AAUK0397025700131023a280",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "640.58",
+              "sellingRate": "781.20",
+              "hotelMandatory": true,
+              "allotment": 4,
+              "rateCommentsId": "164|54591|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "320.29",
+                  "from": "2026-02-20T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-71.18"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|DBT.SU|NRFBB|BB||1~2~0||N@07~A-SIC~230330~651958617~S~~~NRF~~6DCD3D297DE5472176920090787706AAUK0397025700131023229d",
+              "rateClass": "NRF",
+              "rateType": "BOOKABLE",
+              "net": "669.50",
+              "sellingRate": "816.48",
+              "hotelMandatory": true,
+              "allotment": 4,
+              "rateCommentsId": "164|59240|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "BB",
+              "boardName": "BED AND BREAKFAST",
+              "cancellationPolicies": [
+                {
+                  "amount": "669.50",
+                  "from": "2026-01-22T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-74.40"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|DBT.SU|BAR BB|BB||1~2~0||N@07~A-SIC~21438b~474596508~S~~~NOR~~6DCD3D297DE5472176920090787706AAUK0397025700131025a2e7",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "743.90",
+              "sellingRate": "907.20",
+              "hotelMandatory": true,
+              "allotment": 4,
+              "rateCommentsId": "164|59239|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "BB",
+              "boardName": "BED AND BREAKFAST",
+              "cancellationPolicies": [
+                {
+                  "amount": "371.95",
+                  "from": "2026-02-20T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-82.66"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "TPL.SU",
+          "name": "CLASSIC TRIPLE",
+          "rates": [
+            {
+              "rateKey": "20260222|20260224|W|164|6605|TPL.SU|NRFRO|RO||1~2~0||N@07~A-SIC~21c2cf~-425072392~S~~~NRF~~6DCD3D297DE5472176920090787706AAUK0397025700131025024d",
+              "rateClass": "NRF",
+              "rateType": "BOOKABLE",
+              "net": "589.80",
+              "sellingRate": "719.28",
+              "hotelMandatory": true,
+              "allotment": 5,
+              "rateCommentsId": "164|59058|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "589.80",
+                  "from": "2026-01-22T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "promotions": [
+                {
+                  "code": "073",
+                  "name": "Non-refundable rate. No amendments permitted",
+                  "remark": "Non-refundable rate. No amendments permitted"
+                }
+              ],
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-65.54"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|TPL.SU|BAR RO|RO||1~2~0||N@07~A-SIC~21431f~138040947~S~~~NOR~~6DCD3D297DE5472176920090787706AAUK0397025700131022228f",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "655.34",
+              "sellingRate": "799.20",
+              "hotelMandatory": true,
+              "allotment": 5,
+              "rateCommentsId": "164|54591|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "327.67",
+                  "from": "2026-02-20T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-72.82"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|TPL.SU|NRFBB|BB||1~2~0||N@07~A-SIC~244340~-1109756964~S~~~NRF~~6DCD3D297DE5472176920090787706AAUK039702570013102502aa",
+              "rateClass": "NRF",
+              "rateType": "BOOKABLE",
+              "net": "682.80",
+              "sellingRate": "832.68",
+              "hotelMandatory": true,
+              "allotment": 5,
+              "rateCommentsId": "164|59240|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "BB",
+              "boardName": "BED AND BREAKFAST",
+              "cancellationPolicies": [
+                {
+                  "amount": "682.80",
+                  "from": "2026-01-22T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-75.86"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|TPL.SU|BAR BB|BB||1~2~0||N@07~A-SIC~21439d~-1364555903~S~~~NOR~~6DCD3D297DE5472176920090787706AAUK039702570013102422f6",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "758.66",
+              "sellingRate": "925.20",
+              "hotelMandatory": true,
+              "allotment": 5,
+              "rateCommentsId": "164|59239|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "BB",
+              "boardName": "BED AND BREAKFAST",
+              "cancellationPolicies": [
+                {
+                  "amount": "379.33",
+                  "from": "2026-02-20T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-84.30"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "DBT.EJ",
+          "name": "Executive Room",
+          "rates": [
+            {
+              "rateKey": "20260222|20260224|W|164|6605|DBT.EJ|NRFRO|RO||1~2~0||N@07~A-SIC~232445~794917447~S~~~NRF~~6DCD3D297DE5472176920090787706AAUK03970257001310243380",
+              "rateClass": "NRF",
+              "rateType": "BOOKABLE",
+              "net": "896.67",
+              "sellingRate": "1093.50",
+              "hotelMandatory": true,
+              "allotment": 24,
+              "rateCommentsId": "164|59058|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "896.67",
+                  "from": "2026-01-22T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "promotions": [
+                {
+                  "code": "073",
+                  "name": "Non-refundable rate. No amendments permitted",
+                  "remark": "Non-refundable rate. No amendments permitted"
+                }
+              ],
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-99.63"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|DBT.EJ|NRFBB|BB||1~2~0||N@07~A-SIC~25a4b6~1924506795~S~~~NRF~~6DCD3D297DE5472176920090787706AAUK039702570013102413dd",
+              "rateClass": "NRF",
+              "rateType": "BOOKABLE",
+              "net": "989.65",
+              "sellingRate": "1206.90",
+              "hotelMandatory": true,
+              "allotment": 24,
+              "rateCommentsId": "164|59240|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "BB",
+              "boardName": "BED AND BREAKFAST",
+              "cancellationPolicies": [
+                {
+                  "amount": "989.65",
+                  "from": "2026-01-22T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-109.97"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|DBT.EJ|BAR RO|RO||1~2~0||N@07~A-SIC~2004bf~-2004209551~S~~~NOR~~6DCD3D297DE5472176920090787706AAUK0397025700131021e3e4",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "996.30",
+              "sellingRate": "1215.00",
+              "hotelMandatory": true,
+              "allotment": 24,
+              "rateCommentsId": "164|54591|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "479.70",
+                  "from": "2026-02-20T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-110.70"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|DBT.EJ|BAR BB|BB||1~2~0||N@07~A-SIC~20053d~-1797865467~S~~~NOR~~6DCD3D297DE5472176920090787706AAUK0397025700131023e44b",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "1099.62",
+              "sellingRate": "1341.00",
+              "hotelMandatory": true,
+              "allotment": 24,
+              "rateCommentsId": "164|59239|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "BB",
+              "boardName": "BED AND BREAKFAST",
+              "cancellationPolicies": [
+                {
+                  "amount": "531.36",
+                  "from": "2026-02-20T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-122.18"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "STU.ST-2",
+          "name": "Studio FAMILY SUITE",
+          "rates": [
+            {
+              "rateKey": "20260222|20260224|W|164|6605|STU.ST-2|NRFRO|RO||1~2~0||N@07~A-SIC~232445~-509788054~S~~~NRF~~6DCD3D297DE5472176920090787706AAUK03970257001310243380",
+              "rateClass": "NRF",
+              "rateType": "BOOKABLE",
+              "net": "896.67",
+              "sellingRate": "1093.50",
+              "hotelMandatory": true,
+              "allotment": 1,
+              "rateCommentsId": "164|59058|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "896.67",
+                  "from": "2026-01-22T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "promotions": [
+                {
+                  "code": "073",
+                  "name": "Non-refundable rate. No amendments permitted",
+                  "remark": "Non-refundable rate. No amendments permitted"
+                }
+              ],
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-99.63"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|STU.ST-2|NRFBB|BB||1~2~0||N@07~A-SIC~25a4b6~619801294~S~~~NRF~~6DCD3D297DE5472176920090787706AAUK039702570013102413dd",
+              "rateClass": "NRF",
+              "rateType": "BOOKABLE",
+              "net": "989.65",
+              "sellingRate": "1206.90",
+              "hotelMandatory": true,
+              "allotment": 1,
+              "rateCommentsId": "164|59240|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "BB",
+              "boardName": "BED AND BREAKFAST",
+              "cancellationPolicies": [
+                {
+                  "amount": "989.65",
+                  "from": "2026-01-22T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-109.97"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|STU.ST-2|BAR RO|RO||1~2~0||N@07~A-SIC~2004bf~499592878~S~~~NOR~~6DCD3D297DE5472176920090787706AAUK0397025700131021e3e4",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "996.30",
+              "sellingRate": "1215.00",
+              "hotelMandatory": true,
+              "allotment": 1,
+              "rateCommentsId": "164|54591|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "479.70",
+                  "from": "2026-02-20T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-110.70"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|STU.ST-2|BAR BB|BB||1~2~0||N@07~A-SIC~20053d~705936962~S~~~NOR~~6DCD3D297DE5472176920090787706AAUK0397025700131023e44b",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "1099.62",
+              "sellingRate": "1341.00",
+              "hotelMandatory": true,
+              "allotment": 1,
+              "rateCommentsId": "164|59239|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "BB",
+              "boardName": "BED AND BREAKFAST",
+              "cancellationPolicies": [
+                {
+                  "amount": "531.36",
+                  "from": "2026-02-20T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-122.18"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "STU.ST-1",
+          "name": "STUDIO SUITE",
+          "rates": [
+            {
+              "rateKey": "20260222|20260224|W|164|6605|STU.ST-1|NRFRO|RO||1~2~0||N@07~A-SIC~200561~-1503759578~S~~~NRF~~6DCD3D297DE5472176920090787706AAUK0397025700131020d469",
+              "rateClass": "NRF",
+              "rateType": "BOOKABLE",
+              "net": "1129.13",
+              "sellingRate": "1377.00",
+              "hotelMandatory": true,
+              "allotment": 3,
+              "rateCommentsId": "164|59058|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "1129.13",
+                  "from": "2026-01-22T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "promotions": [
+                {
+                  "code": "073",
+                  "name": "Non-refundable rate. No amendments permitted",
+                  "remark": "Non-refundable rate. No amendments permitted"
+                }
+              ],
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-125.47"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|STU.ST-1|NRFBB|BB||1~2~0||N@07~A-SIC~2285d2~642165129~S~~~NRF~~6DCD3D297DE5472176920090787706AAUK0397025700131020d4c6",
+              "rateClass": "NRF",
+              "rateType": "BOOKABLE",
+              "net": "1222.13",
+              "sellingRate": "1490.40",
+              "hotelMandatory": true,
+              "allotment": 3,
+              "rateCommentsId": "164|59240|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "BB",
+              "boardName": "BED AND BREAKFAST",
+              "cancellationPolicies": [
+                {
+                  "amount": "1222.13",
+                  "from": "2026-01-22T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-135.79"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|STU.ST-1|BAR RO|RO||1~2~0||N@07~A-SIC~2005fa~1309316830~S~~~NOR~~6DCD3D297DE5472176920090787706AAUK0397025700131023c4e6",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "1254.60",
+              "sellingRate": "1530.00",
+              "hotelMandatory": true,
+              "allotment": 3,
+              "rateCommentsId": "164|54591|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "608.85",
+                  "from": "2026-02-20T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-139.40"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|STU.ST-1|BAR BB|BB||1~2~0||N@07~A-SIC~200678~756640185~S~~~NOR~~6DCD3D297DE5472176920090787706AAUK0397025700131025c54d",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "1357.92",
+              "sellingRate": "1656.00",
+              "hotelMandatory": true,
+              "allotment": 3,
+              "rateCommentsId": "164|59239|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "BB",
+              "boardName": "BED AND BREAKFAST",
+              "cancellationPolicies": [
+                {
+                  "amount": "660.51",
+                  "from": "2026-02-20T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-150.88"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "SUI.PV",
+          "name": "PARK SUITE",
+          "rates": [
+            {
+              "rateKey": "20260222|20260224|W|164|6605|SUI.PV|NRFRO|RO||1~2~0||N@07~A-SIC~2007e9~-575659206~S~~~NRF~~6DCD3D297DE5472176920090787706AAUK0397025700131023167c",
+              "rateClass": "NRF",
+              "rateType": "BOOKABLE",
+              "net": "1660.49",
+              "sellingRate": "2025.00",
+              "hotelMandatory": true,
+              "allotment": 4,
+              "rateCommentsId": "164|59058|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "1660.49",
+                  "from": "2026-01-22T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "promotions": [
+                {
+                  "code": "073",
+                  "name": "Non-refundable rate. No amendments permitted",
+                  "remark": "Non-refundable rate. No amendments permitted"
+                }
+              ],
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-184.51"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|SUI.PV|NRFBB|BB||1~2~0||N@07~A-SIC~22885a~1983422896~S~~~NRF~~6DCD3D297DE5472176920090787706AAUK039702570013102316d9",
+              "rateClass": "NRF",
+              "rateType": "BOOKABLE",
+              "net": "1753.49",
+              "sellingRate": "2138.40",
+              "hotelMandatory": true,
+              "allotment": 4,
+              "rateCommentsId": "164|59240|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "BB",
+              "boardName": "BED AND BREAKFAST",
+              "cancellationPolicies": [
+                {
+                  "amount": "1753.49",
+                  "from": "2026-01-22T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-194.83"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|SUI.PV|BAR RO|RO||1~2~0||N@07~A-SIC~2008ca~-947790930~S~~~NOR~~6DCD3D297DE5472176920090787706AAUK03970257001310200735",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "1845.00",
+              "sellingRate": "2250.00",
+              "hotelMandatory": true,
+              "allotment": 4,
+              "rateCommentsId": "164|54591|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "904.05",
+                  "from": "2026-02-20T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-205.00"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|SUI.PV|BAR BB|BB||1~2~0||N@07~A-SIC~200948~-1500466831~S~~~NOR~~6DCD3D297DE5472176920090787706AAUK0397025700131022079c",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "1948.32",
+              "sellingRate": "2376.00",
+              "hotelMandatory": true,
+              "allotment": 4,
+              "rateCommentsId": "164|59239|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "BB",
+              "boardName": "BED AND BREAKFAST",
+              "cancellationPolicies": [
+                {
+                  "amount": "955.71",
+                  "from": "2026-02-20T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-216.48"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "code": "SUI.ST-3",
+          "name": "ROYAL SUITE",
+          "rates": [
+            {
+              "rateKey": "20260222|20260224|W|164|6605|SUI.ST-3|NRFRO|RO||1~2~0||N@07~A-SIC~200cf9~419937850~S~~~NRF~~6DCD3D297DE5472176920090787706AAUK03970257001310216aa3",
+              "rateClass": "NRF",
+              "rateType": "BOOKABLE",
+              "net": "2723.22",
+              "sellingRate": "3321.00",
+              "hotelMandatory": true,
+              "allotment": 1,
+              "rateCommentsId": "164|59058|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "2723.22",
+                  "from": "2026-01-22T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "promotions": [
+                {
+                  "code": "073",
+                  "name": "Non-refundable rate. No amendments permitted",
+                  "remark": "Non-refundable rate. No amendments permitted"
+                }
+              ],
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-302.58"
+                }
+              ]
+            },
+            {
+              "rateKey": "20260222|20260224|W|164|6605|SUI.ST-3|BAR RO|RO||1~2~0||N@07~A-SIC~200e6a~-1034696018~S~~~NOR~~6DCD3D297DE5472176920090787706AAUK03970257001310250bd1",
+              "rateClass": "NOR",
+              "rateType": "BOOKABLE",
+              "net": "3025.80",
+              "sellingRate": "3690.00",
+              "hotelMandatory": true,
+              "allotment": 1,
+              "rateCommentsId": "164|54591|0",
+              "paymentType": "AT_WEB",
+              "packaging": false,
+              "boardCode": "RO",
+              "boardName": "ROOM ONLY",
+              "cancellationPolicies": [
+                {
+                  "amount": "1512.90",
+                  "from": "2026-02-20T23:59:00Z"
+                }
+              ],
+              "rooms": 1,
+              "adults": 2,
+              "children": 0,
+              "offers": [
+                {
+                  "code": "9010",
+                  "name": "Tailored Campaign",
+                  "amount": "-336.20"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "minRate": "490.18",
+      "maxRate": "3025.80",
+      "currency": "GBP"
+    }
+  },
+  "comparison": {
+    "hotelCount": {
+      "vyspa": 0,
+      "hotelbeds": 397,
+      "winner": "HotelBeds"
+    },
+    "responseTime": {
+      "vyspa": 17750,
+      "hotelbeds": 1722,
+      "winner": "HotelBeds"
+    }
+  }
+}

@@ -11,6 +11,25 @@
 import process from 'process';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Read .env manually (no dotenv dependency)
+const envPath = join(__dirname, '..', '.env');
+const envContent = fs.readFileSync(envPath, 'utf-8');
+const envVars = {};
+envContent.split('\n').forEach(line => {
+  const match = line.match(/^([^=]+)=(.*)$/);
+  if (match) {
+    envVars[match[1].trim()] = match[2].trim();
+  }
+});
+
+// Set environment variables
+Object.assign(process.env, envVars);
 
 function requireEnv(key) {
   const v = process.env[key];
@@ -49,9 +68,26 @@ async function post(path, payload) {
   return { ok: res.ok, status: res.status, json };
 }
 
-function pickCity(items) {
+function pickCity(items, q) {
   if (!Array.isArray(items)) return null;
-  return items.find((x) => String(x.loc).toLowerCase() === 'city') || items[0] || null;
+  const query = String(q || '').trim().toLowerCase();
+  const cities = items.filter((x) => String(x?.loc).toLowerCase() === 'city');
+  const normCountry = (x) => String(x?.country || x?.country_name || '').trim().toLowerCase();
+  const normLabel = (x) => String(x?.label || '').trim().toLowerCase();
+
+  // Prefer exact label match in UK (avoids "East London" in South Africa)
+  const exactUk = cities.find((x) => normLabel(x) === query && normCountry(x).includes('united kingdom'));
+  if (exactUk) return exactUk;
+
+  // Otherwise any UK city
+  const anyUk = cities.find((x) => normCountry(x).includes('united kingdom'));
+  if (anyUk) return anyUk;
+
+  // Otherwise exact label match anywhere
+  const exact = cities.find((x) => normLabel(x) === query);
+  if (exact) return exact;
+
+  return cities[0] || items[0] || null;
 }
 
 async function main() {
@@ -59,6 +95,10 @@ async function main() {
   const checkIn = process.argv[3] || '2026-02-10';
   const checkOut = process.argv[4] || '2026-02-12';
   const branches = process.env.VYSPA_BRANCH_CODE || 'UK';
+  const nights = Math.max(
+    1,
+    Math.round((new Date(checkOut).getTime() - new Date(checkIn).getTime()) / (1000 * 60 * 60 * 24))
+  );
 
   console.log('== Vyspa hotels smoke test ==');
   console.log({ q, checkIn, checkOut, branches, base: baseUrl() });
@@ -70,7 +110,7 @@ async function main() {
     process.exit(1);
   }
 
-  const city = pickCity(cities.json);
+  const city = pickCity(cities.json, q);
   if (!city) throw new Error('No city found');
 
   console.log('Picked', { id: city.id, label: city.label, loc: city.loc, arrival_point_code: city.arrival_point_code });
@@ -80,7 +120,7 @@ async function main() {
       location: city.label,
       hidden_id: String(city.id),
       hidden_key: String(city.loc),
-      nights: '2',
+      nights: String(nights),
       rooms: '1',
       adults: '2',
       children: '0',
@@ -106,7 +146,7 @@ async function main() {
     hasCriteria: !!avail.json?.Criteria,
     searchCriteriaId,
     resultsCount: results.length,
-    topKeys: Object.keys(avail.json || {}).slice(0, 20),
+    topKeys: Object.keys(avail.json || {}).slice(0, 100),
   });
 
   const firstHotel = results[0] || null;
@@ -216,7 +256,7 @@ async function main() {
         location: city.label,
         hidden_id: String(city.id),
         hidden_key: String(city.loc),
-        nights: '2',
+        nights: String(nights),
         rooms: '1',
         adults: '2',
         children: '0',

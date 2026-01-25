@@ -1,0 +1,118 @@
+{
+  "query": {
+    "q": "london",
+    "checkIn": "2026-02-03",
+    "checkOut": "2026-02-10",
+    "branches": "UK",
+    "base": "https://a1.stagev4.vyspa.net/anon.php"
+  },
+  "get_cities": {
+    "ok": true,
+    "status": 200,
+    "json": [
+      {
+        "id": 12057,
+        "label": "East London",
+        "loc": "City",
+        "country": "South Africa"
+      },
+      {
+        "id": 13924,
+        "label": "Londonderry",
+        "loc": "City",
+        "country": "United Kingdom"
+      },
+      {
+        "id": 14095,
+        "label": "London",
+        "loc": "City",
+        "country": "United Kingdom"
+      },
+      {
+        "id": 19385,
+        "label": "L London",
+        "loc": "City",
+        "country": "United Kingdom"
+      },
+      {
+        "id": 48794,
+        "label": "New London",
+        "loc": null,
+        "country": "United States"
+      },
+      {
+        "id": 49066,
+        "label": "London",
+        "loc": null,
+        "country": "Canada"
+      },
+      {
+        "id": 52237,
+        "label": "London",
+        "loc": null,
+        "country": "United States"
+      },
+      {
+        "id": 54717,
+        "label": "London",
+        "loc": null,
+        "country": "United States"
+      },
+      {
+        "id": 55909,
+        "label": "Londonderry",
+        "loc": null,
+        "country": "United States"
+      },
+      {
+        "id": 59440,
+        "label": "New London",
+        "loc": null,
+        "country": "United States"
+      }
+    ]
+  },
+  "accommodationAvailabilityV3": {
+    "ok": true,
+    "status": 200,
+    "json": {
+      "Results": [
+        true,
+        "No hotels found in this area."
+      ],
+      "Criteria": {
+        "location": "East London",
+        "hidden_id": 12057,
+        "hidden_key": "City",
+        "nights": 2,
+        "rooms": 1,
+        "adults": 2,
+        "children": 0,
+        "arrivalDate": "2026-02-03",
+        "departureDate": "2026-02-10",
+        "internal_rates": 1,
+        "live_rates": 1,
+        "optionsRadios": "hotels",
+        "branches": "UK",
+        "api": 1,
+        "arrival": "2026-02-03",
+        "departure": "2026-02-10",
+        "searchCriteriaId": 52014668
+      }
+    }
+  },
+  "getRoomsV3": {
+    "ok": true,
+    "status": 200,
+    "json": {
+      "error": true,
+      "desc": "No hotels found in this area."
+    }
+  },
+  "hotel_search_details": null,
+  "createApiCustomerFolder": {
+    "ok": true,
+    "status": 200,
+    "json": 136279
+  }
+}

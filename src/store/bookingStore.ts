@@ -140,6 +140,7 @@ interface BookingState {
       rooms?: any[];
       detailsText?: string;
       cancellationText?: string;
+      amenities?: string[];
       fetchedAt: number;
     }
   >;

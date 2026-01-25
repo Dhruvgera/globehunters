@@ -1,0 +1,125 @@
+{
+  "query": {
+    "q": "new york",
+    "checkIn": "2026-03-15",
+    "checkOut": "2026-03-17",
+    "branches": "UK",
+    "base": "https://a1.stagev4.vyspa.net/anon.php"
+  },
+  "get_cities": {
+    "ok": true,
+    "status": 200,
+    "json": [
+      {
+        "id": 15134,
+        "label": "New York, NY",
+        "loc": "City",
+        "country": "United States"
+      },
+      {
+        "id": 30003,
+        "label": "New York",
+        "loc": "City",
+        "country": "United States"
+      },
+      {
+        "id": 57283,
+        "label": "New York (and vicinity)",
+        "loc": null,
+        "country": "United States"
+      },
+      {
+        "id": 61493,
+        "label": "New York Mills",
+        "loc": null,
+        "country": "United States"
+      },
+      {
+        "id": 73531,
+        "label": "Central New York State",
+        "loc": null,
+        "country": "United States"
+      },
+      {
+        "id": 73798,
+        "label": "Niagara Falls - Western New York",
+        "loc": null,
+        "country": "United States"
+      },
+      {
+        "id": 96696,
+        "label": "AESSEAL New York Stadium",
+        "loc": null,
+        "country": "United Kingdom"
+      },
+      {
+        "id": 101999,
+        "label": "East New York",
+        "loc": null,
+        "country": "United States"
+      },
+      {
+        "id": 103473,
+        "label": "Upstate New York",
+        "loc": null,
+        "country": "United States"
+      },
+      {
+        "id": 103479,
+        "label": "Downstate New York",
+        "loc": null,
+        "country": "United States"
+      },
+      {
+        "id": 5133,
+        "label": "Park Central New York",
+        "loc": "Hotel",
+        "city": "New York, NY",
+        "country": "United States"
+      }
+    ]
+  },
+  "accommodationAvailabilityV3": {
+    "ok": true,
+    "status": 200,
+    "json": {
+      "Results": [
+        true,
+        "No hotels found in this area."
+      ],
+      "Criteria": {
+        "location": "New York, NY",
+        "hidden_id": 15134,
+        "hidden_key": "City",
+        "nights": 2,
+        "rooms": 1,
+        "adults": 2,
+        "children": 0,
+        "arrivalDate": "2026-03-15",
+        "departureDate": "2026-03-17",
+        "internal_rates": 1,
+        "live_rates": 1,
+        "optionsRadios": "hotels",
+        "branches": "UK",
+        "api": 1,
+        "arrival": "2026-03-15",
+        "departure": "2026-03-17",
+        "searchCriteriaId": 52014636
+      }
+    }
+  },
+  "getRoomsV3": {
+    "ok": true,
+    "status": 200,
+    "json": {
+      "error": true,
+      "desc": "No hotels found in this area."
+    }
+  },
+  "hotel_search_details": null,
+  "createApiCustomerFolder": {
+    "ok": true,
+    "status": 200,
+    "json": 136274
+  }
+}
