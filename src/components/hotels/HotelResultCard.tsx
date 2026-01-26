@@ -42,13 +42,16 @@ export function HotelResultCard({
   view,
   selected = false,
   onSelect,
+  isPackageMode = false,
 }: {
   hotel: Hotel;
   view: Exclude<HotelViewMode, "map">;
   selected?: boolean;
   onSelect?: () => void;
+  isPackageMode?: boolean;
 }) {
   const isGrid = view === "grid";
+  const hotelDetailUrl = isPackageMode ? `/hotels/${hotel.id}?type=package` : `/hotels/${hotel.id}`;
 
   const rootClass = [
     "bg-white border rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden w-full max-w-full cursor-pointer",
@@ -157,7 +160,7 @@ export function HotelResultCard({
             </div>
 
             {/* CTA Button */}
-            <Link href={`/hotels/${hotel.id}`} className="w-full">
+            <Link href={hotelDetailUrl} className="w-full">
               <Button className="rounded-full py-3 h-auto gap-2 text-sm font-semibold w-full bg-[#3754ED] hover:bg-[#2A3FB8] text-white">
                 Check Rooms
                 <ChevronRight className="h-4 w-4" />
@@ -253,7 +256,7 @@ export function HotelResultCard({
               </div>
 
               <div className="mt-auto w-full flex justify-end">
-                <Link href={`/hotels/${hotel.id}`}>
+                <Link href={hotelDetailUrl}>
                   <Button className="rounded-full px-4 py-2 h-auto gap-1.5 text-sm font-medium bg-[#3754ED] hover:bg-[#2A3FB8] text-white w-[170px]">
                     Check Rooms
                     <ChevronRight className="h-4 w-4" />

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronRight,
   ChevronUp,
@@ -42,6 +42,7 @@ import { useBookingStore } from "@/store/bookingStore";
 import {
   mockHotelDetails,
 } from "@/data/mockHotelDetails";
+import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
 
 function LoadingBlock({ className }: { className: string }) {
   return <div className={`animate-pulse bg-gray-200/70 rounded-xl ${className}`} />;
@@ -105,10 +106,62 @@ function transformAmenities(rawAmenities: string[]): { label: string; icon: stri
 // Navigation sections
 const navSections = ["Overview", "About", "Rooms", "Accessibilities", "Policies"];
 
+// Package mode mock rooms (so we don't depend on hotel APIs yet)
+const mockPackageRooms: any[] = [
+  {
+    id: "pkg-room-1",
+    name: "Deluxe King Room",
+    bedType: "Breakfast included",
+    reviews: { score: 9.2, label: "Excellent", count: 412 },
+    isRefundable: true,
+    paymentType: "Pay now",
+    amenities: [
+      { label: "Free WiFi", icon: "wifi" },
+      { label: "Air conditioning", icon: "ac" },
+      { label: "City view", icon: "city" },
+    ],
+    price: { currency: "£", nightly: 285, total: 1710 },
+    _raw: { room_code: "PKG.DLX" },
+  },
+  {
+    id: "pkg-room-2",
+    name: "Premier Twin Room",
+    bedType: "Room only",
+    reviews: { score: 8.9, label: "Very good", count: 287 },
+    isRefundable: false,
+    paymentType: "Pay now",
+    amenities: [
+      { label: "Free WiFi", icon: "wifi" },
+      { label: "Gym access", icon: "gym" },
+    ],
+    price: { currency: "£", nightly: 240, total: 1440 },
+    _raw: { room_code: "PKG.PRM" },
+  },
+  {
+    id: "pkg-room-3",
+    name: "Executive Suite",
+    bedType: "Breakfast included",
+    reviews: { score: 9.5, label: "Exceptional", count: 155 },
+    isRefundable: true,
+    paymentType: "Pay now",
+    amenities: [
+      { label: "Free WiFi", icon: "wifi" },
+      { label: "Spa access", icon: "spa" },
+      { label: "Airport shuttle", icon: "shuttle" },
+    ],
+    price: { currency: "£", nightly: 410, total: 2460 },
+    _raw: { room_code: "PKG.SUI" },
+  },
+];
+
 export default function HotelRoomsPage() {
   const params = useParams();
   const hotelId = params?.id as string;
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // Detect if we're in package (flight+hotel) mode
+  const isPackageMode = searchParams.get("type") === "package";
 
   const hotelSearch = useBookingStore((s) => s.hotelSearch);
   const hotelResultsMeta = useBookingStore((s) => s.hotelResultsMeta);
@@ -353,6 +406,60 @@ export default function HotelRoomsPage() {
     let cancelled = false;
 
     async function loadRooms() {
+      // Package mode should not use live hotel APIs yet.
+      if (isPackageMode) {
+        setRoomsLoading(true);
+        setRoomsError(null);
+
+        const headerName =
+          searchParams.get("hotelName") ||
+          hotelResultsMeta?.[hotelId]?.hotelName ||
+          remoteHotelHeader?.name ||
+          mockHotelDetails.name;
+
+        const headerRating =
+          Number(hotelResultsMeta?.[hotelId]?.hotelRating || remoteHotelHeader?.rating || mockHotelDetails.starRating || 3) || 3;
+
+        const headerImage =
+          hotelResultsMeta?.[hotelId]?.image_name ||
+          remoteHotelHeader?.image ||
+          mockHotelDetails.mainImage;
+
+        if (!cancelled) {
+          setRemoteHotelHeader({
+            name: headerName,
+            rating: headerRating,
+            image: headerImage,
+            address: remoteHotelHeader?.address,
+          });
+
+          // Sort low -> high like the normal flow
+          const flattened = [...mockPackageRooms].sort((a, b) => (a.price.total || 0) - (b.price.total || 0));
+          const cheapest = flattened[0];
+
+          setRemoteRooms(flattened);
+          setSelectedHotel({ hotelId, hotelName: headerName });
+
+          if (cheapest?.id) {
+            setSelectedHotelRoomIds([String(cheapest.id)]);
+            setSelectedRoomId(String(cheapest.id));
+            setSelectedHotelRoomSummary({
+              hotelId,
+              roomId: String(cheapest.id),
+              roomName: cheapest?.name,
+              mealName: cheapest?.bedType,
+              isRefundable: cheapest?.isRefundable,
+              currency: cheapest?.price?.currency,
+              total: cheapest?.price?.total,
+              nightly: cheapest?.price?.nightly,
+            });
+          }
+        }
+
+        if (!cancelled) setRoomsLoading(false);
+        return;
+      }
+
       if (!hotelSearch?.searchCriteriaId) return;
       setRoomsLoading(true);
       setRoomsError(null);
@@ -553,7 +660,7 @@ export default function HotelRoomsPage() {
     return () => {
       cancelled = true;
     };
-  }, [hotelId, hotelResultsMeta, hotelSearch?.searchCriteriaId, setSelectedHotel]);
+  }, [hotelId, hotelResultsMeta, hotelSearch?.searchCriteriaId, isPackageMode, searchParams, setSelectedHotel]);
 
   const scrollToSection = (section: string) => {
     setActiveSection(section);
@@ -624,6 +731,13 @@ export default function HotelRoomsPage() {
           </div>
         </div>
       </div>
+
+      {/* Package Mode: Step Progress */}
+      {isPackageMode && (
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-6">
+          <PackageStepProgress currentStep="stay" />
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
@@ -1015,10 +1129,41 @@ export default function HotelRoomsPage() {
                               total: room?.price?.total,
                               nightly: room?.price?.nightly,
                             });
-                            router.push("/hotels/checkout");
+                            // Navigate based on mode
+                            if (isPackageMode) {
+                              // For package mode, go to flight search with package context
+                              const params = new URLSearchParams();
+                              params.set("type", "package");
+                              params.set("hotelId", hotelId);
+                              params.set("hotelName", hotel.name);
+                              params.set("roomId", String(rid));
+                              // Preserve search params for flight search
+                              const checkIn = searchParams.get("checkIn");
+                              const checkOut = searchParams.get("checkOut");
+                              const guests = searchParams.get("guests") || searchParams.get("adults") || "2";
+                              const rooms = searchParams.get("rooms") || "1";
+                              if (checkIn) {
+                                params.set("departureDate", checkIn);
+                                params.set("checkIn", checkIn);
+                              }
+                              if (checkOut) {
+                                params.set("returnDate", checkOut);
+                                params.set("checkOut", checkOut);
+                              }
+                              params.set("guests", guests);
+                              params.set("rooms", rooms);
+                              // Default origin/destination - in real app these would come from user selection
+                              params.set("from", "LHR");
+                              params.set("to", "HKG");
+                              params.set("adults", guests);
+                              params.set("tripType", "round-trip");
+                              router.push(`/search?${params.toString()}`);
+                            } else {
+                              router.push("/hotels/checkout");
+                            }
                           }}
                         >
-                          Reserve
+                          {isPackageMode ? "Continue Booking" : "Reserve"}
                           <ChevronRight className="w-5 h-5" />
                         </Button>
                       </div>

@@ -16,11 +16,15 @@ import { usePriceCheck } from "@/hooks/usePriceCheck";
 interface FlightCardProps {
   flight: Flight;
   showReturn?: boolean;
+  onSelect?: () => void;
+  isPackageMode?: boolean;
 }
 
 export default function FlightCard({
   flight,
   showReturn = true,
+  onSelect,
+  isPackageMode = false,
 }: FlightCardProps) {
   const router = useRouter();
   const setSelectedFlight = useBookingStore(
@@ -54,6 +58,13 @@ export default function FlightCard({
   const handleSelectFlight = (
     fareType: "Eco Value" | "Eco Classic" | "Eco Flex"
   ) => {
+    // For package mode, use the onSelect callback instead of navigating to booking
+    if (isPackageMode && onSelect) {
+      setSelectedFlight(flight, fareType);
+      onSelect();
+      return;
+    }
+
     // Clear any previous folder info when selecting a new flight
     setVyspaFolderInfo({ folderNumber: '', customerId: null, emailAddress: null });
     
@@ -157,6 +168,8 @@ export default function FlightCard({
         flight={flight}
         open={showFlightInfo}
         onOpenChange={setShowFlightInfo}
+        isPackageMode={isPackageMode}
+        onPackageSelect={onSelect}
       />
     </div>
   );

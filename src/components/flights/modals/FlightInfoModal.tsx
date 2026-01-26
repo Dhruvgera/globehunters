@@ -48,6 +48,8 @@ interface FlightInfoModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   stayOnCurrentPage?: boolean;
+  isPackageMode?: boolean;
+  onPackageSelect?: () => void;
 }
 
 export default function FlightInfoModal({
@@ -55,6 +57,8 @@ export default function FlightInfoModal({
   open,
   onOpenChange,
   stayOnCurrentPage = false,
+  isPackageMode = false,
+  onPackageSelect,
 }: FlightInfoModalProps) {
   const t = useTranslations('flightInfo');
   const router = useRouter();
@@ -351,6 +355,13 @@ export default function FlightInfoModal({
 
     if (stayOnCurrentPage) {
       onOpenChange(false);
+      return;
+    }
+
+    // For package mode, use the onPackageSelect callback
+    if (isPackageMode && onPackageSelect) {
+      onOpenChange(false);
+      onPackageSelect();
       return;
     }
 

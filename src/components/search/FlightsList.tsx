@@ -7,27 +7,38 @@ import { useTranslations } from "next-intl";
 
 interface FlightsListProps {
   flights: Flight[];
-  displayCount: number;
-  onLoadMore: () => void;
+  displayCount?: number;
+  onLoadMore?: () => void;
+  onSelect?: (flight: Flight) => void;
+  isPackageMode?: boolean;
+  currency?: string;
 }
 
 export function FlightsList({
   flights,
   displayCount,
   onLoadMore,
+  onSelect,
+  isPackageMode = false,
+  currency = "£",
 }: FlightsListProps) {
   const t = useTranslations('search.flights');
-  const displayedFlights = flights.slice(0, displayCount);
-  const hasMore = displayCount < flights.length;
+  const displayedFlights = displayCount ? flights.slice(0, displayCount) : flights;
+  const hasMore = displayCount ? displayCount < flights.length : false;
 
   return (
     <div className="flex-1 flex flex-col gap-2 min-w-0">
       {displayedFlights.map((flight) => (
-        <FlightCard key={flight.id} flight={flight} />
+        <FlightCard 
+          key={flight.id} 
+          flight={flight} 
+          onSelect={onSelect ? () => onSelect(flight) : undefined}
+          isPackageMode={isPackageMode}
+        />
       ))}
 
       {/* Show More Results Button */}
-      {hasMore && (
+      {hasMore && onLoadMore && (
         <div className="flex justify-center mt-4">
           <Button
             onClick={onLoadMore}

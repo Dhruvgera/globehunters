@@ -74,8 +74,12 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
 
   const productFromUrl: Product = useMemo(() => {
     if (pathname?.startsWith("/hotels")) {
-      const t = urlParams.get("type");
-      return t === "package" ? "package" : "hotel";
+      // Check if it's a package search (Flight+Hotel)
+      const typeParam = urlParams.get("type");
+      if (typeParam === "package") {
+        return "package";
+      }
+      return "hotel";
     }
     return "flight";
   }, [pathname, urlParams]);
@@ -197,7 +201,28 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
   };
 
   const handleSearch = () => {
-    if (activeProduct === "hotel" || activeProduct === "package") {
+    if (activeProduct === "package") {
+      // Flight+Hotel packages: navigate to /hotels?type=package with query params
+      const loc = hotelLocationItem?.label?.trim() || "London";
+      const checkIn = hotelStartDate ? format(hotelStartDate, "yyyy-MM-dd") : "";
+      const checkOut = hotelEndDate ? format(hotelEndDate, "yyyy-MM-dd") : "";
+      const params = new URLSearchParams();
+      params.set("type", "package");
+      params.set("location", loc);
+      if (checkIn) params.set("checkIn", checkIn);
+      if (checkOut) params.set("checkOut", checkOut);
+      params.set("adults", String(Math.max(1, hotelGuests)));
+      params.set("rooms", String(Math.max(1, hotelRooms)));
+      // Include flight origin if available
+      if (from?.code) params.set("fromCode", from.code);
+      if (from?.city) params.set("from", from.city);
+      if (hotelLocationItem?.id != null) params.set("hidden_id", String(hotelLocationItem.id));
+      if (hotelLocationItem?.loc) params.set("hidden_key", String(hotelLocationItem.loc));
+      if (hotelLocationItem) setHotelLocationSelection(hotelLocationItem);
+      router.push(`/hotels?${params.toString()}`);
+      return;
+    }
+    if (activeProduct === "hotel") {
       // Hotels: navigate to /hotels with query params so results page can call Vyspa
       const loc = hotelLocationItem?.label?.trim() || "London";
       const checkIn = hotelStartDate ? format(hotelStartDate, "yyyy-MM-dd") : "";

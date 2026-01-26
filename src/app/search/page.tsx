@@ -31,6 +31,9 @@ import { ContactCard } from "@/components/search/ContactCard";
 import { FlightSortTabs } from "@/components/search/FlightSortTabs";
 import { SortOption } from "@/utils/flightFilter";
 import { FlightSearchLoading } from "@/components/flights/FlightSearchLoading";
+import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
+import { PackageStaySummary } from "@/components/packages/PackageStaySummary";
+import { mockPackageFlights } from "@/data/mockPackageFlights";
 
 // Default search params
 const DEFAULT_SEARCH_PARAMS: SearchParams = {
@@ -58,6 +61,12 @@ function SearchPageContent() {
   const t = useTranslations('search');
   const urlParams = useSearchParams();
   const router = useRouter();
+  
+  // Detect if we're in package (Flight+Hotel) mode
+  const isPackageMode = urlParams.get("type") === "package";
+  const packageHotelId = urlParams.get("hotelId");
+  const packageHotelName = urlParams.get("hotelName");
+  
   const setStoreSearchParams = useBookingStore((state) => state.setSearchParams);
   const storeSearchParams = useBookingStore((state) => state.searchParams);
   const setSearchRequestId = useBookingStore((state) => state.setSearchRequestId);
@@ -404,7 +413,12 @@ function SearchPageContent() {
   }, [departureDates.length, returnDates.length, fetchDatePricesBatch, effectiveSearchParams.tripType]);
 
   // Only use mock data if explicitly in error state and no real data
+  // For package mode, always use mock package flights
   const effectiveFlights = useMemo(() => {
+    // Package mode: use mock package flights (no API calls)
+    if (isPackageMode) {
+      return mockPackageFlights;
+    }
     // While loading after initial results, keep showing last results
     if (loading) {
       if (flights.length > 0) return flights;
@@ -416,7 +430,7 @@ function SearchPageContent() {
     if (error) return mockFlights;
     // Otherwise empty
     return [];
-  }, [flights, loading, error]);
+  }, [flights, loading, error, isPackageMode]);
 
   const effectiveFilters = useMemo(() => {
     // Always return filters (even empty during loading)
@@ -448,7 +462,20 @@ function SearchPageContent() {
   }, [apiFilters, loading, resolvedAirportNames]);
 
   // Initialize/adjust price range when real API filters arrive or bounds change
+  // For package mode, use a wide price range to show all mock flights
   useEffect(() => {
+    if (isPackageMode) {
+      // For package mode with mock data, ensure wide price range
+      setFilterState((prev) => ({
+        ...prev,
+        priceRange: [0, 5000],
+        departureAirports: [],
+        arrivalAirports: [],
+        airlines: [],
+        stops: [],
+      }));
+      return;
+    }
     if (apiFilters?.minPrice != null && apiFilters?.maxPrice != null) {
       setFilterState((prev) => {
         const isPlaceholder = prev.priceRange[0] === 0 && prev.priceRange[1] === 2000;
@@ -463,7 +490,7 @@ function SearchPageContent() {
         return prev;
       });
     }
-  }, [apiFilters?.minPrice, apiFilters?.maxPrice]);
+  }, [apiFilters?.minPrice, apiFilters?.maxPrice, isPackageMode]);
 
   // Track date changes from date slider to reset filters
   const prevDatesRef = useRef<{ departure: number | null; return: number | null }>({
@@ -901,6 +928,14 @@ function SearchPageContent() {
     setDisplayedFlightsCount((prev) => Math.min(prev + 5, filteredFlights.length));
   };
 
+  // Handler for package mode flight selection
+  const handlePackageFlightSelect = (flight: typeof filteredFlights[0]) => {
+    // Build URL with all package parameters for review page
+    const params = new URLSearchParams(urlParams.toString());
+    params.set("flightId", flight.id);
+    router.push(`/packages/review?${params.toString()}`);
+  };
+
   // Inactivity: 30 minutes -> show fare expired popup
   useIdleTimer({
     timeoutMs: 30 * 60 * 1000,
@@ -947,6 +982,23 @@ function SearchPageContent() {
         resultCount={filteredFlights.length}
       />
 
+      {/* Package Mode: Step Progress */}
+      {isPackageMode && (
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-6">
+          <PackageStepProgress currentStep="flight" />
+          {/* Hotel/Stay Summary for package mode */}
+          {packageHotelName && (
+            <PackageStaySummary 
+              hotelName={decodeURIComponent(packageHotelName)}
+              checkIn={urlParams.get("checkIn") || urlParams.get("departureDate") || ""}
+              checkOut={urlParams.get("checkOut") || urlParams.get("returnDate") || ""}
+              guests={parseInt(urlParams.get("guests") || urlParams.get("adults") || "2")}
+              rooms={parseInt(urlParams.get("rooms") || "1")}
+            />
+          )}
+        </div>
+      )}
+
       {/* Date Price Selector - Show for one-way and round-trip only (not multi-city) */}
       {!error && departureDates.length > 0 && effectiveSearchParams.tripType !== 'multi-city' && (
         <div className="relative">
@@ -964,8 +1016,8 @@ function SearchPageContent() {
         </div>
       )}
 
-      {/* Loading State - Show during bootstrap, first fetch, and any date change */}
-      {(!isInitialized || loading || isDateChanging || (isInitialized && !loading && flights.length === 0 && !hasAttemptedFetch)) && (
+      {/* Loading State - Show during bootstrap, first fetch, and any date change (skip for package mode with mock data) */}
+      {!isPackageMode && (!isInitialized || loading || isDateChanging || (isInitialized && !loading && flights.length === 0 && !hasAttemptedFetch)) && (
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
           <div className="flex flex-col items-center justify-center gap-4">
             <FlightSearchLoading showText={false} lottieClassName="w-[220px] max-w-full" />
@@ -1096,6 +1148,8 @@ function SearchPageContent() {
                     flights={filteredFlights}
                     displayCount={displayedFlightsCount}
                     onLoadMore={handleLoadMore}
+                    isPackageMode={isPackageMode}
+                    onSelect={isPackageMode ? handlePackageFlightSelect : undefined}
                   />
                 </>
               ) : (

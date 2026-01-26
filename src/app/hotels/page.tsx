@@ -19,6 +19,8 @@ import { Button } from "@/components/ui/button";
 import type { Hotel } from "@/types/hotel";
 import { hotelService } from "@/services/api/hotelService";
 import { useBookingStore } from "@/store/bookingStore";
+import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
+import { mockHotels } from "@/data/mockHotels";
 
 const DEFAULT_WEB_REF = "IN-649707636";
 
@@ -98,6 +100,10 @@ function matchesPopular(hotel: Hotel, filters: HotelFiltersState) {
 function HotelsPageInner() {
   const urlParams = useSearchParams();
   const urlParamsKey = urlParams.toString();
+  
+  // Detect if we're in package (Flight+Hotel) mode
+  const isPackageMode = urlParams.get("type") === "package";
+  
   const setHotelSearch = useBookingStore((s) => s.setHotelSearch);
   const setHotelResultsMeta = useBookingStore((s) => s.setHotelResultsMeta);
   const hotelResultsCache = useBookingStore((s) => s.hotelResultsCache);
@@ -253,6 +259,17 @@ function HotelsPageInner() {
       setDisplayedHotelsCount(12);
       setBreakfastByHotelId({});
       setBreakfastEnriching(false);
+
+      // Package mode: use mock data instead of API
+      if (isPackageMode) {
+        if (!cancelled && requestSeq === activeRequestSeq.current) {
+          setHotels(mockHotels);
+          setSelectedHotelId(mockHotels[0]?.id || "");
+          setLoading(false);
+          setHasAttemptedFetch(true);
+        }
+        return;
+      }
 
       // Hydrate from cache immediately to preserve results on back-navigation.
       // Only use cache if queryKey matches and cache has results and is fresh (< 2 min).
@@ -464,7 +481,7 @@ function HotelsPageInner() {
       cancelled = true;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- resolvedSearch accessed via ref to avoid loop
-  }, [queryKey, setHotelResultsCache, setHotelResultsMeta, setHotelSearch]);
+  }, [queryKey, setHotelResultsCache, setHotelResultsMeta, setHotelSearch, isPackageMode]);
 
   // On-demand breakfast enrichment: when user enables breakfast filter, use getRoomsV3 to detect breakfast
   // for hotels where availability doesn't expose meal plans reliably.
@@ -731,6 +748,13 @@ function HotelsPageInner() {
         </div>
       </div>
 
+      {/* Package Mode: Step Progress */}
+      {isPackageMode && (
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-6">
+          <PackageStepProgress currentStep="stay" />
+        </div>
+      )}
+
       {/* Content */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex flex-col lg:flex-row gap-4">
@@ -804,6 +828,7 @@ function HotelsPageInner() {
                     view="grid"
                     selected={hotel.id === selectedHotelId}
                     onSelect={() => setSelectedHotelId(hotel.id)}
+                    isPackageMode={isPackageMode}
                   />
                 ))}
               </div>
@@ -818,6 +843,7 @@ function HotelsPageInner() {
                       view="grid"
                       selected={hotel.id === selectedHotelId}
                       onSelect={() => setSelectedHotelId(hotel.id)}
+                      isPackageMode={isPackageMode}
                     />
                   ))}
                 </div>
@@ -830,6 +856,7 @@ function HotelsPageInner() {
                       view="list"
                       selected={hotel.id === selectedHotelId}
                       onSelect={() => setSelectedHotelId(hotel.id)}
+                      isPackageMode={isPackageMode}
                     />
                   ))}
                 </div>

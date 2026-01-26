@@ -28,6 +28,8 @@ import { PaymentSummary } from "@/components/payment/PaymentSummary";
 import { FlightSummaryCard } from "@/components/booking/FlightSummaryCard";
 import { WebRefCard } from "@/components/booking/WebRefCard";
 import { PaymentForm } from "@/components/payment/PaymentForm";
+import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
+import { HotelSummaryCard } from "@/components/booking/HotelSummaryCard";
 
 import { FOLDER_STATUS_CODES } from "@/types/portal";
 import { countryCodes } from "@/lib/utils/countryCodes";
@@ -36,6 +38,7 @@ function PaymentContent() {
   const t = useTranslations('payment');
   const router = useRouter();
   const searchParams = useSearchParams();
+  const isPackageMode = searchParams?.get("type") === "package";
   const [showFlightInfo, setShowFlightInfo] = useState(false);
   const [isPaymentValid, setIsPaymentValid] = useState(false);
   const [paymentTermsAccepted, setPaymentTermsAccepted] = useState(false);
@@ -195,6 +198,16 @@ function PaymentContent() {
 
   // Price calculation - Use real pricing from selected upgrade or flight
   const currency = selectedUpgrade ? selectedUpgrade.currency : flight.currency;
+
+  // BoxPay expects ISO currency codes (e.g. GBP), not symbols (e.g. £)
+  const currencyForGateway = (() => {
+    const c = String(currency || '').trim();
+    if (!c) return 'GBP';
+    if (c === '£') return 'GBP';
+    if (c === '$') return 'USD';
+    if (c === '€') return 'EUR';
+    return c.toUpperCase();
+  })();
   const baseFare = selectedUpgrade ? selectedUpgrade.totalPrice : (flight.price || 0);
 
   // Determine region (UK vs Global) and pick appropriate iAssure pricing
@@ -329,8 +342,12 @@ function PaymentContent() {
 
       {/* Main Content */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 flex flex-col gap-4">
-        {/* Header with Back Link and Progress Steps */}
-        <PaymentHeader currentStep={3} />
+        {/* Header with progress */}
+        {isPackageMode ? (
+          <PackageStepProgress currentStep="payment" />
+        ) : (
+          <PaymentHeader currentStep={3} />
+        )}
 
         {/* Payment Failed Banner */}
         {searchParams?.get('error') === 'payment_failed' && (
@@ -358,6 +375,11 @@ function PaymentContent() {
 
           {/* Left Column */}
           <div className="flex-1 flex flex-col gap-4">
+            {isPackageMode && (
+              <div className="flex flex-col gap-3">
+                <HotelSummaryCard />
+              </div>
+            )}
             {/* Flight Summary Cards */}
             <div className="flex flex-col gap-3">
               {summaryLegs.map((leg, index) => (
@@ -508,7 +530,8 @@ function PaymentContent() {
                 const result = await createSession({
                   orderId,
                   amount: tripTotal,
-                  currency: currency,
+                  currency: currencyForGateway,
+                  flow: isPackageMode ? "package" : "flight",
                   shopper: {
                     firstName,
                     lastName,
@@ -530,7 +553,7 @@ function PaymentContent() {
                   // Store order info before redirect
                   sessionStorage.setItem('pendingOrderId', orderId);
                   sessionStorage.setItem('pendingOrderAmount', tripTotal.toString());
-                  sessionStorage.setItem('pendingOrderCurrency', currency);
+                  sessionStorage.setItem('pendingOrderCurrency', currencyForGateway);
 
                   // Persist a per-order snapshot so the confirmation page/email can't pick up stale store data
                   // (e.g. multi-tab or navigating around during payment redirects).

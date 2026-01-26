@@ -12,6 +12,8 @@ import { Flight, FlightSegment } from "@/types/flight";
 import { PriceCheckResult, TransformedPriceOption } from "@/types/priceCheck";
 import FlightDetailedInfo from "@/components/flights/FlightDetailedInfo";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
+import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
+import { HotelSummaryCard } from "@/components/booking/HotelSummaryCard";
 import {
   mockBookingConfirmation,
   airportNames,
@@ -562,6 +564,7 @@ function PaymentCompleteContent() {
   const searchParams = useSearchParams();
   const { inquirePayment, loading: inquiryLoading } = useBoxPay();
   const { phoneNumber: affiliatePhone } = useAffiliatePhone();
+  const isPackageMode = searchParams?.get("type") === "package";
 
   const [paymentInfo, setPaymentInfo] = useState<PaymentCompletionInfo | null>(
     null
@@ -716,7 +719,7 @@ function PaymentCompleteContent() {
                 [`Payment failed: ${result.payment.error || 'Unknown error'}`]
               );
             }
-            router.replace('/payment?error=payment_failed');
+            router.replace(`/payment?error=payment_failed${isPackageMode ? '&type=package' : ''}`);
             return;
           }
 
@@ -998,6 +1001,11 @@ function PaymentCompleteContent() {
       <Navbar />
 
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8">
+        {isPackageMode && (
+          <div className="mb-6">
+            <PackageStepProgress currentStep="confirmation" />
+          </div>
+        )}
         {/* Loading State */}
         {inquiryLoading && !paymentInfo && !isMockMode && (
           <div className="flex flex-col items-center justify-center py-20">
@@ -1154,6 +1162,14 @@ function PaymentCompleteContent() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Package: hotel summary (best-effort from store/cache) */}
+            {isPackageMode && (
+              <div className="bg-white rounded-xl shadow-sm border border-[#E5E7EB] p-6">
+                <h3 className="font-semibold text-[#3754ED] mb-4">Hotel Details</h3>
+                <HotelSummaryCard />
               </div>
             )}
 

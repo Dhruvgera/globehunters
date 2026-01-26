@@ -12,6 +12,7 @@ interface CreateSessionRequestBody {
   orderId: string;
   amount: number;
   currency: string;
+  flow?: 'flight' | 'package';
   shopper: {
     firstName: string;
     lastName: string;
@@ -50,9 +51,12 @@ export async function POST(request: NextRequest) {
     // Get the origin for return URLs
     const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     
+    const flow = body.flow === 'package' ? 'package' : 'flight';
+    const qp = flow === 'package' ? '&type=package' : '';
+
     // Build the return URL with order ID for status checking
-    const returnUrl = `${origin}/payment-complete?orderId=${encodeURIComponent(body.orderId)}`;
-    const backUrl = `${origin}/payment`;
+    const returnUrl = `${origin}/payment-complete?orderId=${encodeURIComponent(body.orderId)}${qp}`;
+    const backUrl = `${origin}/payment${flow === 'package' ? '?type=package' : ''}`;
 
     // Build and send the session request
     const sessionRequest = boxpayService.buildSessionRequest({
