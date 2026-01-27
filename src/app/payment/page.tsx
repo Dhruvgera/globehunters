@@ -177,14 +177,6 @@ function PaymentContent() {
     loadAirportNames();
   }, [flight]);
 
-  // Show loading state while store is hydrating or no flight/hotel selected
-  if (!hasHydrated || (!flight && !isHotelMode)) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-[#3754ED] animate-spin" />
-      </div>
-    );
-  }
 
   // Helper to get airport name - prefer cache, then flight data, then code
   const getAirportName = (code: string, flightName: string, city: string) => {
@@ -341,6 +333,15 @@ function PaymentContent() {
   // Web reference: prefer folder number, then search request ID, then fallbacks
   const refNumber: string = vyspaFolderNumber || searchRequestId || flight?.webRef || '—';
   const orderId = refNumber;
+
+  // Show loading state while store is hydrating or no flight/hotel selected
+  if (!hasHydrated || (!flight && !isHotelMode)) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-[#3754ED] animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white">

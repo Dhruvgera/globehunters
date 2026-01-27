@@ -27,14 +27,14 @@ const createTransporter = () => {
  * Generate the HTML email template matching Figma design
  */
 export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData): string {
-  const { orderNumber, travelerName, travelerEmail, travelerPhone, passengers, journeys, payment } = data;
+  const { orderNumber, travelerName, travelerEmail, travelerPhone, passengers, journeys, hotel, payment } = data;
 
   // Generate passenger sections using tables for email client compatibility
   const passengerSections = passengers.map((passenger, index) => `
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 18px;">
       <tr>
         <td colspan="2" style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 12px; color: #555555; padding-bottom: 8px;">
-          ${passenger.isLead ? 'Lead Passenger' : `Passenger ${index + 1}`}
+          ${passenger.isLead ? (data.hotel ? 'Lead Guest' : 'Lead Passenger') : (data.hotel ? `Guest ${index + 1}` : `Passenger ${index + 1}`)}
         </td>
       </tr>
       <tr>
@@ -54,8 +54,9 @@ export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData
     </table>
   `).join('');
 
-  // Generate journey sections (outbound/inbound)
-  const journeySections = journeys.map((journey) => generateJourneySection(journey)).join('');
+  // Generate main content sections (journeys or hotel)
+  const journeySections = (journeys || []).map((journey) => generateJourneySection(journey)).join('');
+  const hotelSection = hotel ? generateHotelSection(hotel) : '';
 
   // Format currency
   const formatCurrency = (amount: number) => `${payment.currencySymbol}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${payment.currency}`;
@@ -95,7 +96,7 @@ export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Globehunters: Flight Booking Confirmation</title>
+  <title>Globehunters: ${hotel ? 'Hotel' : 'Flight'} Booking Confirmation</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -164,15 +165,16 @@ export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData
               <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F8F9FA; border-radius: 12px; margin-bottom: 24px;">
                 <tr>
                   <td style="padding: 16px;">
-                    <div style="font-family: 'Inter', Arial, sans-serif; font-weight: 600; font-size: 16px; color: #0A0A0A; margin-bottom: 16px;">${journeys[0]?.route || 'Flight Route'}</div>
-                    <div style="font-family: 'Inter', Arial, sans-serif; font-weight: 600; font-size: 14px; color: #555555; margin-bottom: 16px;">Passenger details:</div>
+                    <div style="font-family: 'Inter', Arial, sans-serif; font-weight: 600; font-size: 16px; color: #0A0A0A; margin-bottom: 16px;">${hotel ? 'Guest Details' : (journeys?.[0]?.route || 'Booking Confirmation')}</div>
+                    ${!hotel ? '<div style="font-family: \'Inter\', Arial, sans-serif; font-weight: 600; font-size: 14px; color: #555555; margin-bottom: 16px;">Passenger details:</div>' : ''}
                     ${passengerSections}
                   </td>
                 </tr>
               </table>
 
-              <!-- Journey Sections (Outbound/Inbound) -->
+              <!-- Journey or Hotel Sections -->
               ${journeySections}
+              ${hotelSection}
 
               <!-- Payment Details Section -->
               <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F8F9FA; border-radius: 12px; margin-bottom: 24px;">
@@ -211,7 +213,7 @@ export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData
                 <tr>
                   <td style="padding: 16px;">
                     <div style="font-family: 'Inter', Arial, sans-serif; font-weight: 700; font-size: 14px; color: #3754ED; margin-bottom: 12px;">Terms and Conditions</div>
-                    <p style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 12px; color: #0A0A0A; line-height: 1.6; margin: 0;">I acknowledge that passenger information matches the passport or official ID for travel, and that name changes are not allowed. I confirm that I have reviewed the flight itinerary and agree to the Refund &amp; Cancellation Policy. I understand tickets are non-transferable and non-changeable unless stated otherwise. I accept full responsibility for valid travel documentation and understand Globehunters cannot be held responsible for denied boarding due to passport or visa validity. At the time of booking you confirmed that you have read and agreed to our General Terms and Conditions of Carriage. Please <a href="https://www.globehunters.com/terms" style="color: #3754ED; font-weight: 600;">Click Here</a> to review these again if necessary.</p>
+                    <p style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 12px; color: #0A0A0A; line-height: 1.6; margin: 0;">I acknowledge that passenger information matches the passport or official ID for travel, and that name changes are not allowed. I confirm that I have reviewed the ${hotel ? 'hotel details' : 'flight itinerary'} and agree to the Refund &amp; Cancellation Policy. I understand tickets are non-transferable and non-changeable unless stated otherwise. I accept full responsibility for valid travel documentation and understand Globehunters cannot be held responsible for denied boarding due to passport or visa validity. At the time of booking you confirmed that you have read and agreed to our General Terms and Conditions of Carriage. Please <a href="https://www.globehunters.com/terms" style="color: #3754ED; font-weight: 600;">Click Here</a> to review these again if necessary.</p>
                   </td>
                 </tr>
               </table>
@@ -235,6 +237,46 @@ export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData
   </table>
 </body>
 </html>
+  `;
+}
+
+/**
+ * Generate a hotel details section
+ */
+function generateHotelSection(hotel: any): string {
+  return `
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F8F9FA; border-radius: 12px; margin-bottom: 24px;">
+      <tr>
+        <td style="padding: 16px;">
+          <div style="font-family: 'Inter', Arial, sans-serif; font-weight: 700; font-size: 14px; color: #3754ED; margin-bottom: 12px;">Hotel Information</div>
+          <div style="font-family: 'Inter', Arial, sans-serif; font-weight: 600; font-size: 15px; color: #0A0A0A; margin-bottom: 8px;">${hotel.hotelName}</div>
+          <div style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #555555; margin-bottom: 8px;">${hotel.address}</div>
+          
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 12px;">
+            <tr>
+              <td width="50%" style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 12px; color: #555555; padding-bottom: 4px;">Check-in</td>
+              <td width="50%" style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 12px; color: #555555; padding-bottom: 4px;">Check-out</td>
+            </tr>
+            <tr>
+              <td style="font-family: 'Inter', Arial, sans-serif; font-weight: 600; font-size: 13px; color: #0A0A0A;">${hotel.checkIn}</td>
+              <td style="font-family: 'Inter', Arial, sans-serif; font-weight: 600; font-size: 13px; color: #0A0A0A;">${hotel.checkOut}</td>
+            </tr>
+          </table>
+          
+          <div style="margin-top: 12px; font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A;">
+            <strong>Stay:</strong> ${hotel.nights} night(s), ${hotel.rooms} room(s)
+          </div>
+          <div style="margin-top: 4px; font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A;">
+            <strong>Room:</strong> ${hotel.roomType}
+          </div>
+          ${hotel.amenities?.length > 0 ? `
+            <div style="margin-top: 8px; font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 12px; color: #555555;">
+              Amenities: ${hotel.amenities.join(', ')}
+            </div>
+          ` : ''}
+        </td>
+      </tr>
+    </table>
   `;
 }
 
@@ -337,7 +379,7 @@ export async function sendConfirmationEmail(
       from: `"${EMAIL_CONFIG.from.name}" <${EMAIL_CONFIG.from.email}>`,
       to,
       replyTo: EMAIL_CONFIG.replyTo,
-      subject: `Globehunters: Flight Booking Confirmation - Order #${data.orderNumber}`,
+      subject: `Globehunters: ${data.hotel ? 'Hotel' : 'Flight'} Booking Confirmation - Order #${data.orderNumber}`,
       html,
     };
 

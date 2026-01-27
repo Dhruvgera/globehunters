@@ -46,6 +46,17 @@ export interface PaymentDetailsEmail {
   currencySymbol: string;
 }
 
+export interface HotelEmailData {
+  hotelName: string;
+  address: string;
+  checkIn: string;
+  checkOut: string;
+  nights: number;
+  rooms: number;
+  roomType: string;
+  amenities?: string[];
+}
+
 export interface BookingConfirmationEmailData {
   orderNumber: string;
   travelerName: string;
@@ -57,6 +68,7 @@ export interface BookingConfirmationEmailData {
     dob: string;
     isLead: boolean;
   }[];
-  journeys: JourneyEmail[];
+  journeys?: JourneyEmail[];
+  hotel?: HotelEmailData;
   payment: PaymentDetailsEmail;
 }

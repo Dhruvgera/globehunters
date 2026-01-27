@@ -315,7 +315,13 @@ export const useBookingStore = create<BookingState & HydrationState>()(
         vyspaCustomerId: null,
         vyspaEmailAddress: null,
       }),
-      setSelectedHotelRoomIds: (roomIds) => set({ selectedHotelRoomIds: roomIds }),
+      setSelectedHotelRoomIds: (roomIds) => set({
+        selectedHotelRoomIds: roomIds,
+        // Reset folder info when changing rooms
+        vyspaFolderNumber: null,
+        vyspaCustomerId: null,
+        vyspaEmailAddress: null,
+      }),
       setHotelDetailsCache: (hotelId, data) =>
         set((state) => ({
           hotelDetailsCache: {

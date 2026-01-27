@@ -29,11 +29,11 @@ export function PaymentHeader({ currentStep = 3, isHotel = false }: PaymentHeade
     <div className="flex flex-col gap-4">
       {/* Back Link */}
       <Link
-        href="/booking"
+        href={isHotel ? "/hotels/checkout" : "/booking"}
         className="flex items-center gap-2 text-[#010D50] text-sm font-medium hover:text-[#3754ED] transition-colors w-fit"
       >
         <ChevronLeft className="w-4 h-4" />
-        {t('backToFare')}
+        {isHotel ? "Back to Checkout" : t('backToFare')}
       </Link>
 
       {/* Progress Steps */}
@@ -42,8 +42,8 @@ export function PaymentHeader({ currentStep = 3, isHotel = false }: PaymentHeade
           <div key={step.number} className="flex items-center gap-1.5 lg:gap-2">
             <div
               className={`w-5 h-5 lg:w-6 lg:h-6 rounded-full flex items-center justify-center ${step.number <= currentStep
-                  ? "bg-[#010D50] border border-[#010D50]"
-                  : "border border-[#010D50]"
+                ? "bg-[#010D50] border border-[#010D50]"
+                : "border border-[#010D50]"
                 }`}
             >
               <span

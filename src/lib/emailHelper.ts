@@ -260,6 +260,76 @@ export function transformBookingToEmailData(params: {
 }
 
 /**
+ * Transform hotel booking data to email format
+ */
+export function transformHotelBookingToEmailData(params: {
+  orderNumber: string;
+  hotel: any;
+  roomSummary: any;
+  passengers: Passenger[];
+  contactEmail: string;
+  contactPhone: string;
+  totalAmount: number;
+  protectionPlanAmount: number;
+  currency: string;
+}): BookingConfirmationEmailData {
+  const {
+    orderNumber,
+    hotel,
+    roomSummary,
+    passengers,
+    contactEmail,
+    contactPhone,
+    totalAmount,
+    protectionPlanAmount,
+    currency,
+  } = params;
+
+  // Get lead passenger
+  const leadPassenger = passengers[0];
+  const travelerName = leadPassenger ? getPassengerFullName(leadPassenger) : 'Guest';
+
+  // Transform passengers
+  const emailPassengers = passengers.map((p, index) => ({
+    name: getPassengerFullName(p),
+    email: index === 0 ? p.email : undefined,
+    dob: formatDOB(p.dateOfBirth),
+    isLead: index === 0,
+  }));
+
+  // Payment breakdown
+  const fees = 0;
+  const baseFare = totalAmount - protectionPlanAmount - fees;
+
+  return {
+    orderNumber,
+    travelerName,
+    travelerEmail: contactEmail,
+    travelerPhone: contactPhone,
+    passengers: emailPassengers,
+    hotel: {
+      hotelName: hotel.hotelName || hotel.name || 'Hotel',
+      address: hotel.address || hotel.distanceLabel || '',
+      checkIn: formatEmailDate(hotel.checkIn),
+      checkOut: formatEmailDate(hotel.checkOut),
+      nights: hotel.nights || 1,
+      rooms: hotel.rooms || 1,
+      roomType: roomSummary?.roomName || roomSummary?.description || 'Standard Room',
+      amenities: hotel.amenities || [],
+    },
+    payment: {
+      totalFare: baseFare,
+      creditCardFees: fees,
+      protectionPlan: protectionPlanAmount,
+      baggagePlan: 0,
+      totalPaid: totalAmount,
+      currency,
+      currencySymbol: getCurrencySymbol(currency),
+    },
+  };
+}
+
+/**
  * Send confirmation email via API
  */
 export async function sendBookingConfirmationEmail(

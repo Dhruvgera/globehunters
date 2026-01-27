@@ -19,7 +19,7 @@ import {
   mockBookingConfirmation,
   airportNames,
 } from "@/data/mockBookingConfirmation";
-import { transformBookingToEmailData, sendBookingConfirmationEmail } from "@/lib/emailHelper";
+import { transformBookingToEmailData, transformHotelBookingToEmailData, sendBookingConfirmationEmail } from "@/lib/emailHelper";
 import { shortenAirportName } from "@/lib/vyspa/utils";
 import { airportCache } from "@/lib/cache/airportCache";
 import { formatPrice } from "@/lib/currency";
@@ -586,7 +586,10 @@ function PaymentCompleteContent() {
   const storeVyspaEmailAddress = useBookingStore((state) => state.vyspaEmailAddress);
   const storeAddOns = useBookingStore((state) => state.addOns);
   const storeSelectedUpgrade = useBookingStore((state) => state.selectedUpgradeOption);
+  const storeSelectedHotel = useBookingStore((state) => state.selectedHotel);
   const storeRoomSummary = useBookingStore((state) => state.selectedHotelRoomSummary);
+  const storeHotelDetailsCache = useBookingStore((state) => state.hotelDetailsCache);
+  const storeHotelSearch = useBookingStore((state) => state.hotelSearch);
   const resetBooking = useBookingStore((state) => state.resetBooking);
   const [emailSent, setEmailSent] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -878,7 +881,6 @@ function PaymentCompleteContent() {
         ctx?.pricing?.currency ||
         "GBP";
 
-      const flightForEmail = ctx?.flight || storeSelectedFlight;
       const passengersForEmail = ctx?.passengers || storePassengers;
       const contactEmailForEmail = ctx?.contactEmail || effectiveContactEmail;
       const contactPhoneForEmail =
@@ -887,11 +889,8 @@ function PaymentCompleteContent() {
         passengersForEmail?.[0]?.phone ||
         "";
 
-      if (!flightForEmail || !contactEmailForEmail) {
-        console.error("Cannot send email - missing data:", {
-          hasFlightData: !!flightForEmail,
-          email: contactEmailForEmail,
-        });
+      if (!contactEmailForEmail) {
+        console.error("Cannot send email - missing email address");
         return;
       }
 
@@ -913,20 +912,55 @@ function PaymentCompleteContent() {
           : Math.max(0, totalPaid - protectionPlanAmount - baggageAmount - otherFees);
 
       console.log("Building email data for:", contactEmailForEmail);
-      const emailData = transformBookingToEmailData({
-        orderNumber: orderId,
-        flight: flightForEmail,
-        passengers: passengersForEmail,
-        contactEmail: contactEmailForEmail,
-        contactPhone: contactPhoneForEmail,
-        totalAmount: totalPaid,
-        protectionPlanAmount,
-        baggageAmount,
-        creditCardFeesAmount: otherFees,
-        baseFareAmount: baseFareAdjusted,
-        currency: currencyCode,
-        cabinClass: (ctx?.selectedUpgradeOption?.cabinClassDisplay || storeSelectedUpgrade?.cabinClassDisplay || "Economy"),
-      });
+
+      let emailData;
+      if (isHotelMode) {
+        const hotelSummary = ctx?.hotelSummary || storeSelectedHotel;
+        const roomSummaryForEmail = ctx?.hotelRoomSummary || storeRoomSummary;
+        const hotelDetails = hotelSummary?.hotelId ? storeHotelDetailsCache[hotelSummary.hotelId] : null;
+
+        emailData = transformHotelBookingToEmailData({
+          orderNumber: orderId,
+          hotel: {
+            hotelName: hotelSummary?.hotelName || hotelDetails?.hotelName || 'Hotel',
+            address: hotelDetails?.address || '',
+            checkIn: ctx?.checkIn || storeHotelSearch?.checkIn || '',
+            checkOut: ctx?.checkOut || storeHotelSearch?.checkOut || '',
+            nights: ctx?.nights || (storeHotelSearch?.checkIn && storeHotelSearch?.checkOut ? Math.ceil((new Date(storeHotelSearch.checkOut).getTime() - new Date(storeHotelSearch.checkIn).getTime()) / (1000 * 3600 * 24)) : 1),
+            rooms: ctx?.rooms || storeHotelSearch?.rooms || 1,
+            amenities: hotelDetails?.amenities || [],
+          },
+          roomSummary: roomSummaryForEmail,
+          passengers: passengersForEmail,
+          contactEmail: contactEmailForEmail,
+          contactPhone: contactPhoneForEmail,
+          totalAmount: totalPaid,
+          protectionPlanAmount,
+          currency: currencyCode,
+        });
+      } else {
+        const flightForEmail = ctx?.flight || storeSelectedFlight;
+
+        if (!flightForEmail) {
+          console.error("Cannot send flight email - missing flight data");
+          return;
+        }
+
+        emailData = transformBookingToEmailData({
+          orderNumber: orderId,
+          flight: flightForEmail,
+          passengers: passengersForEmail,
+          contactEmail: contactEmailForEmail,
+          contactPhone: contactPhoneForEmail,
+          totalAmount: totalPaid,
+          protectionPlanAmount,
+          baggageAmount,
+          creditCardFeesAmount: otherFees,
+          baseFareAmount: baseFareAdjusted,
+          currency: currencyCode,
+          cabinClass: (ctx?.selectedUpgradeOption?.cabinClassDisplay || storeSelectedUpgrade?.cabinClassDisplay || "Economy"),
+        });
+      }
 
       const result = await sendBookingConfirmationEmail(contactEmailForEmail, emailData);
 
@@ -942,7 +976,7 @@ function PaymentCompleteContent() {
       setEmailError(error instanceof Error ? error.message : "Failed to send confirmation email");
       console.error('Error sending confirmation email:', error);
     }
-  }, [emailSent, bookingContext, loadBookingContext, storeSelectedFlight, storePassengers, effectiveContactEmail, storeContactPhone, storeSelectedUpgrade]);
+  }, [emailSent, isHotelMode, bookingContext, loadBookingContext, storeSelectedFlight, storePassengers, effectiveContactEmail, storeContactPhone, storeSelectedUpgrade, storeSelectedHotel, storeRoomSummary, storeHotelDetailsCache, storeHotelSearch]);
 
   // Send confirmation email when payment is successful and data is available
   useEffect(() => {

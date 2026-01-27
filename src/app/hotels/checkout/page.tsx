@@ -26,6 +26,7 @@ export default function HotelCheckoutPage() {
   const passengers = useBookingStore((s) => s.passengers);
   const passengersSaved = useBookingStore((s) => s.passengersSaved);
   const setVyspaFolderInfo = useBookingStore((s) => s.setVyspaFolderInfo);
+  const setContactInfo = useBookingStore((s) => s.setContactInfo);
   const vyspaFolderNumber = useBookingStore((s) => s.vyspaFolderNumber);
   const searchRequestId = useBookingStore((s) => s.searchRequestId);
   const { phoneNumber: affiliatePhone } = useAffiliatePhone();
@@ -65,6 +66,9 @@ export default function HotelCheckoutPage() {
         throw new Error("Lead passenger email and phone are required.");
       }
 
+      // Sync lead guest details to contact info for payment page
+      setContactInfo(lead.email, lead.phone);
+
       let folderNo = vyspaFolderNumber ? Number(vyspaFolderNumber) : null;
 
       if (!folderNo) {
@@ -92,7 +96,7 @@ export default function HotelCheckoutPage() {
           throw new Error("Vyspa did not return a folder number (folder_no).");
         }
 
-        setVyspaFolderInfo({ folderNumber: String(folderNo) });
+        setVyspaFolderInfo({ folderNumber: String(folderNo), emailAddress: lead.email });
       }
 
       // Build passengers in Vyspa folder format using existing helper in folderService
