@@ -18,7 +18,7 @@ import { HotelResultCard } from "@/components/hotels/HotelResultCard";
 import { Button } from "@/components/ui/button";
 import type { Hotel } from "@/types/hotel";
 import { hotelService } from "@/services/api/hotelService";
-import { useBookingStore } from "@/store/bookingStore";
+import { useBookingStore, useStoreHydration } from "@/store/bookingStore";
 import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
 import { mockHotels } from "@/data/mockHotels";
 
@@ -98,12 +98,13 @@ function matchesPopular(hotel: Hotel, filters: HotelFiltersState) {
 }
 
 function HotelsPageInner() {
+  const hasHydrated = useStoreHydration();
   const urlParams = useSearchParams();
   const urlParamsKey = urlParams.toString();
-  
+
   // Detect if we're in package (Flight+Hotel) mode
   const isPackageMode = urlParams.get("type") === "package";
-  
+
   const setHotelSearch = useBookingStore((s) => s.setHotelSearch);
   const setHotelResultsMeta = useBookingStore((s) => s.setHotelResultsMeta);
   const hotelResultsCache = useBookingStore((s) => s.hotelResultsCache);
@@ -231,7 +232,7 @@ function HotelsPageInner() {
 
   // Hydrate filters for this queryKey (so opening a hotel and coming back doesn't reset price slider).
   useEffect(() => {
-    if (!queryKey) return;
+    if (!hasHydrated || !queryKey) return;
     if (hotelFiltersCache?.queryKey === queryKey) {
       if (!hydratedFiltersRef.current) {
         setFilters(hotelFiltersCache.filters);
@@ -250,7 +251,27 @@ function HotelsPageInner() {
     let cancelled = false;
 
     async function load() {
+      if (!hasHydrated) return;
+
       const requestSeq = ++activeRequestSeq.current;
+
+      // Hydrate from cache immediately to preserve results on back-navigation.
+      // Only use cache if queryKey matches and cache has results and is fresh (< 2 min).
+      const cache = hotelResultsCacheRef.current;
+      const cacheAge = cache?.fetchedAt ? Date.now() - cache.fetchedAt : Infinity;
+      const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+      const isCacheFresh = cacheAge < CACHE_TTL;
+
+      if (cache?.queryKey === queryKey && cache.hotels.length > 0 && isCacheFresh) {
+        if (!cancelled && requestSeq === activeRequestSeq.current) {
+          setHotels(cache.hotels);
+          setSelectedHotelId(cache.selectedHotelId || cache.hotels[0]?.id || "");
+          setLoading(false);
+          setHasAttemptedFetch(true);
+        }
+        return;
+      }
+
       setLoading(true);
       setError(null);
       // Clear stale results immediately on a new search (match flights UX).
@@ -260,29 +281,12 @@ function HotelsPageInner() {
       setBreakfastByHotelId({});
       setBreakfastEnriching(false);
 
-      // Package mode: use mock data instead of API
       if (isPackageMode) {
         if (!cancelled && requestSeq === activeRequestSeq.current) {
           setHotels(mockHotels);
           setSelectedHotelId(mockHotels[0]?.id || "");
           setLoading(false);
           setHasAttemptedFetch(true);
-        }
-        return;
-      }
-
-      // Hydrate from cache immediately to preserve results on back-navigation.
-      // Only use cache if queryKey matches and cache has results and is fresh (< 2 min).
-      const cache = hotelResultsCacheRef.current;
-      const cacheAge = cache?.fetchedAt ? Date.now() - cache.fetchedAt : Infinity;
-      const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
-      const isCacheFresh = cacheAge < CACHE_TTL;
-      
-      if (cache?.queryKey === queryKey && cache.hotels.length > 0 && isCacheFresh) {
-        if (!cancelled && requestSeq === activeRequestSeq.current) {
-          setHotels(cache.hotels);
-          setSelectedHotelId(cache.selectedHotelId || cache.hotels[0]?.id || "");
-          setLoading(false);
         }
         return;
       }
@@ -296,15 +300,15 @@ function HotelsPageInner() {
 
         const pick = urlHiddenId && urlHiddenKey
           ? {
-              id: Number(urlHiddenId),
-              label: search.location,
-              loc: urlHiddenKey,
-              arrival_point_code: urlArrivalPointCode,
-            }
+            id: Number(urlHiddenId),
+            label: search.location,
+            loc: urlHiddenKey,
+            arrival_point_code: urlArrivalPointCode,
+          }
           : (await (async () => {
-              const lookup = await hotelService.lookupCities(search.location);
-              return lookup.find((x) => String(x.loc).toLowerCase() === "city") || lookup[0];
-            })());
+            const lookup = await hotelService.lookupCities(search.location);
+            return lookup.find((x) => String(x.loc).toLowerCase() === "city") || lookup[0];
+          })());
 
         if (!pick?.id || !pick?.label || !pick?.loc) {
           throw new Error("No matching city/hotel found for the selected destination.");
@@ -480,8 +484,8 @@ function HotelsPageInner() {
     return () => {
       cancelled = true;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- resolvedSearch accessed via ref to avoid loop
-  }, [queryKey, setHotelResultsCache, setHotelResultsMeta, setHotelSearch, isPackageMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resolvedSearch accessed via ref to avoid loop
+  }, [queryKey, setHotelResultsCache, setHotelResultsMeta, setHotelSearch, isPackageMode, hasHydrated]);
 
   // On-demand breakfast enrichment: when user enables breakfast filter, use getRoomsV3 to detect breakfast
   // for hotels where availability doesn't expose meal plans reliably.

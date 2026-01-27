@@ -128,7 +128,7 @@ export default function HotelCheckoutPage() {
         throw new Error(addResp.message || "Failed to add hotel to folder");
       }
 
-      router.push("/payment");
+      router.push("/payment?type=hotel");
     } catch (e: any) {
       setError(e?.message || "Failed to confirm hotel booking");
     } finally {

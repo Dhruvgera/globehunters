@@ -12,7 +12,7 @@ interface CreateSessionRequestBody {
   orderId: string;
   amount: number;
   currency: string;
-  flow?: 'flight' | 'package';
+  flow?: 'flight' | 'package' | 'hotel';
   shopper: {
     firstName: string;
     lastName: string;
@@ -50,13 +50,13 @@ export async function POST(request: NextRequest) {
 
     // Get the origin for return URLs
     const origin = request.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    
-    const flow = body.flow === 'package' ? 'package' : 'flight';
-    const qp = flow === 'package' ? '&type=package' : '';
+
+    const flow = body.flow || 'flight';
+    const qp = flow !== 'flight' ? `&type=${flow}` : '';
 
     // Build the return URL with order ID for status checking
     const returnUrl = `${origin}/payment-complete?orderId=${encodeURIComponent(body.orderId)}${qp}`;
-    const backUrl = `${origin}/payment${flow === 'package' ? '?type=package' : ''}`;
+    const backUrl = `${origin}/payment${flow !== 'flight' ? `?type=${flow}` : ''}`;
 
     // Build and send the session request
     const sessionRequest = boxpayService.buildSessionRequest({
@@ -77,9 +77,9 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('BoxPay session creation error:', error);
-    
+
     const errorMessage = error instanceof Error ? error.message : 'Failed to create payment session';
-    
+
     return NextResponse.json(
       { error: errorMessage, success: false },
       { status: 500 }

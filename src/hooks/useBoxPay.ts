@@ -10,7 +10,7 @@ interface BoxPaySessionParams {
   amount: number;
   currency: string;
   /** Optional flow discriminator so return/back URLs can be routed correctly */
-  flow?: "flight" | "package";
+  flow?: "flight" | "package" | "hotel";
   shopper: {
     firstName: string;
     lastName: string;

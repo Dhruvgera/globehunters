@@ -519,15 +519,15 @@ function FlightConfirmationCard({
               />
             </div>
           )}
-          
+
           {/* Detailed Info (Baggage, Fare Rules etc.) */}
           <div className="mt-4 pt-4 border-t border-gray-100">
-             <FlightDetailedInfo 
-                flight={fullFlight}
-                segment={segment} 
-                priceCheck={priceCheck}
-                selectedUpgradeOption={selectedUpgradeOption}
-             />
+            <FlightDetailedInfo
+              flight={fullFlight}
+              segment={segment}
+              priceCheck={priceCheck}
+              selectedUpgradeOption={selectedUpgradeOption}
+            />
           </div>
         </div>
       )}
@@ -565,6 +565,7 @@ function PaymentCompleteContent() {
   const { inquirePayment, loading: inquiryLoading } = useBoxPay();
   const { phoneNumber: affiliatePhone } = useAffiliatePhone();
   const isPackageMode = searchParams?.get("type") === "package";
+  const isHotelMode = searchParams?.get("type") === "hotel";
 
   const [paymentInfo, setPaymentInfo] = useState<PaymentCompletionInfo | null>(
     null
@@ -584,6 +585,7 @@ function PaymentCompleteContent() {
   const storeVyspaEmailAddress = useBookingStore((state) => state.vyspaEmailAddress);
   const storeAddOns = useBookingStore((state) => state.addOns);
   const storeSelectedUpgrade = useBookingStore((state) => state.selectedUpgradeOption);
+  const storeRoomSummary = useBookingStore((state) => state.selectedHotelRoomSummary);
   const resetBooking = useBookingStore((state) => state.resetBooking);
   const [emailSent, setEmailSent] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -749,13 +751,13 @@ function PaymentCompleteContent() {
           } else {
             // Check if status is explicitly failed/declined
             if (result.status === "failed" || result.status === "declined") {
-               if (vyspaFolderNumber) {
-                 await updateFolderStatus(
-                   vyspaFolderNumber,
-                   FOLDER_STATUS_CODES.PAYMENT_FAILURE,
-                   [`Payment inquiry failed/declined: ${result.error || result.status}`]
-                 );
-               }
+              if (vyspaFolderNumber) {
+                await updateFolderStatus(
+                  vyspaFolderNumber,
+                  FOLDER_STATUS_CODES.PAYMENT_FAILURE,
+                  [`Payment inquiry failed/declined: ${result.error || result.status}`]
+                );
+              }
             }
             setError(result.error || "Failed to get payment status");
           }
@@ -866,8 +868,8 @@ function PaymentCompleteContent() {
       const ctx = bookingContext || loadBookingContext(orderId);
       const totalPaid = parseFloat(
         amount ||
-          sessionStorage.getItem("pendingOrderAmount") ||
-          String(ctx?.pricing?.tripTotal || "0")
+        sessionStorage.getItem("pendingOrderAmount") ||
+        String(ctx?.pricing?.tripTotal || "0")
       );
       const currencyCode =
         currency ||
@@ -943,18 +945,19 @@ function PaymentCompleteContent() {
 
   // Send confirmation email when payment is successful and data is available
   useEffect(() => {
-    if (paymentInfo?.status === "success" && (bookingContext?.flight || storeSelectedFlight) && (bookingContext?.contactEmail || effectiveContactEmail) && !emailSent) {
+    const hasData = (bookingContext?.flight || storeSelectedFlight) || (bookingContext?.hotelRoomSummary || storeRoomSummary);
+    if (paymentInfo?.status === "success" && hasData && (bookingContext?.contactEmail || effectiveContactEmail) && !emailSent) {
       const emailAlreadySent = sessionStorage.getItem(`emailSent_${paymentInfo.orderId}`);
       if (!emailAlreadySent) {
         console.log('Triggering confirmation email:', {
           orderId: paymentInfo.orderId,
           email: bookingContext?.contactEmail || effectiveContactEmail,
-          hasFlightData: !!(bookingContext?.flight || storeSelectedFlight)
+          hasData: true
         });
         sendConfirmationEmailAsync(paymentInfo.orderId, paymentInfo.amount, paymentInfo.currency);
       }
     }
-  }, [paymentInfo, bookingContext, storeSelectedFlight, effectiveContactEmail, emailSent, sendConfirmationEmailAsync]);
+  }, [paymentInfo, bookingContext, storeSelectedFlight, storeRoomSummary, effectiveContactEmail, emailSent, sendConfirmationEmailAsync]);
 
   // Prevent browser back once payment is confirmed (avoids duplicate/looping payment state)
   useEffect(() => {
@@ -1166,10 +1169,12 @@ function PaymentCompleteContent() {
             )}
 
             {/* Package: hotel summary (best-effort from store/cache) */}
-            {isPackageMode && (
+            {(isPackageMode || isHotelMode) && (
               <div className="bg-white rounded-xl shadow-sm border border-[#E5E7EB] p-6">
                 <h3 className="font-semibold text-[#3754ED] mb-4">Hotel Details</h3>
-                <HotelSummaryCard />
+                <HotelSummaryCard
+                  roomSummary={ctx?.hotelRoomSummary}
+                />
               </div>
             )}
 

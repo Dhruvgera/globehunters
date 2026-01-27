@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
@@ -39,6 +39,7 @@ function PaymentContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isPackageMode = searchParams?.get("type") === "package";
+  const isHotelMode = searchParams?.get("type") === "hotel";
   const [showFlightInfo, setShowFlightInfo] = useState(false);
   const [isPaymentValid, setIsPaymentValid] = useState(false);
   const [paymentTermsAccepted, setPaymentTermsAccepted] = useState(false);
@@ -59,6 +60,7 @@ function PaymentContent() {
   const addOns = useBookingStore((state) => state.addOns);
   const setProtectionPlan = useBookingStore((state) => state.setProtectionPlan);
   const setAdditionalBaggage = useBookingStore((state) => state.setAdditionalBaggage);
+  const hotelRoomSummary = useBookingStore((state) => state.selectedHotelRoomSummary);
   const vyspaFolderNumber = useBookingStore((state) => state.vyspaFolderNumber);
   const searchRequestId = useBookingStore((state) => state.searchRequestId);
   const passengers = useBookingStore((state) => state.passengers);
@@ -82,12 +84,12 @@ function PaymentContent() {
     return a.startsWith('sk') || a.includes('skyscanner');
   })();
 
-  // Redirect to search if no flight selected (only after store has hydrated)
+  // Redirect to search if no flight/hotel selected (only after store has hydrated)
   useEffect(() => {
-    if (hasHydrated && !flight) {
+    if (hasHydrated && !flight && !isHotelMode) {
       router.push('/search');
     }
-  }, [hasHydrated, flight, router]);
+  }, [hasHydrated, flight, isHotelMode, router]);
 
   // Track session start for 60-min refresh expiry
   useEffect(() => {
@@ -175,8 +177,8 @@ function PaymentContent() {
     loadAirportNames();
   }, [flight]);
 
-  // Show loading state while store is hydrating or no flight selected
-  if (!hasHydrated || !flight) {
+  // Show loading state while store is hydrating or no flight/hotel selected
+  if (!hasHydrated || (!flight && !isHotelMode)) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-[#3754ED] animate-spin" />
@@ -196,8 +198,8 @@ function PaymentContent() {
     return code;
   };
 
-  // Price calculation - Use real pricing from selected upgrade or flight
-  const currency = selectedUpgrade ? selectedUpgrade.currency : flight.currency;
+  // Price calculation - Use real pricing from selected upgrade, flight or hotel room
+  const currency = isHotelMode ? hotelRoomSummary?.currency : (selectedUpgrade ? selectedUpgrade.currency : flight?.currency);
 
   // BoxPay expects ISO currency codes (e.g. GBP), not symbols (e.g. £)
   const currencyForGateway = (() => {
@@ -208,7 +210,7 @@ function PaymentContent() {
     if (c === '€') return 'EUR';
     return c.toUpperCase();
   })();
-  const baseFare = selectedUpgrade ? selectedUpgrade.totalPrice : (flight.price || 0);
+  const baseFare = isHotelMode ? (hotelRoomSummary?.total || 0) : (selectedUpgrade ? selectedUpgrade.totalPrice : (flight?.price || 0));
 
   // Determine region (UK vs Global) and pick appropriate iAssure pricing
   const region = getRegion();
@@ -270,16 +272,18 @@ function PaymentContent() {
   const discountPercent = 0; // No automatic discount unless applied explicitly
 
   // Flight data for summary cards - Use real flight data (supports multi-city)
-  // Moved up to calculate number of ways for baggage pricing
-  const journeySegments = flight.segments && flight.segments.length > 0
-    ? flight.segments
-    : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
+  const journeySegments = useMemo(() => {
+    if (!flight) return [];
+    return flight.segments && flight.segments.length > 0
+      ? flight.segments
+      : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
+  }, [flight]);
 
   const normalizedProtectionPlan = protectionPlan;
   const protectionPlanCost = normalizedProtectionPlan
     ? protectionPlanPrices[normalizedProtectionPlan]
     : 0;
-  
+
   // Calculate number of ways for baggage pricing
   // For round-trip: 2 ways, for one-way: 1 way, for multi-city: number of segments
   const numberOfWays = journeySegments.length;
@@ -298,20 +302,22 @@ function PaymentContent() {
           ? "All Included"
           : "None";
 
-  const summaryLegs = journeySegments.map((seg) => ({
-    // Use full airport name from cache or flight data
-    from: getAirportName(seg.departureAirport.code, seg.departureAirport.name, seg.departureAirport.city),
-    to: getAirportName(seg.arrivalAirport.code, seg.arrivalAirport.name, seg.arrivalAirport.city),
-    fromCode: seg.departureAirport.code,
-    toCode: seg.arrivalAirport.code,
-    departureTime: seg.departureTime,
-    arrivalTime: seg.arrivalTime,
-    date: seg.date,
-    duration: seg.totalJourneyTime || seg.duration,
-    stops: seg.stopDetails || `${seg.stops} Stop${seg.stops !== 1 ? 's' : ''}`,
-    airline: flight.airline.name,
-    airlineCode: flight.airline.code,
-  }));
+  const summaryLegs = useMemo(() => {
+    return journeySegments.map((seg) => ({
+      // Use full airport name from cache or flight data
+      from: getAirportName(seg.departureAirport.code, seg.departureAirport.name, seg.departureAirport.city),
+      to: getAirportName(seg.arrivalAirport.code, seg.arrivalAirport.name, seg.arrivalAirport.city),
+      fromCode: seg.departureAirport.code,
+      toCode: seg.arrivalAirport.code,
+      departureTime: seg.departureTime,
+      arrivalTime: seg.arrivalTime,
+      date: seg.date,
+      duration: seg.totalJourneyTime || seg.duration,
+      stops: seg.stopDetails || `${seg.stops} Stop${seg.stops !== 1 ? 's' : ''}`,
+      airline: flight?.airline?.name || "",
+      airlineCode: flight?.airline?.code || "",
+    }));
+  }, [journeySegments, flight]);
 
   const passengerLabel = (() => {
     if (selectedUpgrade?.passengerBreakdown?.length) {
@@ -333,7 +339,7 @@ function PaymentContent() {
   })();
   const cabinLabel = formatFareLabel(selectedUpgrade?.cabinClassDisplay || selectedFareType);
   // Web reference: prefer folder number, then search request ID, then fallbacks
-  const refNumber = vyspaFolderNumber || searchRequestId || flight.webRef || '—';
+  const refNumber: string = vyspaFolderNumber || searchRequestId || flight?.webRef || '—';
   const orderId = refNumber;
 
   return (
@@ -343,7 +349,7 @@ function PaymentContent() {
       {/* Main Content */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 flex flex-col gap-4">
         {/* Header with progress */}
-        {isPackageMode ? (
+        {isPackageMode || isHotelMode ? (
           <PackageStepProgress currentStep="payment" />
         ) : (
           <PaymentHeader currentStep={3} />
@@ -375,45 +381,49 @@ function PaymentContent() {
 
           {/* Left Column */}
           <div className="flex-1 flex flex-col gap-4">
-            {isPackageMode && (
+            {(isPackageMode || isHotelMode) && (
               <div className="flex flex-col gap-3">
                 <HotelSummaryCard />
               </div>
             )}
             {/* Flight Summary Cards */}
-            <div className="flex flex-col gap-3">
-              {summaryLegs.map((leg, index) => (
-                <FlightSummaryCard
-                  key={`${leg.fromCode}-${leg.toCode}-${index}`}
-                  leg={leg}
-                  passengers={passengerLabel || `1 ${t('adult')}`}
-                  onViewDetails={() => setShowFlightInfo(true)}
-                  cabinLabel={cabinLabel}
-                />
-              ))}
-            </div>
+            {!isHotelMode && (
+              <div className="flex flex-col gap-3">
+                {summaryLegs.map((leg, index) => (
+                  <FlightSummaryCard
+                    key={`${leg.fromCode}-${leg.toCode}-${index}`}
+                    leg={leg}
+                    passengers={passengerLabel || `1 ${t('adult')}`}
+                    onViewDetails={() => setShowFlightInfo(true)}
+                    cabinLabel={cabinLabel}
+                  />
+                ))}
+              </div>
+            )}
 
             {/* Baggage Allowance Section */}
-            <BaggageSection
-              additionalBaggage={additionalBaggage}
-              onUpdateBaggage={setAdditionalBaggage}
-              baggageDescription={
-                selectedUpgrade?.baggage?.description ||
-                (flight.outbound.segmentBaggageQuantity && flight.outbound.segmentBaggageUnit
-                  ? `${flight.outbound.segmentBaggageQuantity} ${flight.outbound.segmentBaggageUnit}`
-                  : flight.outbound.segmentBaggage || flight.baggage || undefined)
-              }
-              maxBaggageCount={(storeSearchParams?.passengers.adults || 1) + (storeSearchParams?.passengers.children || 0)}
-              baggagePrice={baggagePrice}
-              currencySymbol={currency === 'GBP' ? '£' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '£'}
-            />
+            {!isHotelMode && (
+              <BaggageSection
+                additionalBaggage={additionalBaggage}
+                onUpdateBaggage={setAdditionalBaggage}
+                baggageDescription={
+                  selectedUpgrade?.baggage?.description ||
+                  (flight?.outbound?.segmentBaggageQuantity && flight?.outbound?.segmentBaggageUnit
+                    ? `${flight.outbound.segmentBaggageQuantity} ${flight.outbound.segmentBaggageUnit}`
+                    : flight?.outbound?.segmentBaggage || flight?.baggage || undefined)
+                }
+                maxBaggageCount={(storeSearchParams?.passengers.adults || 1) + (storeSearchParams?.passengers.children || 0)}
+                baggagePrice={baggagePrice}
+                currencySymbol={currency === 'GBP' ? '£' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : '£'}
+              />
+            )}
 
             {/* iAssure Protection Plan */}
             <ProtectionPlanSection
               selectedPlan={normalizedProtectionPlan}
               onSelectPlan={setProtectionPlan}
               planPrices={protectionPlanPrices}
-              currency={currency}
+              currency={currency || 'GBP'}
             />
 
             {/* Billing Address Form */}
@@ -531,7 +541,7 @@ function PaymentContent() {
                   orderId,
                   amount: tripTotal,
                   currency: currencyForGateway,
-                  flow: isPackageMode ? "package" : "flight",
+                  flow: isHotelMode ? "hotel" : (isPackageMode ? "package" : "flight"),
                   shopper: {
                     firstName,
                     lastName,
@@ -567,6 +577,7 @@ function PaymentContent() {
                       contactPhone: shopperPhone,
                       passengers,
                       flight,
+                      hotelRoomSummary,
                       selectedUpgradeOption: selectedUpgrade,
                       addOns,
                       pricing: {
@@ -592,22 +603,22 @@ function PaymentContent() {
                 }
               } catch (e: any) {
                 console.error('BoxPay error:', e);
-                
+
                 // Update folder status to Payment Failed (56) on initial creation error
                 if (vyspaFolderNumber) {
-                   try {
-                     await fetch("/api/vyspa/update-status", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          folderNumber: vyspaFolderNumber,
-                          statusCode: FOLDER_STATUS_CODES.PAYMENT_FAILURE,
-                          comments: [`BoxPay Session Creation Failed: ${e?.message || 'Unknown error'}`]
-                        }),
-                     });
-                   } catch (err) {
-                     console.error("Failed to update status on error", err);
-                   }
+                  try {
+                    await fetch("/api/vyspa/update-status", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        folderNumber: vyspaFolderNumber,
+                        statusCode: FOLDER_STATUS_CODES.PAYMENT_FAILURE,
+                        comments: [`BoxPay Session Creation Failed: ${e?.message || 'Unknown error'}`]
+                      }),
+                    });
+                  } catch (err) {
+                    console.error("Failed to update status on error", err);
+                  }
                 }
 
                 // Show affiliate-specific copy
@@ -675,19 +686,21 @@ function PaymentContent() {
               discountAmount={discountAmount}
               tripTotal={tripTotal}
               isSticky={true}
-              currency={currency}
+              currency={currency || 'GBP'}
             />
           </div>
         </div>
       </div>
 
       {/* Flight Info Modal */}
-      <FlightInfoModal
-        flight={flight}
-        open={showFlightInfo}
-        onOpenChange={setShowFlightInfo}
-        stayOnCurrentPage={true}
-      />
+      {flight && (
+        <FlightInfoModal
+          flight={flight}
+          open={showFlightInfo}
+          onOpenChange={setShowFlightInfo}
+          stayOnCurrentPage={true}
+        />
+      )}
 
       {/* 60-min refresh expiry */}
       <Dialog open={sessionExpiredOpen} onOpenChange={setSessionExpiredOpen}>

@@ -13,21 +13,35 @@ function formatMoney(currency: string | undefined, amount: number | undefined) {
   return c ? `${c} ${a.toFixed(2)}` : a.toFixed(2);
 }
 
-export function HotelSummaryCard() {
-  const hotelSearch = useBookingStore((s) => s.hotelSearch);
-  const selectedHotel = useBookingStore((s) => s.selectedHotel);
-  const selectedRoomIds = useBookingStore((s) => s.selectedHotelRoomIds);
-  const roomSummary = useBookingStore((s) => s.selectedHotelRoomSummary);
-  const detailsCache = useBookingStore((s) => s.hotelDetailsCache);
+interface HotelSummaryCardProps {
+  hotelSearch?: any;
+  selectedHotel?: any;
+  selectedRoomIds?: string[];
+  roomSummary?: any;
+  detailsCache?: any;
+}
+
+export function HotelSummaryCard(props: HotelSummaryCardProps) {
+  const storeHotelSearch = useBookingStore((s) => s.hotelSearch);
+  const storeSelectedHotel = useBookingStore((s) => s.selectedHotel);
+  const storeSelectedRoomIds = useBookingStore((s) => s.selectedHotelRoomIds);
+  const storeRoomSummary = useBookingStore((s) => s.selectedHotelRoomSummary);
+  const storeDetailsCache = useBookingStore((s) => s.hotelDetailsCache);
+
+  const hotelSearch = props.hotelSearch || storeHotelSearch;
+  const selectedHotel = props.selectedHotel || storeSelectedHotel;
+  const selectedRoomIds = props.selectedRoomIds || storeSelectedRoomIds;
+  const roomSummary = props.roomSummary || storeRoomSummary;
+  const detailsCache = props.detailsCache || storeDetailsCache;
 
   const hotelId = selectedHotel?.hotelId;
-  const cached = hotelId ? detailsCache[hotelId] : undefined;
+  const cached = hotelId ? detailsCache?.[hotelId] : undefined;
 
   const display = useMemo(() => {
     const name = selectedHotel?.hotelName || cached?.hotelName || "Selected hotel";
     const address = cached?.address || "";
     const img = cached?.mainImage;
-    const roomId = selectedRoomIds[0] || roomSummary?.roomId;
+    const roomId = selectedRoomIds?.[0] || roomSummary?.roomId;
     const room =
       roomId && Array.isArray(cached?.rooms)
         ? cached!.rooms!.find((r: any) => String(r.id) === String(roomId))
@@ -38,8 +52,8 @@ export function HotelSummaryCard() {
       typeof roomSummary?.isRefundable === "boolean"
         ? roomSummary.isRefundable
         : typeof room?.isRefundable === "boolean"
-        ? room.isRefundable
-        : undefined;
+          ? room.isRefundable
+          : undefined;
     const currency = roomSummary?.currency || room?.price?.currency;
     const total = roomSummary?.total ?? room?.price?.total;
     const nightly = roomSummary?.nightly ?? room?.price?.nightly;
@@ -78,8 +92,8 @@ export function HotelSummaryCard() {
           {display.isRefundable == null
             ? "Content missing from API: refundability"
             : display.isRefundable
-            ? "Refundable"
-            : "Non-refundable"}
+              ? "Refundable"
+              : "Non-refundable"}
         </div>
       </div>
 
