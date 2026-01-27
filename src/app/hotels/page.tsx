@@ -459,12 +459,14 @@ function HotelsPageInner() {
           adults: search.adults,
           children: 0,
           branches: search.branches,
-          searchCriteriaId:
-            typeof (criteria as any)?.searchCriteriaId === "number"
-              ? (criteria as any).searchCriteriaId
-              : undefined,
+          searchCriteriaId: criteriaId ?? undefined,
           arrivalPointCode: pick.arrival_point_code,
         });
+
+        // Set searchRequestId for consistent web reference (same as flight logic)
+        if (criteriaId) {
+          useBookingStore.getState().setSearchRequestId(String(criteriaId));
+        }
         setHotelResultsMeta(meta);
       } catch (e: any) {
         if (cancelled || requestSeq !== activeRequestSeq.current) return;

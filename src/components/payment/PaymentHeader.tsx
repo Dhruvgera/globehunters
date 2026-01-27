@@ -6,17 +6,24 @@ import { useTranslations } from "next-intl";
 
 interface PaymentHeaderProps {
   currentStep?: number;
+  isHotel?: boolean;
 }
 
-export function PaymentHeader({ currentStep = 3 }: PaymentHeaderProps) {
+export function PaymentHeader({ currentStep = 3, isHotel = false }: PaymentHeaderProps) {
   const t = useTranslations('payment.header');
-  
-  const steps = [
-    { number: 1, label: t('step1') },
-    { number: 2, label: t('step2') },
-    { number: 3, label: t('step3') },
-    { number: 4, label: t('step4') },
-  ];
+
+  const steps = isHotel
+    ? [
+      { number: 1, label: t('step1') },
+      { number: 2, label: t('step3') },
+      { number: 3, label: t('step4') },
+    ]
+    : [
+      { number: 1, label: t('step1') },
+      { number: 2, label: t('step2') },
+      { number: 3, label: t('step3') },
+      { number: 4, label: t('step4') },
+    ];
 
   return (
     <div className="flex flex-col gap-4">
@@ -34,18 +41,14 @@ export function PaymentHeader({ currentStep = 3 }: PaymentHeaderProps) {
         {steps.map((step) => (
           <div key={step.number} className="flex items-center gap-1.5 lg:gap-2">
             <div
-              className={`w-5 h-5 lg:w-6 lg:h-6 rounded-full flex items-center justify-center ${
-                step.number < currentStep
+              className={`w-5 h-5 lg:w-6 lg:h-6 rounded-full flex items-center justify-center ${step.number <= currentStep
                   ? "bg-[#010D50] border border-[#010D50]"
-                  : step.number === currentStep
-                  ? "border-2 border-[#010D50]"
                   : "border border-[#010D50]"
-              }`}
+                }`}
             >
               <span
-                className={`text-[10px] lg:text-xs font-medium ${
-                  step.number <= currentStep ? "text-[#010D50]" : "text-[#010D50]"
-                } ${step.number < currentStep ? "text-white" : ""}`}
+                className={`text-[10px] lg:text-xs font-medium ${step.number <= currentStep ? "text-white" : "text-[#010D50]"
+                  }`}
               >
                 {step.number}
               </span>

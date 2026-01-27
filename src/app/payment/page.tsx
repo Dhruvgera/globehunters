@@ -349,8 +349,10 @@ function PaymentContent() {
       {/* Main Content */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 flex flex-col gap-4">
         {/* Header with progress */}
-        {isPackageMode || isHotelMode ? (
+        {isPackageMode ? (
           <PackageStepProgress currentStep="payment" />
+        ) : isHotelMode ? (
+          <PaymentHeader currentStep={2} isHotel={true} />
         ) : (
           <PaymentHeader currentStep={3} />
         )}

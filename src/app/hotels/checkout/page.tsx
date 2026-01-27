@@ -13,6 +13,8 @@ import { useBookingStore } from "@/store/bookingStore";
 import { hotelService } from "@/services/api/hotelService";
 import { folderService } from "@/services/api/folderService";
 import type { AddToFolderRequest } from "@/types/folder";
+import { WebRefCard } from "@/components/booking/WebRefCard";
+import { useAffiliatePhone } from "@/lib/AffiliateContext";
 
 export default function HotelCheckoutPage() {
   const router = useRouter();
@@ -24,6 +26,11 @@ export default function HotelCheckoutPage() {
   const passengers = useBookingStore((s) => s.passengers);
   const passengersSaved = useBookingStore((s) => s.passengersSaved);
   const setVyspaFolderInfo = useBookingStore((s) => s.setVyspaFolderInfo);
+  const vyspaFolderNumber = useBookingStore((s) => s.vyspaFolderNumber);
+  const searchRequestId = useBookingStore((s) => s.searchRequestId);
+  const { phoneNumber: affiliatePhone } = useAffiliatePhone();
+
+  const webRefNumber = vyspaFolderNumber || searchRequestId || (hotelSearch?.searchCriteriaId ? String(hotelSearch.searchCriteriaId) : "—");
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,31 +65,35 @@ export default function HotelCheckoutPage() {
         throw new Error("Lead passenger email and phone are required.");
       }
 
-      const folderResp = await hotelService.createCustomerFolder({
-        title: lead.title || "Mr",
-        firstName: lead.firstName,
-        lastName: lead.lastName,
-        email: lead.email,
-        phone: lead.phone,
-        branchCode: hotelSearch.branches || "UK",
-        desAirportCode: hotelSearch.arrivalPointCode,
-        departureDate: hotelSearch.checkIn,
-        address: "NA",
-        zipCode: "NA",
-      });
-
-      const folderNo = (() => {
-        if (typeof folderResp === "number") return folderResp;
-        if (typeof folderResp === "string" && /^\d+$/.test(folderResp)) return Number(folderResp);
-        if (Array.isArray(folderResp)) return (folderResp as any)[0]?.folder_no;
-        return (folderResp as any)?.folder_no;
-      })();
+      let folderNo = vyspaFolderNumber ? Number(vyspaFolderNumber) : null;
 
       if (!folderNo) {
-        throw new Error("Vyspa did not return a folder number (folder_no).");
-      }
+        const folderResp = await hotelService.createCustomerFolder({
+          title: lead.title || "Mr",
+          firstName: lead.firstName,
+          lastName: lead.lastName,
+          email: lead.email,
+          phone: lead.phone,
+          branchCode: hotelSearch.branches || "UK",
+          desAirportCode: hotelSearch.arrivalPointCode,
+          departureDate: hotelSearch.checkIn,
+          address: "NA",
+          zipCode: "NA",
+        });
 
-      setVyspaFolderInfo({ folderNumber: String(folderNo) });
+        folderNo = (() => {
+          if (typeof folderResp === "number") return folderResp;
+          if (typeof folderResp === "string" && /^\d+$/.test(folderResp)) return Number(folderResp);
+          if (Array.isArray(folderResp)) return (folderResp as any)[0]?.folder_no;
+          return (folderResp as any)?.folder_no;
+        })();
+
+        if (!folderNo) {
+          throw new Error("Vyspa did not return a folder number (folder_no).");
+        }
+
+        setVyspaFolderInfo({ folderNumber: String(folderNo) });
+      }
 
       // Build passengers in Vyspa folder format using existing helper in folderService
       const folderPassengers = passengers.map((p, idx) => ({
@@ -141,9 +152,14 @@ export default function HotelCheckoutPage() {
       <Navbar />
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
-        <BookingHeader currentStep={1} />
+        <BookingHeader currentStep={1} isHotel={true} />
 
         <div className="flex flex-col lg:flex-row gap-4 mt-4">
+          <WebRefCard
+            refNumber={webRefNumber}
+            phoneNumber={affiliatePhone}
+            isMobile={true}
+          />
           <div className="flex-1 flex flex-col gap-4">
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-4">
               <div className="text-sm font-semibold text-[#010D50]">Hotel booking</div>
@@ -168,6 +184,11 @@ export default function HotelCheckoutPage() {
           </div>
 
           <aside className="w-full lg:w-[360px] flex flex-col gap-4">
+            <WebRefCard
+              refNumber={webRefNumber}
+              phoneNumber={affiliatePhone}
+              isMobile={false}
+            />
             <HotelSummaryCard />
           </aside>
         </div>

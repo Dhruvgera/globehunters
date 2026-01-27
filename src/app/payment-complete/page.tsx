@@ -13,6 +13,7 @@ import { PriceCheckResult, TransformedPriceOption } from "@/types/priceCheck";
 import FlightDetailedInfo from "@/components/flights/FlightDetailedInfo";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
 import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
+import { PaymentHeader } from "@/components/payment/PaymentHeader";
 import { HotelSummaryCard } from "@/components/booking/HotelSummaryCard";
 import {
   mockBookingConfirmation,
@@ -975,16 +976,15 @@ function PaymentCompleteContent() {
     return () => window.removeEventListener("popstate", onPopState);
   }, [paymentInfo?.status]);
 
-  // Flight summary data
+  const ctx = bookingContext;
   const refNumber =
-    paymentInfo?.orderId || vyspaFolderNumber || orderId || "—";
+    paymentInfo?.orderId || ctx?.vyspaFolderNumber || vyspaFolderNumber || orderId || "—";
 
   const isSuccess = paymentInfo?.status === "success";
   const isFailed = paymentInfo?.status === "failed";
   const isPending = paymentInfo?.status === "pending";
   const isCancelled = paymentInfo?.status === "cancelled";
 
-  const ctx = bookingContext;
   const displayEmail = (isMockMode ? contactEmail : (ctx?.contactEmail || effectiveContactEmail)) || "—";
   const displayPhone =
     (isMockMode ? contactPhone : (ctx?.contactPhone || storeContactPhone || passengers?.[0]?.phone)) || "—";
@@ -1061,6 +1061,9 @@ function PaymentCompleteContent() {
               <h1 className="text-2xl font-bold text-[#010D50] mb-2">
                 Booking Confirmed
               </h1>
+              <div className="text-lg font-semibold text-[#3754ED] mb-6">
+                Booking Reference: {refNumber}
+              </div>
               <p className="text-[#6B7280] mb-6">
                 {emailSent ? (
                   <>Confirmation email sent to <span className="font-semibold text-[#010D50]">{displayEmail}</span>.</>

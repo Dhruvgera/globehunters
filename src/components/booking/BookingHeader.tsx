@@ -9,6 +9,7 @@ import { SearchParams } from "@/types/flight";
 
 interface BookingHeaderProps {
   currentStep?: number;
+  isHotel?: boolean;
 }
 
 interface AffiliateData {
@@ -35,19 +36,19 @@ function buildSearchUrl(
     // Add flight search params
     params.set("from", searchParams.from);
     params.set("to", searchParams.to);
-    
+
     // Format date as YYYY-MM-DD
     const formatDate = (date: Date | string) => {
       const d = date instanceof Date ? date : new Date(date);
       return d.toISOString().split("T")[0];
     };
-    
+
     params.set("departureDate", formatDate(searchParams.departureDate));
-    
+
     if (searchParams.returnDate) {
       params.set("returnDate", formatDate(searchParams.returnDate));
     }
-    
+
     params.set("adults", String(searchParams.passengers.adults));
     params.set("children", String(searchParams.passengers.children));
     params.set("infants", String(searchParams.passengers.infants));
@@ -86,12 +87,12 @@ function buildSearchUrl(
   return queryString ? `/search?${queryString}` : "/search";
 }
 
-export function BookingHeader({ currentStep = 1 }: BookingHeaderProps) {
+export function BookingHeader({ currentStep = 1, isHotel = false }: BookingHeaderProps) {
   const t = useTranslations('booking.header');
   const searchParams = useBookingStore((state) => state.searchParams);
   const affiliateData = useBookingStore((state) => state.affiliateData);
   const isFromDeeplink = useBookingStore((state) => state.isFromDeeplink);
-  
+
   // Build the back URL - always include search params so user can continue searching
   const backUrl = useMemo(() => {
     // If we have search params (from deeplink or regular flow), use them
@@ -102,12 +103,18 @@ export function BookingHeader({ currentStep = 1 }: BookingHeaderProps) {
     return "/search";
   }, [searchParams, affiliateData]);
 
-  const steps = [
-    { number: 1, label: t('step1') },
-    { number: 2, label: t('step2') },
-    { number: 3, label: t('step3') },
-    { number: 4, label: t('step4') },
-  ];
+  const steps = isHotel
+    ? [
+      { number: 1, label: t('step1') },
+      { number: 2, label: t('step3') },
+      { number: 3, label: t('step4') },
+    ]
+    : [
+      { number: 1, label: t('step1') },
+      { number: 2, label: t('step2') },
+      { number: 3, label: t('step3') },
+      { number: 4, label: t('step4') },
+    ];
 
   return (
     <div className="flex flex-col gap-4 mb-4">
@@ -125,13 +132,15 @@ export function BookingHeader({ currentStep = 1 }: BookingHeaderProps) {
         {steps.map((step, index) => (
           <div key={step.number} className="flex items-center gap-1.5 lg:gap-2">
             <div
-              className={`w-5 h-5 lg:w-6 lg:h-6 rounded-full flex items-center justify-center ${
-                step.number === currentStep
-                  ? "border-2 border-[#010D50]"
+              className={`w-5 h-5 lg:w-6 lg:h-6 rounded-full flex items-center justify-center ${step.number <= currentStep
+                  ? "bg-[#010D50] border border-[#010D50]"
                   : "border border-[#010D50]"
-              }`}
+                }`}
             >
-              <span className="text-[10px] lg:text-xs font-medium text-[#010D50]">
+              <span
+                className={`text-[10px] lg:text-xs font-medium ${step.number <= currentStep ? "text-white" : "text-[#010D50]"
+                  }`}
+              >
                 {step.number}
               </span>
             </div>

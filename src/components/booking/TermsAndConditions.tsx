@@ -32,6 +32,7 @@ export function TermsAndConditions({
   const priceCheckData = useBookingStore((s) => s.priceCheckData);
   const setVyspaFolderInfo = useBookingStore((s) => s.setVyspaFolderInfo);
   const passengersSaved = useBookingStore((s) => s.passengersSaved);
+  const vyspaFolderNumber = useBookingStore((s) => s.vyspaFolderNumber);
 
   const canProceedToPayment = (): boolean => {
     const counts = searchParams?.passengers || { adults: 1, children: 0, infants: 0 };
@@ -56,6 +57,12 @@ export function TermsAndConditions({
     }
 
     if (!selectedFlight) {
+      router.push("/payment");
+      return;
+    }
+
+    // If we already have a folder number, skip creation and just go to payment
+    if (vyspaFolderNumber) {
       router.push("/payment");
       return;
     }
@@ -241,8 +248,8 @@ export function TermsAndConditions({
         useBookingStore.getState().affiliateData?.code ||
         (typeof window !== 'undefined'
           ? (sessionStorage.getItem('affiliate_code') ||
-              sessionStorage.getItem('utm_source') ||
-              '')
+            sessionStorage.getItem('utm_source') ||
+            '')
           : '');
 
       // Build per-passenger pricing from price check data

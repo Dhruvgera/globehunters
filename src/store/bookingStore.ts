@@ -276,10 +276,21 @@ export const useBookingStore = create<BookingState & HydrationState>()(
       setHasHydrated: (state) => set({ _hasHydrated: state }),
 
       // Search params
-      setSearchParams: (params) => set({ searchParams: reviveSearchParams(params) }),
+      setSearchParams: (params) => set({
+        searchParams: reviveSearchParams(params),
+        vyspaFolderNumber: null,
+        vyspaCustomerId: null,
+        vyspaEmailAddress: null,
+        searchRequestId: null,
+      }),
 
       // Hotels (Vyspa) search
-      setHotelSearch: (search) => set({ hotelSearch: search }),
+      setHotelSearch: (search) => set({
+        hotelSearch: search,
+        vyspaFolderNumber: null,
+        vyspaCustomerId: null,
+        vyspaEmailAddress: null,
+      }),
       clearHotelSearch: () =>
         set({
           hotelSearch: null,
@@ -297,7 +308,13 @@ export const useBookingStore = create<BookingState & HydrationState>()(
       clearHotelFiltersCache: () => set({ hotelFiltersCache: null }),
       setHotelResultsMeta: (meta) => set({ hotelResultsMeta: meta }),
       clearHotelResultsMeta: () => set({ hotelResultsMeta: {} }),
-      setSelectedHotel: (hotel) => set({ selectedHotel: hotel }),
+      setSelectedHotel: (hotel) => set({
+        selectedHotel: hotel,
+        // Reset folder info when picking a new hotel
+        vyspaFolderNumber: null,
+        vyspaCustomerId: null,
+        vyspaEmailAddress: null,
+      }),
       setSelectedHotelRoomIds: (roomIds) => set({ selectedHotelRoomIds: roomIds }),
       setHotelDetailsCache: (hotelId, data) =>
         set((state) => ({
@@ -320,6 +337,10 @@ export const useBookingStore = create<BookingState & HydrationState>()(
           selectedFlight: flight,
           selectedFareType: fareType,
           currentStep: 'booking',
+          // Reset folder info when picking a new flight
+          vyspaFolderNumber: null,
+          vyspaCustomerId: null,
+          vyspaEmailAddress: null,
         }),
 
       setSelectedUpgrade: (option) =>
