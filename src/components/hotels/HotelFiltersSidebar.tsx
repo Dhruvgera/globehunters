@@ -120,7 +120,7 @@ export function HotelFiltersSidebar({
       </div>
 
       {/* Popular filters */}
-      <FilterSection
+      {/* <FilterSection
         title="Popular filters"
         isExpanded={!!expanded.popular}
         onToggle={() => onToggleExpanded("popular")}
@@ -181,7 +181,7 @@ export function HotelFiltersSidebar({
             <span className="text-sm text-[#010D50]">Airport shuttle included</span>
           </label>
         </div>
-      </FilterSection>
+      </FilterSection> */}
 
       {/* Price */}
       <FilterSection title="Price" isExpanded={!!expanded.price} onToggle={() => onToggleExpanded("price")}>
@@ -294,7 +294,7 @@ export function HotelFiltersSidebar({
                 </div>
                 {minPriceForRating !== undefined && (
                 <span className="text-sm font-medium text-[#010D50]">
-                    from {currencySymbol}{Math.round(minPriceForRating).toLocaleString()}
+                    from {currencySymbol}{Math.round(minPriceForRating).toLocaleString()} per night
                 </span>
                 )}
               </label>

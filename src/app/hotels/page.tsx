@@ -24,8 +24,6 @@ import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
 import { mockHotels } from "@/data/mockHotels";
 import type { PackageSearchResult, PackageResultsMeta } from "@/types/holidayPackage";
 
-const DEFAULT_WEB_REF = "IN-649707636";
-
 const DEFAULT_FILTERS: HotelFiltersState = {
   propertyQuery: "",
   neighborhoods: [],
@@ -110,6 +108,7 @@ function HotelsPageInner() {
   const setHotelSearch = useBookingStore((s) => s.setHotelSearch);
   const setHotelResultsMeta = useBookingStore((s) => s.setHotelResultsMeta);
   const hotelResultsCache = useBookingStore((s) => s.hotelResultsCache);
+  const searchRequestId = useBookingStore((s) => s.searchRequestId);
   const hotelFiltersCache = useBookingStore((s) => s.hotelFiltersCache);
   const setHotelFiltersCache = useBookingStore((s) => s.setHotelFiltersCache);
   const setHotelResultsCache = useBookingStore((s) => s.setHotelResultsCache);
@@ -874,7 +873,9 @@ function HotelsPageInner() {
         <div className="flex flex-col lg:flex-row gap-4">
           {/* Left sidebar */}
           <aside className="hidden lg:flex w-full lg:w-72 flex-col gap-4">
-            <ContactCard webRef={DEFAULT_WEB_REF} />
+            {searchRequestId && (
+              <ContactCard webRef={searchRequestId} />
+            )}
             <HotelFiltersSidebar
               resultCount={filteredHotels.length}
               value={filters}
