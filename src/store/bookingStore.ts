@@ -103,6 +103,7 @@ interface BookingState {
     queryKey: string;
     hotels: Hotel[];
     selectedHotelId?: string;
+    selectedHotelKey?: string;
     /** Timestamp when results were fetched - used to invalidate stale cache */
     fetchedAt?: number;
   } | null;

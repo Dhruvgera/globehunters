@@ -96,66 +96,67 @@ export function HotelResultCard({
 
           {/* Content padded; CTA pinned to bottom so all cards align */}
           <div className="flex flex-col gap-4 p-5 flex-1">
-            {/* Hotel name + location */}
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0 flex-1">
-                <h3 className="text-lg font-semibold text-[#010D50] leading-tight">
-                  {hotel.name}
-                </h3>
-                <p className="text-sm text-[#3A478A] mt-0.5">{hotel.distanceLabel}</p>
-                {hotel.neighborhood && (
-                  <p className="text-xs text-[#3A478A] mt-0.5">{hotel.neighborhood}</p>
-                )}
+            {/* Scrollable content area */}
+            <div className="flex flex-col gap-4 flex-1">
+              {/* Hotel name + location */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-lg font-semibold text-[#010D50] leading-tight line-clamp-2 min-h-[3rem]">
+                    {hotel.name}
+                  </h3>
+                  <p className="text-sm text-[#3A478A] mt-0.5 line-clamp-1">
+                    {hotel.distanceLabel}
+                  </p>
+                  {hotel.neighborhood && (
+                    <p className="text-xs text-[#3A478A] mt-0.5">{hotel.neighborhood}</p>
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/* Quick description */}
-            {hotel.description && (
-              <p className="text-xs text-[#3A478A] line-clamp-2">{hotel.description}</p>
-            )}
-
-            {/* Review score row - score badge on left, label/count stacked on right */}
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-lg bg-[#008234] text-white grid place-content-center font-bold text-sm">
-                {hotel.reviews.score > 0 ? hotel.reviews.score.toFixed(1) : "—"}
+              
+              {/* Review score row - score badge on left, label/count stacked on right */}
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-lg bg-[#008234] text-white grid place-content-center font-bold text-sm">
+                  {hotel.reviews.score > 0 ? hotel.reviews.score.toFixed(1) : "—"}
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-[#010D50]">
+                    {hotel.reviews.label}
+                  </span>
+                  <span className="text-xs text-[#3A478A]">
+                    {hotel.reviews.count > 0 ? `${hotel.reviews.count} reviews` : "—"}
+                  </span>
+                </div>
               </div>
-              <div className="flex flex-col">
-                <span className="text-sm font-semibold text-[#010D50]">
-                  {hotel.reviews.label || "Content missing from API: rating"}
-                </span>
-                <span className="text-xs text-[#3A478A]">
-                  {hotel.reviews.count > 0 ? `${hotel.reviews.count} reviews` : "—"}
-                </span>
-              </div>
-            </div>
 
-            {/* Amenities with icons */}
-            <div className="flex flex-wrap items-center gap-2">
-              {hotel.amenities.slice(0, 2).map((a) => (
-                <AmenityPill key={a} text={a} />
-              ))}
-            </div>
-
-            {/* Room details card */}
-            <div className="rounded-xl border border-[#DFE0E4] bg-white p-4">
-              <div className="text-sm font-semibold text-[#010D50]">{hotel.room.name}</div>
-              <div className="mt-3 flex flex-col gap-2">
-                {hotel.room.highlights.slice(0, 2).map((h) => (
-                  <RoomBullet key={h} text={h} />
+              {/* Amenities with icons */}
+              <div className="flex flex-wrap items-center gap-2">
+                {hotel.amenities.slice(0, 2).map((a) => (
+                  <AmenityPill key={a} text={a} />
                 ))}
               </div>
-            </div>
 
-            {/* Price section - right aligned */}
-            <div className="flex flex-col items-end gap-1 mt-auto">
-              <div className="text-sm text-[#3A478A]">
-                {hotel.price.currency}{hotel.price.nightly.toLocaleString()} nightly
+              {/* Room details card */}
+              <div className="rounded-xl border border-[#DFE0E4] bg-white p-4">
+                <div className="text-sm font-semibold text-[#010D50]">{hotel.room.name}</div>
+                <div className="mt-3 flex flex-col gap-2">
+                  {hotel.room.highlights.slice(0, 2).map((h) => (
+                    <RoomBullet key={h} text={h} />
+                  ))}
+                </div>
               </div>
-              <div className="text-2xl font-bold text-[#010D50]">
-                {hotel.price.currency}{hotel.price.total.toLocaleString()} total
-              </div>
-              <div className="text-xs text-[#3A478A]">
-                * Total with taxes and fees
+
+              {/* Meal plans and Price section - right aligned and bottom aligned */}
+              <div className="mt-auto flex flex-col items-end gap-1">
+                <div className="text-sm text-[#3A478A]">
+                  {hotel.price.currency}{hotel.price.nightly.toLocaleString()} nightly
+                </div>
+                <div className="text-2xl font-bold text-[#010D50]">
+                  {hotel.price.currency}{hotel.price.total.toLocaleString()} total
+                </div>
+                <div className="text-xs text-[#3A478A]">
+                  * Total with taxes and fees
+                </div>
               </div>
             </div>
 
@@ -204,11 +205,7 @@ export function HotelResultCard({
                 )}
               </div>
 
-              {/* Quick description */}
-              {hotel.description && (
-                <p className="text-xs text-[#3A478A] line-clamp-2">{hotel.description}</p>
-              )}
-
+              
               <div className="flex flex-wrap items-center gap-2">
                 {hotel.amenities.slice(0, 2).map((a) => (
                   <AmenityPill key={a} text={a} />

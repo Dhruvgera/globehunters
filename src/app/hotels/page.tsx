@@ -134,7 +134,7 @@ function HotelsPageInner() {
   const [viewMode, setViewMode] = useState<HotelViewMode>("grid");
   // Default: low -> high (user request), but keep other options available.
   const [sortMode, setSortMode] = useState<HotelSortMode>("price_low");
-  const [selectedHotelId, setSelectedHotelId] = useState<string>("");
+  const [selectedHotelKey, setSelectedHotelKey] = useState<string>("");
 
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(false);
@@ -267,7 +267,7 @@ function HotelsPageInner() {
       if (cache?.queryKey === queryKey && cache.hotels.length > 0 && isCacheFresh) {
         if (!cancelled && requestSeq === activeRequestSeq.current) {
           setHotels(cache.hotels);
-          setSelectedHotelId(cache.selectedHotelId || cache.hotels[0]?.id || "");
+          setSelectedHotelKey(cache.selectedHotelKey || (cache.hotels.length > 0 ? `${cache.hotels[0]?.id}-0` : ""));
           setLoading(false);
           setHasAttemptedFetch(true);
         }
@@ -278,7 +278,7 @@ function HotelsPageInner() {
       setError(null);
       // Clear stale results immediately on a new search (match flights UX).
       setHotels([]);
-      setSelectedHotelId("");
+      setSelectedHotelKey("");
       setDisplayedHotelsCount(12);
       setBreakfastByHotelId({});
       setBreakfastEnriching(false);
@@ -370,12 +370,12 @@ function HotelsPageInner() {
           if (!cancelled && requestSeq === activeRequestSeq.current) {
             if (mappedHotels.length > 0) {
               setHotels(mappedHotels);
-              setSelectedHotelId(mappedHotels[0]?.id || "");
+              setSelectedHotelKey(mappedHotels.length > 0 ? `${mappedHotels[0]?.id}-0` : "");
             } else {
               // Fall back to mock hotels if no packages found
               console.log('[Hotels Page] No packages found, using mock hotels');
               setHotels(mockHotels);
-              setSelectedHotelId(mockHotels[0]?.id || "");
+              setSelectedHotelKey(mockHotels.length > 0 ? `${mockHotels[0]?.id}-0` : "");
             }
             setLoading(false);
             setHasAttemptedFetch(true);
@@ -385,7 +385,7 @@ function HotelsPageInner() {
           // Fall back to mock hotels on error
           if (!cancelled && requestSeq === activeRequestSeq.current) {
             setHotels(mockHotels);
-            setSelectedHotelId(mockHotels[0]?.id || "");
+            setSelectedHotelKey(mockHotels.length > 0 ? `${mockHotels[0]?.id}-0` : "");
             setLoading(false);
             setHasAttemptedFetch(true);
           }
@@ -535,10 +535,11 @@ function HotelsPageInner() {
           }
           return next;
         });
-        setSelectedHotelId(mapped[0]?.id || "");
+        setSelectedHotelKey(mapped.length > 0 ? `${mapped[0]?.id}-0` : "");
         // Only cache if we have actual results (don't cache empty "no results" responses)
         if (mapped.length > 0) {
-          setHotelResultsCache({ queryKey, hotels: mapped, selectedHotelId: mapped[0]?.id || "", fetchedAt: Date.now() });
+          const selectedHotelKey = `${mapped[0]?.id}-0`;
+          setHotelResultsCache({ queryKey, hotels: mapped, selectedHotelKey, fetchedAt: Date.now() });
         }
 
         // If user hasn't interacted yet, set price slider bounds from real data (total).
@@ -934,43 +935,58 @@ function HotelsPageInner() {
               </div>
             ) : viewMode === "grid" ? (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-stretch">
-                {displayedHotels.map((hotel) => (
+                {displayedHotels.map((hotel, idx) => (
+                  (() => {
+                    const hotelKey = `${hotel.id}-${idx}`;
+                    return (
                   <HotelResultCard
-                    key={hotel.id}
+                    key={hotelKey}
                     hotel={hotel}
                     view="grid"
-                    selected={hotel.id === selectedHotelId}
-                    onSelect={() => setSelectedHotelId(hotel.id)}
+                    selected={hotelKey === selectedHotelKey}
+                    onSelect={() => setSelectedHotelKey(hotelKey)}
                     isPackageMode={isPackageMode}
                   />
+                    );
+                  })()
                 ))}
               </div>
             ) : (
               <>
                 {/* On mobile, show grid layout since list looks the same */}
                 <div className="grid grid-cols-1 gap-4 sm:hidden">
-                  {displayedHotels.map((hotel) => (
+                  {displayedHotels.map((hotel, idx) => (
+                    (() => {
+                      const hotelKey = `${hotel.id}-${idx}`;
+                      return (
                     <HotelResultCard
-                      key={hotel.id}
+                      key={hotelKey}
                       hotel={hotel}
                       view="grid"
-                      selected={hotel.id === selectedHotelId}
-                      onSelect={() => setSelectedHotelId(hotel.id)}
+                      selected={hotelKey === selectedHotelKey}
+                      onSelect={() => setSelectedHotelKey(hotelKey)}
                       isPackageMode={isPackageMode}
                     />
+                      );
+                    })()
                   ))}
                 </div>
                 {/* On desktop, show list layout */}
                 <div className="hidden sm:flex flex-col gap-4">
-                  {displayedHotels.map((hotel) => (
+                  {displayedHotels.map((hotel, idx) => (
+                    (() => {
+                      const hotelKey = `${hotel.id}-${idx}`;
+                      return (
                     <HotelResultCard
-                      key={hotel.id}
+                      key={hotelKey}
                       hotel={hotel}
                       view="list"
-                      selected={hotel.id === selectedHotelId}
-                      onSelect={() => setSelectedHotelId(hotel.id)}
+                      selected={hotelKey === selectedHotelKey}
+                      onSelect={() => setSelectedHotelKey(hotelKey)}
                       isPackageMode={isPackageMode}
                     />
+                      );
+                    })()
                   ))}
                 </div>
               </>
