@@ -211,6 +211,19 @@ export interface FlightBookingDetails {
   optionalServices?: string[];
   /** Seat selections */
   seats?: SeatSelection[];
+  /** Flag to mark flight as part of a holiday package (1=yes) */
+  holidayPackage?: 0 | 1;
+}
+
+export interface HotelBookingDetails {
+  /** Hotel search result ID */
+  searchResultId?: string;
+  /** Room IDs to book */
+  roomIds: string[];
+  /** Room to passenger mapping (roomId -> comma-separated passenger indices) */
+  roomPassengers: HotelRoomPassengers;
+  /** Flag to mark hotel as part of a holiday package (1=yes) */
+  holidayPackage?: 0 | 1;
 }
 
 export interface PassengerDetails {

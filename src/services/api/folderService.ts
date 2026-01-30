@@ -13,11 +13,14 @@ import {
   CreateFolderResponse,
   FolderPassenger,
   FlightRequestItem,
+  HotelRequestItem,
   FlightBookingDetails,
+  HotelBookingDetails,
   PassengerDetails,
   PassengerType,
   PassengerTitle,
   SeatSelection,
+  HotelRoomPassengers,
 } from '@/types/folder';
 
 /**
@@ -50,7 +53,7 @@ export function buildFlightRequestItem(
   flightDetails: FlightBookingDetails,
   passengerIndices: number[]
 ): FlightRequestItem {
-  return {
+  const item: FlightRequestItem = {
     type: 'flight',
     psw_result_id: flightDetails.pswResultId,
     passengers: passengerIndices.join(','),
@@ -59,6 +62,34 @@ export function buildFlightRequestItem(
     optionalServices: flightDetails.optionalServices,
     seats: flightDetails.seats,
   };
+
+  // Add holiday_package flag if this is part of a package booking
+  if (flightDetails.holidayPackage) {
+    item.holiday_package = flightDetails.holidayPackage;
+  }
+
+  return item;
+}
+
+/**
+ * Build hotel request item for adding to folder
+ */
+export function buildHotelRequestItem(
+  hotelDetails: HotelBookingDetails
+): HotelRequestItem {
+  const item: HotelRequestItem = {
+    type: 'hotel',
+    search_result_id: hotelDetails.searchResultId,
+    roomIds: hotelDetails.roomIds.join(','),
+    passengers: hotelDetails.roomPassengers,
+  };
+
+  // Add holiday_package flag if this is part of a package booking
+  if (hotelDetails.holidayPackage) {
+    item.holiday_package = hotelDetails.holidayPackage;
+  }
+
+  return item;
 }
 
 /**
@@ -212,6 +243,7 @@ class FolderService {
     currency: string;
     passengers: PassengerDetails[];
     flights?: FlightBookingDetails[];
+    hotels?: HotelBookingDetails[];
     travelPurpose?: string;
     comments?: string[];
     setAsPreferred?: boolean;
@@ -232,6 +264,13 @@ class FolderService {
       }
     }
 
+    // Add hotels
+    if (params.hotels) {
+      for (const hotel of params.hotels) {
+        requestData.push(buildHotelRequestItem(hotel));
+      }
+    }
+
     return {
       folderNumber: params.folderNumber,
       itineraryNumber: params.itineraryNumber ?? '1',
@@ -242,6 +281,46 @@ class FolderService {
       passengers: folderPassengers,
       requestData,
     };
+  }
+
+  /**
+   * Add a holiday package (flight + hotel) to an existing folder
+   * This is a convenience method for package bookings
+   */
+  async addPackageToFolder(params: {
+    folderNumber: number;
+    itineraryNumber: string | number;
+    currency: string;
+    passengers: PassengerDetails[];
+    flight: FlightBookingDetails;
+    hotel: HotelBookingDetails;
+    travelPurpose?: string;
+    comments?: string[];
+    setAsPreferred?: boolean;
+  }): Promise<AddToFolderResponse> {
+    // Mark both flight and hotel as part of a holiday package
+    const flightWithFlag: FlightBookingDetails = {
+      ...params.flight,
+      holidayPackage: 1,
+    };
+    const hotelWithFlag: HotelBookingDetails = {
+      ...params.hotel,
+      holidayPackage: 1,
+    };
+
+    const request = this.buildAddToFolderRequest({
+      folderNumber: params.folderNumber,
+      itineraryNumber: params.itineraryNumber,
+      currency: params.currency,
+      passengers: params.passengers,
+      flights: [flightWithFlag],
+      hotels: [hotelWithFlag],
+      travelPurpose: params.travelPurpose || 'Holiday',
+      comments: params.comments,
+      setAsPreferred: params.setAsPreferred,
+    });
+
+    return this.addToFolder(request);
   }
 
   /**
@@ -277,7 +356,11 @@ export type {
   CreateFolderResponse,
   FolderPassenger,
   FlightRequestItem,
+  HotelRequestItem,
   FlightBookingDetails,
+  HotelBookingDetails,
+  HotelRoomPassengers,
   PassengerDetails,
   SeatSelection,
 };
+

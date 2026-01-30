@@ -13,6 +13,14 @@ import { normalizeCabinClass } from '@/lib/utils';
 import type { Hotel } from '@/types/hotel';
 import type { VyspaCityHotelLookupItem } from '@/types/vyspaHotels';
 import type { HotelFiltersState } from '@/components/hotels/HotelFiltersSidebar';
+import type {
+  PackageSearchCriteria,
+  PackageSearchResult,
+  PackageResultsMeta,
+  SelectedPackage,
+  TransformedAlternateFlight,
+  HolidayDestination,
+} from '@/types/holidayPackage';
 
 type Dateish = Date | string | number | null | undefined;
 
@@ -159,6 +167,23 @@ interface BookingState {
   } | null;
   setSelectedHotelRoomSummary: (summary: BookingState['selectedHotelRoomSummary']) => void;
 
+  // Holiday Package state
+  packageSearch: PackageSearchCriteria | null;
+  setPackageSearch: (search: PackageSearchCriteria | null) => void;
+  packageDestination: HolidayDestination | null;
+  setPackageDestination: (destination: HolidayDestination | null) => void;
+  packageResults: PackageSearchResult[] | null;
+  packageResultsMeta: PackageResultsMeta | null;
+  setPackageResults: (results: PackageSearchResult[], meta: PackageResultsMeta) => void;
+  clearPackageResults: () => void;
+  selectedPackage: SelectedPackage | null;
+  setSelectedPackage: (pkg: SelectedPackage | null) => void;
+  selectedPackageRoomIds: string[];
+  setSelectedPackageRoomIds: (roomIds: string[]) => void;
+  alternateFlights: TransformedAlternateFlight[] | null;
+  setAlternateFlights: (flights: TransformedAlternateFlight[] | null) => void;
+  clearPackageState: () => void;
+
   // Affiliate data
   affiliateData: AffiliateData | null;
   setAffiliateData: (data: AffiliateData | null) => void;
@@ -237,6 +262,15 @@ const initialState = {
   selectedHotelRoomIds: [],
   hotelDetailsCache: {},
   selectedHotelRoomSummary: null,
+  // Package state
+  packageSearch: null,
+  packageDestination: null,
+  packageResults: null,
+  packageResultsMeta: null,
+  selectedPackage: null,
+  selectedPackageRoomIds: [] as string[],
+  alternateFlights: null,
+  // End package state
   affiliateData: null,
   isFromDeeplink: false,
   selectedFlight: null,
@@ -330,6 +364,61 @@ export const useBookingStore = create<BookingState & HydrationState>()(
           },
         })),
       setSelectedHotelRoomSummary: (summary) => set({ selectedHotelRoomSummary: summary }),
+
+      // Holiday Package state
+      setPackageSearch: (search) =>
+        set({
+          packageSearch: search,
+          // Clear folder info when starting a new package search
+          vyspaFolderNumber: null,
+          vyspaCustomerId: null,
+          vyspaEmailAddress: null,
+        }),
+
+      setPackageDestination: (destination) => set({ packageDestination: destination }),
+
+      setPackageResults: (results, meta) =>
+        set({
+          packageResults: results,
+          packageResultsMeta: meta,
+        }),
+
+      clearPackageResults: () =>
+        set({
+          packageResults: null,
+          packageResultsMeta: null,
+        }),
+
+      setSelectedPackage: (pkg) =>
+        set({
+          selectedPackage: pkg,
+          // Clear folder info when selecting a new package
+          vyspaFolderNumber: null,
+          vyspaCustomerId: null,
+          vyspaEmailAddress: null,
+        }),
+
+      setSelectedPackageRoomIds: (roomIds) =>
+        set({
+          selectedPackageRoomIds: roomIds,
+          // Clear folder info when changing rooms
+          vyspaFolderNumber: null,
+          vyspaCustomerId: null,
+          vyspaEmailAddress: null,
+        }),
+
+      setAlternateFlights: (flights) => set({ alternateFlights: flights }),
+
+      clearPackageState: () =>
+        set({
+          packageSearch: null,
+          packageDestination: null,
+          packageResults: null,
+          packageResultsMeta: null,
+          selectedPackage: null,
+          selectedPackageRoomIds: [],
+          alternateFlights: null,
+        }),
 
       // Affiliate data
       setAffiliateData: (data) => set({ affiliateData: data }),
@@ -473,10 +562,18 @@ export const useBookingStore = create<BookingState & HydrationState>()(
           },
           booking: null,
           currentStep: 'search',
+          // Clear package state
+          packageResults: null,
+          packageResultsMeta: null,
+          selectedPackage: null,
+          selectedPackageRoomIds: [],
+          alternateFlights: null,
           // Preserve these
           affiliateData: state.affiliateData,
           isFromDeeplink: state.isFromDeeplink,
           searchParams: state.searchParams,
+          packageSearch: state.packageSearch,
+          packageDestination: state.packageDestination,
           // searchRequestId: state.searchRequestId, // Removed to clear it
         })),
     }),
@@ -496,6 +593,15 @@ export const useBookingStore = create<BookingState & HydrationState>()(
         selectedHotelRoomIds: state.selectedHotelRoomIds,
         hotelDetailsCache: state.hotelDetailsCache,
         selectedHotelRoomSummary: state.selectedHotelRoomSummary,
+        // Packages: persist for back navigation and refresh
+        packageSearch: state.packageSearch,
+        packageDestination: state.packageDestination,
+        packageResults: state.packageResults,
+        packageResultsMeta: state.packageResultsMeta,
+        selectedPackage: state.selectedPackage,
+        selectedPackageRoomIds: state.selectedPackageRoomIds,
+        alternateFlights: state.alternateFlights,
+        // End packages
         affiliateData: state.affiliateData,
         isFromDeeplink: state.isFromDeeplink,
         selectedFlight: state.selectedFlight,
@@ -544,3 +650,12 @@ export const useBooking = () => useBookingStore((state) => state.booking);
 export const useCurrentStep = () => useBookingStore((state) => state.currentStep);
 export const useAffiliateData = () => useBookingStore((state) => state.affiliateData);
 export const useIsFromDeeplink = () => useBookingStore((state) => state.isFromDeeplink);
+
+// Package selectors
+export const usePackageSearch = () => useBookingStore((state) => state.packageSearch);
+export const usePackageDestination = () => useBookingStore((state) => state.packageDestination);
+export const usePackageResults = () => useBookingStore((state) => state.packageResults);
+export const usePackageResultsMeta = () => useBookingStore((state) => state.packageResultsMeta);
+export const useSelectedPackage = () => useBookingStore((state) => state.selectedPackage);
+export const useSelectedPackageRoomIds = () => useBookingStore((state) => state.selectedPackageRoomIds);
+export const useAlternateFlights = () => useBookingStore((state) => state.alternateFlights);

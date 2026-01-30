@@ -18,9 +18,11 @@ import { HotelResultCard } from "@/components/hotels/HotelResultCard";
 import { Button } from "@/components/ui/button";
 import type { Hotel } from "@/types/hotel";
 import { hotelService } from "@/services/api/hotelService";
+import { packageService } from "@/services/api/packageService";
 import { useBookingStore, useStoreHydration } from "@/store/bookingStore";
 import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
 import { mockHotels } from "@/data/mockHotels";
+import type { PackageSearchResult, PackageResultsMeta } from "@/types/holidayPackage";
 
 const DEFAULT_WEB_REF = "IN-649707636";
 
@@ -282,11 +284,111 @@ function HotelsPageInner() {
       setBreakfastEnriching(false);
 
       if (isPackageMode) {
-        if (!cancelled && requestSeq === activeRequestSeq.current) {
-          setHotels(mockHotels);
-          setSelectedHotelId(mockHotels[0]?.id || "");
-          setLoading(false);
-          setHasAttemptedFetch(true);
+        // Use package search API for Flight+Hotel packages
+        try {
+          const search = resolvedSearchRef.current;
+          const p = new URLSearchParams(urlParamsKey);
+          
+          // Get package-specific params from URL
+          const fromCode = p.get("fromCode") || "LON";
+          const fromName = p.get("from") || "London";
+          const destinationHiddenValue = p.get("hidden_key") 
+            ? `${p.get("hidden_key")?.split(";")[0] || ""};${p.get("hidden_id") || ""};${search.location}`
+            : `${search.location.substring(0, 3).toUpperCase()};0;${search.location}`;
+          
+          // Calculate nights from check-in/check-out
+          const nights = Math.max(1, Math.round(
+            (new Date(search.checkOut).getTime() - new Date(search.checkIn).getTime()) / (1000 * 60 * 60 * 24)
+          ));
+          
+          console.log('[Hotels Page] Package mode - searching packages:', {
+            from: fromCode,
+            to: search.location,
+            checkIn: search.checkIn,
+            nights,
+            rooms: search.rooms,
+            adults: search.adults,
+          });
+          
+          const packageResponse = await packageService.searchPackages({
+            departureCode: fromCode,
+            departureName: fromName,
+            destinationCode: destinationHiddenValue.split(";")[0] || "",
+            destinationName: search.location,
+            destinationHiddenValue,
+            checkIn: search.checkIn,
+            nights,
+            rooms: [{ adults: search.adults, children: 0, childAges: [], infants: 0 }],
+          });
+          
+          console.log('[Hotels Page] Package search response:', {
+            resultsCount: packageResponse.results.length,
+            meta: packageResponse.meta,
+          });
+          
+          // Transform package results to Hotel format for display
+          const mappedHotels: Hotel[] = packageResponse.results.map((pkg: PackageSearchResult): Hotel => {
+            const total = pkg.startingPrice || 0;
+            const nightly = nights > 0 ? total / nights : total;
+            const starRatingClamped = Math.min(5, Math.max(1, pkg.starRating || 3)) as 1 | 2 | 3 | 4 | 5;
+            
+            return {
+              id: String(pkg.id),
+              name: pkg.hotelName,
+              distanceLabel: pkg.address?.street1 || pkg.address?.city || search.location,
+              neighborhood: pkg.address?.city || undefined,
+              starRating: starRatingClamped,
+              amenities: [],
+              room: {
+                name: "Room options available",
+                highlights: pkg.flight ? ["Includes flights"] : [],
+              },
+              reviews: {
+                score: 8.0,
+                label: "Very Good",
+                count: 0,
+              },
+              price: {
+                currency: currencySymbol(pkg.currency || "GBP"),
+                nightly,
+                total,
+                nights,
+                rooms: search.rooms,
+              },
+              imageSrc: pkg.imageUrl || "/hotel-placeholder.jpg",
+              description: pkg.description || "",
+              cityName: pkg.address?.city || "",
+              countryName: "",
+              mealPlans: [],
+            };
+          });
+          
+          // Store package metadata in booking store for later use
+          const setPackageResults = useBookingStore.getState().setPackageResults;
+          setPackageResults(packageResponse.results, packageResponse.meta);
+          
+          if (!cancelled && requestSeq === activeRequestSeq.current) {
+            if (mappedHotels.length > 0) {
+              setHotels(mappedHotels);
+              setSelectedHotelId(mappedHotels[0]?.id || "");
+            } else {
+              // Fall back to mock hotels if no packages found
+              console.log('[Hotels Page] No packages found, using mock hotels');
+              setHotels(mockHotels);
+              setSelectedHotelId(mockHotels[0]?.id || "");
+            }
+            setLoading(false);
+            setHasAttemptedFetch(true);
+          }
+        } catch (err) {
+          console.error('[Hotels Page] Package search error:', err);
+          // Fall back to mock hotels on error
+          if (!cancelled && requestSeq === activeRequestSeq.current) {
+            setHotels(mockHotels);
+            setSelectedHotelId(mockHotels[0]?.id || "");
+            setLoading(false);
+            setHasAttemptedFetch(true);
+          }
         }
         return;
       }
@@ -336,6 +438,11 @@ function HotelsPageInner() {
         const results = rawResults.filter(
           (r: any) => r && typeof r === "object" && !Array.isArray(r) && (r.hotel_id || r.hotelId || r.id)
         );
+
+        // Debug logging - track what we receive from API vs what we render
+        console.log('[Hotels Page] Raw API Results Count:', rawResults.length);
+        console.log('[Hotels Page] Valid Hotel Objects Count:', results.length);
+        console.log('[Hotels Page] Search Criteria ID:', criteriaId);
 
         const nights =
           Math.max(
