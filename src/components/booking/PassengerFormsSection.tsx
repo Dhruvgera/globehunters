@@ -15,6 +15,7 @@ export default function PassengerFormsSection({
 }: PassengerFormsSectionProps) {
   const t = useTranslations("booking.passengerDetails");
   const searchParams = useBookingStore((s) => s.searchParams);
+  const hotelSearch = useBookingStore((s) => s.hotelSearch);
   const passengers = useBookingStore((s) => s.passengers);
   const addPassenger = useBookingStore((s) => s.addPassenger);
   const updatePassenger = useBookingStore((s) => s.updatePassenger);
@@ -23,13 +24,17 @@ export default function PassengerFormsSection({
   // Build the required passenger slots from search parameters
   const requiredPassengers: { type: PassengerType; index: number }[] = useMemo(() => {
     const result: { type: PassengerType; index: number }[] = [];
-    const counts = searchParams?.passengers || { adults: 1, children: 0, infants: 0 };
+    const counts = searchParams?.passengers
+      ? searchParams.passengers
+      : hotelSearch
+      ? { adults: hotelSearch.adults, children: hotelSearch.children, infants: 0 }
+      : { adults: 1, children: 0, infants: 0 };
     let idx = 0;
     for (let i = 0; i < counts.adults; i += 1) result.push({ type: "adult", index: idx++ });
     for (let i = 0; i < counts.children; i += 1) result.push({ type: "child", index: idx++ });
     for (let i = 0; i < counts.infants; i += 1) result.push({ type: "infant", index: idx++ });
     return result;
-  }, [searchParams]);
+  }, [hotelSearch, searchParams]);
 
   const handleSave = (slotIndex: number, type: PassengerType, data: Passenger) => {
     const passenger: Passenger = { ...data, type };

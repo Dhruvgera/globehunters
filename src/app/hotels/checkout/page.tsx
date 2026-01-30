@@ -115,8 +115,26 @@ export default function HotelCheckoutPage() {
       }));
 
       // Best-effort room passenger mapping: assign everyone to the first selected room
-      const primaryRoomId = summary.roomIds[0]!;
-      const passengerIndices = passengers.map((_, i) => i + 1).join(",");
+      const roomPassengers = (() => {
+        const roomIds = summary.roomIds;
+        const mapping: Record<string, string> = {};
+        if (roomIds.length === 0) return mapping;
+        const allocations: Record<string, number[]> = {};
+        for (const roomId of roomIds) allocations[roomId] = [];
+
+        const totalPax = passengers.length;
+        for (let i = 0; i < totalPax; i += 1) {
+          const roomId = roomIds[i % roomIds.length]!;
+          allocations[roomId]!.push(i + 1);
+        }
+
+        for (const roomId of roomIds) {
+          const pax = allocations[roomId] || [];
+          if (pax.length > 0) mapping[roomId] = pax.join(",");
+        }
+
+        return mapping;
+      })();
 
       const addToFolderRequest: AddToFolderRequest = {
         folderNumber: Number(folderNo),
@@ -131,9 +149,7 @@ export default function HotelCheckoutPage() {
             type: "hotel",
             search_result_id: summary.searchResultId,
             roomIds: summary.roomIds.join(","),
-            passengers: {
-              [primaryRoomId]: passengerIndices,
-            },
+            passengers: roomPassengers,
           } as any,
         ],
       };
