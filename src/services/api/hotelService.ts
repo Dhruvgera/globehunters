@@ -46,7 +46,7 @@ function jsonFetch<T>(url: string, init: RequestInit): Promise<T> {
 
 export class HotelService {
   async lookupCities(location: string): Promise<VyspaCityHotelLookupItem[]> {
-    return jsonFetch<VyspaCityHotelLookupItem[]>('/api/vyspa/hotels/cities', {
+    return jsonFetch<VyspaCityHotelLookupItem[]>('/api/hotels/cities', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ location, json_format: true }),
@@ -54,7 +54,7 @@ export class HotelService {
   }
 
   async availabilityV3(payload: Record<string, any> | Record<string, any>[]): Promise<VyspaAvailabilityV3Response> {
-    return jsonFetch<VyspaAvailabilityV3Response>('/api/vyspa/hotels/availability', {
+    return jsonFetch<VyspaAvailabilityV3Response>('/api/hotels/availability', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -86,16 +86,16 @@ export class HotelService {
     return this.availabilityV3([criteria]);
   }
 
-  async getRoomsV3(searchCriteriaId: number, hotelId: string, srId?: string): Promise<VyspaGetRoomsV3Response> {
+  async getRoomsV3(searchCriteriaId: number | string, hotelId: string, srId?: string): Promise<VyspaGetRoomsV3Response> {
     const trySrIds = async () =>
-      jsonFetch<VyspaGetRoomsV3Response>('/api/vyspa/hotels/rooms', {
+      jsonFetch<VyspaGetRoomsV3Response>('/api/hotels/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify([{ SearchCriteriaId: searchCriteriaId, srIds: String(srId) }]),
       });
 
     const tryHotelIds = async () =>
-      jsonFetch<VyspaGetRoomsV3Response>('/api/vyspa/hotels/rooms', {
+      jsonFetch<VyspaGetRoomsV3Response>('/api/hotels/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify([{ SearchCriteriaId: searchCriteriaId, hotelIds: String(hotelId) }]),
@@ -114,7 +114,7 @@ export class HotelService {
   }
 
   async hotelSearchDetails(payload: unknown[]): Promise<VyspaHotelSearchDetailsResponse> {
-    return jsonFetch<VyspaHotelSearchDetailsResponse>('/api/vyspa/hotels/details', {
+    return jsonFetch<VyspaHotelSearchDetailsResponse>('/api/hotels/details', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -142,14 +142,26 @@ export class HotelService {
       },
     ];
 
-    return jsonFetch<VyspaCreateCustomerFolderResponse>('/api/vyspa/hotels/create-folder', {
+    return jsonFetch<VyspaCreateCustomerFolderResponse>('/api/hotels/create-folder', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
   }
+
+  async submitHotelbedsToFolder(payload: {
+    folderNumber: number;
+    currency: string;
+    hotel: { hotelId: string; hotelName: string };
+    stay: { checkIn: string; checkOut: string; rooms: number; adults: number; children: number };
+    selection: { total: number; nightly?: number; rateKey?: string; boardName?: string; refundable?: boolean };
+  }): Promise<{ success: boolean; result?: unknown; message?: string }> {
+    return jsonFetch<{ success: boolean; result?: unknown; message?: string }>('/api/hotels/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: 'hotelbeds', ...payload }),
+    });
+  }
 }
 
 export const hotelService = new HotelService();
-
-

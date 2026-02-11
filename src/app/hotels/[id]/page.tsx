@@ -30,7 +30,6 @@ import {
   Sparkles,
   Wind,
   Bath,
-  CreditCard,
   X,
   ChevronLeft,
 } from "lucide-react";
@@ -48,6 +47,62 @@ import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
 
 function LoadingBlock({ className }: { className: string }) {
   return <div className={`animate-pulse bg-gray-200/70 rounded-xl ${className}`} />;
+}
+
+function formatIsoDateLabel(d?: string): string {
+  const s = String(d || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "Add Date";
+  return s;
+}
+
+function seededHsl(seed: string): { h: number; s: number; l: number } {
+  const str = String(seed || "room");
+  let h = 0;
+  for (let i = 0; i < str.length; i += 1) {
+    h = (h * 31 + str.charCodeAt(i)) >>> 0;
+  }
+  const hue = h % 360;
+  // Pleasant range
+  return { h: hue, s: 70, l: 52 };
+}
+
+function RoomImagePlaceholder({ seed, title }: { seed: string; title: string }) {
+  const a = seededHsl(`${seed}:a`);
+  const b = seededHsl(`${seed}:b`);
+  const initials = title
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]!.toUpperCase())
+    .join("");
+
+  return (
+    <div
+      className="relative w-full h-40 overflow-hidden"
+      style={{
+        background: `linear-gradient(135deg, hsl(${a.h} ${a.s}% ${a.l}%) 0%, hsl(${b.h} ${b.s}% ${Math.max(
+          38,
+          b.l - 10
+        )}%) 100%)`,
+      }}
+    >
+      <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "radial-gradient(#fff 1px, transparent 1px)", backgroundSize: "16px 16px" }} />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="flex items-center gap-3 rounded-2xl bg-white/20 px-4 py-3 text-white backdrop-blur-sm">
+          <div className="w-12 h-12 rounded-xl bg-white/20 grid place-content-center text-lg font-bold">
+            {initials || "RM"}
+          </div>
+          <div className="flex flex-col">
+            <div className="text-sm font-semibold leading-tight">No photo yet</div>
+            <div className="text-xs opacity-90 leading-tight">Still a great deal</div>
+          </div>
+        </div>
+      </div>
+      <div className="absolute right-3 bottom-3 rounded-full bg-black/25 px-3 py-1 text-[11px] text-white">
+        Placeholder
+      </div>
+    </div>
+  );
 }
 
 // Icon mapping for amenities
@@ -173,6 +228,9 @@ export default function HotelRoomsPage() {
   const hotelDetailsCache = useBookingStore((s) => s.hotelDetailsCache);
   const setHotelDetailsCache = useBookingStore((s) => s.setHotelDetailsCache);
   const setSelectedHotelRoomSummary = useBookingStore((s) => s.setSelectedHotelRoomSummary);
+  const setHotelSearch = useBookingStore((s) => s.setHotelSearch);
+  const setHotelResultsMeta = useBookingStore((s) => s.setHotelResultsMeta);
+  const setSearchRequestId = useBookingStore((s) => s.setSearchRequestId);
 
   // State
   const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null);
@@ -196,6 +254,93 @@ export default function HotelRoomsPage() {
   const [roomsLoading, setRoomsLoading] = useState(false);
   const [roomsError, setRoomsError] = useState<string | null>(null);
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [stayEditorOpen, setStayEditorOpen] = useState(false);
+  const [roomsFilterOpen, setRoomsFilterOpen] = useState(false);
+  const [expandedRoomInfoById, setExpandedRoomInfoById] = useState<Record<string, boolean>>({});
+  const [stayCheckIn, setStayCheckIn] = useState<string>(() => hotelSearch?.checkIn || "");
+  const [stayCheckOut, setStayCheckOut] = useState<string>(() => hotelSearch?.checkOut || "");
+  const [stayAdults, setStayAdults] = useState<number>(() => hotelSearch?.adults || 2);
+  const [stayChildren, setStayChildren] = useState<number>(() => hotelSearch?.children || 0);
+  const [stayRooms, setStayRooms] = useState<number>(() => hotelSearch?.rooms || 1);
+  const [filterRefundableOnly, setFilterRefundableOnly] = useState(false);
+  const [filterBoardQuery, setFilterBoardQuery] = useState<string>("");
+
+  useEffect(() => {
+    // Keep local editor state in sync with global search state when navigating between hotels.
+    setStayCheckIn(hotelSearch?.checkIn || "");
+    setStayCheckOut(hotelSearch?.checkOut || "");
+    setStayAdults(hotelSearch?.adults || 2);
+    setStayChildren(hotelSearch?.children || 0);
+    setStayRooms(hotelSearch?.rooms || 1);
+  }, [hotelSearch?.checkIn, hotelSearch?.checkOut, hotelSearch?.adults, hotelSearch?.children, hotelSearch?.rooms]);
+
+  function shortWebRefFromToken(token: string): string {
+    let h = 2166136261;
+    for (let i = 0; i < token.length; i += 1) {
+      h ^= token.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return `HB-${(h >>> 0).toString(16).padStart(8, "0").slice(0, 8).toUpperCase()}`;
+  }
+
+  async function runStaySearch(next: { checkIn: string; checkOut: string; adults: number; children: number; rooms: number }) {
+    if (!hotelSearch?.location || !hotelSearch?.hidden_id || !hotelSearch?.hidden_key) {
+      throw new Error("Missing search context (destination) to update availability.");
+    }
+
+    const availability = await hotelService.searchAvailabilityV3({
+      location: hotelSearch.location,
+      hidden_id: hotelSearch.hidden_id,
+      hidden_key: hotelSearch.hidden_key,
+      checkIn: next.checkIn,
+      checkOut: next.checkOut,
+      rooms: next.rooms,
+      adults: next.adults,
+      children: next.children,
+      branches: hotelSearch.branches,
+    });
+
+    const criteriaIdAny = (availability as any)?.Criteria?.searchCriteriaId;
+    const criteriaId =
+      typeof criteriaIdAny === "number" || typeof criteriaIdAny === "string" ? criteriaIdAny : null;
+    if (!criteriaId) throw new Error("No searchCriteriaId returned from availability search.");
+
+    const provider = typeof criteriaId === "string" ? "hotelbeds" : "vyspa";
+
+    // Update global search state so room loader effect re-runs.
+    setHotelSearch({
+      provider,
+      location: hotelSearch.location,
+      hidden_id: hotelSearch.hidden_id,
+      hidden_key: hotelSearch.hidden_key,
+      checkIn: next.checkIn,
+      checkOut: next.checkOut,
+      rooms: next.rooms,
+      adults: next.adults,
+      children: next.children,
+      branches: hotelSearch.branches,
+      searchCriteriaId: criteriaId,
+      arrivalPointCode: hotelSearch.arrivalPointCode,
+    });
+
+    setSearchRequestId(typeof criteriaId === "string" ? shortWebRefFromToken(criteriaId) : String(criteriaId));
+
+    // Update booking meta for this hotel if present in the new availability response (Vyspa needs srId for booking).
+    const results = Array.isArray((availability as any)?.Results) ? (availability as any).Results : [];
+    const hit = results.find((r: any) => String(r?.hotel_id ?? r?.hotelId ?? r?.id ?? "") === String(hotelId));
+    if (hit) {
+      const srId = hit?.id != null ? String(hit.id) : undefined;
+      const nextMeta = { ...useBookingStore.getState().hotelResultsMeta };
+      nextMeta[String(hotelId)] = {
+        ...(nextMeta[String(hotelId)] || { hotelId: String(hotelId) }),
+        hotelId: String(hotelId),
+        hotelName: hit?.hotel_name || hit?.hotelName || nextMeta[String(hotelId)]?.hotelName,
+        searchResultId: srId || nextMeta[String(hotelId)]?.searchResultId,
+        srId: srId || nextMeta[String(hotelId)]?.srId,
+      };
+      setHotelResultsMeta(nextMeta);
+    }
+  }
 
   function parseRemoteDataXml(remoteData: string, fallbackImageUrl?: string) {
     try {
@@ -392,14 +537,22 @@ export default function HotelRoomsPage() {
       reviews: { score: 0, label: "", count: 0, breakdown: {} as Record<string, number> },
       policies: cancellationText || "",
       mapUrl: coordinates
-        ? `https://www.google.com/maps/search/?api=1&query=${coordinates.lat},${coordinates.lng}`
+        ? `https://www.google.com/maps/search/?api=1&query=${coordinates.lat},${coordinates.lng}&hl=en`
         : base.mapUrl || "#",
       coordinates,
     };
   }, [cancellationText, coordinates, detailsText, galleryImages, remoteAmenities, remoteHotelHeader]);
   const rooms = useMemo(() => {
-    return remoteRooms;
-  }, [remoteRooms]);
+    const q = filterBoardQuery.trim().toLowerCase();
+    return remoteRooms.filter((r: any) => {
+      if (filterRefundableOnly && !r?.isRefundable) return false;
+      if (q) {
+        const s = `${r?.name || ""} ${r?.bedType || ""}`.toLowerCase();
+        if (!s.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [filterBoardQuery, filterRefundableOnly, remoteRooms]);
   const reviews: any[] = [];
   const faqs: any[] = [];
 
@@ -499,6 +652,40 @@ export default function HotelRoomsPage() {
         const imgs = headerImage ? [headerImage] : [];
         setGalleryImages(imgs);
 
+        // HotelBeds: enrich amenities + gallery + room images from Content API (best effort).
+        if (hotelSearch?.provider === "hotelbeds") {
+          fetch(`/api/hotels/content?code=${encodeURIComponent(hotelId)}`)
+            .then((r) => r.json().catch(() => null))
+            .then((data: any) => {
+              if (cancelled) return;
+              if (!data?.ok) return;
+
+              const nextHeaderImage = data?.imageUrl || headerImage;
+              if (nextHeaderImage && nextHeaderImage !== headerImage) {
+                setRemoteHotelHeader((prev) =>
+                  prev
+                    ? { ...prev, image: nextHeaderImage }
+                    : { name: headerName, rating: headerRating, image: nextHeaderImage, address: headerAddress }
+                );
+              }
+
+              const hotelImages: string[] = Array.isArray(data?.hotelImages) ? data.hotelImages.filter(Boolean) : [];
+              const mergedGallery = Array.from(new Set([...(hotelImages.length ? hotelImages : []), ...(imgs || [])])).slice(0, 12);
+              if (mergedGallery.length > 0) setGalleryImages(mergedGallery);
+
+              const amenities: string[] = Array.isArray(data?.amenities) ? data.amenities.filter(Boolean) : [];
+              if (amenities.length > 0) setRemoteAmenities(amenities);
+
+              const roomImagesNext: Record<string, string[]> =
+                data?.roomImages && typeof data.roomImages === "object" ? data.roomImages : {};
+              if (roomImagesNext && Object.keys(roomImagesNext).length > 0) setRoomImages(roomImagesNext);
+
+              const desc = typeof data?.description === "string" ? data.description.trim() : "";
+              if (desc) setDetailsText(desc);
+            })
+            .catch(() => {});
+        }
+
         // Real schema (seen in stage): rooms.room1options[] with {id, room_name, meal_name, net_price, nonRef, ...}
         const roomsObj: any = respAny?.rooms;
         const room1options: any[] = Array.isArray(roomsObj?.room1options) ? roomsObj.room1options : [];
@@ -541,7 +728,7 @@ export default function HotelRoomsPage() {
             });
 
             // Populate additional hotel fields from hotel_search_details (best available content in current API set)
-            if (hotelSearch?.location && hotelSearch?.hidden_id && hotelSearch?.hidden_key) {
+            if (hotelSearch?.provider === "vyspa" && hotelSearch?.location && hotelSearch?.hidden_id && hotelSearch?.hidden_key) {
               const detailsPayload: any[] = [
                 {
                   location: hotelSearch.location,
@@ -1004,7 +1191,7 @@ export default function HotelRoomsPage() {
                   <div className="relative aspect-[4/3] bg-gray-200">
                     {hotel.coordinates ? (
                       <iframe
-                        src={`https://www.openstreetmap.org/export/embed.html?bbox=${hotel.coordinates.lng - 0.01}%2C${hotel.coordinates.lat - 0.008}%2C${hotel.coordinates.lng + 0.01}%2C${hotel.coordinates.lat + 0.008}&layer=mapnik&marker=${hotel.coordinates.lat}%2C${hotel.coordinates.lng}`}
+                        src={`https://www.google.com/maps?q=${hotel.coordinates.lat},${hotel.coordinates.lng}&z=14&output=embed&hl=en`}
                         className="absolute inset-0 w-full h-full border-0"
                         style={{ border: 0 }}
                         loading="lazy"
@@ -1052,21 +1239,38 @@ export default function HotelRoomsPage() {
                 </div>
 
                 {/* Date Selector */}
-                <div className="flex items-center gap-2 px-4 py-3 border border-[#DFE0E4] rounded-2xl min-w-[150px]">
+                <button
+                  type="button"
+                  onClick={() => setStayEditorOpen(true)}
+                  className="flex items-center gap-2 px-4 py-3 border border-[#DFE0E4] rounded-2xl min-w-[180px] hover:border-[#3754ED]/60"
+                >
                   <Calendar className="w-[18px] h-[18px] text-[#3A478A]" />
-                  <span className="text-sm font-medium text-[#010D50]">Add Date</span>
-                </div>
+                  <span className="text-sm font-medium text-[#010D50]">
+                    {stayCheckIn && stayCheckOut
+                      ? `${formatIsoDateLabel(stayCheckIn)} → ${formatIsoDateLabel(stayCheckOut)}`
+                      : "Add Date"}
+                  </span>
+                </button>
 
                 {/* Guests */}
-                <div className="flex items-center gap-2 px-4 py-3 border border-[#DFE0E4] rounded-2xl min-w-[150px]">
+                <button
+                  type="button"
+                  onClick={() => setStayEditorOpen(true)}
+                  className="flex items-center gap-2 px-4 py-3 border border-[#DFE0E4] rounded-2xl min-w-[180px] hover:border-[#3754ED]/60"
+                >
                   <Users className="w-[18px] h-[18px] text-[#3A478A]" />
-                  <span className="text-sm font-medium text-[#010D50]">2 Guests, 1 Room</span>
-                </div>
+                  <span className="text-sm font-medium text-[#010D50]">
+                    {stayAdults} Adult{stayAdults === 1 ? "" : "s"}
+                    {stayChildren > 0 ? `, ${stayChildren} Child${stayChildren === 1 ? "" : "ren"}` : ""}
+                    , {stayRooms} Room{stayRooms === 1 ? "" : "s"}
+                  </span>
+                </button>
 
                 {/* Filters Button */}
                 <Button
                   variant="default"
                   className="flex items-center gap-2 px-5 py-3 h-auto rounded-full bg-[#3754ED] hover:bg-[#2A3FB8] text-white"
+                  onClick={() => setRoomsFilterOpen(true)}
                 >
                   <SlidersHorizontal className="w-[18px] h-[18px]" />
                   <span className="text-sm font-medium">Filters</span>
@@ -1076,11 +1280,164 @@ export default function HotelRoomsPage() {
                 <Button
                   variant="default"
                   className="flex items-center gap-2 px-6 py-3 h-auto rounded-full bg-[#3754ED] hover:bg-[#2A3FB8] text-white font-bold"
+                  onClick={async () => {
+                    try {
+                      setRoomsError(null);
+                      setRoomsLoading(true);
+                      await runStaySearch({
+                        checkIn: stayCheckIn,
+                        checkOut: stayCheckOut,
+                        adults: stayAdults,
+                        children: stayChildren,
+                        rooms: stayRooms,
+                      });
+                    } catch (e: any) {
+                      setRoomsError(e?.message || "Failed to update availability");
+                    } finally {
+                      setRoomsLoading(false);
+                    }
+                  }}
                 >
                   Search
                 </Button>
               </div>
             </div>
+
+            <Dialog open={stayEditorOpen} onOpenChange={setStayEditorOpen}>
+              <DialogContent className="max-w-lg bg-white text-[#010D50]">
+                <DialogHeader>
+                  <DialogTitle>Update stay</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="flex flex-col gap-1 text-sm text-[#010D50]">
+                      Check-in
+                      <input
+                        type="date"
+                        value={stayCheckIn}
+                        onChange={(e) => setStayCheckIn(e.target.value)}
+                        className="border border-[#DFE0E4] rounded-lg px-3 py-2 bg-white text-[#010D50]"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm text-[#010D50]">
+                      Check-out
+                      <input
+                        type="date"
+                        value={stayCheckOut}
+                        onChange={(e) => setStayCheckOut(e.target.value)}
+                        className="border border-[#DFE0E4] rounded-lg px-3 py-2 bg-white text-[#010D50]"
+                      />
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <label className="flex flex-col gap-1 text-sm text-[#010D50]">
+                      Adults
+                      <input
+                        type="number"
+                        min={1}
+                        max={16}
+                        value={stayAdults}
+                        onChange={(e) => setStayAdults(Math.max(1, Number(e.target.value || 1)))}
+                        className="border border-[#DFE0E4] rounded-lg px-3 py-2 bg-white text-[#010D50]"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm text-[#010D50]">
+                      Children
+                      <input
+                        type="number"
+                        min={0}
+                        max={16}
+                        value={stayChildren}
+                        onChange={(e) => setStayChildren(Math.max(0, Number(e.target.value || 0)))}
+                        className="border border-[#DFE0E4] rounded-lg px-3 py-2 bg-white text-[#010D50]"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-sm text-[#010D50]">
+                      Rooms
+                      <input
+                        type="number"
+                        min={1}
+                        max={8}
+                        value={stayRooms}
+                        onChange={(e) => setStayRooms(Math.max(1, Number(e.target.value || 1)))}
+                        className="border border-[#DFE0E4] rounded-lg px-3 py-2 bg-white text-[#010D50]"
+                      />
+                    </label>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="outline" onClick={() => setStayEditorOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={async () => {
+                        try {
+                          setRoomsError(null);
+                          setRoomsLoading(true);
+                          await runStaySearch({
+                            checkIn: stayCheckIn,
+                            checkOut: stayCheckOut,
+                            adults: stayAdults,
+                            children: stayChildren,
+                            rooms: stayRooms,
+                          });
+                          setStayEditorOpen(false);
+                        } catch (e: any) {
+                          setRoomsError(e?.message || "Failed to update availability");
+                        } finally {
+                          setRoomsLoading(false);
+                        }
+                      }}
+                      className="bg-[#3754ED] hover:bg-[#2A3FB8]"
+                    >
+                      Update
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={roomsFilterOpen} onOpenChange={setRoomsFilterOpen}>
+              <DialogContent className="max-w-lg bg-white text-[#010D50]">
+                <DialogHeader>
+                  <DialogTitle>Room filters</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <label className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={filterRefundableOnly}
+                      onChange={(e) => setFilterRefundableOnly(e.target.checked)}
+                      className="h-4 w-4 accent-[#3754ED]"
+                    />
+                    <span className="text-sm text-[#010D50]">Refundable only</span>
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm text-[#010D50]">
+                    Search room / board
+                    <input
+                      type="text"
+                      value={filterBoardQuery}
+                      onChange={(e) => setFilterBoardQuery(e.target.value)}
+                      placeholder="e.g. Breakfast, Deluxe"
+                      className="border border-[#DFE0E4] rounded-lg px-3 py-2 bg-white text-[#010D50]"
+                    />
+                  </label>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setFilterRefundableOnly(false);
+                        setFilterBoardQuery("");
+                      }}
+                    >
+                      Clear
+                    </Button>
+                    <Button onClick={() => setRoomsFilterOpen(false)} className="bg-[#3754ED] hover:bg-[#2A3FB8]">
+                      Done
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
 
             {/* Room Cards Grid */}
             <div className="p-6 lg:p-8 space-y-8">
@@ -1098,14 +1455,27 @@ export default function HotelRoomsPage() {
                 )}
                 {rooms.map((room) => {
                   // Get room-specific image if available
-                  const roomCode = room._raw?.room_code || "";
-                  // Try exact match first, then match on room type prefix (e.g., "DBT" from "DBT.ST")
-                  const roomTypePrefix = roomCode.split(".")[0];
-                  const roomImgList = roomImages[roomCode] ||
-                    (roomTypePrefix ? Object.entries(roomImages).find(([k]) => k.startsWith(roomTypePrefix + "."))?.[1] : undefined) ||
-                    [];
+                  const roomCode = room._raw?.room_code || room._raw?.roomCode || "";
+                  // Strict: only show images that match the returned room code (no heuristics/prefix matching).
+                  const roomImgList = roomCode ? (roomImages[roomCode] || []) : [];
                   // Only show image if room-specific image is available
                   const roomImage = roomImgList[0] || "";
+                  const hbCancelFrom = (() => {
+                    const from = room?._raw?._hotelbeds?.cancellationPolicies?.[0]?.from;
+                    if (typeof from !== "string" || !from) return "";
+                    return from.slice(0, 10);
+                  })();
+                  const hbRateClass = String(room?._raw?._hotelbeds?.rateClass || "").trim();
+                  const hbOffers: any[] = Array.isArray(room?._raw?._hotelbeds?.offers) ? room._raw._hotelbeds.offers : [];
+                  const hbPromotions: any[] = Array.isArray(room?._raw?._hotelbeds?.promotions)
+                    ? room._raw._hotelbeds.promotions
+                    : [];
+                  const hasMoreInfo =
+                    roomImgList.length > 1 ||
+                    hbOffers.length > 0 ||
+                    hbPromotions.length > 0 ||
+                    (Array.isArray(room?.amenities) && room.amenities.length > 0);
+                  const expanded = !!expandedRoomInfoById[room.id];
 
                   return (
                     <div
@@ -1117,7 +1487,7 @@ export default function HotelRoomsPage() {
                       onClick={() => setSelectedRoomId(room.id)}
                     >
                       {/* Room Image */}
-                      {roomImage && (
+                      {roomImage ? (
                         <div className="relative w-full h-40 bg-gray-100">
                           <img
                             src={roomImage}
@@ -1125,20 +1495,29 @@ export default function HotelRoomsPage() {
                             className="w-full h-full object-cover"
                           />
                         </div>
+                      ) : (
+                        <RoomImagePlaceholder seed={roomCode || room.id} title={room.name || "Room"} />
                       )}
 
                       {/* Room Info */}
-                      <div className="flex-1 space-y-4 p-6">
+                      <div className="flex-1 p-6 flex flex-col">
                         {/* Room Name & Bed Type */}
                         <div className="space-y-2">
                           <h3 className="text-lg font-semibold text-[#010D50]">
                             {room.name}
                           </h3>
                           <p className="text-sm text-[#3A478A]">{room.bedType}</p>
+                          {(roomCode || hbRateClass) && (
+                            <p className="text-xs text-[#3A478A]">
+                              {roomCode ? `Code: ${roomCode}` : ""}
+                              {roomCode && hbRateClass ? " · " : ""}
+                              {hbRateClass ? `Rate: ${hbRateClass}` : ""}
+                            </p>
+                          )}
                         </div>
 
                         {/* Rating */}
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 mt-4">
                           <div className="w-10 h-10 rounded-xl bg-[#008234] text-white flex items-center justify-center font-medium text-sm">
                             {room.reviews.score.toFixed(1)}
                           </div>
@@ -1153,7 +1532,7 @@ export default function HotelRoomsPage() {
                         </div>
 
                         {/* Refund & Payment Tags */}
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-2 mt-4">
                           <div className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs ${room.isRefundable
                             ? "bg-green-100 text-green-700"
                             : "bg-[rgba(0,0,0,0.08)] text-[#FF1414]"
@@ -1161,14 +1540,15 @@ export default function HotelRoomsPage() {
                             <X className="w-3.5 h-3.5" />
                             {room.isRefundable ? "Refundable" : "Non-refundable"}
                           </div>
-                          <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[rgba(0,0,0,0.08)] text-xs text-[#010D50]">
-                            <CreditCard className="w-3.5 h-3.5" />
-                            {room.paymentType}
-                          </div>
+                          {room.isRefundable && hbCancelFrom && (
+                            <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-green-50 text-xs text-green-700">
+                              Free cancellation until {hbCancelFrom}
+                            </div>
+                          )}
                         </div>
 
                         {/* Room Amenities */}
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-2 mt-4">
                           {room.amenities.slice(0, 5).map((amenity: any) => (
                             <div
                               key={amenity.label}
@@ -1182,12 +1562,61 @@ export default function HotelRoomsPage() {
                           ))}
                         </div>
 
-                        <button className="text-sm text-[#3754ED] font-medium">
-                          More
-                        </button>
+                        {hasMoreInfo && (
+                          <button
+                            type="button"
+                            className="mt-4 text-sm text-[#3754ED] font-medium text-left"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExpandedRoomInfoById((prev) => ({ ...prev, [room.id]: !prev[room.id] }));
+                            }}
+                          >
+                            {expanded ? "Hide details" : "More"}
+                          </button>
+                        )}
+
+                        {hasMoreInfo && expanded && (
+                          <div className="mt-3 space-y-3">
+                            {roomImgList.length > 1 && (
+                              <div className="space-y-2">
+                                <div className="text-xs font-semibold text-[#010D50]">More photos</div>
+                                <div className="flex gap-2 overflow-x-auto pb-1">
+                                  {roomImgList.slice(1, 7).map((img: string, idx: number) => (
+                                    <img
+                                      key={`${img}-${idx}`}
+                                      src={img}
+                                      alt=""
+                                      className="h-14 w-20 rounded-lg object-cover border border-[#DFE0E4]"
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            {(hbPromotions.length > 0 || hbOffers.length > 0) && (
+                              <div className="space-y-1">
+                                <div className="text-xs font-semibold text-[#010D50]">Notes</div>
+                                {hbPromotions.length > 0 && (
+                                  <div className="text-xs text-[#3A478A]">
+                                    Promotions: {hbPromotions.length}
+                                  </div>
+                                )}
+                                {hbOffers.length > 0 && (
+                                  <div className="text-xs text-[#3A478A]">
+                                    Offers: {hbOffers.length}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {Array.isArray(room?.amenities) && room.amenities.length > 5 && (
+                              <div className="text-xs text-[#3A478A]">
+                                +{room.amenities.length - 5} more amenities
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         {/* Pricing & CTA */}
-                        <div className="mt-6 space-y-4">
+                        <div className="mt-auto pt-6 space-y-4">
                           <div className="flex flex-col items-end gap-1">
                             <span className="text-base text-[#010D50]">
                               {room.price.currency}{room.price.nightly.toLocaleString()} nightly
@@ -1216,6 +1645,7 @@ export default function HotelRoomsPage() {
                                 currency: room?.price?.currency,
                                 total: room?.price?.total,
                                 nightly: room?.price?.nightly,
+                                hotelbedsRateKey: (room as any)?._raw?.rateKey,
                               });
                               // Navigate based on mode
                               if (isPackageMode) {
@@ -1418,4 +1848,3 @@ export default function HotelRoomsPage() {
     </div>
   );
 }
-

@@ -52,6 +52,42 @@ export async function POST(req: Request) {
       );
     }
 
+    // Normalize passenger payload for Vyspa:
+    // - ensure CHD/INF have birth_date (Vyspa expects DOB)
+    // - provide telephone field (some endpoints use telephone vs phone)
+    // - keep indices stable (pax_no is optional but preferred)
+    const normalizedPassengers = (body.passengers || []).map((p, idx) => {
+      const paxType = (p as any)?.pax_type;
+      const birthDate = (p as any)?.birth_date;
+      if ((paxType === 'CHD' || paxType === 'INF') && !birthDate) {
+        throw new Error(`Passenger ${idx + 1} (${paxType}) is missing date of birth (birth_date).`);
+      }
+      const phone = (p as any)?.phone || (p as any)?.telephone || '';
+      return {
+        ...p,
+        pax_no: (p as any)?.pax_no ?? idx + 1,
+        // Support both key names to keep Vyspa compatible.
+        phone: phone || undefined,
+        telephone: phone || undefined,
+      } as any;
+    });
+
+    // Normalize hotel request items: ensure roomIds and room->pax mapping are strings.
+    const normalizedRequestData = (body.requestData || []).map((item: any) => {
+      if (item?.type !== 'hotel') return item;
+      const passengers = item?.passengers && typeof item.passengers === 'object' ? item.passengers : {};
+      const mapped: Record<string, string> = {};
+      for (const [k, v] of Object.entries(passengers)) {
+        if (!k) continue;
+        mapped[String(k)] = typeof v === 'string' ? v : Array.isArray(v) ? v.join(',') : String(v ?? '');
+      }
+      return {
+        ...item,
+        roomIds: typeof item?.roomIds === 'string' ? item.roomIds : String(item?.roomIds ?? ''),
+        passengers: mapped,
+      };
+    });
+
     // Build Vyspa API request
     const apiUrl = VYSPA_CONFIG.apiUrl.replace(/\/+$/, '');
     const basicAuth = Buffer.from(
@@ -66,8 +102,8 @@ export async function POST(req: Request) {
       travelPurpose: body.travelPurpose || 'Holiday',
       comments: body.comments || [],
       set_as_preferred_itinerary: body.set_as_preferred_itinerary ?? true,
-      passengers: body.passengers,
-      requestData: body.requestData,
+      passengers: normalizedPassengers,
+      requestData: normalizedRequestData,
     }];
 
     console.log('➡️ Calling Vyspa ApiAddToFolder', {

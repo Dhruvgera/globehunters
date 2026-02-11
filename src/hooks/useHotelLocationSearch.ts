@@ -1,6 +1,6 @@
 /**
  * Hotel/City lookup hook (Vyspa get_cities)
- * Debounced client-side search against /api/vyspa/hotels/cities.
+ * Debounced client-side search against /api/hotels/cities.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -42,7 +42,7 @@ export function useHotelLocationSearch(options: UseHotelLocationSearchOptions = 
       setError(null);
 
       try {
-        const resp = await fetch('/api/vyspa/hotels/cities', {
+        const resp = await fetch('/api/hotels/cities', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ location: q, json_format: true }),
@@ -78,7 +78,6 @@ export function useHotelLocationSearch(options: UseHotelLocationSearchOptions = 
 
   return { query, results, loading, error, search, clear };
 }
-
 
 
 

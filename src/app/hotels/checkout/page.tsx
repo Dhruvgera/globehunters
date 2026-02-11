@@ -36,6 +36,8 @@ export default function HotelCheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isHotelbedsMode = hotelSearch?.provider === 'hotelbeds';
+
   const summary = useMemo(() => {
     const hotelId = selectedHotel?.hotelId;
     const meta = hotelId ? hotelResultsMeta[hotelId] : undefined;
@@ -70,7 +72,6 @@ export default function HotelCheckoutPage() {
       setContactInfo(lead.email, lead.phone);
 
       let folderNo = vyspaFolderNumber ? Number(vyspaFolderNumber) : null;
-
       if (!folderNo) {
         const folderResp = await hotelService.createCustomerFolder({
           title: lead.title || "Mr",
@@ -136,27 +137,53 @@ export default function HotelCheckoutPage() {
         return mapping;
       })();
 
-      const addToFolderRequest: AddToFolderRequest = {
-        folderNumber: Number(folderNo),
-        itineraryNumber: "1",
-        foldcur: "GBP",
-        travelPurpose: "Holiday",
-        comments: [],
-        set_as_preferred_itinerary: true,
-        passengers: folderPassengers as any,
-        requestData: [
-          {
-            type: "hotel",
-            search_result_id: summary.searchResultId,
-            roomIds: summary.roomIds.join(","),
-            passengers: roomPassengers,
-          } as any,
-        ],
-      };
+      if (isHotelbedsMode) {
+        const roomSummary = useBookingStore.getState().selectedHotelRoomSummary;
+        const submitResp = await hotelService.submitHotelbedsToFolder({
+          folderNumber: Number(folderNo),
+          currency: "GBP",
+          hotel: { hotelId: summary.hotelId, hotelName: summary.hotelName },
+          stay: {
+            checkIn: hotelSearch.checkIn,
+            checkOut: hotelSearch.checkOut,
+            rooms: hotelSearch.rooms,
+            adults: hotelSearch.adults,
+            children: hotelSearch.children,
+          },
+          selection: {
+            total: roomSummary?.total || 0,
+            nightly: roomSummary?.nightly,
+            rateKey: roomSummary?.hotelbedsRateKey,
+            boardName: roomSummary?.mealName,
+            refundable: roomSummary?.isRefundable,
+          },
+        });
+        if (!submitResp?.success) {
+          throw new Error((submitResp as any)?.message || "Failed to submit HotelBeds hotel to folder");
+        }
+      } else {
+        const addToFolderRequest: AddToFolderRequest = {
+          folderNumber: Number(folderNo),
+          itineraryNumber: "1",
+          foldcur: "GBP",
+          travelPurpose: "Holiday",
+          comments: [],
+          set_as_preferred_itinerary: true,
+          passengers: folderPassengers as any,
+          requestData: [
+            {
+              type: "hotel",
+              search_result_id: summary.searchResultId,
+              roomIds: summary.roomIds.join(","),
+              passengers: roomPassengers,
+            } as any,
+          ],
+        };
 
-      const addResp = await folderService.addToFolder(addToFolderRequest);
-      if (!addResp.success) {
-        throw new Error(addResp.message || "Failed to add hotel to folder");
+        const addResp = await folderService.addToFolder(addToFolderRequest);
+        if (!addResp.success) {
+          throw new Error(addResp.message || "Failed to add hotel to folder");
+        }
       }
 
       router.push("/payment?type=hotel");
@@ -218,5 +245,3 @@ export default function HotelCheckoutPage() {
     </div>
   );
 }
-
-

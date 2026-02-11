@@ -9,7 +9,7 @@ export interface VyspaCityHotelLookupItem {
 }
 
 export interface VyspaAvailabilityV3Criteria {
-  searchCriteriaId?: number;
+  searchCriteriaId?: number | string;
   [key: string]: any;
 }
 
@@ -68,5 +68,4 @@ export type VyspaCreateCustomerFolderResponse =
   | number
   | VyspaCreateCustomerFolderResponseItem
   | VyspaCreateCustomerFolderResponseItem[];
-
 

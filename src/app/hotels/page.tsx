@@ -141,11 +141,14 @@ function HotelsPageInner() {
   const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
   const [displayedHotelsCount, setDisplayedHotelsCount] = useState(12);
   const activeRequestSeq = useRef(0);
+  const contentInflightRef = useRef<Set<string>>(new Set());
+  const contentAttemptRef = useRef<Map<string, { attempts: number; lastAttemptAt: number; ok: boolean }>>(new Map());
   const hotelResultsCacheRef = useRef(hotelResultsCache);
   const prevPriceModeRef = useRef<HotelFiltersState["priceMode"]>(DEFAULT_FILTERS.priceMode);
-  const [searchCriteriaId, setSearchCriteriaId] = useState<number | null>(null);
+  const [searchCriteriaId, setSearchCriteriaId] = useState<number | string | null>(null);
   const [breakfastByHotelId, setBreakfastByHotelId] = useState<Record<string, BreakfastStatus>>({});
   const [breakfastEnriching, setBreakfastEnriching] = useState(false);
+  const [contentEnriching, setContentEnriching] = useState(false);
 
   useEffect(() => {
     hotelResultsCacheRef.current = hotelResultsCache;
@@ -166,6 +169,16 @@ function HotelsPageInner() {
     if (v === 3) return 3;
     if (v === 4) return 4;
     return 5;
+  }
+
+  function shortWebRefFromToken(token: string): string {
+    // Small, deterministic hash for display only (avoid leaking long opaque tokens in UI).
+    let h = 2166136261;
+    for (let i = 0; i < token.length; i += 1) {
+      h ^= token.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return `HB-${(h >>> 0).toString(16).padStart(8, "0").slice(0, 8).toUpperCase()}`;
   }
 
   function parsePriceFromResult(r: any): number | null {
@@ -193,6 +206,7 @@ function HotelsPageInner() {
     const checkIn = p.get("checkIn") || savedHotelSearch?.checkIn || "2026-02-10";
     const checkOut = p.get("checkOut") || savedHotelSearch?.checkOut || "2026-02-12";
     const adults = Math.max(1, Number(p.get("adults") || savedHotelSearch?.adults || "2") || 2);
+    const children = Math.max(0, Number(p.get("children") || savedHotelSearch?.children || "0") || 0);
     const rooms = Math.max(1, Number(p.get("rooms") || savedHotelSearch?.rooms || "1") || 1);
     const branches = p.get("branches") || savedHotelSearch?.branches || "UK";
     const hidden_id = p.get("hidden_id") || savedHotelSearch?.hidden_id || null;
@@ -204,6 +218,7 @@ function HotelsPageInner() {
       checkIn,
       checkOut,
       adults,
+      children,
       rooms,
       branches,
       hidden_id,
@@ -224,6 +239,7 @@ function HotelsPageInner() {
       checkIn: resolvedSearch.checkIn,
       checkOut: resolvedSearch.checkOut,
       adults: resolvedSearch.adults,
+      children: resolvedSearch.children,
       rooms: resolvedSearch.rooms,
       hidden_id: resolvedSearch.hidden_id,
       hidden_key: resolvedSearch.hidden_key,
@@ -307,6 +323,7 @@ function HotelsPageInner() {
             nights,
             rooms: search.rooms,
             adults: search.adults,
+            children: search.children,
           });
           
           const packageResponse = await packageService.searchPackages({
@@ -317,7 +334,7 @@ function HotelsPageInner() {
             destinationHiddenValue,
             checkIn: search.checkIn,
             nights,
-            rooms: [{ adults: search.adults, children: 0, childAges: [], infants: 0 }],
+            rooms: [{ adults: search.adults, children: search.children, childAges: [], infants: 0 }],
           });
           
           console.log('[Hotels Page] Package search response:', {
@@ -423,14 +440,15 @@ function HotelsPageInner() {
           checkOut: search.checkOut,
           rooms: search.rooms,
           adults: search.adults,
-          children: 0,
+          children: search.children,
           branches: search.branches,
         });
 
         const rawResults = availability?.Results || [];
         const criteria = availability?.Criteria;
+        const rawCriteriaId = (criteria as any)?.searchCriteriaId;
         const criteriaId =
-          typeof (criteria as any)?.searchCriteriaId === "number" ? (criteria as any).searchCriteriaId : null;
+          typeof rawCriteriaId === "number" || typeof rawCriteriaId === "string" ? rawCriteriaId : null;
         setSearchCriteriaId(criteriaId);
 
         // Filter out non-object results (e.g. [true, "No hotels found"] becomes empty array)
@@ -470,6 +488,8 @@ function HotelsPageInner() {
           const cityName = r?.cityName || r?.city_name || "";
           const countryName = r?.countryName || r?.country_name || "";
           const quickDesc = r?.quickDescription || "";
+          const starRating = clampStar(r?.hotel_rating ?? r?.hotelRating);
+          const hbCheapest = (r as any)?._hotelbeds?.cheapest;
 
           return {
             id: hotelId,
@@ -479,21 +499,24 @@ function HotelsPageInner() {
                 ? [r?.address1, r?.address2].filter(Boolean).join(", ")
                 : "Content missing from API: address",
             neighborhood: cityName && countryName ? `${cityName}, ${countryName}` : cityName || countryName || undefined,
-            starRating: clampStar(r?.hotel_rating ?? r?.hotelRating),
+            starRating,
             amenities,
             room: {
               name:
-                mealPlans.length > 0
-                  ? `Meal plans: ${mealPlans.slice(0, 2).join(", ")}${mealPlans.length > 2 ? " +" : ""}`
-                  : "Room options available",
+                hbCheapest?.roomName
+                  ? `${hbCheapest.roomName}${hbCheapest.boardName ? ` · ${normalizeMealPlanLabel(String(hbCheapest.boardName))}` : ""}`
+                  : mealPlans.length > 0
+                    ? `Meal plans: ${mealPlans.slice(0, 2).join(", ")}${mealPlans.length > 2 ? " +" : ""}`
+                    : "Room options available",
               highlights: [
                 ...(r?.AvailabilityStatuses ? [`Availability: ${r.AvailabilityStatuses}`] : []),
                 ...(r?.suppliers?.[0] ? [`Supplier: ${r.suppliers[0]}`] : []),
+                ...(hbCheapest?.refundable === true ? ["Refundable"] : hbCheapest?.refundable === false ? ["Non-refundable"] : []),
               ].slice(0, 2),
             },
             reviews: {
               score: reviewsRating,
-              label: reviewsRating > 0 ? "Rating" : "No rating",
+              label: reviewsRating > 0 ? "Rating" : `${starRating}-star hotel`,
               count: totalReviews,
             },
             price: {
@@ -556,7 +579,11 @@ function HotelsPageInner() {
           return { ...prev, priceMode: "total", priceRange: [min, max] };
         });
 
+        const provider =
+          typeof criteriaId === "string" ? "hotelbeds" : "vyspa";
+
         setHotelSearch({
+          provider,
           location: pick.label,
           hidden_id: String(pick.id),
           hidden_key: String(pick.loc),
@@ -564,15 +591,17 @@ function HotelsPageInner() {
           checkOut: search.checkOut,
           rooms: search.rooms,
           adults: search.adults,
-          children: 0,
+          children: search.children,
           branches: search.branches,
           searchCriteriaId: criteriaId ?? undefined,
           arrivalPointCode: pick.arrival_point_code,
         });
 
-        // Set searchRequestId for consistent web reference (same as flight logic)
+        // Set searchRequestId for consistent web reference (same as flight logic).
+        // For HotelBeds, criteriaId is an opaque token (too long for UI), so derive a short display ref.
         if (criteriaId) {
-          useBookingStore.getState().setSearchRequestId(String(criteriaId));
+          const displayRef = typeof criteriaId === "string" ? shortWebRefFromToken(criteriaId) : String(criteriaId);
+          useBookingStore.getState().setSearchRequestId(displayRef);
         }
         setHotelResultsMeta(meta);
       } catch (e: any) {
@@ -681,6 +710,7 @@ function HotelsPageInner() {
   }, [breakfastByHotelId, filters.popular.breakfastIncluded, hotels, searchCriteriaId]);
 
   const currency = useMemo(() => hotels[0]?.price.currency || "$", [hotels]);
+  const isEnriching = breakfastEnriching || contentEnriching;
 
   const hotelsForPriceBounds = useMemo(() => {
     // Apply all filters except priceRange, so slider bounds reflect the "current result set"
@@ -826,6 +856,131 @@ function HotelsPageInner() {
 
   const hasMoreHotels = displayedHotelsCount < filteredHotels.length;
 
+  // HotelBeds content enrichment: fill images/address/city for *visible* (filtered) results (lazy, client-side).
+  useEffect(() => {
+    if (!hasHydrated) return;
+    if (savedHotelSearch?.provider !== "hotelbeds") return;
+    if (filteredHotels.length === 0) return;
+
+    const target = filteredHotels.slice(0, Math.min(filteredHotels.length, displayedHotelsCount + 24));
+    const now = Date.now();
+    const needs = target
+      .filter((h) => {
+        if (contentInflightRef.current.has(h.id)) return false;
+        const missingImage = !h.imageSrc || h.imageSrc.includes("/figma/");
+        const missingAddress = !h.distanceLabel || h.distanceLabel.includes("Content missing from API");
+        if (!missingImage && !missingAddress) return false;
+
+        const status = contentAttemptRef.current.get(h.id);
+        if (status?.ok) return false;
+        if ((status?.attempts ?? 0) >= 2) return false;
+        // If a prior attempt was cancelled mid-flight or failed, allow retry after a short cooldown.
+        if (status?.lastAttemptAt && now - status.lastAttemptAt < 4000) return false;
+        return true;
+      })
+      .slice(0, 48);
+
+    if (needs.length === 0) return;
+
+    for (const h of needs) {
+      contentInflightRef.current.add(h.id);
+      const prev = contentAttemptRef.current.get(h.id);
+      contentAttemptRef.current.set(h.id, {
+        attempts: (prev?.attempts ?? 0) + 1,
+        lastAttemptAt: now,
+        ok: false,
+      });
+    }
+
+    let cancelled = false;
+    setContentEnriching(true);
+
+    const run = async () => {
+      const concurrency = 6;
+      for (let i = 0; i < needs.length; i += concurrency) {
+        const batch = needs.slice(i, i + concurrency);
+        const settled = await Promise.allSettled(
+          batch.map(async (h) => {
+            const resp = await fetch(`/api/hotels/content?code=${encodeURIComponent(h.id)}`);
+            const data = await resp.json().catch(() => null);
+            if (!resp.ok) throw new Error((data as any)?.message || `HTTP ${resp.status}`);
+            return { id: h.id, data };
+          })
+        );
+
+        if (cancelled) return;
+
+        const updates: Record<string, any> = {};
+        const succeededIds: string[] = [];
+        const failedIds: string[] = [];
+        for (const s of settled) {
+          if (s.status === "fulfilled") {
+            const { id, data } = s.value as any;
+            if (data?.ok) {
+              updates[id] = data;
+              succeededIds.push(id);
+            } else {
+              failedIds.push(id);
+            }
+          } else {
+            const reasonAny: any = (s as any).reason;
+            // We don't always have the id on rejection; keep it best-effort.
+            if (typeof reasonAny?.id === "string") failedIds.push(reasonAny.id);
+          }
+        }
+
+        for (const id of succeededIds) {
+          const prev = contentAttemptRef.current.get(id);
+          contentAttemptRef.current.set(id, { attempts: prev?.attempts ?? 1, lastAttemptAt: Date.now(), ok: true });
+          contentInflightRef.current.delete(id);
+        }
+        for (const id of failedIds) {
+          const prev = contentAttemptRef.current.get(id);
+          contentAttemptRef.current.set(id, { attempts: prev?.attempts ?? 1, lastAttemptAt: Date.now(), ok: false });
+          contentInflightRef.current.delete(id);
+        }
+        if (Object.keys(updates).length === 0) continue;
+
+        setHotels((prev) =>
+          prev.map((h) => {
+            const u = updates[h.id];
+            if (!u) return h;
+            const imageSrc = u.imageUrl ? String(u.imageUrl) : h.imageSrc;
+            const distanceLabel =
+              u.address1 && typeof u.address1 === "string" && u.address1.trim()
+                ? String(u.address1)
+                : h.distanceLabel;
+            const neighborhood =
+              u.cityName || u.countryName
+                ? [u.cityName, u.countryName].filter(Boolean).join(", ")
+                : h.neighborhood;
+
+            return {
+              ...h,
+              imageSrc,
+              distanceLabel,
+              neighborhood: neighborhood || h.neighborhood,
+              cityName: u.cityName || h.cityName,
+              countryName: u.countryName || h.countryName,
+            };
+          })
+        );
+      }
+    };
+
+    run().finally(() => {
+      if (!cancelled) setContentEnriching(false);
+      // Ensure inflight flags are cleared if we cancel mid-flight
+      if (cancelled) {
+        for (const h of needs) contentInflightRef.current.delete(h.id);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [displayedHotelsCount, filteredHotels, hasHydrated, savedHotelSearch?.provider]);
+
   // Calculate available meal plans from all hotels
   const availableMealPlans = useMemo(() => {
     const planSet = new Set<string>();
@@ -837,18 +992,28 @@ function HotelsPageInner() {
     return Array.from(planSet).sort();
   }, [hotels]);
 
+  const availableNeighborhoods = useMemo(() => {
+    const set = new Set<string>();
+    for (const h of hotels) {
+      const n = (h.neighborhood || "").trim();
+      if (n) set.add(n);
+    }
+    return Array.from(set).sort();
+  }, [hotels]);
+
   // Calculate min price per star rating
   const minPriceByStarRating = useMemo(() => {
     const minByRating: Record<number, number> = {};
     for (const h of hotels) {
       const rating = h.starRating;
-      const price = filters.priceMode === "nightly" ? h.price.nightly : h.price.total;
+      // Sidebar label is "per night" so always compute using nightly pricing.
+      const price = h.price.nightly;
       if (minByRating[rating] === undefined || price < minByRating[rating]) {
         minByRating[rating] = price;
       }
     }
     return minByRating;
-  }, [hotels, filters.priceMode]);
+  }, [hotels]);
 
   return (
     <div className="min-h-screen bg-white">
@@ -888,6 +1053,7 @@ function HotelsPageInner() {
               expanded={expanded}
               onToggleExpanded={(key) => setExpanded((prev) => ({ ...prev, [key]: !prev[key] }))}
               availableMealPlans={availableMealPlans}
+              availableNeighborhoods={availableNeighborhoods}
               minPriceByStarRating={minPriceByStarRating}
             />
           </aside>
@@ -927,6 +1093,11 @@ function HotelsPageInner() {
             {filters.popular.breakfastIncluded && breakfastEnriching && (
               <div className="text-xs text-[#3A478A]">
                 Checking breakfast availability…
+              </div>
+            )}
+            {contentEnriching && (
+              <div className="text-xs text-[#3A478A]">
+                Loading hotel photos and addresses…
               </div>
             )}
 
@@ -1023,5 +1194,3 @@ export default function HotelsPage() {
     </Suspense>
   );
 }
-
-

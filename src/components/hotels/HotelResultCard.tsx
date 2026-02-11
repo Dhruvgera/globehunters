@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Check, ChevronRight, Heart, PawPrint, Bus, Coffee, X } from "lucide-react";
+import { Check, ChevronRight, Heart, PawPrint, Bus, Coffee, X, Star } from "lucide-react";
 import { motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
@@ -110,6 +110,18 @@ export function HotelResultCard({
                   {hotel.neighborhood && (
                     <p className="text-xs text-[#3A478A] mt-0.5">{hotel.neighborhood}</p>
                   )}
+                  <div className="mt-1 flex items-center gap-1">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <Star
+                        key={i}
+                        className={[
+                          "h-3.5 w-3.5",
+                          i < hotel.starRating ? "text-[#F5A524] fill-[#F5A524]" : "text-[#DFE0E4]",
+                        ].join(" ")}
+                      />
+                    ))}
+                    <span className="ml-1 text-xs text-[#3A478A]">{hotel.starRating}-star</span>
+                  </div>
                 </div>
               </div>
 
@@ -203,6 +215,18 @@ export function HotelResultCard({
                 {hotel.neighborhood && (
                   <div className="text-xs text-[#3A478A]">{hotel.neighborhood}</div>
                 )}
+                <div className="flex items-center gap-1 mt-0.5">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Star
+                      key={i}
+                      className={[
+                        "h-3.5 w-3.5",
+                        i < hotel.starRating ? "text-[#F5A524] fill-[#F5A524]" : "text-[#DFE0E4]",
+                      ].join(" ")}
+                    />
+                  ))}
+                  <span className="ml-1 text-xs text-[#3A478A]">{hotel.starRating}-star</span>
+                </div>
               </div>
 
               
@@ -267,5 +291,4 @@ export function HotelResultCard({
     </motion.div>
   );
 }
-
 

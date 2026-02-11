@@ -95,6 +95,7 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
   const [hotelStartDate, setHotelStartDate] = useState<Date | undefined>(undefined);
   const [hotelEndDate, setHotelEndDate] = useState<Date | undefined>(undefined);
   const [hotelGuests, setHotelGuests] = useState(2);
+  const [hotelChildren, setHotelChildren] = useState(0);
   const [hotelRooms, setHotelRooms] = useState(1);
   const [isHotelDatesOpen, setIsHotelDatesOpen] = useState(false);
   const [isHotelGuestsOpen, setIsHotelGuestsOpen] = useState(false);
@@ -137,6 +138,7 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
       const inStr = urlParams.get("checkIn") || savedHotelSearch?.checkIn || "";
       const outStr = urlParams.get("checkOut") || savedHotelSearch?.checkOut || "";
       const adults = Number(urlParams.get("adults") || savedHotelSearch?.adults || "") || undefined;
+      const children = Number(urlParams.get("children") || savedHotelSearch?.children || "") || 0;
       const rms = Number(urlParams.get("rooms") || savedHotelSearch?.rooms || "") || undefined;
 
       if (inStr) {
@@ -148,6 +150,7 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
         if (!Number.isNaN(d.getTime())) setHotelEndDate(d);
       }
       if (adults) setHotelGuests(adults);
+      setHotelChildren(Math.max(0, Number(children) || 0));
       if (rms) setHotelRooms(rms);
     }
   }, [pathname, savedHotelLocation, savedHotelSearch, urlParams]);
@@ -212,6 +215,7 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
       if (checkIn) params.set("checkIn", checkIn);
       if (checkOut) params.set("checkOut", checkOut);
       params.set("adults", String(Math.max(1, hotelGuests)));
+      params.set("children", String(Math.max(0, hotelChildren)));
       params.set("rooms", String(Math.max(1, hotelRooms)));
       // Include flight origin if available
       if (from?.code) params.set("fromCode", from.code);
@@ -232,6 +236,7 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
       if (checkIn) params.set("checkIn", checkIn);
       if (checkOut) params.set("checkOut", checkOut);
       params.set("adults", String(Math.max(1, hotelGuests)));
+      params.set("children", String(Math.max(0, hotelChildren)));
       params.set("rooms", String(Math.max(1, hotelRooms)));
       if (hotelLocationItem?.id != null) params.set("hidden_id", String(hotelLocationItem.id));
       if (hotelLocationItem?.loc) params.set("hidden_key", String(hotelLocationItem.loc));
@@ -253,6 +258,18 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
     if (!hotelEndDate) return format(hotelStartDate, "EEE, dd MMM yyyy");
     return `${format(hotelStartDate, "dd MMM")} - ${format(hotelEndDate, "dd MMM")}`;
   }, [hotelStartDate, hotelEndDate]);
+
+  const hotelGuestLabel = useMemo(() => {
+    const adults = Math.max(1, hotelGuests);
+    const kids = Math.max(0, hotelChildren);
+    const rooms = Math.max(1, hotelRooms);
+    const parts = [
+      `${adults} Adult${adults === 1 ? "" : "s"}`,
+      ...(kids > 0 ? [`${kids} Child${kids === 1 ? "" : "ren"}`] : []),
+      `${rooms} Room${rooms === 1 ? "" : "s"}`,
+    ];
+    return parts.join(", ");
+  }, [hotelGuests, hotelChildren, hotelRooms]);
 
   return (
     <div className={
@@ -492,7 +509,7 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
                     className="opacity-90 flex-shrink-0"
                   />
                   <span className="truncate text-sm font-medium text-[#010D50]">
-                    {hotelGuests} Guests, {hotelRooms} Room{hotelRooms === 1 ? "" : "s"}
+                    {hotelGuestLabel}
                   </span>
                 </div>
                 <ChevronDown className="h-4 w-4 text-[#010D50] ml-auto" />
@@ -502,8 +519,8 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-sm font-semibold text-[#010D50]">Guests</div>
-                    <div className="text-xs text-[#3A478A]">Adults & children</div>
+                    <div className="text-sm font-semibold text-[#010D50]">Adults</div>
+                    <div className="text-xs text-[#3A478A]">Ages 18+</div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
@@ -523,6 +540,36 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
                       variant="outline"
                       size="icon"
                       onClick={() => setHotelGuests((g) => Math.min(16, g + 1))}
+                      className="h-9 w-9 rounded-full"
+                    >
+                      <PlusIcon />
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-[#010D50]">Children</div>
+                    <div className="text-xs text-[#3A478A]">Ages 0–17</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setHotelChildren((c) => Math.max(0, c - 1))}
+                      className="h-9 w-9 rounded-full"
+                    >
+                      <Minus />
+                    </Button>
+                    <div className="w-8 text-center text-sm font-semibold text-[#010D50]">
+                      {hotelChildren}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => setHotelChildren((c) => Math.min(16, c + 1))}
                       className="h-9 w-9 rounded-full"
                     >
                       <PlusIcon />

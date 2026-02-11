@@ -66,6 +66,7 @@ export function HotelFiltersSidebar({
   expanded,
   onToggleExpanded,
   availableMealPlans = [],
+  availableNeighborhoods = [],
   minPriceByStarRating = {},
 }: {
   resultCount: number;
@@ -80,11 +81,13 @@ export function HotelFiltersSidebar({
   onToggleExpanded: (key: string) => void;
   /** Available meal plans from current hotel data */
   availableMealPlans?: string[];
+  /** Available neighborhoods from current hotel data */
+  availableNeighborhoods?: string[];
   /** Minimum price per star rating from current hotel data */
   minPriceByStarRating?: Record<number, number>;
 }) {
   const unsupportedNote =
-    "Note: Only Property name, Price, and Star rating are currently powered by the hotel API. Other filters are shown for UI parity but may not affect results yet.";
+    "Note: Property name, Price, Star rating, Meal plans, and Breakfast are powered by the hotel list. Neighborhood is available when present in results. Other filters are shown for UI parity but may not affect results yet.";
 
   const priceText = useMemo(() => {
     const [min, max] = value.priceRange;
@@ -119,69 +122,68 @@ export function HotelFiltersSidebar({
         <span className="text-xs text-[#3A478A]">Showing {resultCount} results</span>
       </div>
 
-      {/* Popular filters */}
-      {/* <FilterSection
-        title="Popular filters"
-        isExpanded={!!expanded.popular}
-        onToggle={() => onToggleExpanded("popular")}
-      >
-        <div className="text-xs text-[#3A478A] mb-2">
-          Breakfast is powered by meal plan data. Other popular filters are not yet available from the hotel list API.
-        </div>
-        <div className="flex flex-col gap-2">
-          <label className="flex items-center gap-3">
-            <Checkbox
-              checked={value.popular.breakfastIncluded}
-              onCheckedChange={(c) =>
-                onChange({
-                  ...value,
-                  popular: { ...value.popular, breakfastIncluded: Boolean(c) },
-                })
-              }
-            />
-            <span className="text-sm text-[#010D50]">Breakfast included</span>
-          </label>
-          <label className="flex items-center gap-3">
-            <Checkbox
-              disabled
-              checked={value.popular.reserveWithoutCard}
-              onCheckedChange={(c) =>
-                onChange({
-                  ...value,
-                  popular: { ...value.popular, reserveWithoutCard: Boolean(c) },
-                })
-              }
-            />
-            <span className="text-sm text-[#010D50]">Reserve without a credit card</span>
-          </label>
-          <label className="flex items-center gap-3">
-            <Checkbox
-              disabled
-              checked={value.popular.reserveNowPayLater}
-              onCheckedChange={(c) =>
-                onChange({
-                  ...value,
-                  popular: { ...value.popular, reserveNowPayLater: Boolean(c) },
-                })
-              }
-            />
-            <span className="text-sm text-[#010D50]">Reserve now, pay later</span>
-          </label>
-          <label className="flex items-center gap-3">
-            <Checkbox
-              disabled
-              checked={value.popular.airportShuttle}
-              onCheckedChange={(c) =>
-                onChange({
-                  ...value,
-                  popular: { ...value.popular, airportShuttle: Boolean(c) },
-                })
-              }
-            />
-            <span className="text-sm text-[#010D50]">Airport shuttle included</span>
-          </label>
-        </div>
-      </FilterSection> */}
+      {/* Popular filters (temporarily hidden) */}
+      {/*
+        <FilterSection
+          title="Popular filters"
+          isExpanded={!!expanded.popular}
+          onToggle={() => onToggleExpanded("popular")}
+        >
+          <div className="flex flex-col gap-2">
+            <label className="flex items-center gap-3">
+              <Checkbox
+                checked={value.popular.breakfastIncluded}
+                onCheckedChange={(c) =>
+                  onChange({
+                    ...value,
+                    popular: { ...value.popular, breakfastIncluded: Boolean(c) },
+                  })
+                }
+              />
+              <span className="text-sm text-[#010D50]">Breakfast included</span>
+            </label>
+            <label className="flex items-center gap-3">
+              <Checkbox
+                disabled
+                checked={value.popular.reserveWithoutCard}
+                onCheckedChange={(c) =>
+                  onChange({
+                    ...value,
+                    popular: { ...value.popular, reserveWithoutCard: Boolean(c) },
+                  })
+                }
+              />
+              <span className="text-sm text-[#010D50]">Reserve without a credit card</span>
+            </label>
+            <label className="flex items-center gap-3">
+              <Checkbox
+                disabled
+                checked={value.popular.reserveNowPayLater}
+                onCheckedChange={(c) =>
+                  onChange({
+                    ...value,
+                    popular: { ...value.popular, reserveNowPayLater: Boolean(c) },
+                  })
+                }
+              />
+              <span className="text-sm text-[#010D50]">Reserve now, pay later</span>
+            </label>
+            <label className="flex items-center gap-3">
+              <Checkbox
+                disabled
+                checked={value.popular.airportShuttle}
+                onCheckedChange={(c) =>
+                  onChange({
+                    ...value,
+                    popular: { ...value.popular, airportShuttle: Boolean(c) },
+                  })
+                }
+              />
+              <span className="text-sm text-[#010D50]">Airport shuttle included</span>
+            </label>
+          </div>
+        </FilterSection>
+      */}
 
       {/* Price */}
       <FilterSection title="Price" isExpanded={!!expanded.price} onToggle={() => onToggleExpanded("price")}>
@@ -241,26 +243,28 @@ export function HotelFiltersSidebar({
         isExpanded={!!expanded.neighborhood}
         onToggle={() => onToggleExpanded("neighborhood")}
       >
-        <div className="text-xs text-[#3A478A] mb-2">Content missing from API: neighborhood data</div>
-        <div className="flex flex-col gap-2">
-          {["Central", "Kowloon", "Mong Kok", "Tsim Sha Tsui", "Jordan"].map((n) => (
-            <label key={n} className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  disabled
-                  checked={value.neighborhoods.includes(n)}
-                  onCheckedChange={(c) => {
-                    const next = Boolean(c)
-                      ? Array.from(new Set([...value.neighborhoods, n]))
-                      : value.neighborhoods.filter((x) => x !== n);
-                    onChange({ ...value, neighborhoods: next });
-                  }}
-                />
-                <span className="text-sm text-[#010D50]">{n}</span>
-              </div>
-            </label>
-          ))}
-        </div>
+        {availableNeighborhoods.length === 0 ? (
+          <div className="text-xs text-[#3A478A]">No neighborhood/city labels available in current results</div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {availableNeighborhoods.map((n) => (
+              <label key={n} className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={value.neighborhoods.includes(n)}
+                    onCheckedChange={(c) => {
+                      const next = Boolean(c)
+                        ? Array.from(new Set([...value.neighborhoods, n]))
+                        : value.neighborhoods.filter((x) => x !== n);
+                      onChange({ ...value, neighborhoods: next });
+                    }}
+                  />
+                  <span className="text-sm text-[#010D50]">{n}</span>
+                </div>
+              </label>
+            ))}
+          </div>
+        )}
       </FilterSection>
 
       {/* Star rating */}
@@ -321,40 +325,43 @@ export function HotelFiltersSidebar({
       </FilterSection>
 
       {/* Amenities with icons in a grid */}
-      <FilterSection
-        title="Amenities"
-        isExpanded={!!expanded.amenities}
-        onToggle={() => onToggleExpanded("amenities")}
-      >
-        <div className="text-xs text-[#3A478A] mb-2">Content missing from API: amenities list</div>
-        <div className="grid grid-cols-2 gap-2">
-          {AMENITIES_WITH_ICONS.map(({ key, icon: Icon }) => {
-            const isSelected = value.amenities.includes(key);
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => {
-                  // UI-only for now
-                  const next = isSelected
-                    ? value.amenities.filter((x) => x !== key)
-                    : [...value.amenities, key];
-                  onChange({ ...value, amenities: next });
-                }}
-                className={[
-                  "flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border text-center transition-colors",
-                  isSelected
-                    ? "border-[#3754ED] bg-[rgba(55,84,237,0.08)]"
-                    : "border-[#DFE0E4] bg-white hover:border-[#3754ED]/50",
-                ].join(" ")}
-              >
-                <Icon className="h-5 w-5 text-[#010D50]" />
-                <span className="text-xs text-[#010D50] leading-tight">{key}</span>
-              </button>
-            );
-          })}
-        </div>
-      </FilterSection>
+      {/* Amenities filter (temporarily hidden) */}
+      {/*
+        <FilterSection
+          title="Amenities"
+          isExpanded={!!expanded.amenities}
+          onToggle={() => onToggleExpanded("amenities")}
+        >
+          <div className="text-xs text-[#3A478A] mb-2">Content missing from API: amenities list</div>
+          <div className="grid grid-cols-2 gap-2">
+            {AMENITIES_WITH_ICONS.map(({ key, icon: Icon }) => {
+              const isSelected = value.amenities.includes(key);
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => {
+                    // UI-only for now
+                    const next = isSelected
+                      ? value.amenities.filter((x) => x !== key)
+                      : [...value.amenities, key];
+                    onChange({ ...value, amenities: next });
+                  }}
+                  className={[
+                    "flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border text-center transition-colors",
+                    isSelected
+                      ? "border-[#3754ED] bg-[rgba(55,84,237,0.08)]"
+                      : "border-[#DFE0E4] bg-white hover:border-[#3754ED]/50",
+                  ].join(" ")}
+                >
+                  <Icon className="h-5 w-5 text-[#010D50]" />
+                  <span className="text-xs text-[#010D50] leading-tight">{key}</span>
+                </button>
+              );
+            })}
+          </div>
+        </FilterSection>
+      */}
 
       {/* Meal plans available */}
       <FilterSection
@@ -385,70 +392,72 @@ export function HotelFiltersSidebar({
         )}
       </FilterSection>
 
-      {/* Number of bedrooms */}
-      <FilterSection
-        title="Number of bedrooms"
-        isExpanded={!!expanded.bedrooms}
-        onToggle={() => onToggleExpanded("bedrooms")}
-      >
-        <div className="text-xs text-[#3A478A] mb-2">Content missing from API: bedroom count</div>
-        <div className="flex flex-wrap gap-2">
-          {["Studio", "1", "2", "3"].map((opt) => {
-            const isSelected = value.bedrooms === opt;
-            return (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => onChange({ ...value, bedrooms: isSelected ? null : opt })}
-                disabled
-                className={[
-                  "px-4 py-2 rounded-full border text-sm font-medium transition-colors",
-                  isSelected
-                    ? "border-[#3754ED] bg-[#3754ED] text-white"
-                    : "border-[#DFE0E4] bg-white text-[#010D50] hover:border-[#3754ED]/50",
-                ].join(" ")}
-              >
-                {opt}
-              </button>
-            );
-          })}
-        </div>
-      </FilterSection>
+      {/* Number of bedrooms (temporarily hidden) */}
+      {/*
+        <FilterSection
+          title="Number of bedrooms"
+          isExpanded={!!expanded.bedrooms}
+          onToggle={() => onToggleExpanded("bedrooms")}
+        >
+          <div className="text-xs text-[#3A478A] mb-2">Content missing from API: bedroom count</div>
+          <div className="flex flex-wrap gap-2">
+            {["Studio", "1", "2", "3"].map((opt) => {
+              const isSelected = value.bedrooms === opt;
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => onChange({ ...value, bedrooms: isSelected ? null : opt })}
+                  disabled
+                  className={[
+                    "px-4 py-2 rounded-full border text-sm font-medium transition-colors",
+                    isSelected
+                      ? "border-[#3754ED] bg-[#3754ED] text-white"
+                      : "border-[#DFE0E4] bg-white text-[#010D50] hover:border-[#3754ED]/50",
+                  ].join(" ")}
+                >
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+        </FilterSection>
+      */}
 
-      {/* Accessibility */}
-      <FilterSection
-        title="Accessibility"
-        isExpanded={!!expanded.accessibility}
-        onToggle={() => onToggleExpanded("accessibility")}
-      >
-        <div className="text-xs text-[#3A478A] mb-2">Content missing from API: accessibility attributes</div>
-        <div className="flex flex-col gap-2">
-          {["Lift", "In-room accessibility", "Stair-free path to entrance"].map((acc) => (
-            <label key={acc} className="flex items-center gap-3">
-              <Checkbox
-                disabled
-                checked={value.accessibility?.includes(acc) ?? false}
-                onCheckedChange={(c) => {
-                  const current = value.accessibility ?? [];
-                  const next = Boolean(c)
-                    ? Array.from(new Set([...current, acc]))
-                    : current.filter((x) => x !== acc);
-                  onChange({ ...value, accessibility: next });
-                }}
-              />
-              <span className="text-sm text-[#010D50]">{acc}</span>
-            </label>
-          ))}
-          <button
-            type="button"
-            className="text-sm text-[#3754ED] hover:underline text-left mt-1"
-          >
-            See more
-          </button>
-        </div>
-      </FilterSection>
+      {/* Accessibility (temporarily hidden) */}
+      {/*
+        <FilterSection
+          title="Accessibility"
+          isExpanded={!!expanded.accessibility}
+          onToggle={() => onToggleExpanded("accessibility")}
+        >
+          <div className="text-xs text-[#3A478A] mb-2">Content missing from API: accessibility attributes</div>
+          <div className="flex flex-col gap-2">
+            {["Lift", "In-room accessibility", "Stair-free path to entrance"].map((acc) => (
+              <label key={acc} className="flex items-center gap-3">
+                <Checkbox
+                  disabled
+                  checked={value.accessibility?.includes(acc) ?? false}
+                  onCheckedChange={(c) => {
+                    const current = value.accessibility ?? [];
+                    const next = Boolean(c)
+                      ? Array.from(new Set([...current, acc]))
+                      : current.filter((x) => x !== acc);
+                    onChange({ ...value, accessibility: next });
+                  }}
+                />
+                <span className="text-sm text-[#010D50]">{acc}</span>
+              </label>
+            ))}
+            <button
+              type="button"
+              className="text-sm text-[#3754ED] hover:underline text-left mt-1"
+            >
+              See more
+            </button>
+          </div>
+        </FilterSection>
+      */}
     </div>
   );
 }
-
-

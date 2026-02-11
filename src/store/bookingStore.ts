@@ -79,6 +79,7 @@ interface BookingState {
 
   // Hotels (Vyspa) search state
   hotelSearch: {
+    provider?: 'vyspa' | 'hotelbeds';
     location: string;
     hidden_id: string;
     hidden_key: string;
@@ -88,7 +89,7 @@ interface BookingState {
     adults: number;
     children: number;
     branches?: string;
-    searchCriteriaId?: number;
+    searchCriteriaId?: number | string;
     arrivalPointCode?: string;
   } | null;
   setHotelSearch: (search: BookingState['hotelSearch']) => void;
@@ -165,6 +166,7 @@ interface BookingState {
     currency?: string;
     total?: number;
     nightly?: number;
+    hotelbedsRateKey?: string;
   } | null;
   setSelectedHotelRoomSummary: (summary: BookingState['selectedHotelRoomSummary']) => void;
 
