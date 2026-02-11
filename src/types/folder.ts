@@ -80,10 +80,14 @@ export interface HotelRequestItem {
   type: 'hotel';
   /** Hotel search result ID */
   search_result_id?: string;
+  /** Comma-separated room codes (Vyspa accepts roomCodes/roomIds for hotel add) */
+  roomCodes?: string;
   /** Comma-separated room IDs */
   roomIds: string;
   /** Room to passenger mapping */
   passengers: HotelRoomPassengers;
+  /** Optional expected net amount(s), formatted as strings */
+  expectedNetPrice?: string[];
   /** Flag to mark hotel as part of a package (1=yes) */
   holiday_package?: number;
 }
@@ -169,6 +173,18 @@ export interface AddToFolderResponse {
   /** Any errors that occurred */
   errors?: string[];
   /** Raw API response for debugging */
+  rawResponse?: unknown;
+}
+
+export interface ConfirmItineraryRequest {
+  folderNumber: number;
+  itineraryNumber: string | number;
+  validateOnly: boolean;
+}
+
+export interface ConfirmItineraryResponse {
+  success: boolean;
+  message?: string;
   rawResponse?: unknown;
 }
 

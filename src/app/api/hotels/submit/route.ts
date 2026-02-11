@@ -21,6 +21,19 @@ type SubmitBody =
         adults: number;
         children: number;
       };
+      passengers?: Array<{
+        pax_no?: number;
+        title?: string;
+        first_name: string;
+        middle_name?: string;
+        last_name: string;
+        birth_date?: string;
+        pax_type: 'ADT' | 'CHD' | 'INF';
+        api_gender?: 'M' | 'F';
+        email?: string;
+        phone?: string;
+        telephone?: string;
+      }>;
       selection: {
         total: number;
         nightly?: number;
@@ -105,6 +118,23 @@ export async function POST(req: Request) {
       folderNumber: body.folderNumber,
       itineraryNumber: '1',
       customer_type: 'C',
+      passengers: (body.passengers || []).map((p, idx) => {
+        const paxNo = String(p?.pax_no ?? idx + 1);
+        const telephone = p?.telephone || p?.phone || '';
+        return {
+          pId: '',
+          pax_no: paxNo,
+          pax_type: p?.pax_type || 'ADT',
+          title: p?.title || 'Mr',
+          first_name: String(p?.first_name || '').toUpperCase(),
+          middle_name: String(p?.middle_name || ''),
+          last_name: String(p?.last_name || '').toUpperCase(),
+          api_gender: p?.api_gender || 'M',
+          email: p?.email || '',
+          telephone,
+          birth_date: p?.birth_date || '',
+        };
+      }),
       manual_items: [manualItem],
     },
   ];
@@ -153,4 +183,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'UNKNOWN_ERROR', message: e?.message || 'Unknown error' }, { status: 500 });
   }
 }
-

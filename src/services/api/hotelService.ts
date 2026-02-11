@@ -154,6 +154,19 @@ export class HotelService {
     currency: string;
     hotel: { hotelId: string; hotelName: string };
     stay: { checkIn: string; checkOut: string; rooms: number; adults: number; children: number };
+    passengers?: Array<{
+      pax_no?: number;
+      title?: string;
+      first_name: string;
+      middle_name?: string;
+      last_name: string;
+      birth_date?: string;
+      pax_type: 'ADT' | 'CHD' | 'INF';
+      api_gender?: 'M' | 'F';
+      email?: string;
+      phone?: string;
+      telephone?: string;
+    }>;
     selection: { total: number; nightly?: number; rateKey?: string; boardName?: string; refundable?: boolean };
   }): Promise<{ success: boolean; result?: unknown; message?: string }> {
     return jsonFetch<{ success: boolean; result?: unknown; message?: string }>('/api/hotels/submit', {

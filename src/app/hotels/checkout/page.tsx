@@ -23,6 +23,7 @@ export default function HotelCheckoutPage() {
   const hotelResultsMeta = useBookingStore((s) => s.hotelResultsMeta);
   const selectedHotel = useBookingStore((s) => s.selectedHotel);
   const selectedHotelRoomIds = useBookingStore((s) => s.selectedHotelRoomIds);
+  const selectedHotelRoomSummary = useBookingStore((s) => s.selectedHotelRoomSummary);
   const passengers = useBookingStore((s) => s.passengers);
   const passengersSaved = useBookingStore((s) => s.passengersSaved);
   const setVyspaFolderInfo = useBookingStore((s) => s.setVyspaFolderInfo);
@@ -138,7 +139,6 @@ export default function HotelCheckoutPage() {
       })();
 
       if (isHotelbedsMode) {
-        const roomSummary = useBookingStore.getState().selectedHotelRoomSummary;
         const submitResp = await hotelService.submitHotelbedsToFolder({
           folderNumber: Number(folderNo),
           currency: "GBP",
@@ -150,16 +150,33 @@ export default function HotelCheckoutPage() {
             adults: hotelSearch.adults,
             children: hotelSearch.children,
           },
+          passengers: folderPassengers as any,
           selection: {
-            total: roomSummary?.total || 0,
-            nightly: roomSummary?.nightly,
-            rateKey: roomSummary?.hotelbedsRateKey,
-            boardName: roomSummary?.mealName,
-            refundable: roomSummary?.isRefundable,
+            total: selectedHotelRoomSummary?.total || 0,
+            nightly: selectedHotelRoomSummary?.nightly,
+            rateKey: selectedHotelRoomSummary?.hotelbedsRateKey,
+            boardName: selectedHotelRoomSummary?.mealName,
+            refundable: selectedHotelRoomSummary?.isRefundable,
           },
         });
         if (!submitResp?.success) {
           throw new Error((submitResp as any)?.message || "Failed to submit HotelBeds hotel to folder");
+        }
+
+        // Ensure passenger rows appear in CMS Passenger tab for HotelBeds folders.
+        // Vyspa persists these via ApiAddToFolder even when requestData is empty.
+        const paxSyncResp = await folderService.addToFolder({
+          folderNumber: Number(folderNo),
+          itineraryNumber: "1",
+          foldcur: "GBP",
+          travelPurpose: "Holiday",
+          comments: [],
+          set_as_preferred_itinerary: true,
+          passengers: folderPassengers as any,
+          requestData: [],
+        });
+        if (!paxSyncResp.success) {
+          throw new Error(paxSyncResp.message || "Failed to sync hotel passengers to folder");
         }
       } else {
         const addToFolderRequest: AddToFolderRequest = {
@@ -174,8 +191,13 @@ export default function HotelCheckoutPage() {
             {
               type: "hotel",
               search_result_id: summary.searchResultId,
+              roomCodes: summary.roomIds.join(","),
               roomIds: summary.roomIds.join(","),
               passengers: roomPassengers,
+              expectedNetPrice:
+                typeof selectedHotelRoomSummary?.total === "number" && selectedHotelRoomSummary.total > 0
+                  ? [selectedHotelRoomSummary.total.toFixed(2)]
+                  : undefined,
             } as any,
           ],
         };
@@ -184,6 +206,24 @@ export default function HotelCheckoutPage() {
         if (!addResp.success) {
           throw new Error(addResp.message || "Failed to add hotel to folder");
         }
+      }
+
+      const validateResp = await folderService.confirmItinerary({
+        folderNumber: Number(folderNo),
+        itineraryNumber: "1",
+        validateOnly: true,
+      });
+      if (!validateResp.success) {
+        throw new Error(validateResp.message || "Failed to validate itinerary");
+      }
+
+      const confirmResp = await folderService.confirmItinerary({
+        folderNumber: Number(folderNo),
+        itineraryNumber: "1",
+        validateOnly: false,
+      });
+      if (!confirmResp.success) {
+        throw new Error(confirmResp.message || "Failed to confirm itinerary");
       }
 
       router.push("/payment?type=hotel");

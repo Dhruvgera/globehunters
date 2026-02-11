@@ -9,6 +9,8 @@
 import {
   AddToFolderRequest,
   AddToFolderResponse,
+  ConfirmItineraryRequest,
+  ConfirmItineraryResponse,
   CreateFolderRequest,
   CreateFolderResponse,
   FolderPassenger,
@@ -80,6 +82,7 @@ export function buildHotelRequestItem(
   const item: HotelRequestItem = {
     type: 'hotel',
     search_result_id: hotelDetails.searchResultId,
+    roomCodes: hotelDetails.roomIds.join(','),
     roomIds: hotelDetails.roomIds.join(','),
     passengers: hotelDetails.roomPassengers,
   };
@@ -165,6 +168,32 @@ class FolderService {
         success: false,
         message: error instanceof Error ? error.message : 'Failed to add items to folder',
         errors: [error instanceof Error ? error.message : 'Unknown error'],
+      };
+    }
+  }
+
+  async confirmItinerary(request: ConfirmItineraryRequest): Promise<ConfirmItineraryResponse> {
+    try {
+      const response = await fetch('/api/vyspa/confirm-itinerary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([request]),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        return {
+          success: false,
+          message: (data as any)?.message || 'Failed to confirm itinerary',
+          rawResponse: data,
+        };
+      }
+
+      return { success: true, rawResponse: data };
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to confirm itinerary',
       };
     }
   }
@@ -363,4 +392,3 @@ export type {
   PassengerDetails,
   SeatSelection,
 };
-

@@ -38,13 +38,6 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!body.requestData || body.requestData.length === 0) {
-      return NextResponse.json(
-        { error: 'INVALID_REQUEST', message: 'Missing requestData (items to add)' },
-        { status: 400 }
-      );
-    }
-
     if (!body.foldcur) {
       return NextResponse.json(
         { error: 'INVALID_REQUEST', message: 'Missing foldcur (currency)' },
@@ -81,10 +74,17 @@ export async function POST(req: Request) {
         if (!k) continue;
         mapped[String(k)] = typeof v === 'string' ? v : Array.isArray(v) ? v.join(',') : String(v ?? '');
       }
+      const roomIds = typeof item?.roomIds === 'string' ? item.roomIds : String(item?.roomIds ?? '');
+      const roomCodes = typeof item?.roomCodes === 'string' ? item.roomCodes : roomIds;
+      const expectedNetPrice = Array.isArray(item?.expectedNetPrice)
+        ? item.expectedNetPrice.map((v: unknown) => String(v))
+        : undefined;
       return {
         ...item,
-        roomIds: typeof item?.roomIds === 'string' ? item.roomIds : String(item?.roomIds ?? ''),
+        roomIds,
+        roomCodes,
         passengers: mapped,
+        expectedNetPrice,
       };
     });
 
