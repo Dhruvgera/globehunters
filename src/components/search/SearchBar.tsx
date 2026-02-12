@@ -99,6 +99,7 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
   const [hotelRooms, setHotelRooms] = useState(1);
   const [isHotelDatesOpen, setIsHotelDatesOpen] = useState(false);
   const [isHotelGuestsOpen, setIsHotelGuestsOpen] = useState(false);
+  const [openMultiCityDateIndex, setOpenMultiCityDateIndex] = useState<number | null>(null);
 
   const savedHotelLocation = useBookingStore((s) => s.hotelLocationSelection);
   const setHotelLocationSelection = useBookingStore((s) => s.setHotelLocationSelection);
@@ -370,7 +371,10 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
                         updateMultiCitySegment(index, { to: airport })
                       }
                     />
-                    <Popover>
+                    <Popover
+                      open={openMultiCityDateIndex === index}
+                      onOpenChange={(open) => setOpenMultiCityDateIndex(open ? index : null)}
+                    >
                       <PopoverTrigger asChild>
                         <Button
                           variant="outline"
@@ -397,9 +401,7 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
                           onStartDateChange={(date) =>
                             updateMultiCitySegment(index, { departureDate: date })
                           }
-                          onDone={() => {
-                            // Popover will close automatically on outside click; no-op here
-                          }}
+                          onDone={() => setOpenMultiCityDateIndex(null)}
                         />
                       </PopoverContent>
                     </Popover>

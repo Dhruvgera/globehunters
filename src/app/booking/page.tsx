@@ -116,6 +116,49 @@ function BookingContent() {
     loadAirportNames();
   }, [flight]);
 
+  const passengerBreakdownForSummary = useMemo(() => {
+    if (!flight) return [];
+
+    // Primary: selected upgrade breakdown (explicit user choice)
+    if (selectedUpgrade?.passengerBreakdown?.length) {
+      return selectedUpgrade.passengerBreakdown;
+    }
+
+    // Fallback: base fare breakdown only if it matches charged amount/currency/passenger counts
+    const fallbackOption = priceCheckData?.priceOptions?.[0];
+    const fallbackBreakdown = fallbackOption?.passengerBreakdown;
+    if (!fallbackBreakdown?.length) return [];
+
+    const chargedTotal = selectedUpgrade ? selectedUpgrade.totalPrice : flight.price;
+    const chargedCurrency = (selectedUpgrade ? selectedUpgrade.currency : flight.currency)?.toUpperCase();
+    const fallbackCurrency = (fallbackOption?.currency || '').toUpperCase();
+
+    // Compare rounded monetary values with 0.01 tolerance
+    const breakdownSum = fallbackBreakdown.reduce((sum, pax) => sum + (pax.totalPrice || 0), 0);
+    const totalsMatch = Math.abs(breakdownSum - chargedTotal) <= 0.01;
+
+    // Ensure counts line up with current search passenger mix
+    const expected = storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 };
+    const actual = fallbackBreakdown.reduce(
+      (acc, pax) => {
+        if (pax.type === 'ADT') acc.adults += pax.count || 0;
+        else if (pax.type === 'CHD') acc.children += pax.count || 0;
+        else if (pax.type === 'INF') acc.infants += pax.count || 0;
+        return acc;
+      },
+      { adults: 0, children: 0, infants: 0 }
+    );
+
+    const countsMatch =
+      actual.adults === (expected.adults || 0) &&
+      actual.children === (expected.children || 0) &&
+      actual.infants === (expected.infants || 0);
+
+    const currencyMatch = fallbackCurrency !== '' && fallbackCurrency === chargedCurrency;
+
+    return totalsMatch && countsMatch && currencyMatch ? fallbackBreakdown : [];
+  }, [selectedUpgrade, priceCheckData, flight, storeSearchParams?.passengers]);
+
   // Show loading state while store is hydrating or no flight selected
   if (!hasHydrated || !flight) {
     return (
@@ -266,6 +309,7 @@ function BookingContent() {
             <PriceSummaryCard
               baseTripTotal={selectedUpgrade ? selectedUpgrade.totalPrice : flight.price}
               selectedUpgrade={selectedUpgrade}
+              passengerBreakdown={passengerBreakdownForSummary}
               isSticky={true}
               currency={selectedUpgrade ? selectedUpgrade.currency : flight.currency}
             />
@@ -292,7 +336,7 @@ function BookingContent() {
                 Creating your booking folder...
               </h3>
               <p className="text-sm text-[#3A478A]">
-                This may take a few moments. Please don't close this page.
+                This may take a few moments. Please do not close this page.
               </p>
             </div>
           </div>

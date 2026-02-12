@@ -8,6 +8,13 @@ import { formatPrice } from "@/lib/currency";
 interface PriceSummaryCardProps {
   baseTripTotal: number;
   selectedUpgrade?: TransformedPriceOption | null;
+  passengerBreakdown?: {
+    type: string;
+    count: number;
+    basePrice: number;
+    totalPrice: number;
+    taxesPerPerson: number;
+  }[];
   isSticky?: boolean;
   currency: string;
 }
@@ -15,12 +22,21 @@ interface PriceSummaryCardProps {
 export function PriceSummaryCard({
   baseTripTotal,
   selectedUpgrade,
+  passengerBreakdown = [],
   isSticky = true,
   currency,
 }: PriceSummaryCardProps) {
   const t = useTranslations('booking.priceSummary');
   const [isExpanded, setIsExpanded] = useState(false);
   const total = selectedUpgrade ? selectedUpgrade.totalPrice : baseTripTotal;
+  const hasBreakdown = passengerBreakdown.length > 0;
+
+  const formatPaxLabel = (type: string, count: number) => {
+    if (type === 'ADT') return `${count}x ${count > 1 ? t('adults') : t('adult')}`;
+    if (type === 'CHD') return `${count}x ${count > 1 ? t('children') : t('child')}`;
+    if (type === 'INF') return `${count}x ${count > 1 ? t('infants') : t('infant')}`;
+    return `${count}x ${type}`;
+  };
 
   return (
     <div
@@ -32,39 +48,36 @@ export function PriceSummaryCard({
         <span className="text-sm font-semibold text-[#010D50]">
           {t('title')}
         </span>
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="lg:hidden text-[#3754ED] text-sm font-medium hidden"
-        >
-          {isExpanded ? t('hideDetails') : t('showDetails')}
-        </button>
+        {hasBreakdown && (
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="lg:hidden text-[#3754ED] text-sm font-medium"
+          >
+            {isExpanded ? t('hideDetails') : t('showDetails')}
+          </button>
+        )}
       </div>
 
-      {/* Breakdown hidden by design - show only Trip Total */}
-      {false && (
+      {hasBreakdown && (
         <div
           className={`flex-col gap-2 ${
             isExpanded ? "flex" : "hidden lg:flex"
           }`}
         >
-          {selectedUpgrade ? (
-            <>
-              {selectedUpgrade!.passengerBreakdown.map((pax, idx) => (
-                <div key={idx} className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-[#010D50]">
-                    {pax.count}x {pax.type === 'ADT' ? t('adult') : pax.type === 'CHD' ? 'Child' : 'Infant'}
-                  </span>
-                  <span className="text-sm font-medium text-[#010D50]">
-                    £{pax.totalPrice.toLocaleString()}
-                  </span>
-                </div>
-              ))}
-            </>
-          ) : null}
+          {passengerBreakdown.map((pax, idx) => (
+            <div key={idx} className="flex items-center justify-between">
+              <span className="text-sm font-medium text-[#010D50]">
+                {formatPaxLabel(pax.type, pax.count)}
+              </span>
+              <span className="text-sm font-medium text-[#010D50]">
+                {formatPrice(pax.totalPrice, currency)}
+              </span>
+            </div>
+          ))}
         </div>
       )}
 
-      {false && (
+      {hasBreakdown && (
         <div
           className={`border-t border-[#DFE0E4] ${
             isExpanded ? "block" : "hidden lg:block"
