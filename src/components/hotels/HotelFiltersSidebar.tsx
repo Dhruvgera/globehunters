@@ -68,6 +68,7 @@ export function HotelFiltersSidebar({
   availableMealPlans = [],
   availableNeighborhoods = [],
   minPriceByStarRating = {},
+  refundableFilterEnabled = false,
 }: {
   resultCount: number;
   value: HotelFiltersState;
@@ -85,6 +86,8 @@ export function HotelFiltersSidebar({
   availableNeighborhoods?: string[];
   /** Minimum price per star rating from current hotel data */
   minPriceByStarRating?: Record<number, number>;
+  /** Enable refundable filter only when provider returns refundable flags in list results */
+  refundableFilterEnabled?: boolean;
 }) {
   const unsupportedNote =
     "Note: Property name, Price, Star rating, Meal plans, and Breakfast are powered by the hotel list. Neighborhood is available when present in results. Other filters are shown for UI parity but may not affect results yet.";
@@ -313,10 +316,14 @@ export function HotelFiltersSidebar({
         isExpanded={!!expanded.refund}
         onToggle={() => onToggleExpanded("refund")}
       >
-        <div className="text-xs text-[#3A478A] mb-2">Content missing from API: refundable flag in list results</div>
+        {!refundableFilterEnabled && (
+          <div className="text-xs text-[#3A478A] mb-2">
+            Content missing from API: refundable flag in list results
+          </div>
+        )}
         <label className="flex items-center gap-3">
           <Checkbox
-            disabled
+            disabled={!refundableFilterEnabled}
             checked={value.fullyRefundableOnly}
             onCheckedChange={(c) => onChange({ ...value, fullyRefundableOnly: Boolean(c) })}
           />

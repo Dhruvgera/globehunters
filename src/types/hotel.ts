@@ -43,6 +43,7 @@ export interface Hotel {
   countryName?: string;
   /** Meal plan codes, e.g. ["Room Only", "Bed and Breakfast"] */
   mealPlans?: string[];
+  /** Property-level refundable signal when available from provider list response */
+  refundable?: boolean | null;
 }
-
 

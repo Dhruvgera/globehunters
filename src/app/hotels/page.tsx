@@ -376,6 +376,7 @@ function HotelsPageInner() {
               cityName: pkg.address?.city || "",
               countryName: "",
               mealPlans: [],
+              refundable: undefined,
             };
           });
           
@@ -531,6 +532,7 @@ function HotelsPageInner() {
             cityName,
             countryName,
             mealPlans,
+            refundable: hbCheapest?.refundable === true ? true : hbCheapest?.refundable === false ? false : null,
           };
         });
 
@@ -806,8 +808,7 @@ function HotelsPageInner() {
 
       if (filters.starRatings.length > 0 && !filters.starRatings.includes(h.starRating)) return false;
 
-      // Refundable filter not supported by list endpoint reliably; leave it as UI-only.
-      if (filters.fullyRefundableOnly) return true;
+      if (filters.fullyRefundableOnly && h.refundable !== true) return false;
 
       if (filters.neighborhoods.length > 0) {
         if (!h.neighborhood || !filters.neighborhoods.includes(h.neighborhood)) return false;
@@ -1001,6 +1002,11 @@ function HotelsPageInner() {
     return Array.from(set).sort();
   }, [hotels]);
 
+  const refundableFilterEnabled = useMemo(
+    () => hotels.some((h) => h.refundable === true || h.refundable === false),
+    [hotels]
+  );
+
   // Calculate min price per star rating
   const minPriceByStarRating = useMemo(() => {
     const minByRating: Record<number, number> = {};
@@ -1055,6 +1061,7 @@ function HotelsPageInner() {
               availableMealPlans={availableMealPlans}
               availableNeighborhoods={availableNeighborhoods}
               minPriceByStarRating={minPriceByStarRating}
+              refundableFilterEnabled={refundableFilterEnabled}
             />
           </aside>
 
