@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 type RoomsBody =
   | unknown[]
   | {
-      SearchCriteriaId: number;
+      SearchCriteriaId: number | string;
       hotelIds?: string | number;
       srIds?: string | number;
     };
@@ -25,12 +25,15 @@ export async function POST(req: Request) {
   const vyspaPayload = Array.isArray(body) ? body : [body];
   const first = vyspaPayload[0] as any;
 
-  if (!first || typeof first !== 'object' || typeof first.SearchCriteriaId !== 'number') {
+  const searchCriteriaId = Number(first?.SearchCriteriaId);
+  if (!first || typeof first !== 'object' || !Number.isFinite(searchCriteriaId)) {
     return NextResponse.json(
-      { error: 'INVALID_REQUEST', message: 'SearchCriteriaId (number) is required' },
+      { error: 'INVALID_REQUEST', message: 'SearchCriteriaId (number|string) is required' },
       { status: 400 }
     );
   }
+
+  first.SearchCriteriaId = searchCriteriaId;
 
   if (!('hotelIds' in first) && !('srIds' in first)) {
     return NextResponse.json(
@@ -54,7 +57,6 @@ export async function POST(req: Request) {
 
   return NextResponse.json(result.data, { status: 200 });
 }
-
 
 
 

@@ -1,17 +1,17 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
-import Link from "next/link";
 import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
 import SearchBar from "@/components/search/SearchBar";
 import { Plane, Loader2, MapPin, Phone, ChevronRight } from "lucide-react";
-import { useTranslations } from "next-intl";
 import { useBookingStore } from "@/store/bookingStore";
 import { useAffiliate, useAffiliatePhone } from "@/lib/AffiliateContext";
 import { normalizeCabinClass } from "@/lib/utils";
+import type { SearchParams } from "@/types/flight";
+import type { Airport } from "@/types/airport";
 
 // Airline logos for the "Why Book With Us" section
 const airlineLogos = [
@@ -64,21 +64,42 @@ const destinationCards = [
 ];
 
 // Featured destination cards
-const featuredDestinations = [
+type FeaturedDestination = {
+  id: string;
+  title: string;
+  image: string;
+  airportQuery: string;
+  preferredAirportCode: string;
+  onClick?: () => void;
+};
+
+const featuredDestinations: FeaturedDestination[] = [
   {
     id: "new-york",
     title: "New York Flights",
     image: "/figma/homepage/new-york.jpg",
+    airportQuery: "New York",
+    preferredAirportCode: "JFK",
   },
   {
     id: "johannesburg",
     title: "Johannesburg Flights",
     image: "/figma/homepage/johannesburg.jpg",
+    airportQuery: "Johannesburg",
+    preferredAirportCode: "JNB",
   },
 ];
 
 // Flight class deals
-const flightClassDeals = [
+type FlightClassDeal = {
+  id: "first-class" | "business-class";
+  title: string;
+  image: string;
+  benefits: string[];
+  onClick?: () => void;
+};
+
+const flightClassDeals: FlightClassDeal[] = [
   {
     id: "first-class",
     title: "First Class Flight Deals",
@@ -160,7 +181,7 @@ function DestinationCard({ card }: { card: typeof destinationCards[0] }) {
   );
 }
 
-function FeaturedDestinationCard({ destination }: { destination: typeof featuredDestinations[0] }) {
+function FeaturedDestinationCard({ destination }: { destination: FeaturedDestination }) {
   return (
     <div className="flex flex-col rounded-[18px] overflow-hidden border border-[#DFE0E4] bg-white">
       <div className="relative h-[280px] sm:h-[340px]">
@@ -173,19 +194,20 @@ function FeaturedDestinationCard({ destination }: { destination: typeof featured
       </div>
       <div className="p-4 flex items-center justify-between bg-white">
         <h3 className="text-lg sm:text-xl font-bold text-[#010D50]">{destination.title}</h3>
-        <Link
-          href={`/search?to=${destination.id}`}
+        <button
+          type="button"
+          onClick={destination.onClick}
           className="flex items-center gap-1 bg-[#3754ED] text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-[#2942D1] transition-colors"
         >
           Explore
           <ChevronRight className="w-4 h-4" />
-        </Link>
+        </button>
       </div>
     </div>
   );
 }
 
-function FlightClassDealCard({ deal }: { deal: typeof flightClassDeals[0] }) {
+function FlightClassDealCard({ deal }: { deal: FlightClassDeal }) {
   return (
     <div className="relative rounded-[18px] overflow-hidden group h-[280px] sm:h-[320px]">
       <Image
@@ -207,19 +229,19 @@ function FlightClassDealCard({ deal }: { deal: typeof flightClassDeals[0] }) {
         </ul>
       </div>
       {/* CTA Button */}
-      <Link
-        href={`/search?class=${deal.id}`}
+      <button
+        type="button"
+        onClick={deal.onClick}
         className="absolute bottom-4 right-4 flex items-center gap-1 bg-[#010D50] text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-[#0B229E] transition-colors"
       >
         {deal.title}
         <ChevronRight className="w-4 h-4" />
-      </Link>
+      </button>
     </div>
   );
 }
 
 function HomeContent() {
-  const t = useTranslations('home');
   const searchParams = useSearchParams();
   const router = useRouter();
   const { setAffiliateCode } = useAffiliate();
@@ -229,8 +251,75 @@ function HomeContent() {
   const setAffiliateData = useBookingStore((state) => state.setAffiliateData);
   const setIsFromDeeplink = useBookingStore((state) => state.setIsFromDeeplink);
   const setSearchRequestId = useBookingStore((state) => state.setSearchRequestId);
+  const searchFormState = useBookingStore((state) => state.searchParams);
+  const searchSectionRef = useRef<HTMLElement | null>(null);
 
   const [isLoadingDeeplink, setIsLoadingDeeplink] = useState(false);
+
+  const getBaseSearchParams = (): SearchParams => ({
+    from: searchFormState?.from || "",
+    to: searchFormState?.to || "",
+    departureDate: searchFormState?.departureDate || new Date(),
+    returnDate: searchFormState?.returnDate,
+    passengers: searchFormState?.passengers || { adults: 1, children: 0, infants: 0 },
+    class: searchFormState?.class || "Economy",
+    tripType: searchFormState?.tripType || "round-trip",
+    segments: searchFormState?.segments,
+  });
+
+  const scrollToSearch = () => {
+    searchSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const handleSelectClass = (travelClass: SearchParams["class"]) => {
+    const current = getBaseSearchParams();
+    setSearchParams({
+      ...current,
+      class: travelClass,
+    });
+    scrollToSearch();
+  };
+
+  const handleSelectDestination = async (query: string, preferredCode: string) => {
+    let selectedAirportCode = preferredCode;
+
+    try {
+      const response = await fetch(`/api/airports?q=${encodeURIComponent(query)}`);
+      if (response.ok) {
+        const airports = (await response.json()) as Airport[];
+        if (airports.length > 0) {
+          const exactCodeMatch = airports.find(
+            (airport) => airport.code.toUpperCase() === preferredCode.toUpperCase()
+          );
+          const firstMatch = exactCodeMatch || airports[0];
+          if (firstMatch?.code) {
+            selectedAirportCode = firstMatch.code;
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch destination airports:", error);
+    }
+
+    const current = getBaseSearchParams();
+    setSearchParams({
+      ...current,
+      to: selectedAirportCode,
+    });
+    scrollToSearch();
+  };
+
+  const featuredDestinationsWithAction = featuredDestinations.map((destination) => ({
+    ...destination,
+    onClick: () => {
+      void handleSelectDestination(destination.airportQuery, destination.preferredAirportCode);
+    },
+  }));
+
+  const classDealsWithAction = flightClassDeals.map((deal) => ({
+    ...deal,
+    onClick: () => handleSelectClass(deal.id === "first-class" ? "First" : "Business"),
+  }));
 
   // Check for deeplink params and handle meta channel URLs (Skyscanner)
   useEffect(() => {
@@ -362,7 +451,7 @@ function HomeContent() {
       <Navbar />
       
       {/* Hero Section with Background Image */}
-      <section className="relative min-h-[500px] sm:min-h-[600px] lg:min-h-[700px] flex items-center justify-center">
+      <section ref={searchSectionRef} className="relative min-h-[500px] sm:min-h-[600px] lg:min-h-[700px] flex items-center justify-center">
         {/* Background Image */}
         <div className="absolute inset-0 z-0">
           <Image
@@ -444,7 +533,7 @@ function HomeContent() {
       <section className="py-12 sm:py-16 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {flightClassDeals.map((deal) => (
+            {classDealsWithAction.map((deal) => (
               <FlightClassDealCard key={deal.id} deal={deal} />
             ))}
           </div>
@@ -465,7 +554,7 @@ function HomeContent() {
           
           {/* Featured Destination Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {featuredDestinations.map((dest) => (
+            {featuredDestinationsWithAction.map((dest) => (
               <FeaturedDestinationCard key={dest.id} destination={dest} />
             ))}
           </div>

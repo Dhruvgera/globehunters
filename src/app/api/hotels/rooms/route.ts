@@ -37,10 +37,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'INVALID_REQUEST', message: 'hotelIds or srIds is required' }, { status: 400 });
   }
 
-  if (provider === 'vyspa') {
-    if (typeof first.SearchCriteriaId !== 'number') {
-      return NextResponse.json({ error: 'INVALID_REQUEST', message: 'SearchCriteriaId (number) is required' }, { status: 400 });
+  const criteriaToken = String(first.SearchCriteriaId ?? first.searchCriteriaId ?? '');
+  const decodedCriteria = decodeHotelSearchToken(criteriaToken);
+  const shouldUseHotelbeds = provider === 'hotelbeds' || Boolean(decodedCriteria);
+
+  if (!shouldUseHotelbeds) {
+    const searchCriteriaId = Number(first.SearchCriteriaId);
+    if (!Number.isFinite(searchCriteriaId)) {
+      return NextResponse.json({ error: 'INVALID_REQUEST', message: 'SearchCriteriaId (number|string) is required' }, { status: 400 });
     }
+    first.SearchCriteriaId = searchCriteriaId;
     const result = await vyspaRestFetch('/rest/v4/getRoomsV3/', payload);
     if (!result.ok) {
       return NextResponse.json(
@@ -55,8 +61,8 @@ export async function POST(req: Request) {
     return NextResponse.json(result.data, { status: 200 });
   }
 
-  const token = String(first.SearchCriteriaId ?? first.searchCriteriaId ?? '');
-  const decoded = decodeHotelSearchToken(token);
+  const token = criteriaToken;
+  const decoded = decodedCriteria;
   if (!decoded) {
     return NextResponse.json(
       { error: 'INVALID_REQUEST', message: 'Invalid SearchCriteriaId for HotelBeds search session' },

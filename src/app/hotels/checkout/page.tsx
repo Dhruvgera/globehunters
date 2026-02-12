@@ -208,24 +208,6 @@ export default function HotelCheckoutPage() {
         }
       }
 
-      const validateResp = await folderService.confirmItinerary({
-        folderNumber: Number(folderNo),
-        itineraryNumber: "1",
-        validateOnly: true,
-      });
-      if (!validateResp.success) {
-        throw new Error(validateResp.message || "Failed to validate itinerary");
-      }
-
-      const confirmResp = await folderService.confirmItinerary({
-        folderNumber: Number(folderNo),
-        itineraryNumber: "1",
-        validateOnly: false,
-      });
-      if (!confirmResp.success) {
-        throw new Error(confirmResp.message || "Failed to confirm itinerary");
-      }
-
       router.push("/payment?type=hotel");
     } catch (e: any) {
       setError(e?.message || "Failed to confirm hotel booking");

@@ -87,21 +87,43 @@ function buildSearchUrl(
   return queryString ? `/search?${queryString}` : "/search";
 }
 
+function buildHotelSearchUrl(
+  hotelSearch: ReturnType<typeof useBookingStore.getState>["hotelSearch"]
+): string {
+  if (!hotelSearch) return "/hotels";
+  const params = new URLSearchParams();
+  params.set("location", hotelSearch.location);
+  params.set("checkIn", hotelSearch.checkIn);
+  params.set("checkOut", hotelSearch.checkOut);
+  params.set("adults", String(hotelSearch.adults));
+  params.set("children", String(hotelSearch.children));
+  params.set("rooms", String(hotelSearch.rooms));
+  if (hotelSearch.hidden_id) params.set("hidden_id", hotelSearch.hidden_id);
+  if (hotelSearch.hidden_key) params.set("hidden_key", hotelSearch.hidden_key);
+  if (hotelSearch.branches) params.set("branches", hotelSearch.branches);
+  if (hotelSearch.arrivalPointCode) params.set("arrival_point_code", hotelSearch.arrivalPointCode);
+  return `/hotels?${params.toString()}`;
+}
+
 export function BookingHeader({ currentStep = 1, isHotel = false }: BookingHeaderProps) {
   const t = useTranslations('booking.header');
   const searchParams = useBookingStore((state) => state.searchParams);
+  const hotelSearch = useBookingStore((state) => state.hotelSearch);
   const affiliateData = useBookingStore((state) => state.affiliateData);
   const isFromDeeplink = useBookingStore((state) => state.isFromDeeplink);
 
   // Build the back URL - always include search params so user can continue searching
   const backUrl = useMemo(() => {
+    if (isHotel && hotelSearch) {
+      return buildHotelSearchUrl(hotelSearch);
+    }
     // If we have search params (from deeplink or regular flow), use them
     if (searchParams) {
       return buildSearchUrl(searchParams, affiliateData);
     }
     // Fallback to plain search
-    return "/search";
-  }, [searchParams, affiliateData]);
+    return isHotel ? "/hotels" : "/search";
+  }, [isHotel, hotelSearch, searchParams, affiliateData]);
 
   const steps = isHotel
     ? [

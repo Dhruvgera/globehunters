@@ -21,7 +21,6 @@ import { hotelService } from "@/services/api/hotelService";
 import { packageService } from "@/services/api/packageService";
 import { useBookingStore, useStoreHydration } from "@/store/bookingStore";
 import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
-import { mockHotels } from "@/data/mockHotels";
 import type { PackageSearchResult, PackageResultsMeta } from "@/types/holidayPackage";
 
 const DEFAULT_FILTERS: HotelFiltersState = {
@@ -42,6 +41,21 @@ const DEFAULT_FILTERS: HotelFiltersState = {
   bedrooms: null,
   accessibility: [],
 };
+
+function sanitizeHiddenHotelFilters(filters: HotelFiltersState): HotelFiltersState {
+  return {
+    ...filters,
+    amenities: [],
+    popular: {
+      breakfastIncluded: false,
+      reserveWithoutCard: false,
+      reserveNowPayLater: false,
+      airportShuttle: false,
+    },
+    bedrooms: null,
+    accessibility: [],
+  };
+}
 
 function normalizeMealPlanLabel(raw: string): string {
   const s = String(raw || "").trim();
@@ -252,7 +266,11 @@ function HotelsPageInner() {
     if (!hasHydrated || !queryKey) return;
     if (hotelFiltersCache?.queryKey === queryKey) {
       if (!hydratedFiltersRef.current) {
-        setFilters(hotelFiltersCache.filters);
+        const sanitized = sanitizeHiddenHotelFilters(hotelFiltersCache.filters);
+        setFilters(sanitized);
+        if (JSON.stringify(sanitized) !== JSON.stringify(hotelFiltersCache.filters)) {
+          setHotelFiltersCache({ queryKey, filters: sanitized });
+        }
         hydratedFiltersRef.current = true;
       }
       return;
@@ -261,7 +279,7 @@ function HotelsPageInner() {
     hydratedFiltersRef.current = true;
     hasUserAdjustedPriceRef.current = false;
     setFilters(DEFAULT_FILTERS);
-    setHotelFiltersCache({ queryKey, filters: DEFAULT_FILTERS });
+    setHotelFiltersCache({ queryKey, filters: sanitizeHiddenHotelFilters(DEFAULT_FILTERS) });
   }, [hotelFiltersCache, queryKey, setHotelFiltersCache]);
 
   useEffect(() => {
@@ -389,20 +407,18 @@ function HotelsPageInner() {
               setHotels(mappedHotels);
               setSelectedHotelKey(mappedHotels.length > 0 ? `${mappedHotels[0]?.id}-0` : "");
             } else {
-              // Fall back to mock hotels if no packages found
-              console.log('[Hotels Page] No packages found, using mock hotels');
-              setHotels(mockHotels);
-              setSelectedHotelKey(mockHotels.length > 0 ? `${mockHotels[0]?.id}-0` : "");
+              setHotels([]);
+              setSelectedHotelKey("");
             }
             setLoading(false);
             setHasAttemptedFetch(true);
           }
         } catch (err) {
           console.error('[Hotels Page] Package search error:', err);
-          // Fall back to mock hotels on error
           if (!cancelled && requestSeq === activeRequestSeq.current) {
-            setHotels(mockHotels);
-            setSelectedHotelKey(mockHotels.length > 0 ? `${mockHotels[0]?.id}-0` : "");
+            setError(err instanceof Error ? err.message : "Failed to fetch package hotels");
+            setHotels([]);
+            setSelectedHotelKey("");
             setLoading(false);
             setHasAttemptedFetch(true);
           }
@@ -450,7 +466,6 @@ function HotelsPageInner() {
         const rawCriteriaId = (criteria as any)?.searchCriteriaId;
         const criteriaId =
           typeof rawCriteriaId === "number" || typeof rawCriteriaId === "string" ? rawCriteriaId : null;
-        setSearchCriteriaId(criteriaId);
 
         // Filter out non-object results (e.g. [true, "No hotels found"] becomes empty array)
         const results = rawResults.filter(
@@ -494,11 +509,11 @@ function HotelsPageInner() {
 
           return {
             id: hotelId,
-            name: r?.hotel_name || r?.hotelName || "Content missing from API: hotel name",
+            name: r?.hotel_name || r?.hotelName || `Hotel ${hotelId}`,
             distanceLabel:
               r?.address1 || r?.address2
                 ? [r?.address1, r?.address2].filter(Boolean).join(", ")
-                : "Content missing from API: address",
+                : "",
             neighborhood: cityName && countryName ? `${cityName}, ${countryName}` : cityName || countryName || undefined,
             starRating,
             amenities,
@@ -527,7 +542,7 @@ function HotelsPageInner() {
               nights,
               rooms: search.rooms,
             },
-            imageSrc: r?.image_name || "/figma/hotels/hotel-card-image.png",
+            imageSrc: r?.image_name || "/hotel-placeholder.jpg",
             description: quickDesc,
             cityName,
             countryName,
@@ -540,9 +555,20 @@ function HotelsPageInner() {
         for (const r of results as any[]) {
           const hid = String(r?.hotel_id ?? r?.hotelId ?? r?.id ?? "");
           if (!hid) continue;
+          const rowProvider = String(r?.provider || "").trim().toLowerCase() === "hotelbeds" ? "hotelbeds" : "vyspa";
+          const rowSearchCriteriaAny =
+            rowProvider === "hotelbeds"
+              ? ((r as any)?.searchCriteriaId ?? (r as any)?._hotelbeds?.searchToken ?? criteriaId)
+              : criteriaId;
+          const rowSearchCriteriaId =
+            typeof rowSearchCriteriaAny === "string" || typeof rowSearchCriteriaAny === "number"
+              ? rowSearchCriteriaAny
+              : undefined;
           meta[hid] = {
             hotelId: hid,
             hotelName: r?.hotel_name || r?.hotelName,
+            provider: rowProvider,
+            searchCriteriaId: rowSearchCriteriaId,
             searchResultId: r?.id ? String(r.id) : undefined,
             srId: r?.id ? String(r.id) : undefined,
           };
@@ -581,8 +607,14 @@ function HotelsPageInner() {
           return { ...prev, priceMode: "total", priceRange: [min, max] };
         });
 
+        const firstResult = results[0] as any;
+        const firstResultProvider = String(firstResult?.provider || "").trim().toLowerCase();
         const provider =
-          typeof criteriaId === "string" ? "hotelbeds" : "vyspa";
+          firstResultProvider === "hotelbeds" || typeof criteriaId === "string" ? "hotelbeds" : "vyspa";
+        const searchCriteriaForStore =
+          provider === "hotelbeds"
+            ? (firstResult?.searchCriteriaId ?? firstResult?._hotelbeds?.searchToken ?? criteriaId)
+            : criteriaId;
 
         setHotelSearch({
           provider,
@@ -595,14 +627,25 @@ function HotelsPageInner() {
           adults: search.adults,
           children: search.children,
           branches: search.branches,
-          searchCriteriaId: criteriaId ?? undefined,
+          searchCriteriaId:
+            typeof searchCriteriaForStore === "string" || typeof searchCriteriaForStore === "number"
+              ? searchCriteriaForStore
+              : undefined,
           arrivalPointCode: pick.arrival_point_code,
         });
+        setSearchCriteriaId(
+          typeof searchCriteriaForStore === "number" || typeof searchCriteriaForStore === "string"
+            ? searchCriteriaForStore
+            : null
+        );
 
         // Set searchRequestId for consistent web reference (same as flight logic).
         // For HotelBeds, criteriaId is an opaque token (too long for UI), so derive a short display ref.
-        if (criteriaId) {
-          const displayRef = typeof criteriaId === "string" ? shortWebRefFromToken(criteriaId) : String(criteriaId);
+        if (searchCriteriaForStore) {
+          const displayRef =
+            typeof searchCriteriaForStore === "string"
+              ? shortWebRefFromToken(searchCriteriaForStore)
+              : String(searchCriteriaForStore);
           useBookingStore.getState().setSearchRequestId(displayRef);
         }
         setHotelResultsMeta(meta);
@@ -785,8 +828,9 @@ function HotelsPageInner() {
   }, [filters.priceMode, priceBounds.max, priceBounds.min]);
 
   const updateFilters = (next: HotelFiltersState) => {
-    setFilters(next);
-    setHotelFiltersCache({ queryKey, filters: next });
+    const sanitized = sanitizeHiddenHotelFilters(next);
+    setFilters(sanitized);
+    setHotelFiltersCache({ queryKey, filters: sanitized });
   };
 
   const onPriceModeChange = (mode: HotelFiltersState["priceMode"]) => {
@@ -869,7 +913,7 @@ function HotelsPageInner() {
       .filter((h) => {
         if (contentInflightRef.current.has(h.id)) return false;
         const missingImage = !h.imageSrc || h.imageSrc.includes("/figma/");
-        const missingAddress = !h.distanceLabel || h.distanceLabel.includes("Content missing from API");
+        const missingAddress = !h.distanceLabel;
         if (!missingImage && !missingAddress) return false;
 
         const status = contentAttemptRef.current.get(h.id);
@@ -1044,25 +1088,27 @@ function HotelsPageInner() {
         <div className="flex flex-col lg:flex-row gap-4">
           {/* Left sidebar */}
           <aside className="hidden lg:flex w-full lg:w-72 flex-col gap-4">
-            {searchRequestId && (
-              <ContactCard webRef={searchRequestId} />
+            <ContactCard webRef={searchRequestId ?? undefined} />
+            {!loading && hotels.length > 0 && (
+              <>
+                <HotelFiltersSidebar
+                  resultCount={filteredHotels.length}
+                  value={filters}
+                  onChange={updateFilters}
+                  onPriceModeChange={onPriceModeChange}
+                  onPriceRangeChange={onPriceRangeChange}
+                  minPrice={priceBounds.min}
+                  maxPrice={priceBounds.max}
+                  currencySymbol={currency}
+                  expanded={expanded}
+                  onToggleExpanded={(key) => setExpanded((prev) => ({ ...prev, [key]: !prev[key] }))}
+                  availableMealPlans={availableMealPlans}
+                  availableNeighborhoods={availableNeighborhoods}
+                  minPriceByStarRating={minPriceByStarRating}
+                  refundableFilterEnabled={refundableFilterEnabled}
+                />
+              </>
             )}
-            <HotelFiltersSidebar
-              resultCount={filteredHotels.length}
-              value={filters}
-              onChange={updateFilters}
-              onPriceModeChange={onPriceModeChange}
-              onPriceRangeChange={onPriceRangeChange}
-              minPrice={priceBounds.min}
-              maxPrice={priceBounds.max}
-              currencySymbol={currency}
-              expanded={expanded}
-              onToggleExpanded={(key) => setExpanded((prev) => ({ ...prev, [key]: !prev[key] }))}
-              availableMealPlans={availableMealPlans}
-              availableNeighborhoods={availableNeighborhoods}
-              minPriceByStarRating={minPriceByStarRating}
-              refundableFilterEnabled={refundableFilterEnabled}
-            />
           </aside>
 
           {/* Results */}

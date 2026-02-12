@@ -50,6 +50,15 @@ export interface VyspaGetRoomsV3Response {
 }
 
 export interface VyspaHotelSearchDetailsResponse {
+  id?: number | string;
+  hotel_id?: number | string;
+  vMapId?: number | string;
+  VmapId?: number | string;
+  hotel_name?: string;
+  quickDescription?: string;
+  image_name?: string;
+  address1?: string;
+  address2?: string;
   Rates?: any;
   Cancellation?: any;
   hotels?: any;
@@ -68,4 +77,3 @@ export type VyspaCreateCustomerFolderResponse =
   | number
   | VyspaCreateCustomerFolderResponseItem
   | VyspaCreateCustomerFolderResponseItem[];
-

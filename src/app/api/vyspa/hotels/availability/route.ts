@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { vyspaRestFetch } from '@/lib/vyspa/restClient';
+import { normalizeVyspaAvailabilityPayload } from '@/lib/vyspa/hotelsAvailability';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -16,15 +17,16 @@ export async function POST(req: Request) {
     );
   }
 
-  const vyspaPayload = Array.isArray(body) ? body : [body];
+  const rawPayload = Array.isArray(body) ? body : [body];
 
-  if (!Array.isArray(vyspaPayload) || vyspaPayload.length === 0) {
+  if (!Array.isArray(rawPayload) || rawPayload.length === 0) {
     return NextResponse.json(
       { error: 'INVALID_REQUEST', message: 'Payload must be a non-empty array' },
       { status: 400 }
     );
   }
 
+  const vyspaPayload = normalizeVyspaAvailabilityPayload(rawPayload);
   const result = await vyspaRestFetch('/rest/v4/accommodationAvailabilityV3/', vyspaPayload);
 
   // Debug logging to track Vyspa API response
@@ -49,7 +51,6 @@ export async function POST(req: Request) {
 
   return NextResponse.json(result.data, { status: 200 });
 }
-
 
 
 

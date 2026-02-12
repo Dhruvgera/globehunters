@@ -40,9 +40,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { hotelService } from "@/services/api/hotelService";
 import { useBookingStore } from "@/store/bookingStore";
-import {
-  mockHotelDetails,
-} from "@/data/mockHotelDetails";
 import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
 
 function LoadingBlock({ className }: { className: string }) {
@@ -53,56 +50,6 @@ function formatIsoDateLabel(d?: string): string {
   const s = String(d || "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "Add Date";
   return s;
-}
-
-function seededHsl(seed: string): { h: number; s: number; l: number } {
-  const str = String(seed || "room");
-  let h = 0;
-  for (let i = 0; i < str.length; i += 1) {
-    h = (h * 31 + str.charCodeAt(i)) >>> 0;
-  }
-  const hue = h % 360;
-  // Pleasant range
-  return { h: hue, s: 70, l: 52 };
-}
-
-function RoomImagePlaceholder({ seed, title }: { seed: string; title: string }) {
-  const a = seededHsl(`${seed}:a`);
-  const b = seededHsl(`${seed}:b`);
-  const initials = title
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]!.toUpperCase())
-    .join("");
-
-  return (
-    <div
-      className="relative w-full h-40 overflow-hidden"
-      style={{
-        background: `linear-gradient(135deg, hsl(${a.h} ${a.s}% ${a.l}%) 0%, hsl(${b.h} ${b.s}% ${Math.max(
-          38,
-          b.l - 10
-        )}%) 100%)`,
-      }}
-    >
-      <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "radial-gradient(#fff 1px, transparent 1px)", backgroundSize: "16px 16px" }} />
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="flex items-center gap-3 rounded-2xl bg-white/20 px-4 py-3 text-white backdrop-blur-sm">
-          <div className="w-12 h-12 rounded-xl bg-white/20 grid place-content-center text-lg font-bold">
-            {initials || "RM"}
-          </div>
-          <div className="flex flex-col">
-            <div className="text-sm font-semibold leading-tight">No photo yet</div>
-            <div className="text-xs opacity-90 leading-tight">Still a great deal</div>
-          </div>
-        </div>
-      </div>
-      <div className="absolute right-3 bottom-3 rounded-full bg-black/25 px-3 py-1 text-[11px] text-white">
-        Placeholder
-      </div>
-    </div>
-  );
 }
 
 // Icon mapping for amenities
@@ -163,53 +110,6 @@ function transformAmenities(rawAmenities: string[]): { label: string; icon: stri
 // Navigation sections
 const navSections = ["Overview", "About", "Rooms", "Accessibilities", "Policies"];
 
-// Package mode mock rooms (so we don't depend on hotel APIs yet)
-const mockPackageRooms: any[] = [
-  {
-    id: "pkg-room-1",
-    name: "Deluxe King Room",
-    bedType: "Breakfast included",
-    reviews: { score: 9.2, label: "Excellent", count: 412 },
-    isRefundable: true,
-    paymentType: "Pay now",
-    amenities: [
-      { label: "Free WiFi", icon: "wifi" },
-      { label: "Air conditioning", icon: "ac" },
-      { label: "City view", icon: "city" },
-    ],
-    price: { currency: "£", nightly: 285, total: 1710 },
-    _raw: { room_code: "PKG.DLX" },
-  },
-  {
-    id: "pkg-room-2",
-    name: "Premier Twin Room",
-    bedType: "Room only",
-    reviews: { score: 8.9, label: "Very good", count: 287 },
-    isRefundable: false,
-    paymentType: "Pay now",
-    amenities: [
-      { label: "Free WiFi", icon: "wifi" },
-      { label: "Gym access", icon: "gym" },
-    ],
-    price: { currency: "£", nightly: 240, total: 1440 },
-    _raw: { room_code: "PKG.PRM" },
-  },
-  {
-    id: "pkg-room-3",
-    name: "Executive Suite",
-    bedType: "Breakfast included",
-    reviews: { score: 9.5, label: "Exceptional", count: 155 },
-    isRefundable: true,
-    paymentType: "Pay now",
-    amenities: [
-      { label: "Free WiFi", icon: "wifi" },
-      { label: "Spa access", icon: "spa" },
-      { label: "Airport shuttle", icon: "shuttle" },
-    ],
-    price: { currency: "£", nightly: 410, total: 2460 },
-    _raw: { room_code: "PKG.SUI" },
-  },
-];
 
 export default function HotelRoomsPage() {
   const params = useParams();
@@ -283,6 +183,57 @@ export default function HotelRoomsPage() {
     return `HB-${(h >>> 0).toString(16).padStart(8, "0").slice(0, 8).toUpperCase()}`;
   }
 
+  function parseVyspaHotelDetailsMedia(payload: any): {
+    hotelImages: string[];
+    roomImages: Record<string, string[]>;
+  } {
+    const normalizeUrl = (value: unknown): string => {
+      const url = String(value || "").trim();
+      if (!url) return "";
+      return /^https?:\/\//i.test(url) ? url : "";
+    };
+
+    const hotelImages = Array.isArray(payload?.VendorImages)
+      ? payload.VendorImages
+        .map((row: any) => {
+          const source = row?.VendorImage || row;
+          return normalizeUrl(source?.printed_image_url || source?.source_image_url || source?.url);
+        })
+        .filter(Boolean)
+      : [];
+
+    const roomImages: Record<string, string[]> = {};
+    const visit = (node: any, roomCodeHint = "") => {
+      if (!node || typeof node !== "object") return;
+      if (Array.isArray(node)) {
+        node.forEach((entry) => visit(entry, roomCodeHint));
+        return;
+      }
+
+      const roomCode = String(
+        node.room_code || node.roomCode || node.code || node.room_id || node.roomId || roomCodeHint || ""
+      ).trim();
+      const url = normalizeUrl(node.printed_image_url || node.source_image_url || node.image_url || node.photo_url || node.url);
+      if (roomCode && url) {
+        if (!roomImages[roomCode]) roomImages[roomCode] = [];
+        roomImages[roomCode].push(url);
+      }
+
+      Object.values(node).forEach((value) => {
+        if (value && typeof value === "object") visit(value, roomCode || roomCodeHint);
+      });
+    };
+    visit(payload?.HotelRoom);
+
+    const dedupedRoomImages: Record<string, string[]> = {};
+    Object.entries(roomImages).forEach(([roomCode, urls]) => {
+      const unique = Array.from(new Set((urls || []).filter(Boolean)));
+      if (unique.length > 0) dedupedRoomImages[roomCode] = unique;
+    });
+
+    return { hotelImages: Array.from(new Set(hotelImages)), roomImages: dedupedRoomImages };
+  }
+
   async function runStaySearch(next: { checkIn: string; checkOut: string; adults: number; children: number; rooms: number }) {
     if (!hotelSearch?.location || !hotelSearch?.hidden_id || !hotelSearch?.hidden_key) {
       throw new Error("Missing search context (destination) to update availability.");
@@ -304,12 +255,23 @@ export default function HotelRoomsPage() {
     const criteriaId =
       typeof criteriaIdAny === "number" || typeof criteriaIdAny === "string" ? criteriaIdAny : null;
     if (!criteriaId) throw new Error("No searchCriteriaId returned from availability search.");
-
-    const provider = typeof criteriaId === "string" ? "hotelbeds" : "vyspa";
+    const results = Array.isArray((availability as any)?.Results) ? (availability as any).Results : [];
+    const hit = results.find((r: any) => String(r?.hotel_id ?? r?.hotelId ?? r?.id ?? "") === String(hotelId));
+    const hitProvider = String(hit?.provider || "").trim().toLowerCase() === "hotelbeds" ? "hotelbeds" : null;
+    const hitSearchCriteriaAny =
+      hitProvider === "hotelbeds"
+        ? (hit?.searchCriteriaId ?? hit?._hotelbeds?.searchToken ?? criteriaId)
+        : criteriaId;
+    const effectiveProvider: "vyspa" | "hotelbeds" =
+      hitProvider || (typeof hitSearchCriteriaAny === "string" ? "hotelbeds" : "vyspa");
+    const effectiveSearchCriteriaId =
+      typeof hitSearchCriteriaAny === "number" || typeof hitSearchCriteriaAny === "string"
+        ? hitSearchCriteriaAny
+        : criteriaId;
 
     // Update global search state so room loader effect re-runs.
     setHotelSearch({
-      provider,
+      provider: effectiveProvider,
       location: hotelSearch.location,
       hidden_id: hotelSearch.hidden_id,
       hidden_key: hotelSearch.hidden_key,
@@ -319,15 +281,17 @@ export default function HotelRoomsPage() {
       adults: next.adults,
       children: next.children,
       branches: hotelSearch.branches,
-      searchCriteriaId: criteriaId,
+      searchCriteriaId: effectiveSearchCriteriaId,
       arrivalPointCode: hotelSearch.arrivalPointCode,
     });
 
-    setSearchRequestId(typeof criteriaId === "string" ? shortWebRefFromToken(criteriaId) : String(criteriaId));
+    setSearchRequestId(
+      typeof effectiveSearchCriteriaId === "string"
+        ? shortWebRefFromToken(effectiveSearchCriteriaId)
+        : String(effectiveSearchCriteriaId)
+    );
 
     // Update booking meta for this hotel if present in the new availability response (Vyspa needs srId for booking).
-    const results = Array.isArray((availability as any)?.Results) ? (availability as any).Results : [];
-    const hit = results.find((r: any) => String(r?.hotel_id ?? r?.hotelId ?? r?.id ?? "") === String(hotelId));
     if (hit) {
       const srId = hit?.id != null ? String(hit.id) : undefined;
       const nextMeta = { ...useBookingStore.getState().hotelResultsMeta };
@@ -335,6 +299,8 @@ export default function HotelRoomsPage() {
         ...(nextMeta[String(hotelId)] || { hotelId: String(hotelId) }),
         hotelId: String(hotelId),
         hotelName: hit?.hotel_name || hit?.hotelName || nextMeta[String(hotelId)]?.hotelName,
+        provider: effectiveProvider,
+        searchCriteriaId: effectiveSearchCriteriaId,
         searchResultId: srId || nextMeta[String(hotelId)]?.searchResultId,
         srId: srId || nextMeta[String(hotelId)]?.srId,
       };
@@ -519,17 +485,13 @@ export default function HotelRoomsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hotelId]);
 
-  // Use mock structure only as a skeleton container; real content comes from API/cached values.
   const hotel = useMemo(() => {
-    // Keep only structure from mock, but prefer API data; don't show mock marketing content.
-    const base = mockHotelDetails;
     return {
-      ...base,
-      name: remoteHotelHeader?.name || base.name,
-      starRating: remoteHotelHeader?.rating || base.starRating,
-      mainImage: remoteHotelHeader?.image || base.mainImage,
-      galleryImages: galleryImages.length > 0 ? galleryImages : (remoteHotelHeader?.image ? [remoteHotelHeader.image] : base.galleryImages),
-      address: remoteHotelHeader?.address || base.address,
+      name: remoteHotelHeader?.name || "",
+      starRating: remoteHotelHeader?.rating || 0,
+      mainImage: remoteHotelHeader?.image || galleryImages[0] || "",
+      galleryImages: galleryImages.length > 0 ? galleryImages : (remoteHotelHeader?.image ? [remoteHotelHeader.image] : []),
+      address: remoteHotelHeader?.address || "",
       about: {
         description: detailsText || "",
       },
@@ -538,7 +500,8 @@ export default function HotelRoomsPage() {
       policies: cancellationText || "",
       mapUrl: coordinates
         ? `https://www.google.com/maps/search/?api=1&query=${coordinates.lat},${coordinates.lng}&hl=en`
-        : base.mapUrl || "#",
+        : "#",
+      importantInfo: "",
       coordinates,
     };
   }, [cancellationText, coordinates, detailsText, galleryImages, remoteAmenities, remoteHotelHeader]);
@@ -562,73 +525,24 @@ export default function HotelRoomsPage() {
     let cancelled = false;
 
     async function loadRooms() {
-      // Package mode should not use live hotel APIs yet.
-      if (isPackageMode) {
-        setRoomsLoading(true);
-        setRoomsError(null);
-
-        const headerName =
-          searchParams.get("hotelName") ||
-          hotelResultsMeta?.[hotelId]?.hotelName ||
-          remoteHotelHeader?.name ||
-          mockHotelDetails.name;
-
-        const headerRating =
-          Number((hotelResultsMeta?.[hotelId] as any)?.hotelRating || remoteHotelHeader?.rating || mockHotelDetails.starRating || 3) || 3;
-
-        const headerImage =
-          (hotelResultsMeta?.[hotelId] as any)?.image_name ||
-          remoteHotelHeader?.image ||
-          mockHotelDetails.mainImage;
-
-        if (!cancelled) {
-          setRemoteHotelHeader({
-            name: headerName,
-            rating: headerRating,
-            image: headerImage,
-            address: remoteHotelHeader?.address,
-          });
-
-          // Sort low -> high like the normal flow
-          const flattened = [...mockPackageRooms].sort((a, b) => (a.price.total || 0) - (b.price.total || 0));
-          const cheapest = flattened[0];
-
-          setRemoteRooms(flattened);
-          setSelectedHotel({ hotelId, hotelName: headerName });
-
-          if (cheapest?.id) {
-            setSelectedHotelRoomIds([String(cheapest.id)]);
-            setSelectedRoomId(String(cheapest.id));
-            setSelectedHotelRoomSummary({
-              hotelId,
-              roomId: String(cheapest.id),
-              roomName: cheapest?.name,
-              mealName: cheapest?.bedType,
-              isRefundable: cheapest?.isRefundable,
-              currency: cheapest?.price?.currency,
-              total: cheapest?.price?.total,
-              nightly: cheapest?.price?.nightly,
-            });
-          }
-        }
-
-        if (!cancelled) setRoomsLoading(false);
-        return;
-      }
-
-      if (!hotelSearch?.searchCriteriaId) return;
+      const meta = hotelResultsMeta?.[hotelId];
+      const metaProvider =
+        meta?.provider === "hotelbeds" || meta?.provider === "vyspa" ? meta.provider : undefined;
+      const effectiveProvider: "vyspa" | "hotelbeds" =
+        metaProvider || (hotelSearch?.provider === "hotelbeds" ? "hotelbeds" : "vyspa");
+      const effectiveSearchCriteriaId = meta?.searchCriteriaId ?? hotelSearch?.searchCriteriaId;
+      if (!effectiveSearchCriteriaId) return;
       setRoomsLoading(true);
       setRoomsError(null);
 
       try {
-        const meta = hotelResultsMeta?.[hotelId];
         const srId = meta?.srId || meta?.searchResultId;
-        const resp = await hotelService.getRoomsV3(hotelSearch.searchCriteriaId, hotelId, srId);
+        const resp = await hotelService.getRoomsV3(effectiveSearchCriteriaId, hotelId, srId);
 
         const respAny: any = resp as any;
-        const headerName = respAny?.hotel_name || meta?.hotelName || mockHotelDetails.name;
-        const headerRating = Number(respAny?.hotel_rating || mockHotelDetails.starRating || 3) || 3;
-        const headerImage = respAny?.image_name || mockHotelDetails.mainImage;
+        const headerName = respAny?.hotel_name || meta?.hotelName || remoteHotelHeader?.name || "";
+        const headerRating = Number(respAny?.hotel_rating || remoteHotelHeader?.rating || 0) || 0;
+        const headerImage = String(respAny?.image_name || "").trim();
         const headerAddress =
           respAny?.address1 || respAny?.address2
             ? [respAny?.address1, respAny?.address2].filter(Boolean).join(", ")
@@ -653,7 +567,18 @@ export default function HotelRoomsPage() {
         setGalleryImages(imgs);
 
         // HotelBeds: enrich amenities + gallery + room images from Content API (best effort).
-        if (hotelSearch?.provider === "hotelbeds") {
+        if (
+          hotelSearch &&
+          (hotelSearch.provider !== effectiveProvider || hotelSearch.searchCriteriaId !== effectiveSearchCriteriaId)
+        ) {
+          setHotelSearch({
+            ...hotelSearch,
+            provider: effectiveProvider,
+            searchCriteriaId: effectiveSearchCriteriaId,
+          });
+        }
+
+        if (effectiveProvider === "hotelbeds") {
           fetch(`/api/hotels/content?code=${encodeURIComponent(hotelId)}`)
             .then((r) => r.json().catch(() => null))
             .then((data: any) => {
@@ -728,38 +653,20 @@ export default function HotelRoomsPage() {
             });
 
             // Populate additional hotel fields from hotel_search_details (best available content in current API set)
-            if (hotelSearch?.provider === "vyspa" && hotelSearch?.location && hotelSearch?.hidden_id && hotelSearch?.hidden_key) {
-              const detailsPayload: any[] = [
-                {
-                  location: hotelSearch.location,
-                  hidden_id: Number(hotelSearch.hidden_id),
-                  hidden_key: hotelSearch.hidden_key,
-                  nights: Math.max(
-                    1,
-                    Math.round(
-                      (new Date(hotelSearch.checkOut).getTime() - new Date(hotelSearch.checkIn).getTime()) /
-                      (1000 * 60 * 60 * 24)
-                    )
-                  ),
-                  rooms: hotelSearch.rooms,
-                  adults: hotelSearch.adults,
-                  children: hotelSearch.children,
-                  arrivalDate: hotelSearch.checkIn,
-                  departureDate: hotelSearch.checkOut,
-                  internal_rates: 1,
-                  live_rates: 1,
-                  optionsRadios: "hotels",
-                  branches: hotelSearch.branches || "UK",
-                  arrival: hotelSearch.checkIn,
-                  departure: hotelSearch.checkOut,
-                  searchCriteriaId: hotelSearch.searchCriteriaId,
-                },
-                { 1: { ids: Number(cheapest.id) } },
-              ];
+            if (effectiveProvider === "vyspa" && hotelSearch?.location && hotelSearch?.hidden_id && hotelSearch?.hidden_key) {
+              const resolvedHotelId = Number(resp?.hotel_id ?? hotelId);
+              const resolvedVMapId = Number(resp?.VmapId ?? (cheapest as any)?.VmapId ?? (cheapest as any)?.vMapId);
+              const detailsPayload: any[] = Number.isFinite(resolvedHotelId)
+                ? [String(resolvedHotelId)]
+                : Number.isFinite(resolvedVMapId)
+                  ? [0, { vMapId: resolvedVMapId }]
+                  : [];
+              if (detailsPayload.length === 0) return;
 
               hotelService
                 .hotelSearchDetails(detailsPayload)
                 .then((d: any) => {
+                  const vyspaMedia = parseVyspaHotelDetailsMedia(d);
                   const desc = (d?.description || d?.hotels?.quickDescription || "").toString();
                   setDetailsText(desc);
                   const policy = Array.isArray(d?.Cancellation) && d.Cancellation[0]?.SearchResultCancellation?.cancellationPolicy
@@ -775,10 +682,16 @@ export default function HotelRoomsPage() {
 
                   const remoteData = d?.liveDetails?.SupplierMapVendor?.remoteData;
                   const parsed = remoteData ? parseRemoteDataXml(String(remoteData), headerImage) : null;
-                  const nextGallery = parsed?.photos?.length ? parsed.photos : imgs;
+                  const nextGallery = Array.from(
+                    new Set([...(vyspaMedia.hotelImages || []), ...(parsed?.photos || []), ...(imgs || [])].filter(Boolean))
+                  );
                   if (parsed?.amenities?.length) setRemoteAmenities(parsed.amenities);
-                  if (parsed?.roomImages && Object.keys(parsed.roomImages).length > 0) {
-                    setRoomImages(parsed.roomImages);
+                  const mergedRoomImages = {
+                    ...(vyspaMedia.roomImages || {}),
+                    ...(parsed?.roomImages || {}),
+                  };
+                  if (Object.keys(mergedRoomImages).length > 0) {
+                    setRoomImages(mergedRoomImages);
                   }
                   if (parsed?.descriptions?.length && !desc) {
                     setDetailsText(parsed.descriptions.slice(0, 3).join("\n\n"));
@@ -791,6 +704,11 @@ export default function HotelRoomsPage() {
                     );
                   }
                   if (nextGallery.length > 0) setGalleryImages(nextGallery);
+                  if (nextGallery.length > 0 && !headerImage) {
+                    setRemoteHotelHeader((prev) =>
+                      prev ? { ...prev, image: nextGallery[0] } : { name: headerName, rating: headerRating, image: nextGallery[0], address: headerAddress }
+                    );
+                  }
                   // Update coordinates from XML if not already set
                   if (parsed?.coordinates && !coordinates) {
                     setCoordinates(parsed.coordinates);
@@ -850,7 +768,7 @@ export default function HotelRoomsPage() {
     return () => {
       cancelled = true;
     };
-  }, [hotelId, hotelResultsMeta, hotelSearch?.searchCriteriaId, isPackageMode, searchParams, setSelectedHotel]);
+  }, [hotelId, hotelResultsMeta, hotelSearch, hotelSearch?.provider, hotelSearch?.searchCriteriaId, isPackageMode, searchParams, setHotelSearch, setSelectedHotel]);
 
   const scrollToSection = (section: string) => {
     setActiveSection(section);
@@ -957,64 +875,66 @@ export default function HotelRoomsPage() {
                 <div
                   className="relative flex-[2] min-h-[300px] lg:min-h-[450px] rounded-2xl overflow-hidden cursor-pointer group"
                   onClick={() => {
-                    setCurrentPhotoIndex(0);
-                    setGalleryOpen(true);
+                    if (hotel.galleryImages.length > 0) {
+                      setCurrentPhotoIndex(0);
+                      setGalleryOpen(true);
+                    }
                   }}
                 >
-                  <Image
-                    src={hotel.mainImage}
-                    alt={hotel.name}
-                    fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-105"
-                    priority
-                  />
+                  {hotel.mainImage ? (
+                    <Image
+                      src={hotel.mainImage}
+                      alt={hotel.name}
+                      fill
+                      className="object-cover transition-transform duration-500 group-hover:scale-105"
+                      priority
+                    />
+                  ) : (
+                    <div className="absolute inset-0 bg-[#F6F6F6]" />
+                  )}
                   {/* Show All Photos Button - Bottom left of main image */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setGalleryOpen(true);
-                    }}
-                    className="absolute bottom-4 left-4 flex items-center gap-2 px-4 py-2 rounded-lg bg-white/90 backdrop-blur-sm hover:bg-white transition-all shadow-sm hover:shadow-md"
-                  >
-                    <Grid3X3 className="w-4 h-4 text-[#010D50]" />
-                    <span className="text-sm font-medium text-[#010D50]">Show All Photos</span>
-                  </button>
+                  {hotel.galleryImages.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setGalleryOpen(true);
+                      }}
+                      className="absolute bottom-4 left-4 flex items-center gap-2 px-4 py-2 rounded-lg bg-white/90 backdrop-blur-sm hover:bg-white transition-all shadow-sm hover:shadow-md"
+                    >
+                      <Grid3X3 className="w-4 h-4 text-[#010D50]" />
+                      <span className="text-sm font-medium text-[#010D50]">Show All Photos</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Thumbnail Stack - 3 images vertically on right */}
                 <div className="flex flex-row lg:flex-col gap-3 lg:w-[220px]">
-                  {Array.from({ length: 3 }).map((_, idx) => {
+                  {(() => {
                     // Logic to skip the main image if it's the first one in galleryImages
                     const firstIsMain = hotel.galleryImages?.[0] === hotel.mainImage;
-                    const imgIndex = firstIsMain ? idx + 1 : idx;
-                    const img = (hotel.galleryImages || [])[imgIndex];
-
-                    return (
+                    const thumbImages = firstIsMain ? (hotel.galleryImages || []).slice(1, 4) : (hotel.galleryImages || []).slice(0, 3);
+                    return thumbImages.map((img: string, idx: number) => {
+                      const imgIndex = firstIsMain ? idx + 1 : idx;
+                      return (
                       <div
-                        key={idx}
+                        key={`${img}-${idx}`}
                         className="relative flex-1 lg:flex-none lg:h-[140px] min-h-[100px] rounded-xl overflow-hidden bg-gray-100 cursor-pointer group"
                         onClick={() => {
                           setCurrentPhotoIndex(imgIndex);
                           setGalleryOpen(true);
                         }}
                       >
-                        {img ? (
-                          <Image
-                            src={img}
-                            alt={`${hotel.name} - ${idx + 1}`}
-                            fill
-                            className="object-cover transition-transform duration-500 group-hover:scale-110"
-                          />
-                        ) : (
-                          <div className="absolute inset-0 grid place-content-center text-xs text-[#3A478A] px-3 text-center">
-                            Content missing from API: photo
-                          </div>
-                        )}
+                        <Image
+                          src={img}
+                          alt={`${hotel.name} - ${idx + 1}`}
+                          fill
+                          className="object-cover transition-transform duration-500 group-hover:scale-110"
+                        />
                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                       </div>
-                    );
-                  })}
+                    )});
+                  })()}
                 </div>
               </div>
             </div>
@@ -1119,7 +1039,7 @@ export default function HotelRoomsPage() {
                     About this property
                   </h2>
                   <div className="text-sm text-[#3A478A] leading-relaxed whitespace-pre-line">
-                    {hotel.about.description || "Content missing from API: description"}
+                    {hotel.about.description}
                   </div>
                 </div>
 
@@ -1198,12 +1118,9 @@ export default function HotelRoomsPage() {
                         title={`Map showing ${hotel.name}`}
                       />
                     ) : (
-                      <Image
-                        src="/figma/hotels/hotel-card-image.png"
-                        alt="Map"
-                        fill
-                        className="object-cover opacity-60"
-                      />
+                      <div className="absolute inset-0 flex items-center justify-center text-sm text-[#3A478A] bg-[#F6F6F6]">
+                        Map unavailable
+                      </div>
                     )}
                     <div className="absolute inset-x-0 bottom-0 flex items-end p-6 bg-gradient-to-t from-black/50 to-transparent">
                       <Link
@@ -1443,7 +1360,7 @@ export default function HotelRoomsPage() {
             <div className="p-6 lg:p-8 space-y-8">
               {rooms.length === 0 && !roomsLoading && (
                 <div className="text-sm text-[#3A478A]">
-                  Content missing from API: room options
+                  No room options returned for this stay.
                 </div>
               )}
               <div className="grid lg:grid-cols-3 gap-6">
@@ -1495,9 +1412,7 @@ export default function HotelRoomsPage() {
                             className="w-full h-full object-cover"
                           />
                         </div>
-                      ) : (
-                        <RoomImagePlaceholder seed={roomCode || room.id} title={room.name || "Room"} />
-                      )}
+                      ) : null}
 
                       {/* Room Info */}
                       <div className="flex-1 p-6 flex flex-col">
@@ -1633,19 +1548,21 @@ export default function HotelRoomsPage() {
                             className="w-full rounded-full py-3 h-auto gap-2 bg-[#3754ED] hover:bg-[#2A3FB8] text-white font-bold"
                             onClick={(e) => {
                               e.stopPropagation();
-                              const rid = selectedRoomId || room.id;
+                              const chosenRoom = room;
+                              const rid = chosenRoom.id;
+                              setSelectedRoomId(String(rid));
                               setSelectedHotelRoomIds([String(rid)]);
                               // Persist summary for checkout display
                               setSelectedHotelRoomSummary({
                                 hotelId,
                                 roomId: String(rid),
-                                roomName: room?.name,
-                                mealName: room?.bedType,
-                                isRefundable: room?.isRefundable,
-                                currency: room?.price?.currency,
-                                total: room?.price?.total,
-                                nightly: room?.price?.nightly,
-                                hotelbedsRateKey: (room as any)?._raw?.rateKey,
+                                roomName: chosenRoom?.name,
+                                mealName: chosenRoom?.bedType,
+                                isRefundable: chosenRoom?.isRefundable,
+                                currency: chosenRoom?.price?.currency,
+                                total: chosenRoom?.price?.total,
+                                nightly: chosenRoom?.price?.nightly,
+                                hotelbedsRateKey: (chosenRoom as any)?._raw?.rateKey,
                               });
                               // Navigate based on mode
                               if (isPackageMode) {
@@ -1784,7 +1701,7 @@ export default function HotelRoomsPage() {
                 Policies
               </h2>
               <div className="text-sm text-[#3A478A] leading-relaxed whitespace-pre-line">
-                {hotel.policies || "Content missing from API: cancellation/policies"}
+                {hotel.policies}
               </div>
             </div>
           </div>

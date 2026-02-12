@@ -560,6 +560,41 @@ const updateFolderStatus = async (
   }
 };
 
+const confirmVyspaItinerary = async (folderNumber: string) => {
+  const payloadBase = {
+    folderNumber: Number(folderNumber),
+    itineraryNumber: "1",
+  };
+
+  const validateResp = await fetch("/api/vyspa/confirm-itinerary", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify([{ ...payloadBase, validateOnly: true }]),
+  });
+
+  const validateResult = await validateResp.json().catch(() => ({}));
+  if (!validateResp.ok) {
+    const message = String((validateResult as any)?.message || "");
+    if (!message.toLowerCase().includes("already")) {
+      throw new Error(message || "Failed to validate itinerary");
+    }
+    return;
+  }
+
+  const confirmResp = await fetch("/api/vyspa/confirm-itinerary", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify([{ ...payloadBase, validateOnly: false }]),
+  });
+  const confirmResult = await confirmResp.json().catch(() => ({}));
+  if (!confirmResp.ok) {
+    const message = String((confirmResult as any)?.message || "");
+    if (!message.toLowerCase().includes("already")) {
+      throw new Error(message || "Failed to confirm itinerary");
+    }
+  }
+};
+
 function PaymentCompleteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -732,21 +767,41 @@ function PaymentCompleteContent() {
           setPaymentInfo(result.payment);
 
           // Show confetti on success
-          if (result.payment.status === "success") {
-            setShowConfetti(true);
-            // Mark as completed to prevent double charging
-            sessionStorage.setItem(
-              "paymentCompletedOrderId",
-              result.payment.orderId
-            );
+	          if (result.payment.status === "success") {
+	            setShowConfetti(true);
+	            // Mark as completed to prevent double charging
+	            sessionStorage.setItem(
+	              "paymentCompletedOrderId",
+	              result.payment.orderId
+	            );
             // Clear pending order info
-            sessionStorage.removeItem("pendingOrderId");
-            sessionStorage.removeItem("pendingOrderAmount");
-            sessionStorage.removeItem("pendingOrderCurrency");
+	            sessionStorage.removeItem("pendingOrderId");
+	            sessionStorage.removeItem("pendingOrderAmount");
+	            sessionStorage.removeItem("pendingOrderCurrency");
 
-            // Record payment to Vyspa Portal (non-blocking)
-            recordPaymentToVyspa(
-              result.payment.transactionId || result.payment.orderId,
+	            // Hotels: confirm itinerary only after successful payment so extras can be added before payment.
+	            if (isHotelMode) {
+	              const folderNumberForConfirm =
+	                String(result.payment.orderId || vyspaFolderNumber || orderId || "").trim();
+	              if (folderNumberForConfirm) {
+	                const confirmGuardKey = `hotelItineraryConfirmed_${folderNumberForConfirm}`;
+	                if (sessionStorage.getItem(confirmGuardKey) !== "1") {
+	                  try {
+	                    await confirmVyspaItinerary(folderNumberForConfirm);
+	                    sessionStorage.setItem(confirmGuardKey, "1");
+	                    console.log("✅ Hotel itinerary confirmed after payment", {
+	                      folderNumber: folderNumberForConfirm,
+	                    });
+	                  } catch (confirmError) {
+	                    console.error("❌ Failed to confirm hotel itinerary after payment", confirmError);
+	                  }
+	                }
+	              }
+	            }
+
+	            // Record payment to Vyspa Portal (non-blocking)
+	            recordPaymentToVyspa(
+	              result.payment.transactionId || result.payment.orderId,
               parseFloat(result.payment.amount || sessionStorage.getItem("pendingOrderAmount") || '0'),
               result.payment.currency || sessionStorage.getItem("pendingOrderCurrency") || 'GBP'
             );
@@ -804,7 +859,7 @@ function PaymentCompleteContent() {
     };
 
     checkPaymentStatus();
-  }, [redirectionResult, orderId, inquirePayment, recordPaymentToVyspa, router]);
+  }, [redirectionResult, orderId, inquirePayment, recordPaymentToVyspa, router, isHotelMode, vyspaFolderNumber]);
 
   // When we know the payment order id, load the correct snapshot for this order to avoid stale data
   useEffect(() => {

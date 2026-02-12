@@ -125,6 +125,8 @@ interface BookingState {
     {
       hotelId: string;
       hotelName?: string;
+      provider?: 'vyspa' | 'hotelbeds';
+      searchCriteriaId?: number | string;
       searchResultId?: string; // used as ApiAddToFolder.search_result_id when available
       srId?: string; // some responses call this srId
     }

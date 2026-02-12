@@ -316,11 +316,6 @@ export function HotelFiltersSidebar({
         isExpanded={!!expanded.refund}
         onToggle={() => onToggleExpanded("refund")}
       >
-        {!refundableFilterEnabled && (
-          <div className="text-xs text-[#3A478A] mb-2">
-            Content missing from API: refundable flag in list results
-          </div>
-        )}
         <label className="flex items-center gap-3">
           <Checkbox
             disabled={!refundableFilterEnabled}

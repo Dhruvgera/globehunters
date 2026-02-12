@@ -61,6 +61,7 @@ function PaymentContent() {
   const setProtectionPlan = useBookingStore((state) => state.setProtectionPlan);
   const setAdditionalBaggage = useBookingStore((state) => state.setAdditionalBaggage);
   const hotelRoomSummary = useBookingStore((state) => state.selectedHotelRoomSummary);
+  const hotelSearch = useBookingStore((state) => state.hotelSearch);
   const vyspaFolderNumber = useBookingStore((state) => state.vyspaFolderNumber);
   const searchRequestId = useBookingStore((state) => state.searchRequestId);
   const passengers = useBookingStore((state) => state.passengers);
@@ -443,7 +444,7 @@ function PaymentContent() {
 
               try {
                 // Sync extras (insurance/baggage) to Vyspa folder before payment (non-blocking)
-                if (vyspaFolderNumber) {
+                {
                   const extras: Array<{ type: 'insurance' | 'baggage'; planType?: string; price?: number; quantity?: number; pricePerBag?: number }> = [];
 
                   // Add protection plan if selected
@@ -456,7 +457,7 @@ function PaymentContent() {
                   }
 
                   // Add baggage if selected
-                  if (additionalBaggage > 0) {
+                  if (!isHotelMode && additionalBaggage > 0) {
                     extras.push({
                       type: 'baggage',
                       quantity: additionalBaggage,
@@ -466,17 +467,38 @@ function PaymentContent() {
 
                   // Sync extras to folder if any are selected
                   if (extras.length > 0) {
+                    const hasInsuranceExtra = extras.some((extra) => extra.type === 'insurance');
                     const firstSegment = journeySegments[0];
                     const lastSegment = journeySegments[journeySegments.length - 1];
-                    const startDate = firstSegment?.date || new Date().toISOString().split('T')[0];
-                    const endDate = lastSegment?.date || startDate;
+                    const startDate = isHotelMode
+                      ? (hotelSearch?.checkIn || new Date().toISOString().split('T')[0])
+                      : (firstSegment?.date || new Date().toISOString().split('T')[0]);
+                    const endDate = isHotelMode
+                      ? (hotelSearch?.checkOut || startDate)
+                      : (lastSegment?.date || startDate);
+                    const extrasCurrency = (currency || "GBP").toUpperCase();
+                    const folderNumberForExtras = (() => {
+                      const fromStore = Number.parseInt(vyspaFolderNumber || '', 10);
+                      if (Number.isFinite(fromStore) && fromStore > 0) return fromStore;
+                      const fromRef = Number.parseInt(refNumber || '', 10);
+                      if (Number.isFinite(fromRef) && fromRef > 0) return fromRef;
+                      return null;
+                    })();
+
+                    if (!folderNumberForExtras) {
+                      if (hasInsuranceExtra) {
+                        throw new Error("Could not apply iAssure because the booking reference is missing. Please restart checkout.");
+                      }
+                      console.warn('⚠️ Skipping extras sync because folder number is unavailable');
+                    } else {
 
                     console.log('📤 Syncing extras to Vyspa folder', {
-                      folderNumber: vyspaFolderNumber,
+                      folderNumber: folderNumberForExtras,
                       extras,
-                      currency,
+                      currency: extrasCurrency,
                       startDate,
                       endDate,
+                      mode: isHotelMode ? "hotel" : (isPackageMode ? "package" : "flight"),
                     });
 
                     try {
@@ -484,8 +506,8 @@ function PaymentContent() {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                          folderNumber: parseInt(vyspaFolderNumber, 10),
-                          currency,
+                          folderNumber: folderNumberForExtras,
+                          currency: extrasCurrency,
                           startDate,
                           endDate,
                           extras,
@@ -499,7 +521,7 @@ function PaymentContent() {
                         status: extrasResponse.status,
                         ok: extrasResponse.ok,
                         success: extrasResult?.success,
-                        folderNumber: vyspaFolderNumber,
+                        folderNumber: folderNumberForExtras,
                         results: extrasResult?.results,
                       });
 
@@ -509,18 +531,30 @@ function PaymentContent() {
                         console.log(JSON.stringify(extrasResult.folderDetails, null, 2));
                       }
 
+                      const insuranceFailed = Array.isArray(extrasResult?.results)
+                        ? extrasResult.results.some((row: any) => row?.type === 'insurance' && !row?.success)
+                        : false;
+
                       if (extrasResponse.ok && extrasResult.success) {
                         console.log('✅ Extras synced to folder successfully');
                       } else {
                         console.error('❌ Failed to sync extras to folder', {
                           error: extrasResult?.error,
                           message: extrasResult?.message,
+                          insuranceFailed,
                         });
-                        // Continue to payment even if sync fails
+                        if (hasInsuranceExtra || insuranceFailed) {
+                          throw new Error('Could not add iAssure to booking in CMS. Payment not started. Please retry.');
+                        }
+                        // Continue for non-insurance extras failures
                       }
                     } catch (syncError) {
                       console.error('❌ Error syncing extras to folder:', syncError);
-                      // Continue to payment even if sync fails
+                      if (hasInsuranceExtra) {
+                        throw syncError;
+                      }
+                      // Continue for non-insurance extras failures
+                    }
                     }
                   }
                 }

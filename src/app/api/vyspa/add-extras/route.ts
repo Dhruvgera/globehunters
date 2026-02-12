@@ -60,6 +60,26 @@ function getIAssurePlanDescription(planType: string): string {
     return descriptions[planType] || 'Basic';
 }
 
+function isPortalSuccess(payload: unknown): boolean {
+    if (!payload || typeof payload !== 'object') return false;
+    const parsed = payload as { success?: unknown; status?: unknown; errors?: unknown };
+
+    if (typeof parsed.success !== 'undefined') {
+        if (parsed.success === true || parsed.success === 1 || parsed.success === '1') return true;
+        if (parsed.success === false || parsed.success === 0 || parsed.success === '0') return false;
+    }
+
+    if (typeof parsed.status === 'string' && parsed.status.toLowerCase() === 'error') {
+        return false;
+    }
+
+    if (Array.isArray(parsed.errors) && parsed.errors.length > 0) {
+        return false;
+    }
+
+    return true;
+}
+
 export async function POST(request: NextRequest) {
     try {
         const body: AddExtrasRequestBody = await request.json();
@@ -198,16 +218,22 @@ export async function POST(request: NextRequest) {
                     console.log(`⚠️ saveBasketToFolder (${extra.type}) response is not JSON`, rawText.substring(0, 500));
                 }
 
-                if (response.ok) {
+                const portalSuccess = isPortalSuccess(parsedResponse);
+
+                if (response.ok && portalSuccess) {
                     console.log(`✅ ${extra.type} added successfully`);
                     results.push({ type: extra.type, success: true, response: parsedResponse });
                 } else {
                     console.error(`❌ Failed to add ${extra.type}`, {
                         status: response.status,
                         statusText: response.statusText,
+                        portalSuccess,
                         response: rawText.substring(0, 500),
                     });
-                    results.push({ type: extra.type, success: false, error: `HTTP ${response.status}`, response: parsedResponse });
+                    const errorMessage = response.ok
+                        ? 'Portal API returned business error'
+                        : `HTTP ${response.status}`;
+                    results.push({ type: extra.type, success: false, error: errorMessage, response: parsedResponse });
                 }
             } catch (err: any) {
                 clearTimeout(timeoutId);
@@ -266,10 +292,17 @@ export async function POST(request: NextRequest) {
                 // Verify extras are in the folder
                 const items = folderDetails?.items || folderDetails?.folderItems || [];
                 const itemsArray = Array.isArray(items) ? items : [];
+                const pageData = Array.isArray(folderDetails?.pagedata) ? folderDetails.pagedata : [];
+                const allEntries = [...itemsArray, ...pageData];
 
-                for (const item of itemsArray) {
+                for (const item of allEntries) {
                     const fiType = item?.FolderItem?.fi_type || item?.Segment?.fi_type || item?.fi_type || '';
-                    const description = item?.FolderItem?.description || item?.description || '';
+                    const description =
+                        item?.FolderItem?.description ||
+                        item?.FolderPricing?.desc ||
+                        item?.Segment?.desc ||
+                        item?.description ||
+                        '';
 
                     verificationResult.itemsInFolder.push(`${fiType}: ${description}`);
 
