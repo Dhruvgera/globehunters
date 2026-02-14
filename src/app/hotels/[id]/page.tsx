@@ -164,6 +164,7 @@ export default function HotelRoomsPage() {
   const [stayRooms, setStayRooms] = useState<number>(() => hotelSearch?.rooms || 1);
   const [filterRefundableOnly, setFilterRefundableOnly] = useState(false);
   const [filterBoardQuery, setFilterBoardQuery] = useState<string>("");
+  const isHotelDatesDebugMode = process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES === "true";
 
   useEffect(() => {
     // Keep local editor state in sync with global search state when navigating between hotels.
@@ -1159,14 +1160,21 @@ export default function HotelRoomsPage() {
                 <button
                   type="button"
                   onClick={() => setStayEditorOpen(true)}
-                  className="flex items-center gap-2 px-4 py-3 border border-[#DFE0E4] rounded-2xl min-w-[180px] hover:border-[#3754ED]/60"
+                  className="flex items-start gap-2 px-4 py-3 border border-[#DFE0E4] rounded-2xl min-w-[180px] hover:border-[#3754ED]/60"
                 >
                   <Calendar className="w-[18px] h-[18px] text-[#3A478A]" />
-                  <span className="text-sm font-medium text-[#010D50]">
-                    {stayCheckIn && stayCheckOut
-                      ? `${formatIsoDateLabel(stayCheckIn)} → ${formatIsoDateLabel(stayCheckOut)}`
-                      : "Add Date"}
-                  </span>
+                  <div className="flex flex-col items-start">
+                    <span className="text-sm font-medium text-[#010D50]">
+                      {stayCheckIn && stayCheckOut
+                        ? `${formatIsoDateLabel(stayCheckIn)} → ${formatIsoDateLabel(stayCheckOut)}`
+                        : "Add Date"}
+                    </span>
+                    {isHotelDatesDebugMode && (
+                      <span className="mt-1 text-[10px] font-mono text-orange-600 bg-orange-50 px-1 py-0.5 rounded w-fit">
+                        API: checkIn={stayCheckIn || "—"} → checkOut={stayCheckOut || "—"}
+                      </span>
+                    )}
+                  </div>
                 </button>
 
                 {/* Guests */}
@@ -1528,6 +1536,24 @@ export default function HotelRoomsPage() {
                               </div>
                             )}
                           </div>
+                        )}
+
+                        {isHotelDatesDebugMode && (
+                          <details
+                            className="mt-4 rounded-lg border border-yellow-200 bg-yellow-50 p-2"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <summary className="cursor-pointer text-xs font-semibold text-yellow-800">
+                              🔧 Room Raw Data
+                            </summary>
+                            <pre
+                              className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-all rounded bg-yellow-100 p-2 text-[10px] text-yellow-900"
+                              onWheel={(e) => e.stopPropagation()}
+                              onTouchMove={(e) => e.stopPropagation()}
+                            >
+                              {JSON.stringify(room?._raw ?? room, null, 2)}
+                            </pre>
+                          </details>
                         )}
 
                         {/* Pricing & CTA */}

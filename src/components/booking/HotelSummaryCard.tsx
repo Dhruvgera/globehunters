@@ -22,6 +22,7 @@ interface HotelSummaryCardProps {
 }
 
 export function HotelSummaryCard(props: HotelSummaryCardProps) {
+  const isHotelDatesDebugMode = process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES === "true";
   const storeHotelSearch = useBookingStore((s) => s.hotelSearch);
   const storeSelectedHotel = useBookingStore((s) => s.selectedHotel);
   const storeSelectedRoomIds = useBookingStore((s) => s.selectedHotelRoomIds);
@@ -78,6 +79,11 @@ export function HotelSummaryCard(props: HotelSummaryCardProps) {
           <div className="text-xs text-[#3A478A] mt-1">
             {hotelSearch?.checkIn || "—"} → {hotelSearch?.checkOut || "—"}
           </div>
+          {isHotelDatesDebugMode && (
+            <div className="mt-1 text-[10px] font-mono text-orange-600 bg-orange-50 px-1 py-0.5 rounded w-fit">
+              API: checkIn={hotelSearch?.checkIn || "—"} → checkOut={hotelSearch?.checkOut || "—"}
+            </div>
+          )}
         </div>
       </div>
 
@@ -111,7 +117,6 @@ export function HotelSummaryCard(props: HotelSummaryCardProps) {
     </div>
   );
 }
-
 
 
 

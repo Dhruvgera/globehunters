@@ -548,6 +548,7 @@ function HotelsPageInner() {
             countryName,
             mealPlans,
             refundable: hbCheapest?.refundable === true ? true : hbCheapest?.refundable === false ? false : null,
+            rawSearchResult: r,
           };
         });
 

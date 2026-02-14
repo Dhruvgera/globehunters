@@ -45,5 +45,6 @@ export interface Hotel {
   mealPlans?: string[];
   /** Property-level refundable signal when available from provider list response */
   refundable?: boolean | null;
+  /** Raw provider search row for debug rendering on listing/detail pages */
+  rawSearchResult?: unknown;
 }
-

@@ -37,6 +37,23 @@ function RoomBullet({ text }: { text: string }) {
   );
 }
 
+function RawHotelResultDebug({ raw }: { raw: unknown }) {
+  return (
+    <details className="rounded-lg border border-yellow-200 bg-yellow-50 p-2" onClick={(e) => e.stopPropagation()}>
+      <summary className="cursor-pointer text-xs font-semibold text-yellow-800">
+        🔧 Raw Search Result
+      </summary>
+      <pre
+        className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap break-all rounded bg-yellow-100 p-2 text-[10px] text-yellow-900"
+        onWheel={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
+      >
+        {JSON.stringify(raw, null, 2)}
+      </pre>
+    </details>
+  );
+}
+
 export function HotelResultCard({
   hotel,
   view,
@@ -52,6 +69,7 @@ export function HotelResultCard({
 }) {
   const isGrid = view === "grid";
   const hotelDetailUrl = isPackageMode ? `/hotels/${hotel.id}?type=package` : `/hotels/${hotel.id}`;
+  const isHotelDatesDebugMode = process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES === "true";
 
   const rootClass = [
     "bg-white border rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden w-full max-w-full cursor-pointer",
@@ -157,6 +175,7 @@ export function HotelResultCard({
                   ))}
                 </div>
               </div>
+              {isHotelDatesDebugMode && <RawHotelResultDebug raw={hotel.rawSearchResult ?? hotel} />}
 
               {/* Meal plans and Price section - right aligned and bottom aligned */}
               <div className="mt-auto flex flex-col items-end gap-1">
@@ -244,6 +263,7 @@ export function HotelResultCard({
                   ))}
                 </div>
               </div>
+              {isHotelDatesDebugMode && <RawHotelResultDebug raw={hotel.rawSearchResult ?? hotel} />}
             </div>
 
             {/* Right (keeps CTA pinned and prevents dropping) */}
@@ -291,4 +311,3 @@ export function HotelResultCard({
     </motion.div>
   );
 }
-
