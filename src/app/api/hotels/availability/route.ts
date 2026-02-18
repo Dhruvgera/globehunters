@@ -68,6 +68,18 @@ function toOptionalPositiveInt(v: unknown): number | undefined {
   return Math.trunc(n);
 }
 
+function shouldHideNoImageResults(): boolean {
+  const value = String(process.env.VYSPA_HIDE_NO_IMAGE || process.env.HOTELBEDS_HIDE_NO_IMAGE || '')
+    .trim()
+    .toLowerCase();
+  return value === 'true';
+}
+
+function filterResultsWithImage(results: unknown[]): unknown[] {
+  if (!shouldHideNoImageResults()) return results;
+  return results.filter((r: any) => typeof r?.image_name === 'string' && r.image_name.trim());
+}
+
 async function runHotelbedsSearch(first: any, debug: boolean, debugSample: number): Promise<HotelbedsSearchResult> {
   const location = String(first?.location || '').trim();
   const checkIn = toDateString(first?.arrivalDate || first?.arrival || first?.checkIn);
@@ -123,10 +135,7 @@ async function runHotelbedsSearch(first: any, debug: boolean, debugSample: numbe
   const hotels = Array.isArray(hbRes.data?.hotels?.hotels) ? hbRes.data.hotels.hotels : [];
   const enrichMap = new Map<string, HotelbedsEnrichment>();
 
-  const hideNoImage =
-    String(process.env.HOTELBEDS_HIDE_NO_IMAGE || '')
-      .trim()
-      .toLowerCase() === 'true';
+  const hideNoImage = shouldHideNoImageResults();
 
   const maxEnrich = (() => {
     const raw = (process.env.HOTELBEDS_ENRICH_LIMIT || '').trim();
@@ -310,7 +319,15 @@ export async function POST(req: Request) {
         { status: result.status }
       );
     }
-    return NextResponse.json(result.data, { status: 200 });
+    const vyspaResults = Array.isArray((result.data as any)?.Results) ? (result.data as any).Results : [];
+    const filteredVyspaResults = filterResultsWithImage(vyspaResults);
+    return NextResponse.json(
+      {
+        ...(result.data as any),
+        Results: filteredVyspaResults,
+      },
+      { status: 200 }
+    );
   }
 
   if (provider === 'hotelbeds') {
@@ -375,12 +392,14 @@ export async function POST(req: Request) {
     );
   }
 
-  const vyspaResults = Array.isArray((vyspaRes.data as any)?.Results) ? (vyspaRes.data as any).Results : [];
+  const vyspaResultsRaw = Array.isArray((vyspaRes.data as any)?.Results) ? (vyspaRes.data as any).Results : [];
+  const vyspaResults = filterResultsWithImage(vyspaResultsRaw);
   if (!hb.ok) {
     // Fallback to plain Vyspa if HB fails.
     return NextResponse.json(
       {
         ...(vyspaRes.data as any),
+        Results: vyspaResults,
         Criteria: {
           ...((vyspaRes.data as any)?.Criteria || {}),
           provider: 'hybrid',

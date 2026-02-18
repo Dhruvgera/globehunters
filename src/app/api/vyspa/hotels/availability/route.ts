@@ -7,6 +7,13 @@ export const runtime = 'nodejs';
 
 type AvailabilityBody = unknown[] | Record<string, unknown>;
 
+function shouldHideNoImageResults(): boolean {
+  const value = String(process.env.VYSPA_HIDE_NO_IMAGE || process.env.HOTELBEDS_HIDE_NO_IMAGE || '')
+    .trim()
+    .toLowerCase();
+  return value === 'true';
+}
+
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as AvailabilityBody | null;
 
@@ -49,8 +56,18 @@ export async function POST(req: Request) {
     );
   }
 
-  return NextResponse.json(result.data, { status: 200 });
-}
+  const rawResults = Array.isArray((result.data as any)?.Results) ? (result.data as any).Results : [];
+  const filteredResults = shouldHideNoImageResults()
+    ? rawResults.filter((r: any) => typeof r?.image_name === 'string' && r.image_name.trim())
+    : rawResults;
 
+  return NextResponse.json(
+    {
+      ...(result.data as any),
+      Results: filteredResults,
+    },
+    { status: 200 }
+  );
+}
 
 

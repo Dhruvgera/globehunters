@@ -58,6 +58,7 @@ function normalizeChildAge(value: unknown, childrenRoom: number[], defaultChildA
 
 export function normalizeVyspaAvailabilityCriteria(criteria: AvailabilityCriteria): AvailabilityCriteria {
   const normalized: AvailabilityCriteria = { ...criteria };
+  normalized.hotel_cache = 'true';
 
   const rooms = Math.max(1, toInt(normalized.rooms, 1));
   const adults = Math.max(1, toInt(normalized.adults, 2));

@@ -129,6 +129,12 @@ interface BookingState {
       searchCriteriaId?: number | string;
       searchResultId?: string; // used as ApiAddToFolder.search_result_id when available
       srId?: string; // some responses call this srId
+      vyspaHotelId?: string;
+      vMapId?: string;
+      imageName?: string;
+      address1?: string;
+      address2?: string;
+      hotelRating?: number;
     }
   >;
   setHotelResultsMeta: (meta: BookingState['hotelResultsMeta']) => void;

@@ -42,6 +42,10 @@ const DEFAULT_FILTERS: HotelFiltersState = {
   accessibility: [],
 };
 
+const SHOW_HYBRID_PROVIDER_IN_RESULTS = ["1", "true", "yes", "on"].includes(
+  String(process.env.NEXT_PUBLIC_SHOW_HOTEL_PROVIDER_IN_RESULTS || "").trim().toLowerCase()
+);
+
 function sanitizeHiddenHotelFilters(filters: HotelFiltersState): HotelFiltersState {
   return {
     ...filters,
@@ -212,6 +216,24 @@ function HotelsPageInner() {
       if (!Number.isNaN(num) && num > 0) return num;
     }
     return null;
+  }
+
+  function toPositiveNumericId(value: unknown): string | null {
+    const s = String(value ?? "").trim();
+    if (!/^\d+$/.test(s)) return null;
+    const n = Number(s);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    return s;
+  }
+
+  function resolveHotelResultId(r: any, fallbackIdx?: number): string {
+    const hotelId = toPositiveNumericId(r?.hotel_id ?? r?.hotelId);
+    if (hotelId) return hotelId;
+
+    const srId = toPositiveNumericId(r?.id ?? r?.srId);
+    if (srId) return srId;
+
+    return String(fallbackIdx ?? 0);
   }
 
   const resolvedSearch = useMemo(() => {
@@ -466,6 +488,7 @@ function HotelsPageInner() {
         const rawCriteriaId = (criteria as any)?.searchCriteriaId;
         const criteriaId =
           typeof rawCriteriaId === "number" || typeof rawCriteriaId === "string" ? rawCriteriaId : null;
+        const isHybridProviderResponse = String((criteria as any)?.provider || "").trim().toLowerCase() === "hybrid";
 
         // Filter out non-object results (e.g. [true, "No hotels found"] becomes empty array)
         const results = rawResults.filter(
@@ -486,7 +509,8 @@ function HotelsPageInner() {
           ) || 1;
 
         const mapped: Hotel[] = results.map((r: any, idx: number) => {
-          const hotelId = String(r?.hotel_id ?? r?.hotelId ?? r?.id ?? idx);
+          const hotelId = resolveHotelResultId(r, idx);
+          const rowProvider = String(r?.provider || "").trim().toLowerCase() === "hotelbeds" ? "hotelbeds" : "vyspa";
           const total = parsePriceFromResult(r) ?? 0;
           const sellCur = r?.SellCur || r?.sellCur || r?.currency;
           const rawMealPlans = Array.isArray(r?.MealPlans) ? r.MealPlans.filter(Boolean) : [];
@@ -526,6 +550,7 @@ function HotelsPageInner() {
                     : "Room options available",
               highlights: [
                 ...(r?.AvailabilityStatuses ? [`Availability: ${r.AvailabilityStatuses}`] : []),
+                ...(SHOW_HYBRID_PROVIDER_IN_RESULTS && isHybridProviderResponse ? [`Provider: ${rowProvider}`] : []),
                 ...(r?.suppliers?.[0] ? [`Supplier: ${r.suppliers[0]}`] : []),
                 ...(hbCheapest?.refundable === true ? ["Refundable"] : hbCheapest?.refundable === false ? ["Non-refundable"] : []),
               ].slice(0, 2),
@@ -554,7 +579,7 @@ function HotelsPageInner() {
 
         const meta: Record<string, any> = {};
         for (const r of results as any[]) {
-          const hid = String(r?.hotel_id ?? r?.hotelId ?? r?.id ?? "");
+          const hid = resolveHotelResultId(r);
           if (!hid) continue;
           const rowProvider = String(r?.provider || "").trim().toLowerCase() === "hotelbeds" ? "hotelbeds" : "vyspa";
           const rowSearchCriteriaAny =
@@ -572,6 +597,12 @@ function HotelsPageInner() {
             searchCriteriaId: rowSearchCriteriaId,
             searchResultId: r?.id ? String(r.id) : undefined,
             srId: r?.id ? String(r.id) : undefined,
+            vyspaHotelId: toPositiveNumericId(r?.hotel_id ?? r?.hotelId) || undefined,
+            vMapId: toPositiveNumericId(r?.VmapId ?? r?.vMapId) || undefined,
+            imageName: typeof r?.image_name === "string" ? r.image_name : undefined,
+            address1: typeof r?.address1 === "string" ? r.address1 : undefined,
+            address2: typeof r?.address2 === "string" ? r.address2 : undefined,
+            hotelRating: Number.isFinite(Number(r?.hotel_rating)) ? Number(r.hotel_rating) : undefined,
           };
         }
 
