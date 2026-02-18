@@ -32,6 +32,7 @@ This list is derived from scanning `process.env.*` usage in `src/`.
 
 - `NEXT_PUBLIC_DEBUG_FLIGHT_IDS` (`true/false`)
 - `NEXT_PUBLIC_DEBUG_FLIGHT_DATES` (`true/false`)
+- `NEXT_PUBLIC_DEBUG_HOTEL_DATES` (`true/false`)
 - `NEXT_PUBLIC_MOCK_BOOKING_CONFIRMATION` (`true/false`)
 - `NEXT_PUBLIC_DATE_SLIDER_STAGGER_MS` (number; default 500)
 - `NEXT_PUBLIC_DATE_SLIDER_CHUNK_SIZE` (number; default 2)
@@ -78,5 +79,4 @@ This list is derived from scanning `process.env.*` usage in `src/`.
 
 `next.config.ts` sets `output: 'standalone'` which is commonly used for Docker deployments.
 See `Dockerfile` at repo root for the specific container build.
-
 
