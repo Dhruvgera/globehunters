@@ -284,7 +284,7 @@ export default function HotelCheckoutPage() {
               </div>
             </div>
 
-            <PassengerFormsSection showPassportFields={false} />
+            <PassengerFormsSection showPassportFields={false} requireOnlyLead={true} />
 
             {error && <div className="text-sm text-red-600">{error}</div>}
 

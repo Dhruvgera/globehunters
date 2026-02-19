@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { PassengerForm } from "./PassengerForm";
 import { useBookingStore } from "@/store/bookingStore";
@@ -8,10 +8,12 @@ import type { Passenger, PassengerType } from "@/types/booking";
 
 interface PassengerFormsSectionProps {
   showPassportFields?: boolean;
+  requireOnlyLead?: boolean;
 }
 
 export default function PassengerFormsSection({
   showPassportFields = false,
+  requireOnlyLead = false,
 }: PassengerFormsSectionProps) {
   const t = useTranslations("booking.passengerDetails");
   const searchParams = useBookingStore((s) => s.searchParams);
@@ -20,6 +22,7 @@ export default function PassengerFormsSection({
   const addPassenger = useBookingStore((s) => s.addPassenger);
   const updatePassenger = useBookingStore((s) => s.updatePassenger);
   const setPassengersSaved = useBookingStore((s) => s.setPassengersSaved);
+  const [expandedOptional, setExpandedOptional] = useState<Record<number, boolean>>({});
 
   // Build the required passenger slots from search parameters
   const requiredPassengers: { type: PassengerType; index: number }[] = useMemo(() => {
@@ -62,12 +65,17 @@ export default function PassengerFormsSection({
 
   // Check if all passengers have complete data
   useEffect(() => {
-    const allComplete = requiredPassengers.length > 0 && requiredPassengers.every((_, idx) => {
+    const isCompletePassenger = (idx: number) => {
       const p = passengers[idx];
-      return p && p.firstName && p.lastName && p.dateOfBirth && p.email && p.phone;
-    });
+      return !!(p && p.firstName && p.lastName && p.dateOfBirth && p.email && p.phone);
+    };
+
+    const allComplete = requireOnlyLead
+      ? requiredPassengers.length > 0 && isCompletePassenger(0)
+      : requiredPassengers.length > 0 && requiredPassengers.every((_, idx) => isCompletePassenger(idx));
+
     setPassengersSaved(allComplete);
-  }, [passengers, requiredPassengers, setPassengersSaved]);
+  }, [passengers, requiredPassengers, requireOnlyLead, setPassengersSaved]);
 
   return (
     <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-6">
@@ -86,6 +94,17 @@ export default function PassengerFormsSection({
               : slot.type === "child"
               ? t("child")
               : t("infant");
+          const isOptional = requireOnlyLead && idx > 0;
+          const hasOptionalData = !!(
+            initial &&
+            (initial.firstName ||
+              initial.lastName ||
+              initial.dateOfBirth ||
+              initial.email ||
+              initial.phone)
+          );
+          const showForm = !isOptional || expandedOptional[idx] || hasOptionalData;
+
           return (
             <div key={`${slot.type}-${idx}`} className="flex flex-col gap-3">
               <div className="flex items-center gap-3">
@@ -95,14 +114,37 @@ export default function PassengerFormsSection({
                   </span>
                 </div>
                 <span className="text-sm text-[#3A478A]">({typeLabel})</span>
+                {requireOnlyLead && idx > 0 ? (
+                  <span className="text-xs text-[#3A478A]">Optional</span>
+                ) : null}
+                {isOptional ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExpandedOptional((prev) => ({
+                        ...prev,
+                        [idx]: !prev[idx],
+                      }))
+                    }
+                    className="ml-auto text-xs font-semibold text-[#3754ED] underline"
+                  >
+                    {showForm ? "Hide details" : "Add details"}
+                  </button>
+                ) : null}
               </div>
-              <PassengerForm
-                passengerIndex={idx}
-                initialData={initial}
-                onSave={(p) => handleSave(idx, slot.type, p)}
-                showPassportFields={showPassportFields}
-                passengerType={slot.type}
-              />
+              {showForm ? (
+                <PassengerForm
+                  passengerIndex={idx}
+                  initialData={initial}
+                  onSave={(p) => handleSave(idx, slot.type, p)}
+                  showPassportFields={showPassportFields}
+                  passengerType={slot.type}
+                />
+              ) : (
+                <div className="rounded-xl border border-[#DFE0E4] p-4 text-sm text-[#3A478A]">
+                  Optional traveller details are skipped unless you add them.
+                </div>
+              )}
             </div>
           );
         })}
