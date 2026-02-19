@@ -2241,7 +2241,7 @@ export default function HotelRoomsPage() {
                 {roomsLoading && (
                   <div className="lg:col-span-3 text-sm text-[#3A478A]">Loading room options…</div>
                 )}
-                {!isPackageMode && (
+                {!isPackageMode && requiredRoomCount > 1 && (
                   <div className="lg:col-span-3 border border-[#DFE0E4] rounded-2xl p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div className="text-sm text-[#010D50]">
                       Select {requiredRoomCount} room{requiredRoomCount === 1 ? "" : "s"}: {selectedRoomCount}/{requiredRoomCount} selected
@@ -2546,6 +2546,23 @@ export default function HotelRoomsPage() {
                               }}
                             >
                               Continue Booking
+                              <ChevronRight className="w-5 h-5" />
+                            </Button>
+                          ) : requiredRoomCount === 1 ? (
+                            <Button
+                              className="w-full rounded-full py-3 h-auto gap-2 bg-[#3754ED] hover:bg-[#2A3FB8] text-white font-bold"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const roomId = String(room.id);
+                                setSelectedRoomCounts({ [roomId]: 1 });
+                                setSelectedHotelRoomIds([roomId]);
+                                setSelectedHotelRoomSummary(
+                                  buildSelectedRoomSummary(hotelId, [roomId], remoteRooms)
+                                );
+                                router.push("/hotels/checkout");
+                              }}
+                            >
+                              Reserve
                               <ChevronRight className="w-5 h-5" />
                             </Button>
                           ) : (

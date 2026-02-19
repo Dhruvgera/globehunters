@@ -186,6 +186,27 @@ export default function HotelCheckoutPage() {
     };
   }, [hotelResultsMeta, selectedHotel, selectedHotelRoomIds]);
 
+  const hotelDetailsBackUrl = useMemo(() => {
+    const hotelId = summary.hotelId;
+    if (!hotelId) return undefined;
+    const meta = hotelResultsMeta?.[hotelId];
+    const params = new URLSearchParams();
+    const searchCriteriaId = meta?.searchCriteriaId ?? hotelSearch?.searchCriteriaId;
+    if (searchCriteriaId != null && String(searchCriteriaId).trim()) {
+      params.set("searchCriteriaId", String(searchCriteriaId));
+    }
+    const srId = meta?.srId || meta?.searchResultId;
+    if (srId && String(srId).trim()) {
+      params.set("srId", String(srId));
+    }
+    const provider = meta?.provider || hotelSearch?.provider;
+    if (provider) {
+      params.set("provider", provider);
+    }
+    const query = params.toString();
+    return query ? `/hotels/${hotelId}?${query}` : `/hotels/${hotelId}`;
+  }, [summary.hotelId, hotelResultsMeta, hotelSearch?.searchCriteriaId, hotelSearch?.provider]);
+
   const expectedNetPrice = useMemo(() => {
     const hotelId = summary.hotelId;
     if (!hotelId) return undefined;
@@ -404,7 +425,7 @@ export default function HotelCheckoutPage() {
       <Navbar />
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
-        <BookingHeader currentStep={1} isHotel={true} />
+        <BookingHeader currentStep={1} isHotel={true} backHref={hotelDetailsBackUrl} />
 
         <div className="flex flex-col lg:flex-row gap-4 mt-4">
           {/* LEFT COLUMN */}

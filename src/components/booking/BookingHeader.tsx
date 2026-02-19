@@ -10,6 +10,7 @@ import { SearchParams } from "@/types/flight";
 interface BookingHeaderProps {
   currentStep?: number;
   isHotel?: boolean;
+  backHref?: string;
 }
 
 interface AffiliateData {
@@ -105,7 +106,7 @@ function buildHotelSearchUrl(
   return `/hotels?${params.toString()}`;
 }
 
-export function BookingHeader({ currentStep = 1, isHotel = false }: BookingHeaderProps) {
+export function BookingHeader({ currentStep = 1, isHotel = false, backHref }: BookingHeaderProps) {
   const t = useTranslations('booking.header');
   const searchParams = useBookingStore((state) => state.searchParams);
   const hotelSearch = useBookingStore((state) => state.hotelSearch);
@@ -114,6 +115,7 @@ export function BookingHeader({ currentStep = 1, isHotel = false }: BookingHeade
 
   // Build the back URL - always include search params so user can continue searching
   const backUrl = useMemo(() => {
+    if (backHref && backHref.trim()) return backHref;
     if (isHotel && hotelSearch) {
       return buildHotelSearchUrl(hotelSearch);
     }
@@ -123,7 +125,7 @@ export function BookingHeader({ currentStep = 1, isHotel = false }: BookingHeade
     }
     // Fallback to plain search
     return isHotel ? "/hotels" : "/search";
-  }, [isHotel, hotelSearch, searchParams, affiliateData]);
+  }, [backHref, isHotel, hotelSearch, searchParams, affiliateData]);
 
   const steps = isHotel
     ? [
