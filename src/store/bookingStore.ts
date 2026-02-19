@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware';
 import { Flight, SearchParams } from '@/types/flight';
 import { Passenger, AddOns, BookingResponse } from '@/types/booking';
 import { PaymentDetails } from '@/types/payment';
@@ -58,6 +58,108 @@ function reviveSearchParams(params: any): SearchParams {
   }
 
   return revived;
+}
+
+function isQuotaExceededError(error: unknown): boolean {
+  if (typeof DOMException !== 'undefined' && error instanceof DOMException) {
+    return error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED';
+  }
+
+  return false;
+}
+
+function buildPersistedStateFallbacks(value: string): string[] {
+  try {
+    const parsed = JSON.parse(value) as { state?: Record<string, unknown> };
+    const state = parsed?.state;
+
+    if (!state || typeof state !== 'object') return [];
+
+    const createFallback = (mutate: (draft: Record<string, unknown>) => void): string => {
+      const draft = { ...state };
+      mutate(draft);
+      return JSON.stringify({ ...parsed, state: draft });
+    };
+
+    const fallbackValues = [
+      createFallback((draft) => {
+        draft.hotelResultsCache = null;
+        draft.hotelResultsMeta = {};
+        draft.hotelDetailsCache = {};
+        draft.packageResults = null;
+        draft.packageResultsMeta = null;
+        draft.alternateFlights = null;
+      }),
+      createFallback((draft) => {
+        draft.hotelResultsCache = null;
+        draft.hotelResultsMeta = {};
+        draft.hotelDetailsCache = {};
+        draft.packageResults = null;
+        draft.packageResultsMeta = null;
+        draft.alternateFlights = null;
+        draft.selectedFlight = null;
+        draft.selectedUpgradeOption = null;
+        draft.priceCheckData = null;
+      }),
+      createFallback((draft) => {
+        draft.hotelSearch = null;
+        draft.hotelLocationSelection = null;
+        draft.hotelResultsCache = null;
+        draft.hotelFiltersCache = null;
+        draft.hotelResultsMeta = {};
+        draft.selectedHotel = null;
+        draft.selectedHotelRoomIds = [];
+        draft.hotelDetailsCache = {};
+        draft.selectedHotelRoomSummary = null;
+        draft.packageSearch = null;
+        draft.packageDestination = null;
+        draft.packageResults = null;
+        draft.packageResultsMeta = null;
+        draft.selectedPackage = null;
+        draft.selectedPackageRoomIds = [];
+        draft.alternateFlights = null;
+        draft.selectedFlight = null;
+        draft.selectedUpgradeOption = null;
+        draft.priceCheckData = null;
+        draft.booking = null;
+        draft.vyspaFolderNumber = null;
+        draft.vyspaCustomerId = null;
+        draft.vyspaEmailAddress = null;
+        draft.searchRequestId = null;
+        draft.currentStep = 'search';
+      }),
+    ];
+
+    return [...new Set(fallbackValues)].filter((fallback) => fallback !== value);
+  } catch {
+    return [];
+  }
+}
+
+function createQuotaSafeStateStorage(storage: Storage): StateStorage {
+  return {
+    getItem: (name) => storage.getItem(name),
+    setItem: (name, value) => {
+      try {
+        storage.setItem(name, value);
+        return;
+      } catch (error) {
+        if (!isQuotaExceededError(error)) throw error;
+      }
+
+      for (const fallbackValue of buildPersistedStateFallbacks(value)) {
+        try {
+          storage.setItem(name, fallbackValue);
+          return;
+        } catch (error) {
+          if (!isQuotaExceededError(error)) throw error;
+        }
+      }
+
+      storage.removeItem(name);
+    },
+    removeItem: (name) => storage.removeItem(name),
+  };
 }
 
 interface AffiliateData {
@@ -135,6 +237,7 @@ interface BookingState {
       address1?: string;
       address2?: string;
       hotelRating?: number;
+      rawSearchResult?: unknown;
     }
   >;
   setHotelResultsMeta: (meta: BookingState['hotelResultsMeta']) => void;
@@ -590,19 +693,51 @@ export const useBookingStore = create<BookingState & HydrationState>()(
     }),
     {
       name: 'globehunters-booking-storage', // Storage key
-      storage: createJSONStorage(() => sessionStorage), // Use sessionStorage instead of localStorage
+      storage: createJSONStorage(() => createQuotaSafeStateStorage(sessionStorage)), // Use sessionStorage instead of localStorage
       // Only persist certain fields
       partialize: (state) => ({
+        // Remove heavy raw payloads before persisting to avoid storage quota issues.
+        hotelResultsCache: state.hotelResultsCache
+          ? {
+            ...state.hotelResultsCache,
+            hotels: state.hotelResultsCache.hotels.map((hotel) => ({
+              ...hotel,
+              rawSearchResult: undefined,
+            })),
+          }
+          : null,
+        hotelResultsMeta: Object.fromEntries(
+          Object.entries(state.hotelResultsMeta).map(([hotelId, meta]) => [
+            hotelId,
+            {
+              ...meta,
+              rawSearchResult: undefined,
+            },
+          ])
+        ),
+        hotelDetailsCache: Object.fromEntries(
+          Object.entries(state.hotelDetailsCache).map(([hotelId, details]) => [
+            hotelId,
+            {
+              ...details,
+              rooms: Array.isArray(details.rooms)
+                ? details.rooms.map((room) => {
+                  if (!room || typeof room !== 'object') return room;
+                  const persistedRoom = { ...(room as Record<string, unknown>) };
+                  delete persistedRoom._raw;
+                  return persistedRoom;
+                })
+                : details.rooms,
+            },
+          ])
+        ),
         searchParams: state.searchParams,
         // Hotels: persist so back navigation and refresh behave like flight journey
         hotelSearch: state.hotelSearch,
         hotelLocationSelection: state.hotelLocationSelection,
-        hotelResultsCache: state.hotelResultsCache,
         hotelFiltersCache: state.hotelFiltersCache,
-        hotelResultsMeta: state.hotelResultsMeta,
         selectedHotel: state.selectedHotel,
         selectedHotelRoomIds: state.selectedHotelRoomIds,
-        hotelDetailsCache: state.hotelDetailsCache,
         selectedHotelRoomSummary: state.selectedHotelRoomSummary,
         // Packages: persist for back navigation and refresh
         packageSearch: state.packageSearch,

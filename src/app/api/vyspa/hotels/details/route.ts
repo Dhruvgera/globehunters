@@ -56,7 +56,10 @@ export async function POST(req: Request) {
 
   let result: Awaited<ReturnType<typeof vyspaRestFetch>>;
   if (getHotelDetailsPayload) {
-    result = await vyspaRestFetch('/rest/v4/get_hotel_details/', getHotelDetailsPayload);
+    result = await vyspaRestFetch('/rest/v4/get_hotel_details/', getHotelDetailsPayload, {
+      // get_hotel_details is stable on v2; v3 can return 501 in live environments.
+      headers: { 'Api-Version': '2' },
+    });
   } else {
     result = await vyspaRestFetch('/rest/v4/hotel_search_details/', body);
   }
@@ -74,6 +77,5 @@ export async function POST(req: Request) {
 
   return NextResponse.json(result.data, { status: 200 });
 }
-
 
 

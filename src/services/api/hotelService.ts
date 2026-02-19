@@ -161,11 +161,28 @@ export class HotelService {
       }
     }
 
-    return await tryHotelIds();
+    // When metadata is missing, the route param can be srId-like. Try both shapes.
+    try {
+      return await tryHotelIds();
+    } catch {
+      return await jsonFetch<VyspaGetRoomsV3Response>('/api/hotels/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify([{ SearchCriteriaId: searchCriteriaId, srIds: String(hotelId) }]),
+      });
+    }
   }
 
   async hotelSearchDetails(payload: unknown[]): Promise<VyspaHotelSearchDetailsResponse> {
     return jsonFetch<VyspaHotelSearchDetailsResponse>('/api/hotels/details', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  }
+
+  async accommodationDetails(payload: unknown[]): Promise<unknown> {
+    return jsonFetch<unknown>('/api/hotels/accommodation-details', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

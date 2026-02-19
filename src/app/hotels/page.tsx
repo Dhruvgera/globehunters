@@ -323,6 +323,71 @@ function HotelsPageInner() {
         if (!cancelled && requestSeq === activeRequestSeq.current) {
           setHotels(cache.hotels);
           setSelectedHotelKey(cache.selectedHotelKey || (cache.hotels.length > 0 ? `${cache.hotels[0]?.id}-0` : ""));
+          const metaFromCache: Record<string, any> = {};
+          cache.hotels.forEach((h, idx) => {
+            const raw = (h as any)?.rawSearchResult as any;
+            if (!raw || typeof raw !== "object") return;
+            const hid = h.id || resolveHotelResultId(raw, idx);
+            if (!hid) return;
+            const rowProvider = String(raw?.provider || "").trim().toLowerCase() === "hotelbeds" ? "hotelbeds" : "vyspa";
+            const rowSearchCriteriaAny = rowProvider === "hotelbeds"
+              ? (raw?.searchCriteriaId ?? raw?._hotelbeds?.searchToken)
+              : raw?.searchCriteriaId;
+            const rowSearchCriteriaId =
+              typeof rowSearchCriteriaAny === "string" || typeof rowSearchCriteriaAny === "number"
+                ? rowSearchCriteriaAny
+                : undefined;
+            metaFromCache[String(hid)] = {
+              hotelId: String(hid),
+              hotelName: raw?.hotel_name || raw?.hotelName || h.name,
+              provider: rowProvider,
+              searchCriteriaId: rowSearchCriteriaId,
+              searchResultId: raw?.id ? String(raw.id) : undefined,
+              srId: raw?.id ? String(raw.id) : undefined,
+              vyspaHotelId: toPositiveNumericId(raw?.hotel_id ?? raw?.hotelId) || undefined,
+              vMapId: toPositiveNumericId(raw?.VmapId ?? raw?.vMapId) || undefined,
+              imageName: typeof raw?.image_name === "string" ? raw.image_name : undefined,
+              address1: typeof raw?.address1 === "string" ? raw.address1 : undefined,
+              address2: typeof raw?.address2 === "string" ? raw.address2 : undefined,
+              hotelRating: Number.isFinite(Number(raw?.hotel_rating)) ? Number(raw.hotel_rating) : undefined,
+              rawSearchResult: raw,
+            };
+          });
+          if (Object.keys(metaFromCache).length > 0) {
+            setHotelResultsMeta(metaFromCache);
+            const firstMeta = metaFromCache[String(cache.hotels[0]?.id)];
+            const firstCriteria = firstMeta?.searchCriteriaId;
+            const firstProvider: "vyspa" | "hotelbeds" =
+              firstMeta?.provider === "hotelbeds" ? "hotelbeds" : "vyspa";
+            const search = resolvedSearchRef.current;
+            setHotelSearch({
+              provider: firstProvider,
+              location: search.location,
+              hidden_id: search.hidden_id || "",
+              hidden_key: search.hidden_key || "",
+              checkIn: search.checkIn,
+              checkOut: search.checkOut,
+              rooms: search.rooms,
+              adults: search.adults,
+              children: search.children,
+              branches: search.branches,
+              searchCriteriaId:
+                typeof firstCriteria === "string" || typeof firstCriteria === "number"
+                  ? firstCriteria
+                  : undefined,
+              arrivalPointCode: search.arrival_point_code || undefined,
+            });
+            setSearchCriteriaId(
+              typeof firstCriteria === "string" || typeof firstCriteria === "number" ? firstCriteria : null
+            );
+            if (firstCriteria) {
+              const displayRef =
+                typeof firstCriteria === "string"
+                  ? shortWebRefFromToken(firstCriteria)
+                  : String(firstCriteria);
+              useBookingStore.getState().setSearchRequestId(displayRef);
+            }
+          }
           setLoading(false);
           setHasAttemptedFetch(true);
         }
@@ -603,6 +668,7 @@ function HotelsPageInner() {
             address1: typeof r?.address1 === "string" ? r.address1 : undefined,
             address2: typeof r?.address2 === "string" ? r.address2 : undefined,
             hotelRating: Number.isFinite(Number(r?.hotel_rating)) ? Number(r.hotel_rating) : undefined,
+            rawSearchResult: r,
           };
         }
 

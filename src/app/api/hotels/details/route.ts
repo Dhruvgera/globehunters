@@ -66,7 +66,10 @@ export async function POST(req: Request) {
   if (provider !== 'hotelbeds' && !isHotelbedsContext) {
     const getHotelDetailsPayload = normalizeGetHotelDetailsPayload(body);
     const result = getHotelDetailsPayload
-      ? await vyspaRestFetch('/rest/v4/get_hotel_details/', getHotelDetailsPayload)
+      ? await vyspaRestFetch('/rest/v4/get_hotel_details/', getHotelDetailsPayload, {
+          // get_hotel_details is stable on v2; v3 can return 501 in live environments.
+          headers: { 'Api-Version': '2' },
+        })
       : await vyspaRestFetch('/rest/v4/hotel_search_details/', body);
     if (!result.ok) {
       return NextResponse.json(

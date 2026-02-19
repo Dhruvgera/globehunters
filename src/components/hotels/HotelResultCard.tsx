@@ -68,7 +68,19 @@ export function HotelResultCard({
   isPackageMode?: boolean;
 }) {
   const isGrid = view === "grid";
-  const hotelDetailUrl = isPackageMode ? `/hotels/${hotel.id}?type=package` : `/hotels/${hotel.id}`;
+  const raw = (hotel.rawSearchResult ?? null) as Record<string, unknown> | null;
+  const detailParams = new URLSearchParams();
+  const criteriaId = raw?.searchCriteriaId;
+  const srId = raw?.id;
+  const provider = raw?.provider;
+  if (criteriaId != null && String(criteriaId).trim()) detailParams.set("searchCriteriaId", String(criteriaId));
+  // Avoid `.../hotels/<srId>?srId=<srId>` when our route param already equals srId.
+  if (srId != null && String(srId).trim() && String(srId) !== String(hotel.id)) detailParams.set("srId", String(srId));
+  if (typeof provider === "string" && provider.trim()) detailParams.set("provider", provider.trim().toLowerCase());
+  if (isPackageMode) detailParams.set("type", "package");
+  const hotelDetailUrl = detailParams.toString()
+    ? `/hotels/${hotel.id}?${detailParams.toString()}`
+    : `/hotels/${hotel.id}`;
   const isHotelDatesDebugMode = process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES === "true";
 
   const rootClass = [
