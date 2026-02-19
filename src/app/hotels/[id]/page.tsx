@@ -545,6 +545,43 @@ function normalizeRemoteImageUrl(value: unknown): string {
   return /^https?:\/\//i.test(url) ? url : "";
 }
 
+function imageDedupKey(value: unknown): string {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+
+  try {
+    const parsed = new URL(raw);
+    const pathname = parsed.pathname.replace(/\/+$/, "");
+    return `${parsed.protocol.toLowerCase()}//${parsed.host.toLowerCase()}${pathname.toLowerCase()}`;
+  } catch {
+    return raw.replace(/[?#].*$/, "").replace(/\/+$/, "").toLowerCase();
+  }
+}
+
+function mergeUniqueImages(...sources: Array<Array<unknown> | undefined>): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+
+  for (const source of sources) {
+    if (!Array.isArray(source)) continue;
+    for (const entry of source) {
+      const url = String(entry || "").trim();
+      if (!url) continue;
+      const key = imageDedupKey(url);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      out.push(url);
+    }
+  }
+
+  return out;
+}
+
+function flattenRoomImages(roomImages: Record<string, string[]> | null | undefined): string[] {
+  if (!roomImages || typeof roomImages !== "object") return [];
+  return Object.values(roomImages).flatMap((urls) => (Array.isArray(urls) ? urls.filter(Boolean) : []));
+}
+
 function sanitizeFacilityText(value: unknown): string {
   const text = sanitizeHotelText(value).replace(/^[^A-Za-z0-9]+/, "").trim();
   if (!text || /^\d+$/.test(text)) return "";
@@ -789,7 +826,6 @@ export default function HotelRoomsPage() {
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
-  const [roomImages, setRoomImages] = useState<Record<string, string[]>>({});
   const [detailsText, setDetailsText] = useState<string>("");
   const [cancellationText, setCancellationText] = useState<string>("");
   const [importantInfoText, setImportantInfoText] = useState<string>("");
@@ -1107,8 +1143,7 @@ export default function HotelRoomsPage() {
       }
 
       return {
-        photos: Array.from(new Set(photos)),
-        roomImages, // Room-specific images keyed by roomCode
+        photos: mergeUniqueImages(photos, ...Object.values(roomImages)),
         amenities: Array.from(new Set(amenities)),
         descriptions,
         address: address || undefined,
@@ -1378,17 +1413,19 @@ export default function HotelRoomsPage() {
               }
 
               const hotelImages: string[] = Array.isArray(data?.hotelImages) ? data.hotelImages.filter(Boolean) : [];
-              const mergedGallery = Array.from(new Set([...(hotelImages.length ? hotelImages : []), ...(imgs || [])])).slice(0, 12);
+              const roomImagesNext: Record<string, string[]> =
+                data?.roomImages && typeof data.roomImages === "object" ? data.roomImages : {};
+              const mergedGallery = mergeUniqueImages(
+                hotelImages,
+                flattenRoomImages(roomImagesNext),
+                imgs || []
+              ).slice(0, 24);
               if (mergedGallery.length > 0) setGalleryImages(mergedGallery);
 
               const amenities: string[] = Array.isArray(data?.amenities) ? data.amenities.filter(Boolean) : [];
               if (amenities.length > 0) {
                 setRemoteAmenities((previous) => Array.from(new Set([...(previous || []), ...amenities])));
               }
-
-              const roomImagesNext: Record<string, string[]> =
-                data?.roomImages && typeof data.roomImages === "object" ? data.roomImages : {};
-              if (roomImagesNext && Object.keys(roomImagesNext).length > 0) setRoomImages(roomImagesNext);
 
               const desc = typeof data?.description === "string" ? data.description.trim() : "";
               if (desc) setDetailsText(desc);
@@ -1547,26 +1584,18 @@ export default function HotelRoomsPage() {
 
                 const remoteData = d?.liveDetails?.SupplierMapVendor?.remoteData;
                 const parsed = remoteData ? parseRemoteDataXml(String(remoteData)) : null;
-                const nextGallery = Array.from(
-                  new Set([
-                    ...(detailsData.galleryImages || []),
-                    ...(vyspaMedia.hotelImages || []),
-                    ...(parsed?.photos || []),
-                    ...(imgs || []),
-                  ].filter(Boolean))
+                const nextGallery = mergeUniqueImages(
+                  detailsData.galleryImages || [],
+                  vyspaMedia.hotelImages || [],
+                  flattenRoomImages(vyspaMedia.roomImages),
+                  parsed?.photos || [],
+                  imgs || []
                 );
                 if (detailsData.amenities.length > 0) {
                   setRemoteAmenities((previous) => Array.from(new Set([...(previous || []), ...detailsData.amenities])));
                 }
                 if (parsed?.amenities?.length) {
                   setRemoteAmenities((previous) => Array.from(new Set([...(previous || []), ...parsed.amenities])));
-                }
-                const mergedRoomImages = {
-                  ...(vyspaMedia.roomImages || {}),
-                  ...(parsed?.roomImages || {}),
-                };
-                if (Object.keys(mergedRoomImages).length > 0) {
-                  setRoomImages(mergedRoomImages);
                 }
                 if (parsed?.descriptions?.length && !desc) {
                   setDetailsText(parsed.descriptions.slice(0, 3).join("\n\n"));
@@ -2266,12 +2295,7 @@ export default function HotelRoomsPage() {
                   const hbCancellationPolicies = Array.isArray(hbRaw?.cancellationPolicies)
                     ? hbRaw.cancellationPolicies
                     : [];
-                  // Get room-specific image if available
                   const roomCode = String(roomRaw.room_code ?? roomRaw.roomCode ?? "").trim();
-                  // Strict: only show images that match the returned room code (no heuristics/prefix matching).
-                  const roomImgList = roomCode ? (roomImages[roomCode] || []) : [];
-                  // Only show image if room-specific image is available
-                  const roomImage = roomImgList[0] || "";
                   const hbCancelFrom = (() => {
                     const from = (hbCancellationPolicies[0] as Record<string, unknown> | undefined)?.from;
                     if (typeof from !== "string" || !from) return "";
@@ -2309,7 +2333,6 @@ export default function HotelRoomsPage() {
                       ? `${roomCancellationSummary.slice(0, 237)}...`
                       : roomCancellationSummary;
                   const hasMoreInfo =
-                    roomImgList.length > 1 ||
                     hbOffers.length > 0 ||
                     hbPromotions.length > 0 ||
                     (Array.isArray(room?.amenities) && room.amenities.length > 0);
@@ -2373,17 +2396,6 @@ export default function HotelRoomsPage() {
                         }
                       } : undefined}
                     >
-                      {/* Room Image */}
-                      {roomImage ? (
-                        <div className="relative w-full h-40 bg-gray-100">
-                          <img
-                            src={roomImage}
-                            alt={room.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      ) : null}
-
                       {/* Room Info */}
                       <div className="flex-1 p-6 flex flex-col">
                         {/* Room Name & Bed Type */}
@@ -2467,21 +2479,6 @@ export default function HotelRoomsPage() {
 
                         {hasMoreInfo && expanded && (
                           <div className="mt-3 space-y-3">
-                            {roomImgList.length > 1 && (
-                              <div className="space-y-2">
-                                <div className="text-xs font-semibold text-[#010D50]">More photos</div>
-                                <div className="flex gap-2 overflow-x-auto pb-1">
-                                  {roomImgList.slice(1, 7).map((img: string, idx: number) => (
-                                    <img
-                                      key={`${img}-${idx}`}
-                                      src={img}
-                                      alt=""
-                                      className="h-14 w-20 rounded-lg object-cover border border-[#DFE0E4]"
-                                    />
-                                  ))}
-                                </div>
-                              </div>
-                            )}
                             {(hbPromotions.length > 0 || hbOffers.length > 0) && (
                               <div className="space-y-1">
                                 <div className="text-xs font-semibold text-[#010D50]">Notes</div>
