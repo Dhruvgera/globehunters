@@ -436,7 +436,7 @@ export default function HotelCheckoutPage() {
               <span className="text-sm font-semibold text-[#010D50]">Traveller Details</span>
 
               <div className="flex flex-col gap-4">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <div className="bg-[#F5F7FF] rounded-full px-4 py-2">
                     <span className="text-sm font-semibold text-[#010D50]">Lead Traveller</span>
                   </div>
@@ -446,8 +446,8 @@ export default function HotelCheckoutPage() {
                 {/* Name Row */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-medium text-[#010D50]">Name</label>
-                  <div className="flex gap-2">
-                    <div className="relative w-[90px] flex-shrink-0">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="relative w-full sm:w-[90px] sm:flex-shrink-0">
                       <select
                         value={title}
                         onChange={(e) => setTitle(e.target.value as PassengerTitle)}
@@ -466,33 +466,33 @@ export default function HotelCheckoutPage() {
                       placeholder="First Name"
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
-                      className={`flex-1 h-12 rounded-xl border ${formErrors.firstName ? "border-red-500" : "border-[#DFE0E4]"} px-4 text-sm text-[#010D50] placeholder:text-[#3A478A] outline-none focus:border-[#3754ED]`}
+                      className={`w-full min-w-0 sm:flex-1 h-12 rounded-xl border ${formErrors.firstName ? "border-red-500" : "border-[#DFE0E4]"} px-4 text-sm text-[#010D50] placeholder:text-[#3A478A] outline-none focus:border-[#3754ED]`}
                     />
                     <input
                       type="text"
                       placeholder="Middle Name"
                       value={middleName}
                       onChange={(e) => setMiddleName(e.target.value)}
-                      className="flex-1 h-12 rounded-xl border border-[#DFE0E4] px-4 text-sm text-[#010D50] placeholder:text-[#3A478A] outline-none focus:border-[#3754ED]"
+                      className="w-full min-w-0 sm:flex-1 h-12 rounded-xl border border-[#DFE0E4] px-4 text-sm text-[#010D50] placeholder:text-[#3A478A] outline-none focus:border-[#3754ED]"
                     />
                     <input
                       type="text"
                       placeholder="Last Name"
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
-                      className={`flex-1 h-12 rounded-xl border ${formErrors.lastName ? "border-red-500" : "border-[#DFE0E4]"} px-4 text-sm text-[#010D50] placeholder:text-[#3A478A] outline-none focus:border-[#3754ED]`}
+                      className={`w-full min-w-0 sm:flex-1 h-12 rounded-xl border ${formErrors.lastName ? "border-red-500" : "border-[#DFE0E4]"} px-4 text-sm text-[#010D50] placeholder:text-[#3A478A] outline-none focus:border-[#3754ED]`}
                     />
                   </div>
                 </div>
 
                 {/* DOB + Email */}
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <InputField label="Date of Birth" placeholder="DD/MM/YYYY" value={dateOfBirth} onChange={setDateOfBirth} type="date" className="flex-1" error={formErrors.dateOfBirth} />
                   <InputField label="Email ID" placeholder="xyz123@gmail.com" value={email} onChange={setEmail} type="email" className="flex-1" error={formErrors.email} />
                 </div>
 
                 {/* Phone + Passport */}
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <div className="flex flex-col gap-1.5 flex-1">
                     <label className="text-xs font-medium text-[#010D50]">Phone no.</label>
                     <div className="flex gap-2">
