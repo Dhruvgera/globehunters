@@ -76,6 +76,53 @@ interface RoomCardData {
   _raw: UnknownRecord;
 }
 
+function selectedRoomIdsFromCounts(counts: Record<string, number>): string[] {
+  const out: string[] = [];
+  for (const [roomId, countRaw] of Object.entries(counts)) {
+    const count = Math.max(0, Number(countRaw || 0));
+    for (let i = 0; i < count; i += 1) out.push(roomId);
+  }
+  return out;
+}
+
+function countSelectedRooms(counts: Record<string, number>): number {
+  return Object.values(counts).reduce((sum, count) => sum + Math.max(0, Number(count || 0)), 0);
+}
+
+function buildSelectedRoomSummary(
+  hotelId: string,
+  selectedRoomIds: string[],
+  allRooms: RoomCardData[]
+) {
+  if (!hotelId || selectedRoomIds.length === 0) return null;
+
+  const selectedRooms = selectedRoomIds
+    .map((roomId) => allRooms.find((room) => String(room.id) === String(roomId)))
+    .filter((room): room is RoomCardData => !!room);
+  if (selectedRooms.length === 0) return null;
+
+  const firstRoom = selectedRooms[0];
+  const currency = firstRoom.price?.currency;
+  const total = selectedRooms.reduce((sum, room) => sum + Number(room.price?.total || 0), 0);
+  const nightly = selectedRooms.reduce((sum, room) => sum + Number(room.price?.nightly || 0), 0);
+  const uniqueRoomNames = Array.from(new Set(selectedRooms.map((room) => room.name).filter(Boolean)));
+  const uniqueMealPlans = Array.from(new Set(selectedRooms.map((room) => room.bedType).filter(Boolean)));
+  const allRefundable = selectedRooms.every((room) => room.isRefundable);
+
+  return {
+    hotelId,
+    roomId: String(firstRoom.id),
+    roomName: uniqueRoomNames.length === 1 ? uniqueRoomNames[0] : `${selectedRooms.length} rooms selected`,
+    mealName: uniqueMealPlans.length === 1 ? uniqueMealPlans[0] : "Multiple meal plans",
+    isRefundable: allRefundable,
+    currency,
+    total,
+    nightly,
+    hotelbedsRateKey:
+      selectedRooms.length === 1 ? (selectedRooms[0]?._raw?.rateKey as string | undefined) : undefined,
+  };
+}
+
 interface HotelContentApiResponse {
   ok?: boolean;
   imageUrl?: string;
@@ -751,7 +798,7 @@ export default function HotelRoomsPage() {
   const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [roomsLoading, setRoomsLoading] = useState(false);
   const [roomsError, setRoomsError] = useState<string | null>(null);
-  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
+  const [selectedRoomCounts, setSelectedRoomCounts] = useState<Record<string, number>>({});
   const [stayEditorOpen, setStayEditorOpen] = useState(false);
   const [roomsFilterOpen, setRoomsFilterOpen] = useState(false);
   const [expandedRoomInfoById, setExpandedRoomInfoById] = useState<Record<string, boolean>>({});
@@ -1135,6 +1182,10 @@ export default function HotelRoomsPage() {
       return true;
     });
   }, [filterBoardQuery, filterRefundableOnly, remoteRooms]);
+  const requiredRoomCount = Math.max(1, Number(stayRooms || 1));
+  const selectedRoomIds = useMemo(() => selectedRoomIdsFromCounts(selectedRoomCounts), [selectedRoomCounts]);
+  const selectedRoomCount = useMemo(() => countSelectedRooms(selectedRoomCounts), [selectedRoomCounts]);
+  const canProceedWithRooms = selectedRoomCount === requiredRoomCount && selectedRoomCount > 0;
   const reviews: Array<{
     id: string;
     author: string;
@@ -1146,6 +1197,12 @@ export default function HotelRoomsPage() {
   const faqs: Array<{ id: string; question: string; answer: string }> = [];
 
   const displayedAmenities = showAllAmenities ? hotel.amenities : hotel.amenities.slice(0, 6);
+
+  useEffect(() => {
+    setSelectedHotelRoomIds(selectedRoomIds);
+    const summary = buildSelectedRoomSummary(hotelId, selectedRoomIds, remoteRooms);
+    setSelectedHotelRoomSummary(summary);
+  }, [hotelId, remoteRooms, selectedRoomIds, setSelectedHotelRoomIds, setSelectedHotelRoomSummary]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1417,7 +1474,18 @@ export default function HotelRoomsPage() {
         const effectiveRooms = flattened.length > 0 ? flattened : accommodationFallbackRooms;
         // Sort rooms low -> high (user request)
         effectiveRooms.sort((a, b) => (a.price.total || 0) - (b.price.total || 0));
-        const cheapest = effectiveRooms[0];
+        const requiredRoomsForSelection = Math.max(1, Number(hotelSearch?.rooms || 1));
+        const defaultSelectedCounts = (() => {
+          const next: Record<string, number> = {};
+          if (effectiveRooms.length === 0) return next;
+          for (let i = 0; i < requiredRoomsForSelection; i += 1) {
+            const room = effectiveRooms[i % effectiveRooms.length];
+            const roomId = String(room?.id || "");
+            if (!roomId) continue;
+            next[roomId] = (next[roomId] || 0) + 1;
+          }
+          return next;
+        })();
 
         if (!cancelled) {
           setRemoteRooms(effectiveRooms);
@@ -1425,24 +1493,7 @@ export default function HotelRoomsPage() {
             setRoomsError(roomsApiDesc);
           }
           setSelectedHotel({ hotelId, hotelName: headerName });
-          if (cheapest?.id) {
-            setSelectedHotelRoomIds([String(cheapest.id)]);
-            setSelectedRoomId(String(cheapest.id));
-            setSelectedHotelRoomSummary({
-              hotelId,
-              roomId: String(cheapest.id),
-              roomName: cheapest?.name,
-              mealName: cheapest?.bedType,
-              isRefundable: cheapest?.isRefundable,
-              currency: cheapest?.price?.currency,
-              total: cheapest?.price?.total,
-              nightly: cheapest?.price?.nightly,
-            });
-          } else {
-            setSelectedHotelRoomIds([]);
-            setSelectedRoomId(null);
-            setSelectedHotelRoomSummary(null);
-          }
+          setSelectedRoomCounts(defaultSelectedCounts);
 
           // Persist header + rooms even when provider doesn't return room options.
           setHotelDetailsCache(hotelId, {
@@ -2190,28 +2241,51 @@ export default function HotelRoomsPage() {
                 {roomsLoading && (
                   <div className="lg:col-span-3 text-sm text-[#3A478A]">Loading room options…</div>
                 )}
+                {!isPackageMode && (
+                  <div className="lg:col-span-3 border border-[#DFE0E4] rounded-2xl p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="text-sm text-[#010D50]">
+                      Select {requiredRoomCount} room{requiredRoomCount === 1 ? "" : "s"}: {selectedRoomCount}/{requiredRoomCount} selected
+                    </div>
+                    <Button
+                      className="rounded-full px-6 py-3 h-auto gap-2 bg-[#3754ED] hover:bg-[#2A3FB8] text-white font-bold disabled:bg-[#A8B3F5]"
+                      disabled={!canProceedWithRooms}
+                      onClick={() => router.push("/hotels/checkout")}
+                    >
+                      Continue
+                      <ChevronRight className="w-5 h-5" />
+                    </Button>
+                  </div>
+                )}
                 {rooms.map((room) => {
+                  const roomSelectionCount = Math.max(0, Number(selectedRoomCounts[room.id] || 0));
+                  const roomIsSelected = roomSelectionCount > 0;
+                  const roomRaw = room._raw as Record<string, unknown>;
+                  const hbRaw = roomRaw._hotelbeds && typeof roomRaw._hotelbeds === "object"
+                    ? (roomRaw._hotelbeds as Record<string, unknown>)
+                    : null;
+                  const hbCancellationPolicies = Array.isArray(hbRaw?.cancellationPolicies)
+                    ? hbRaw.cancellationPolicies
+                    : [];
                   // Get room-specific image if available
-                  const roomCode = room._raw?.room_code || room._raw?.roomCode || "";
+                  const roomCode = String(roomRaw.room_code ?? roomRaw.roomCode ?? "").trim();
                   // Strict: only show images that match the returned room code (no heuristics/prefix matching).
                   const roomImgList = roomCode ? (roomImages[roomCode] || []) : [];
                   // Only show image if room-specific image is available
                   const roomImage = roomImgList[0] || "";
                   const hbCancelFrom = (() => {
-                    const from = room?._raw?._hotelbeds?.cancellationPolicies?.[0]?.from;
+                    const from = (hbCancellationPolicies[0] as Record<string, unknown> | undefined)?.from;
                     if (typeof from !== "string" || !from) return "";
                     return from.slice(0, 10);
                   })();
-                  const hbRateClass = String(room?._raw?._hotelbeds?.rateClass || "").trim();
-                  const hbOffers: any[] = Array.isArray(room?._raw?._hotelbeds?.offers) ? room._raw._hotelbeds.offers : [];
-                  const hbPromotions: any[] = Array.isArray(room?._raw?._hotelbeds?.promotions)
-                    ? room._raw._hotelbeds.promotions
+                  const hbRateClass = String(hbRaw?.rateClass || "").trim();
+                  const hbOffers: any[] = Array.isArray(hbRaw?.offers) ? hbRaw.offers
+                    : [];
+                  const hbPromotions: any[] = Array.isArray(hbRaw?.promotions)
+                    ? hbRaw.promotions
                     : [];
                   const roomCancellationPolicy = sanitizeHotelText(room?._raw?.cancellation_policy ?? room?._raw?.cancellationPolicy);
                   const hbCancellationSummary = (() => {
-                    const firstCancellation = Array.isArray(room?._raw?._hotelbeds?.cancellationPolicies)
-                      ? room._raw._hotelbeds.cancellationPolicies[0]
-                      : null;
+                    const firstCancellation = hbCancellationPolicies[0] ?? null;
                     if (!firstCancellation || typeof firstCancellation !== "object") return "";
 
                     const cancellationRow = firstCancellation as Record<string, unknown>;
@@ -2245,10 +2319,9 @@ export default function HotelRoomsPage() {
                     <div
                       key={room.id}
                       className={[
-                        "border rounded-[32px] bg-white overflow-hidden flex flex-col h-full cursor-pointer",
-                        selectedRoomId === room.id ? "border-[#3754ED]" : "border-[#DFE0E4]",
+                        "border rounded-[32px] bg-white overflow-hidden flex flex-col h-full",
+                        roomIsSelected ? "border-[#3754ED]" : "border-[#DFE0E4]",
                       ].join(" ")}
-                      onClick={() => setSelectedRoomId(room.id)}
                     >
                       {/* Room Image */}
                       {roomImage ? (
@@ -2414,35 +2487,30 @@ export default function HotelRoomsPage() {
                             </span>
                           </div>
 
-                          <Button
-                            className="w-full rounded-full py-3 h-auto gap-2 bg-[#3754ED] hover:bg-[#2A3FB8] text-white font-bold"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const chosenRoom = room;
-                              const rid = chosenRoom.id;
-                              setSelectedRoomId(String(rid));
-                              setSelectedHotelRoomIds([String(rid)]);
-                              // Persist summary for checkout display
-                              setSelectedHotelRoomSummary({
-                                hotelId,
-                                roomId: String(rid),
-                                roomName: chosenRoom?.name,
-                                mealName: chosenRoom?.bedType,
-                                isRefundable: chosenRoom?.isRefundable,
-                                currency: chosenRoom?.price?.currency,
-                                total: chosenRoom?.price?.total,
-                                nightly: chosenRoom?.price?.nightly,
-                                hotelbedsRateKey: (chosenRoom as any)?._raw?.rateKey,
-                              });
-                              // Navigate based on mode
-                              if (isPackageMode) {
-                                // For package mode, go to flight search with package context
+                          {isPackageMode ? (
+                            <Button
+                              className="w-full rounded-full py-3 h-auto gap-2 bg-[#3754ED] hover:bg-[#2A3FB8] text-white font-bold"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const chosenRoom = room;
+                                const rid = chosenRoom.id;
+                                setSelectedHotelRoomIds([String(rid)]);
+                                setSelectedHotelRoomSummary({
+                                  hotelId,
+                                  roomId: String(rid),
+                                  roomName: chosenRoom?.name,
+                                  mealName: chosenRoom?.bedType,
+                                  isRefundable: chosenRoom?.isRefundable,
+                                  currency: chosenRoom?.price?.currency,
+                                  total: chosenRoom?.price?.total,
+                                  nightly: chosenRoom?.price?.nightly,
+                                  hotelbedsRateKey: (chosenRoom as any)?._raw?.rateKey,
+                                });
                                 const params = new URLSearchParams();
                                 params.set("type", "package");
                                 params.set("hotelId", hotelId);
                                 params.set("hotelName", hotel.name);
                                 params.set("roomId", String(rid));
-                                // Preserve search params for flight search
                                 const checkIn = searchParams.get("checkIn");
                                 const checkOut = searchParams.get("checkOut");
                                 const guests = searchParams.get("guests") || searchParams.get("adults") || "2";
@@ -2457,20 +2525,54 @@ export default function HotelRoomsPage() {
                                 }
                                 params.set("guests", guests);
                                 params.set("rooms", rooms);
-                                // Default origin/destination - in real app these would come from user selection
                                 params.set("from", "LHR");
                                 params.set("to", "HKG");
                                 params.set("adults", guests);
                                 params.set("tripType", "round-trip");
                                 router.push(`/search?${params.toString()}`);
-                              } else {
-                                router.push("/hotels/checkout");
-                              }
-                            }}
-                          >
-                            {isPackageMode ? "Continue Booking" : "Reserve"}
-                            <ChevronRight className="w-5 h-5" />
-                          </Button>
+                              }}
+                            >
+                              Continue Booking
+                              <ChevronRight className="w-5 h-5" />
+                            </Button>
+                          ) : (
+                            <div className="w-full flex items-center justify-between rounded-full border border-[#DFE0E4] px-3 py-2">
+                              <Button
+                                variant="ghost"
+                                className="h-8 w-8 p-0 rounded-full"
+                                disabled={roomSelectionCount === 0}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedRoomCounts((prev) => {
+                                    const current = Math.max(0, Number(prev[room.id] || 0));
+                                    if (current <= 0) return prev;
+                                    const next = { ...prev };
+                                    if (current === 1) delete next[room.id];
+                                    else next[room.id] = current - 1;
+                                    return next;
+                                  });
+                                }}
+                              >
+                                −
+                              </Button>
+                              <span className="text-sm font-semibold text-[#010D50]">{roomSelectionCount}</span>
+                              <Button
+                                variant="ghost"
+                                className="h-8 w-8 p-0 rounded-full"
+                                disabled={selectedRoomCount >= requiredRoomCount}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedRoomCounts((prev) => {
+                                    if (countSelectedRooms(prev) >= requiredRoomCount) return prev;
+                                    const current = Math.max(0, Number(prev[room.id] || 0));
+                                    return { ...prev, [room.id]: current + 1 };
+                                  });
+                                }}
+                              >
+                                +
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -2529,7 +2631,7 @@ export default function HotelRoomsPage() {
                           </span>
                         </div>
                         <p className="text-sm text-[#010D50] leading-relaxed line-clamp-3">
-                          {review.text}
+                          {review.body}
                         </p>
                         <button className="text-sm text-[#3754ED] font-medium">
                           Read more

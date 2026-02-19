@@ -21,6 +21,7 @@ export default function HotelCheckoutPage() {
 
   const hotelSearch = useBookingStore((s) => s.hotelSearch);
   const hotelResultsMeta = useBookingStore((s) => s.hotelResultsMeta);
+  const hotelDetailsCache = useBookingStore((s) => s.hotelDetailsCache);
   const selectedHotel = useBookingStore((s) => s.selectedHotel);
   const selectedHotelRoomIds = useBookingStore((s) => s.selectedHotelRoomIds);
   const selectedHotelRoomSummary = useBookingStore((s) => s.selectedHotelRoomSummary);
@@ -46,14 +47,29 @@ export default function HotelCheckoutPage() {
       hotelId,
       hotelName: selectedHotel?.hotelName || meta?.hotelName || "Selected hotel",
       searchResultId: meta?.searchResultId || meta?.srId,
-      roomIds: selectedHotelRoomIds,
+      roomIds: selectedHotelRoomIds.map((roomId) => String(roomId).trim()).filter(Boolean),
     };
   }, [hotelResultsMeta, selectedHotel, selectedHotelRoomIds]);
+
+  const expectedNetPrice = useMemo(() => {
+    const hotelId = summary.hotelId;
+    if (!hotelId) return undefined;
+    const cachedRooms = hotelDetailsCache?.[hotelId]?.rooms;
+    if (!Array.isArray(cachedRooms)) return undefined;
+    const priceByRoomId = new Map(
+      cachedRooms.map((room: any) => [String(room?.id || ""), Number(room?.price?.total || 0)])
+    );
+    const values = summary.roomIds
+      .map((roomId) => priceByRoomId.get(String(roomId)))
+      .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0)
+      .map((value) => value.toFixed(2));
+    return values.length > 0 ? values : undefined;
+  }, [hotelDetailsCache, summary.hotelId, summary.roomIds]);
 
   const canSubmit =
     !!hotelSearch &&
     !!summary.hotelId &&
-    summary.roomIds.length > 0 &&
+    summary.roomIds.length === Math.max(1, Number(hotelSearch?.rooms || 1)) &&
     passengersSaved &&
     passengers.length > 0 &&
     !submitting;
@@ -116,24 +132,58 @@ export default function HotelCheckoutPage() {
         phone: p.phone,
       }));
 
-      // Best-effort room passenger mapping: assign everyone to the first selected room
+      // Build room passenger mapping for ApiAddToFolder.hotel.passengers (roomId -> "1,2,3")
       const roomPassengers = (() => {
         const roomIds = summary.roomIds;
         const mapping: Record<string, string> = {};
         if (roomIds.length === 0) return mapping;
-        const allocations: Record<string, number[]> = {};
-        for (const roomId of roomIds) allocations[roomId] = [];
 
-        const totalPax = passengers.length;
-        for (let i = 0; i < totalPax; i += 1) {
-          const roomId = roomIds[i % roomIds.length]!;
-          allocations[roomId]!.push(i + 1);
-        }
+        const allocations = roomIds.map(() => [] as number[]);
+        const byType = {
+          adult: [] as number[],
+          child: [] as number[],
+          infant: [] as number[],
+        };
 
-        for (const roomId of roomIds) {
-          const pax = allocations[roomId] || [];
-          if (pax.length > 0) mapping[roomId] = pax.join(",");
-        }
+        passengers.forEach((passenger, index) => {
+          const paxNo = index + 1;
+          if (passenger.type === "child") byType.child.push(paxNo);
+          else if (passenger.type === "infant") byType.infant.push(paxNo);
+          else byType.adult.push(paxNo);
+        });
+
+        const distribute = (indices: number[]) => {
+          if (indices.length === 0) return;
+          const roomCount = roomIds.length;
+          const base = Math.floor(indices.length / roomCount);
+          const remainder = indices.length % roomCount;
+          const counts = Array.from({ length: roomCount }, () => base);
+          for (let i = 0; i < remainder; i += 1) {
+            counts[roomCount - 1 - i] += 1;
+          }
+
+          let cursor = 0;
+          counts.forEach((count, roomIndex) => {
+            for (let i = 0; i < count; i += 1) {
+              const paxNo = indices[cursor];
+              if (paxNo != null) allocations[roomIndex]?.push(paxNo);
+              cursor += 1;
+            }
+          });
+        };
+
+        distribute(byType.adult);
+        distribute(byType.child);
+        distribute(byType.infant);
+
+        roomIds.forEach((roomId, index) => {
+          const pax = allocations[index] || [];
+          if (pax.length > 0) {
+            mapping[roomId] = mapping[roomId]
+              ? `${mapping[roomId]},${pax.join(",")}`
+              : pax.join(",");
+          }
+        });
 
         return mapping;
       })();
@@ -194,10 +244,7 @@ export default function HotelCheckoutPage() {
               roomCodes: summary.roomIds.join(","),
               roomIds: summary.roomIds.join(","),
               passengers: roomPassengers,
-              expectedNetPrice:
-                typeof selectedHotelRoomSummary?.total === "number" && selectedHotelRoomSummary.total > 0
-                  ? [selectedHotelRoomSummary.total.toFixed(2)]
-                  : undefined,
+              expectedNetPrice,
             } as any,
           ],
         };
