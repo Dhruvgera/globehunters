@@ -39,7 +39,7 @@ export function HotelResultsToolbar({
               <SelectValue placeholder="Price (low to high)" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="recommended">Recommended</SelectItem>
+              <SelectItem value="recommended">Sort by Recommended for you</SelectItem>
               <SelectItem value="price_low">Price (low to high)</SelectItem>
               <SelectItem value="review_score">Rating</SelectItem>
             </SelectContent>
@@ -109,5 +109,4 @@ export function HotelResultsToolbar({
     </div>
   );
 }
-
 

@@ -45,7 +45,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import Image from "next/image";
-
+import { useMemo } from "react";
 import { FOLDER_STATUS_CODES } from "@/types/portal";
 
 // Check if mock mode is enabled
@@ -1322,7 +1322,6 @@ function PaymentCompleteContent() {
                             ? new Date(storeHotelSearch.checkIn + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })
                             : "—"}
                         </span>
-                        <span className="text-xs text-[#3A478A]">3:00 PM – 6:00 PM</span>
                       </div>
                       <div className="flex-1 bg-[#F5F7FF] border border-[#E5E7EB] rounded-lg p-3 flex flex-col gap-1.5">
                         <div className="flex items-center gap-1.5">
@@ -1334,7 +1333,6 @@ function PaymentCompleteContent() {
                             ? new Date(storeHotelSearch.checkOut + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })
                             : "—"}
                         </span>
-                        <span className="text-xs text-[#3A478A]">8:00 AM – 11:00 AM</span>
                       </div>
                     </div>
 

@@ -2314,6 +2314,46 @@ export default function HotelRoomsPage() {
                     hbPromotions.length > 0 ||
                     (Array.isArray(room?.amenities) && room.amenities.length > 0);
                   const expanded = !!expandedRoomInfoById[room.id];
+                  const handlePackageRoomContinue = () => {
+                    const chosenRoom = room;
+                    const rid = chosenRoom.id;
+                    setSelectedHotelRoomIds([String(rid)]);
+                    setSelectedHotelRoomSummary({
+                      hotelId,
+                      roomId: String(rid),
+                      roomName: chosenRoom?.name,
+                      mealName: chosenRoom?.bedType,
+                      isRefundable: chosenRoom?.isRefundable,
+                      currency: chosenRoom?.price?.currency,
+                      total: chosenRoom?.price?.total,
+                      nightly: chosenRoom?.price?.nightly,
+                      hotelbedsRateKey: (chosenRoom as any)?._raw?.rateKey,
+                    });
+                    const params = new URLSearchParams();
+                    params.set("type", "package");
+                    params.set("hotelId", hotelId);
+                    params.set("hotelName", hotel.name);
+                    params.set("roomId", String(rid));
+                    const checkIn = searchParams.get("checkIn");
+                    const checkOut = searchParams.get("checkOut");
+                    const guests = searchParams.get("guests") || searchParams.get("adults") || "2";
+                    const rooms = searchParams.get("rooms") || "1";
+                    if (checkIn) {
+                      params.set("departureDate", checkIn);
+                      params.set("checkIn", checkIn);
+                    }
+                    if (checkOut) {
+                      params.set("returnDate", checkOut);
+                      params.set("checkOut", checkOut);
+                    }
+                    params.set("guests", guests);
+                    params.set("rooms", rooms);
+                    params.set("from", "LHR");
+                    params.set("to", "HKG");
+                    params.set("adults", guests);
+                    params.set("tripType", "round-trip");
+                    router.push(`/search?${params.toString()}`);
+                  };
 
                   return (
                     <div
@@ -2321,7 +2361,17 @@ export default function HotelRoomsPage() {
                       className={[
                         "border rounded-[32px] bg-white overflow-hidden flex flex-col h-full",
                         roomIsSelected ? "border-[#3754ED]" : "border-[#DFE0E4]",
+                        isPackageMode ? "cursor-pointer hover:shadow-md transition-shadow" : "",
                       ].join(" ")}
+                      role={isPackageMode ? "button" : undefined}
+                      tabIndex={isPackageMode ? 0 : undefined}
+                      onClick={isPackageMode ? handlePackageRoomContinue : undefined}
+                      onKeyDown={isPackageMode ? (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          handlePackageRoomContinue();
+                        }
+                      } : undefined}
                     >
                       {/* Room Image */}
                       {roomImage ? (
@@ -2492,44 +2542,7 @@ export default function HotelRoomsPage() {
                               className="w-full rounded-full py-3 h-auto gap-2 bg-[#3754ED] hover:bg-[#2A3FB8] text-white font-bold"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                const chosenRoom = room;
-                                const rid = chosenRoom.id;
-                                setSelectedHotelRoomIds([String(rid)]);
-                                setSelectedHotelRoomSummary({
-                                  hotelId,
-                                  roomId: String(rid),
-                                  roomName: chosenRoom?.name,
-                                  mealName: chosenRoom?.bedType,
-                                  isRefundable: chosenRoom?.isRefundable,
-                                  currency: chosenRoom?.price?.currency,
-                                  total: chosenRoom?.price?.total,
-                                  nightly: chosenRoom?.price?.nightly,
-                                  hotelbedsRateKey: (chosenRoom as any)?._raw?.rateKey,
-                                });
-                                const params = new URLSearchParams();
-                                params.set("type", "package");
-                                params.set("hotelId", hotelId);
-                                params.set("hotelName", hotel.name);
-                                params.set("roomId", String(rid));
-                                const checkIn = searchParams.get("checkIn");
-                                const checkOut = searchParams.get("checkOut");
-                                const guests = searchParams.get("guests") || searchParams.get("adults") || "2";
-                                const rooms = searchParams.get("rooms") || "1";
-                                if (checkIn) {
-                                  params.set("departureDate", checkIn);
-                                  params.set("checkIn", checkIn);
-                                }
-                                if (checkOut) {
-                                  params.set("returnDate", checkOut);
-                                  params.set("checkOut", checkOut);
-                                }
-                                params.set("guests", guests);
-                                params.set("rooms", rooms);
-                                params.set("from", "LHR");
-                                params.set("to", "HKG");
-                                params.set("adults", guests);
-                                params.set("tripType", "round-trip");
-                                router.push(`/search?${params.toString()}`);
+                                handlePackageRoomContinue();
                               }}
                             >
                               Continue Booking

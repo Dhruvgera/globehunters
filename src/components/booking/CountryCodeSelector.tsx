@@ -9,7 +9,6 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from "@/components/ui/popover";
-import { Input } from "@/components/ui/input";
 import { countryCodes } from "@/lib/utils/countryCodes";
 
 interface CountryCodeSelectorProps {
@@ -31,12 +30,22 @@ export function CountryCodeSelector({
     }, [value]);
 
     const filteredCountries = useMemo(() => {
-        if (!searchQuery) return countryCodes;
-        const lowerQuery = searchQuery.toLowerCase();
+        const lowerQuery = searchQuery.trim().toLowerCase();
+        if (!lowerQuery) return countryCodes;
+
         return countryCodes.filter(
-            (c) =>
-                c.name.toLowerCase().includes(lowerQuery) ||
-                c.code.toLowerCase().includes(lowerQuery)
+            (c) => {
+                const name = c.name.toLowerCase();
+                const words = name.split(/[\s'()\-]+/).filter(Boolean);
+                const code = c.code.toLowerCase();
+
+                return (
+                    name.startsWith(lowerQuery) ||
+                    words.some((word) => word.startsWith(lowerQuery)) ||
+                    code.startsWith(lowerQuery) ||
+                    code.includes(lowerQuery)
+                );
+            }
         );
     }, [searchQuery]);
 

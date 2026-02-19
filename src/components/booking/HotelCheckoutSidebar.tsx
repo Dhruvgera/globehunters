@@ -203,14 +203,12 @@ export function HotelCheckoutSidebar({
             <span className="text-sm font-semibold text-[#010D50]">
               {hotelSearch?.checkIn ? formatDateDisplay(hotelSearch.checkIn) : "—"}
             </span>
-            <span className="text-xs text-[#3A478A]">3:00 PM – 6:00 PM</span>
           </div>
           <div className="flex-1 bg-[#F5F7FF] border border-[#DFE0E4] rounded-lg p-3 flex flex-col gap-1.5">
             <span className="text-xs text-[#010D50]">Check-Out:</span>
             <span className="text-sm font-semibold text-[#010D50]">
               {hotelSearch?.checkOut ? formatDateDisplay(hotelSearch.checkOut) : "—"}
             </span>
-            <span className="text-xs text-[#3A478A]">8:00 AM – 11:00 AM</span>
           </div>
         </div>
 

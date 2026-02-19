@@ -19,6 +19,7 @@ import { hotelService } from "@/services/api/hotelService";
 import { folderService } from "@/services/api/folderService";
 import type { AddToFolderRequest } from "@/types/folder";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
+import { CountryCodeSelector } from "@/components/booking/CountryCodeSelector";
 import type { Passenger, PassengerType, PassengerTitle } from "@/types/booking";
 
 function InputField({
@@ -125,6 +126,7 @@ export default function HotelCheckoutPage() {
   const [dateOfBirth, setDateOfBirth] = useState(leadPassenger?.dateOfBirth || "");
   const [email, setEmail] = useState(leadPassenger?.email || "");
   const [phone, setPhone] = useState(leadPassenger?.phone || "");
+  const [countryCode, setCountryCode] = useState(leadPassenger?.countryCode || "+44");
   const [passport, setPassport] = useState(leadPassenger?.nationality || "India");
 
   // Booking for
@@ -156,6 +158,7 @@ export default function HotelCheckoutPage() {
         dateOfBirth,
         email,
         phone,
+        countryCode,
         nationality: passport,
         type: "adult" as PassengerType,
       };
@@ -170,7 +173,7 @@ export default function HotelCheckoutPage() {
       setPassengersSaved(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, firstName, middleName, lastName, dateOfBirth, email, phone, passport]);
+  }, [title, firstName, middleName, lastName, dateOfBirth, email, phone, countryCode, passport]);
 
   const summary = useMemo(() => {
     const hotelId = selectedHotel?.hotelId;
@@ -242,8 +245,8 @@ export default function HotelCheckoutPage() {
     setError(null);
 
     try {
-      const lead = { title, firstName, lastName, email, phone, dateOfBirth, type: "adult" as PassengerType };
-      setContactInfo(lead.email, lead.phone);
+      const lead = { title, firstName, lastName, email, phone, countryCode, dateOfBirth, type: "adult" as PassengerType };
+      setContactInfo(lead.email, `${countryCode}${lead.phone}`);
 
       let folderNo = vyspaFolderNumber ? Number(vyspaFolderNumber) : null;
       if (!folderNo) {
@@ -469,7 +472,20 @@ export default function HotelCheckoutPage() {
 
                 {/* Phone + Passport */}
                 <div className="flex gap-3">
-                  <InputField label="Phone no." placeholder="1234567890" value={phone} onChange={setPhone} type="tel" className="flex-1" error={formErrors.phone} />
+                  <div className="flex flex-col gap-1.5 flex-1">
+                    <label className="text-xs font-medium text-[#010D50]">Phone no.</label>
+                    <div className="flex gap-2">
+                      <CountryCodeSelector value={countryCode} onChange={setCountryCode} />
+                      <input
+                        type="tel"
+                        placeholder="1234567890"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className={`flex-1 h-12 rounded-xl border px-4 text-sm text-[#010D50] placeholder:text-[#A0A3BD] outline-none focus:ring-2 focus:ring-[#3754ED]/30 ${formErrors.phone ? "border-red-400" : "border-[#DFE0E4]"}`}
+                      />
+                    </div>
+                    {formErrors.phone && <span className="text-xs text-red-500">{formErrors.phone}</span>}
+                  </div>
                   <SelectField label="Passport" value={passport} onChange={setPassport} className="flex-1">
                     <option value="India">India</option>
                     <option value="United Kingdom">United Kingdom</option>
@@ -545,7 +561,6 @@ export default function HotelCheckoutPage() {
             {/* Your arrival time */}
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-3">
               <span className="text-sm font-semibold text-[#010D50]">Your arrival time</span>
-              <p className="text-sm text-[#010D50]">You can check in between 15:00 and 18:00</p>
               <SelectField label="Add your estimated arrival time. (optional)" value={arrivalTime} onChange={setArrivalTime} className="max-w-sm">
                 <option value="">Select</option>
                 <option value="14:00">14:00 - 15:00</option>
@@ -580,7 +595,7 @@ export default function HotelCheckoutPage() {
               <div className="flex justify-end">
                 <button
                   onClick={handleConfirm}
-                  disabled={submitting}
+                  disabled={submitting || !tcAccepted}
                   className="bg-[#3754ED] hover:bg-[#2A3FB8] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-6 py-3 rounded-full flex items-center gap-1 transition-colors"
                 >
                   {submitting ? "Confirming…" : "Continue to payment"}
