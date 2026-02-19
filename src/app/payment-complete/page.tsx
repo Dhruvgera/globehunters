@@ -30,6 +30,8 @@ import {
   AlertCircle,
   Plane,
   Calendar,
+  CalendarDays,
+  Moon,
   Users,
   CreditCard,
   Phone,
@@ -625,6 +627,7 @@ function PaymentCompleteContent() {
   const storeRoomSummary = useBookingStore((state) => state.selectedHotelRoomSummary);
   const storeHotelDetailsCache = useBookingStore((state) => state.hotelDetailsCache);
   const storeHotelSearch = useBookingStore((state) => state.hotelSearch);
+  const storeSelectedHotelRoomIds = useBookingStore((state) => state.selectedHotelRoomIds);
   const resetBooking = useBookingStore((state) => state.resetBooking);
   const [emailSent, setEmailSent] = useState(false);
   const [emailError, setEmailError] = useState<string | null>(null);
@@ -641,6 +644,41 @@ function PaymentCompleteContent() {
       return null;
     }
   }, []);
+
+  const hotelConfirmDisplay = useMemo(() => {
+    if (!isHotelMode) return null;
+    const hotelId = storeSelectedHotel?.hotelId;
+    const cached = hotelId ? storeHotelDetailsCache?.[hotelId] : undefined;
+    const cancellationText = cached?.cancellationText || "";
+    const isRefundable = storeRoomSummary?.isRefundable;
+    const roomName = storeRoomSummary?.roomName || "Selected Room";
+    const hs = storeHotelSearch;
+    const nightsCount = hs
+      ? Math.max(1, Math.round((new Date(hs.checkOut).getTime() - new Date(hs.checkIn).getTime()) / (1000 * 60 * 60 * 24)))
+      : 0;
+    const rooms = hs?.rooms || 1;
+    const adults = hs?.adults || 1;
+    const children = hs?.children || 0;
+
+    const roomNames: string[] = [];
+    if (Array.isArray(cached?.rooms) && storeSelectedHotelRoomIds.length > 0) {
+      const roomMap = new Map(cached!.rooms!.map((r: any) => [String(r.id), r.name || "Room"]));
+      const counts: Record<string, number> = {};
+      for (const rid of storeSelectedHotelRoomIds) {
+        const n = roomMap.get(String(rid)) || roomName;
+        counts[n] = (counts[n] || 0) + 1;
+      }
+      for (const [n, c] of Object.entries(counts)) {
+        roomNames.push(c > 1 ? `${n} x${c}` : n);
+      }
+    } else if (storeSelectedHotelRoomIds.length > 0) {
+      roomNames.push(
+        storeSelectedHotelRoomIds.length > 1 ? `${roomName} x${storeSelectedHotelRoomIds.length}` : roomName
+      );
+    }
+
+    return { cancellationText, isRefundable, nightsCount, rooms, adults, children, roomNames, roomName, currency: storeRoomSummary?.currency, total: storeRoomSummary?.total };
+  }, [isHotelMode, storeSelectedHotel, storeHotelDetailsCache, storeRoomSummary, storeHotelSearch, storeSelectedHotelRoomIds]);
 
   // Record payment to Vyspa Portal (non-blocking)
   const recordPaymentToVyspa = useCallback(async (
@@ -1262,11 +1300,104 @@ function PaymentCompleteContent() {
 
             {/* Package: hotel summary (best-effort from store/cache) */}
             {(isPackageMode || isHotelMode) && (
-              <div className="bg-white rounded-xl shadow-sm border border-[#E5E7EB] p-6">
-                <h3 className="font-semibold text-[#3754ED] mb-4">Hotel Details</h3>
+              <div className="bg-white rounded-xl shadow-sm border border-[#E5E7EB] p-6 flex flex-col gap-4">
+                <h3 className="font-semibold text-[#3754ED]">Hotel Details</h3>
                 <HotelSummaryCard
                   roomSummary={ctx?.hotelRoomSummary}
                 />
+
+                {/* Stay Details - hotel mode only */}
+                {isHotelMode && hotelConfirmDisplay && (
+                  <div className="border border-[#E5E7EB] rounded-xl p-4 flex flex-col gap-4">
+                    <span className="text-sm font-semibold text-[#010D50]">Stay Details</span>
+
+                    <div className="flex gap-3">
+                      <div className="flex-1 bg-[#F5F7FF] border border-[#E5E7EB] rounded-lg p-3 flex flex-col gap-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <CalendarDays className="w-3.5 h-3.5 text-[#3A478A]" />
+                          <span className="text-xs text-[#3A478A]">Check-In</span>
+                        </div>
+                        <span className="text-sm font-semibold text-[#010D50]">
+                          {storeHotelSearch?.checkIn
+                            ? new Date(storeHotelSearch.checkIn + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })
+                            : "—"}
+                        </span>
+                        <span className="text-xs text-[#3A478A]">3:00 PM – 6:00 PM</span>
+                      </div>
+                      <div className="flex-1 bg-[#F5F7FF] border border-[#E5E7EB] rounded-lg p-3 flex flex-col gap-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <CalendarDays className="w-3.5 h-3.5 text-[#3A478A]" />
+                          <span className="text-xs text-[#3A478A]">Check-Out</span>
+                        </div>
+                        <span className="text-sm font-semibold text-[#010D50]">
+                          {storeHotelSearch?.checkOut
+                            ? new Date(storeHotelSearch.checkOut + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })
+                            : "—"}
+                        </span>
+                        <span className="text-xs text-[#3A478A]">8:00 AM – 11:00 AM</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Moon className="w-3.5 h-3.5 text-[#3A478A]" />
+                      <span className="text-xs text-[#3A478A]">Total length of stay:</span>
+                      <span className="text-sm font-semibold text-[#010D50]">{hotelConfirmDisplay.nightsCount} Night{hotelConfirmDisplay.nightsCount !== 1 ? "s" : ""}</span>
+                    </div>
+
+                    <div className="border-t border-[#E5E7EB]" />
+
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs text-[#3A478A]">You selected</span>
+                      <span className="text-sm font-semibold text-[#010D50]">
+                        {hotelConfirmDisplay.rooms} room{hotelConfirmDisplay.rooms !== 1 ? "s" : ""} for {hotelConfirmDisplay.adults + hotelConfirmDisplay.children} {hotelConfirmDisplay.adults + hotelConfirmDisplay.children === 1 ? "guest" : "guests"}
+                      </span>
+                    </div>
+
+                    {hotelConfirmDisplay.roomNames.length > 0 && (
+                      <div className="flex flex-col gap-1.5">
+                        {hotelConfirmDisplay.roomNames.map((name, i) => (
+                          <span key={i} className="text-xs text-[#3A478A]">{name}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Cancellation Policy - hotel mode only */}
+                {isHotelMode && hotelConfirmDisplay && (
+                  <div className="border border-[#E5E7EB] rounded-xl p-4 flex flex-col gap-3">
+                    <span className="text-sm font-semibold text-[#010D50]">Cancellation Policy</span>
+
+                    {hotelConfirmDisplay.isRefundable === true && storeHotelSearch?.checkIn && (
+                      <p className="text-sm font-semibold text-[#008234]">
+                        Free cancellation before{" "}
+                        {new Date(storeHotelSearch.checkIn + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                      </p>
+                    )}
+
+                    {hotelConfirmDisplay.isRefundable === false && (
+                      <p className="text-sm font-medium text-[#010D50]">Non-refundable</p>
+                    )}
+
+                    {hotelConfirmDisplay.cancellationText && (
+                      <p className="text-xs text-[#3A478A]">{hotelConfirmDisplay.cancellationText}</p>
+                    )}
+
+                    {hotelConfirmDisplay.isRefundable === true && storeHotelSearch?.checkIn && hotelConfirmDisplay.total != null && (
+                      <div className="flex items-center justify-between text-sm font-medium text-[#3A478A]">
+                        <span>
+                          After 12:00 AM on{" "}
+                          {new Date(storeHotelSearch.checkIn + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                        </span>
+                        <span>
+                          {hotelConfirmDisplay.currency === "£" || hotelConfirmDisplay.currency === "$" || hotelConfirmDisplay.currency === "€"
+                            ? `${hotelConfirmDisplay.currency}${hotelConfirmDisplay.total.toFixed(2)}`
+                            : `${hotelConfirmDisplay.currency || ""} ${hotelConfirmDisplay.total.toFixed(2)}`}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

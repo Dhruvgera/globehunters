@@ -1,20 +1,91 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import {
+  ChevronRight,
+  ChevronDown,
+  Ban,
+  CreditCard,
+  Pencil,
+} from "lucide-react";
 
 import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
 import { BookingHeader } from "@/components/booking/BookingHeader";
-import PassengerFormsSection from "@/components/booking/PassengerFormsSection";
-import { HotelSummaryCard } from "@/components/booking/HotelSummaryCard";
-import { Button } from "@/components/ui/button";
+import { HotelCheckoutSidebar } from "@/components/booking/HotelCheckoutSidebar";
 import { useBookingStore } from "@/store/bookingStore";
 import { hotelService } from "@/services/api/hotelService";
 import { folderService } from "@/services/api/folderService";
 import type { AddToFolderRequest } from "@/types/folder";
-import { WebRefCard } from "@/components/booking/WebRefCard";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
+import type { Passenger, PassengerType, PassengerTitle } from "@/types/booking";
+
+function InputField({
+  label,
+  placeholder,
+  value,
+  onChange,
+  type = "text",
+  className = "",
+  error,
+}: {
+  label?: string;
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+  className?: string;
+  error?: string;
+}) {
+  return (
+    <div className={`flex flex-col gap-1.5 ${className}`}>
+      {label && (
+        <label className="text-xs font-medium text-[#010D50]">{label}</label>
+      )}
+      <input
+        type={type}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`h-12 rounded-xl border ${error ? "border-red-500" : "border-[#DFE0E4]"} px-4 text-sm text-[#010D50] placeholder:text-[#3A478A] outline-none focus:border-[#3754ED] transition-colors`}
+      />
+      {error && <p className="text-xs text-red-600">{error}</p>}
+    </div>
+  );
+}
+
+function SelectField({
+  label,
+  value,
+  onChange,
+  children,
+  className = "",
+}: {
+  label?: string;
+  value: string;
+  onChange: (v: string) => void;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`flex flex-col gap-1.5 ${className}`}>
+      {label && (
+        <label className="text-xs font-medium text-[#010D50]">{label}</label>
+      )}
+      <div className="relative">
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-12 w-full rounded-xl border border-[#DFE0E4] px-4 pr-10 text-sm text-[#010D50] outline-none focus:border-[#3754ED] appearance-none bg-white transition-colors"
+        >
+          {children}
+        </select>
+        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#3A478A] pointer-events-none" />
+      </div>
+    </div>
+  );
+}
 
 export default function HotelCheckoutPage() {
   const router = useRouter();
@@ -26,19 +97,80 @@ export default function HotelCheckoutPage() {
   const selectedHotelRoomIds = useBookingStore((s) => s.selectedHotelRoomIds);
   const selectedHotelRoomSummary = useBookingStore((s) => s.selectedHotelRoomSummary);
   const passengers = useBookingStore((s) => s.passengers);
-  const passengersSaved = useBookingStore((s) => s.passengersSaved);
+  const addPassenger = useBookingStore((s) => s.addPassenger);
+  const updatePassenger = useBookingStore((s) => s.updatePassenger);
+  const setPassengersSaved = useBookingStore((s) => s.setPassengersSaved);
   const setVyspaFolderInfo = useBookingStore((s) => s.setVyspaFolderInfo);
   const setContactInfo = useBookingStore((s) => s.setContactInfo);
   const vyspaFolderNumber = useBookingStore((s) => s.vyspaFolderNumber);
   const searchRequestId = useBookingStore((s) => s.searchRequestId);
   const { phoneNumber: affiliatePhone } = useAffiliatePhone();
 
-  const webRefNumber = vyspaFolderNumber || searchRequestId || (hotelSearch?.searchCriteriaId ? String(hotelSearch.searchCriteriaId) : "—");
+  const webRefNumber =
+    vyspaFolderNumber ||
+    searchRequestId ||
+    (hotelSearch?.searchCriteriaId ? String(hotelSearch.searchCriteriaId) : "—");
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isHotelbedsMode = hotelSearch?.provider === 'hotelbeds';
+  const isHotelbedsMode = hotelSearch?.provider === "hotelbeds";
+
+  // Traveller form state
+  const leadPassenger = passengers[0];
+  const [title, setTitle] = useState<PassengerTitle>(leadPassenger?.title || "Mr");
+  const [firstName, setFirstName] = useState(leadPassenger?.firstName || "");
+  const [middleName, setMiddleName] = useState(leadPassenger?.middleName || "");
+  const [lastName, setLastName] = useState(leadPassenger?.lastName || "");
+  const [dateOfBirth, setDateOfBirth] = useState(leadPassenger?.dateOfBirth || "");
+  const [email, setEmail] = useState(leadPassenger?.email || "");
+  const [phone, setPhone] = useState(leadPassenger?.phone || "");
+  const [passport, setPassport] = useState(leadPassenger?.nationality || "India");
+
+  // Booking for
+  const [bookingFor, setBookingFor] = useState<"self" | "other">("self");
+
+  // Special request
+  const [specialRequest, setSpecialRequest] = useState("");
+
+  // Arrival time
+  const [arrivalTime, setArrivalTime] = useState("");
+
+  // T&C
+  const [tcAccepted, setTcAccepted] = useState(false);
+
+  // Form errors
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  // Track whether the lead passenger slot has been created in the store
+  const passengerAdded = useRef(!!passengers[0]);
+
+  // Auto-save passenger to store when form fields change
+  useEffect(() => {
+    if (firstName && lastName && dateOfBirth && email && phone) {
+      const passenger: Passenger = {
+        title,
+        firstName,
+        middleName,
+        lastName,
+        dateOfBirth,
+        email,
+        phone,
+        nationality: passport,
+        type: "adult" as PassengerType,
+      };
+      if (passengerAdded.current) {
+        updatePassenger(0, passenger);
+      } else {
+        addPassenger(passenger);
+        passengerAdded.current = true;
+      }
+      setPassengersSaved(true);
+    } else {
+      setPassengersSaved(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, firstName, middleName, lastName, dateOfBirth, email, phone, passport]);
 
   const summary = useMemo(() => {
     const hotelId = selectedHotel?.hotelId;
@@ -66,26 +198,51 @@ export default function HotelCheckoutPage() {
     return values.length > 0 ? values : undefined;
   }, [hotelDetailsCache, summary.hotelId, summary.roomIds]);
 
-  const canSubmit =
-    !!hotelSearch &&
-    !!summary.hotelId &&
-    summary.roomIds.length === Math.max(1, Number(hotelSearch?.rooms || 1)) &&
-    passengersSaved &&
-    passengers.length > 0 &&
-    !submitting;
+  const roomDisplayData = useMemo(() => {
+    const hotelId = summary.hotelId;
+    const cached = hotelId ? hotelDetailsCache?.[hotelId] : undefined;
+    const rooms = cached?.rooms || [];
+    const counts: Record<string, { count: number; isRefundable?: boolean }> = {};
+
+    for (const rid of selectedHotelRoomIds) {
+      const room = rooms.find((r: any) => String(r.id) === String(rid));
+      const name = room?.name || selectedHotelRoomSummary?.roomName || "Room";
+      const isRefundable = room?.isRefundable ?? selectedHotelRoomSummary?.isRefundable;
+      if (!counts[name]) counts[name] = { count: 0, isRefundable };
+      counts[name].count += 1;
+    }
+
+    const result = Object.entries(counts).map(([name, data]) => ({
+      name,
+      count: data.count,
+      isRefundable: data.isRefundable,
+    }));
+
+    return result.length > 0
+      ? result
+      : [{ name: selectedHotelRoomSummary?.roomName || "Room", count: 1, isRefundable: selectedHotelRoomSummary?.isRefundable }];
+  }, [summary.hotelId, hotelDetailsCache, selectedHotelRoomIds, selectedHotelRoomSummary]);
+
+  function validateForm(): boolean {
+    const errors: Record<string, string> = {};
+    if (!firstName.trim()) errors.firstName = "First name is required";
+    if (!lastName.trim()) errors.lastName = "Last name is required";
+    if (!dateOfBirth) errors.dateOfBirth = "Date of birth is required";
+    if (!email.trim()) errors.email = "Email is required";
+    if (!phone.trim()) errors.phone = "Phone number is required";
+    if (!tcAccepted) errors.tc = "You must accept the terms and conditions";
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  }
 
   async function handleConfirm() {
     if (!hotelSearch || !summary.hotelId) return;
+    if (!validateForm()) return;
     setSubmitting(true);
     setError(null);
 
     try {
-      const lead = passengers[0];
-      if (!lead?.email || !lead?.phone) {
-        throw new Error("Lead passenger email and phone are required.");
-      }
-
-      // Sync lead guest details to contact info for payment page
+      const lead = { title, firstName, lastName, email, phone, dateOfBirth, type: "adult" as PassengerType };
       setContactInfo(lead.email, lead.phone);
 
       let folderNo = vyspaFolderNumber ? Number(vyspaFolderNumber) : null;
@@ -110,64 +267,52 @@ export default function HotelCheckoutPage() {
           return (folderResp as any)?.folder_no;
         })();
 
-        if (!folderNo) {
-          throw new Error("Vyspa did not return a folder number (folder_no).");
-        }
-
+        if (!folderNo) throw new Error("Vyspa did not return a folder number (folder_no).");
         setVyspaFolderInfo({ folderNumber: String(folderNo), emailAddress: lead.email });
       }
 
-      // Build passengers in Vyspa folder format using existing helper in folderService
-      const folderPassengers = passengers.map((p, idx) => ({
+      const allPassengers = [lead, ...passengers.slice(1)];
+      const folderPassengers = allPassengers.map((p, idx) => ({
         pax_no: idx + 1,
         title: p.title as any,
         first_name: p.firstName,
         middle_name: "",
         last_name: p.lastName,
         birth_date: p.dateOfBirth || undefined,
-        pax_type: (p.type === "child" ? "CHD" : p.type === "infant" ? "INF" : "ADT") as any,
-        // booking.ts titles don't include Mstr/Mrs mapping; infer male only for Mr, default to F otherwise
+        pax_type: ((p as any).type === "child" ? "CHD" : (p as any).type === "infant" ? "INF" : "ADT") as any,
         api_gender: (p.title === "Mr" ? "M" : "F") as any,
         email: p.email,
         phone: p.phone,
       }));
 
-      // Build room passenger mapping for ApiAddToFolder.hotel.passengers (roomId -> "1,2,3")
       const roomPassengers = (() => {
         const roomIds = summary.roomIds;
         const mapping: Record<string, string> = {};
         if (roomIds.length === 0) return mapping;
-
         const allocations = roomIds.map(() => [] as number[]);
-        const byType = {
-          adult: [] as number[],
-          child: [] as number[],
-          infant: [] as number[],
-        };
+        const byType = { adult: [] as number[], child: [] as number[], infant: [] as number[] };
 
-        passengers.forEach((passenger, index) => {
+        allPassengers.forEach((passenger, index) => {
           const paxNo = index + 1;
-          if (passenger.type === "child") byType.child.push(paxNo);
-          else if (passenger.type === "infant") byType.infant.push(paxNo);
+          const t = (passenger as any).type;
+          if (t === "child") byType.child.push(paxNo);
+          else if (t === "infant") byType.infant.push(paxNo);
           else byType.adult.push(paxNo);
         });
 
         const distribute = (indices: number[]) => {
           if (indices.length === 0) return;
-          const roomCount = roomIds.length;
-          const base = Math.floor(indices.length / roomCount);
-          const remainder = indices.length % roomCount;
-          const counts = Array.from({ length: roomCount }, () => base);
-          for (let i = 0; i < remainder; i += 1) {
-            counts[roomCount - 1 - i] += 1;
-          }
-
-          let cursor = 0;
-          counts.forEach((count, roomIndex) => {
-            for (let i = 0; i < count; i += 1) {
-              const paxNo = indices[cursor];
-              if (paxNo != null) allocations[roomIndex]?.push(paxNo);
-              cursor += 1;
+          const rc = roomIds.length;
+          const base = Math.floor(indices.length / rc);
+          const rem = indices.length % rc;
+          const cnts = Array.from({ length: rc }, () => base);
+          for (let i = 0; i < rem; i++) cnts[rc - 1 - i] += 1;
+          let cur = 0;
+          cnts.forEach((count, ri) => {
+            for (let i = 0; i < count; i++) {
+              const pn = indices[cur];
+              if (pn != null) allocations[ri]?.push(pn);
+              cur += 1;
             }
           });
         };
@@ -179,12 +324,9 @@ export default function HotelCheckoutPage() {
         roomIds.forEach((roomId, index) => {
           const pax = allocations[index] || [];
           if (pax.length > 0) {
-            mapping[roomId] = mapping[roomId]
-              ? `${mapping[roomId]},${pax.join(",")}`
-              : pax.join(",");
+            mapping[roomId] = mapping[roomId] ? `${mapping[roomId]},${pax.join(",")}` : pax.join(",");
           }
         });
-
         return mapping;
       })();
 
@@ -209,12 +351,8 @@ export default function HotelCheckoutPage() {
             refundable: selectedHotelRoomSummary?.isRefundable,
           },
         });
-        if (!submitResp?.success) {
-          throw new Error((submitResp as any)?.message || "Failed to submit HotelBeds hotel to folder");
-        }
+        if (!submitResp?.success) throw new Error((submitResp as any)?.message || "Failed to submit HotelBeds hotel to folder");
 
-        // Ensure passenger rows appear in CMS Passenger tab for HotelBeds folders.
-        // Vyspa persists these via ApiAddToFolder even when requestData is empty.
         const paxSyncResp = await folderService.addToFolder({
           folderNumber: Number(folderNo),
           itineraryNumber: "1",
@@ -225,9 +363,7 @@ export default function HotelCheckoutPage() {
           passengers: folderPassengers as any,
           requestData: [],
         });
-        if (!paxSyncResp.success) {
-          throw new Error(paxSyncResp.message || "Failed to sync hotel passengers to folder");
-        }
+        if (!paxSyncResp.success) throw new Error(paxSyncResp.message || "Failed to sync hotel passengers to folder");
       } else {
         const addToFolderRequest: AddToFolderRequest = {
           folderNumber: Number(folderNo),
@@ -248,11 +384,8 @@ export default function HotelCheckoutPage() {
             } as any,
           ],
         };
-
         const addResp = await folderService.addToFolder(addToFolderRequest);
-        if (!addResp.success) {
-          throw new Error(addResp.message || "Failed to add hotel to folder");
-        }
+        if (!addResp.success) throw new Error(addResp.message || "Failed to add hotel to folder");
       }
 
       router.push("/payment?type=hotel");
@@ -271,42 +404,197 @@ export default function HotelCheckoutPage() {
         <BookingHeader currentStep={1} isHotel={true} />
 
         <div className="flex flex-col lg:flex-row gap-4 mt-4">
-          <WebRefCard
-            refNumber={webRefNumber}
-            phoneNumber={affiliatePhone}
-            isMobile={true}
-          />
-          <div className="flex-1 flex flex-col gap-4">
-            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4">
-              <div className="text-sm font-semibold text-[#010D50]">Hotel booking</div>
-              <div className="text-xs text-[#3A478A] mt-1">
-                Rooms selected: {summary.roomIds.length}
+          {/* LEFT COLUMN */}
+          <div className="flex-1 flex flex-col gap-3">
+
+            {/* Traveller Details */}
+            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
+              <span className="text-sm font-semibold text-[#010D50]">Traveller Details</span>
+
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="bg-[#F5F7FF] rounded-full px-4 py-2">
+                    <span className="text-sm font-semibold text-[#010D50]">Lead Traveller</span>
+                  </div>
+                  <span className="text-sm text-[#010D50]">(Must be 18 or older)</span>
+                </div>
+
+                {/* Name Row */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-[#010D50]">Name</label>
+                  <div className="flex gap-2">
+                    <div className="relative w-[90px] flex-shrink-0">
+                      <select
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value as PassengerTitle)}
+                        className="h-12 w-full rounded-xl border border-[#DFE0E4] px-3 pr-8 text-sm text-[#010D50] outline-none focus:border-[#3754ED] appearance-none bg-white"
+                      >
+                        <option value="Mr">Mr.</option>
+                        <option value="Mrs">Mrs.</option>
+                        <option value="Miss">Miss</option>
+                        <option value="Ms">Ms.</option>
+                        <option value="Dr">Dr.</option>
+                      </select>
+                      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-[#3A478A] pointer-events-none" />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="First Name"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      className={`flex-1 h-12 rounded-xl border ${formErrors.firstName ? "border-red-500" : "border-[#DFE0E4]"} px-4 text-sm text-[#010D50] placeholder:text-[#3A478A] outline-none focus:border-[#3754ED]`}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Middle Name"
+                      value={middleName}
+                      onChange={(e) => setMiddleName(e.target.value)}
+                      className="flex-1 h-12 rounded-xl border border-[#DFE0E4] px-4 text-sm text-[#010D50] placeholder:text-[#3A478A] outline-none focus:border-[#3754ED]"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Last Name"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      className={`flex-1 h-12 rounded-xl border ${formErrors.lastName ? "border-red-500" : "border-[#DFE0E4]"} px-4 text-sm text-[#010D50] placeholder:text-[#3A478A] outline-none focus:border-[#3754ED]`}
+                    />
+                  </div>
+                </div>
+
+                {/* DOB + Email */}
+                <div className="flex gap-3">
+                  <InputField label="Date of Birth" placeholder="DD/MM/YYYY" value={dateOfBirth} onChange={setDateOfBirth} type="date" className="flex-1" error={formErrors.dateOfBirth} />
+                  <InputField label="Email ID" placeholder="xyz123@gmail.com" value={email} onChange={setEmail} type="email" className="flex-1" error={formErrors.email} />
+                </div>
+
+                {/* Phone + Passport */}
+                <div className="flex gap-3">
+                  <InputField label="Phone no." placeholder="1234567890" value={phone} onChange={setPhone} type="tel" className="flex-1" error={formErrors.phone} />
+                  <SelectField label="Passport" value={passport} onChange={setPassport} className="flex-1">
+                    <option value="India">India</option>
+                    <option value="United Kingdom">United Kingdom</option>
+                    <option value="United States">United States</option>
+                    <option value="Australia">Australia</option>
+                    <option value="Canada">Canada</option>
+                    <option value="Other">Other</option>
+                  </SelectField>
+                </div>
               </div>
             </div>
 
-            <PassengerFormsSection showPassportFields={false} requireOnlyLead={true} />
+            {/* Who are you booking for? */}
+            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-3">
+              <span className="text-sm font-medium text-[#010D50]">Who are you booking for? (optional)</span>
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="bookingFor" checked={bookingFor === "self"} onChange={() => setBookingFor("self")} className="w-5 h-5 accent-[#3754ED]" />
+                  <span className="text-sm text-[#010D50]">I&apos;m the traveller</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" name="bookingFor" checked={bookingFor === "other"} onChange={() => setBookingFor("other")} className="w-5 h-5 accent-[#3754ED]" />
+                  <span className="text-sm text-[#010D50]">I&apos;m booking for someone else</span>
+                </label>
+              </div>
+            </div>
 
-            {error && <div className="text-sm text-red-600">{error}</div>}
+            {/* Room Cards */}
+            {roomDisplayData.map((room, idx) => (
+              <div key={idx} className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-[#010D50]">
+                    {room.name} {room.count > 1 ? `x${room.count}` : ""}
+                  </span>
+                  <button className="flex items-center gap-1.5 text-xs text-[#3A478A] hover:text-[#3754ED]">
+                    <span>{firstName || "Add main guest details"}</span>
+                    {firstName && <Pencil className="w-3 h-3" />}
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <div className="border border-[#DFE0E4] rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
+                    <Ban className="w-3 h-3 text-[#010D50]" />
+                    <span className="text-xs text-[#010D50]">
+                      {room.isRefundable === false ? "Non-refundable" : room.isRefundable === true ? "Refundable" : "Non-refundable"}
+                    </span>
+                  </div>
+                  <div className="border border-[#DFE0E4] rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">
+                    <CreditCard className="w-3 h-3 text-[#010D50]" />
+                    <span className="text-xs text-[#010D50]">Pay Online</span>
+                  </div>
+                </div>
+              </div>
+            ))}
 
-            <div className="flex items-center justify-end">
-              <Button
-                onClick={handleConfirm}
-                disabled={!canSubmit}
-                className="rounded-full px-6 py-3 h-auto bg-[#3754ED] hover:bg-[#2A3FB8] text-white font-semibold"
-              >
-                {submitting ? "Confirming…" : "Continue to payment"}
-              </Button>
+            {/* Special Request */}
+            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-3">
+              <span className="text-sm font-semibold text-[#010D50]">Special Request</span>
+              <p className="text-xs text-[#3A478A]">
+                Special requests can&apos;t be guaranteed, but the property will do its best to meet your needs.
+                You can always make a special request after your booking is complete.
+              </p>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-[#010D50]">Please write your requests in English. (optional)</label>
+                <textarea
+                  value={specialRequest}
+                  onChange={(e) => setSpecialRequest(e.target.value)}
+                  rows={4}
+                  className="w-full rounded-xl border border-[#DFE0E4] px-4 py-3 text-sm text-[#010D50] placeholder:text-[#3A478A] outline-none focus:border-[#3754ED] resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Your arrival time */}
+            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-3">
+              <span className="text-sm font-semibold text-[#010D50]">Your arrival time</span>
+              <p className="text-sm text-[#010D50]">You can check in between 15:00 and 18:00</p>
+              <SelectField label="Add your estimated arrival time. (optional)" value={arrivalTime} onChange={setArrivalTime} className="max-w-sm">
+                <option value="">Select</option>
+                <option value="14:00">14:00 - 15:00</option>
+                <option value="15:00">15:00 - 16:00</option>
+                <option value="16:00">16:00 - 17:00</option>
+                <option value="17:00">17:00 - 18:00</option>
+                <option value="18:00">18:00 - 19:00</option>
+                <option value="19:00">19:00 - 20:00</option>
+                <option value="20:00">20:00 - 21:00</option>
+                <option value="21:00">21:00 - 22:00</option>
+                <option value="22:00">22:00 - 23:00</option>
+                <option value="23:00">23:00 - 00:00</option>
+              </SelectField>
+            </div>
+
+            {/* T&C + Continue to payment */}
+            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" checked={tcAccepted} onChange={(e) => setTcAccepted(e.target.checked)} className="w-5 h-5 accent-[#3754ED] flex-shrink-0 mt-0.5 rounded" />
+                <span className="text-xs text-[#010D50] leading-relaxed">
+                  By checking this box, I acknowledge that passenger information matches the passport or
+                  official ID for travel, and that name changes are not allowed. I confirm that I have reviewed
+                  the hotel itinerary and agree to the Refund &amp; Cancellation Policy. I understand tickets are
+                  non-transferable and non-changeable unless stated otherwise. I accept full responsibility for
+                  valid travel documentation and understand Globehunters cannot be held responsible for denied
+                  boarding due to passport or visa validity.
+                </span>
+              </label>
+              {formErrors.tc && <p className="text-xs text-red-600">{formErrors.tc}</p>}
+              {error && <div className="text-xs text-red-600 bg-red-50 rounded-lg p-2">{error}</div>}
+
+              <div className="flex justify-end">
+                <button
+                  onClick={handleConfirm}
+                  disabled={submitting}
+                  className="bg-[#3754ED] hover:bg-[#2A3FB8] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium px-6 py-3 rounded-full flex items-center gap-1 transition-colors"
+                >
+                  {submitting ? "Confirming…" : "Continue to payment"}
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
 
-          <aside className="w-full lg:w-[360px] flex flex-col gap-4">
-            <WebRefCard
-              refNumber={webRefNumber}
-              phoneNumber={affiliatePhone}
-              isMobile={false}
-            />
-            <HotelSummaryCard />
-          </aside>
+          {/* RIGHT SIDEBAR */}
+          <HotelCheckoutSidebar
+            webRef={webRefNumber}
+            phoneNumber={affiliatePhone}
+          />
         </div>
       </div>
 
