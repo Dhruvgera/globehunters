@@ -27,6 +27,20 @@ export function AirportAutocomplete({
 
   const { results, loading, search } = useAirportSearch({ limit: 10 });
 
+  const handleDropdownWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const { scrollTop, scrollHeight, clientHeight } = target;
+    const isScrollable = scrollHeight > clientHeight;
+    if (!isScrollable) return;
+
+    const isAtTop = scrollTop <= 0;
+    const isAtBottom = scrollTop + clientHeight >= scrollHeight;
+    if ((isAtTop && e.deltaY < 0) || (isAtBottom && e.deltaY > 0)) {
+      e.preventDefault();
+    }
+    e.stopPropagation();
+  };
+
   // Update input when value changes externally
   useEffect(() => {
     if (value) {
@@ -138,7 +152,11 @@ export function AirportAutocomplete({
 
       {/* Dropdown */}
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#D3D3D3] rounded-xl shadow-lg max-h-80 overflow-y-auto z-50">
+        <div
+          className="absolute top-full left-0 right-0 mt-1 bg-white border border-[#D3D3D3] rounded-xl shadow-lg max-h-80 overflow-y-auto overscroll-contain z-50"
+          data-lenis-prevent
+          onWheel={handleDropdownWheel}
+        >
           {loading && results.length === 0 && (
             <div className="p-4 text-center text-sm text-gray-500">
               {t('loading')}
