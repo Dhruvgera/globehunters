@@ -29,6 +29,7 @@ import {
   Bath,
   X,
   ChevronLeft,
+  Loader2,
 } from "lucide-react";
 
 import Navbar from "@/components/navigation/Navbar";
@@ -868,6 +869,7 @@ export default function HotelRoomsPage() {
   const [roomsError, setRoomsError] = useState<string | null>(null);
   const [selectedRoomCounts, setSelectedRoomCounts] = useState<Record<string, number>>({});
   const [stayEditorOpen, setStayEditorOpen] = useState(false);
+  const [stayUpdateLoading, setStayUpdateLoading] = useState(false);
   const [roomsFilterOpen, setRoomsFilterOpen] = useState(false);
   const [expandedRoomInfoById, setExpandedRoomInfoById] = useState<Record<string, boolean>>({});
   const [stayCheckIn, setStayCheckIn] = useState<string>(() => hotelSearch?.checkIn || "");
@@ -2190,7 +2192,7 @@ export default function HotelRoomsPage() {
               </div>
             </div>
 
-            <Dialog open={stayEditorOpen} onOpenChange={setStayEditorOpen}>
+            <Dialog open={stayEditorOpen} onOpenChange={(open) => !stayUpdateLoading && setStayEditorOpen(open)}>
               <DialogContent className="max-w-lg bg-white text-[#010D50]">
                 <DialogHeader>
                   <DialogTitle>Update stay</DialogTitle>
@@ -2203,6 +2205,7 @@ export default function HotelRoomsPage() {
                         type="date"
                         value={stayCheckIn}
                         onChange={(e) => setStayCheckIn(e.target.value)}
+                        disabled={stayUpdateLoading}
                         className="border border-[#DFE0E4] rounded-lg px-3 py-2 bg-white text-[#010D50]"
                       />
                     </label>
@@ -2212,6 +2215,7 @@ export default function HotelRoomsPage() {
                         type="date"
                         value={stayCheckOut}
                         onChange={(e) => setStayCheckOut(e.target.value)}
+                        disabled={stayUpdateLoading}
                         className="border border-[#DFE0E4] rounded-lg px-3 py-2 bg-white text-[#010D50]"
                       />
                     </label>
@@ -2225,6 +2229,7 @@ export default function HotelRoomsPage() {
                         max={16}
                         value={stayAdults}
                         onChange={(e) => setStayAdults(Math.max(1, Number(e.target.value || 1)))}
+                        disabled={stayUpdateLoading}
                         className="border border-[#DFE0E4] rounded-lg px-3 py-2 bg-white text-[#010D50]"
                       />
                     </label>
@@ -2236,6 +2241,7 @@ export default function HotelRoomsPage() {
                         max={16}
                         value={stayChildren}
                         onChange={(e) => setStayChildren(Math.max(0, Number(e.target.value || 0)))}
+                        disabled={stayUpdateLoading}
                         className="border border-[#DFE0E4] rounded-lg px-3 py-2 bg-white text-[#010D50]"
                       />
                     </label>
@@ -2247,17 +2253,25 @@ export default function HotelRoomsPage() {
                         max={8}
                         value={stayRooms}
                         onChange={(e) => setStayRooms(Math.max(1, Number(e.target.value || 1)))}
+                        disabled={stayUpdateLoading}
                         className="border border-[#DFE0E4] rounded-lg px-3 py-2 bg-white text-[#010D50]"
                       />
                     </label>
                   </div>
+                  {stayUpdateLoading && (
+                    <div className="flex items-center gap-2 text-sm text-[#3A478A]">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading updated rates and room options...
+                    </div>
+                  )}
                   <div className="flex justify-end gap-2 pt-2">
-                    <Button variant="outline" onClick={() => setStayEditorOpen(false)}>
+                    <Button variant="outline" onClick={() => setStayEditorOpen(false)} disabled={stayUpdateLoading}>
                       Cancel
                     </Button>
                     <Button
                       onClick={async () => {
                         try {
+                          setStayUpdateLoading(true);
                           setRoomsError(null);
                           setRoomsLoading(true);
                           await runStaySearch({
@@ -2272,11 +2286,20 @@ export default function HotelRoomsPage() {
                           setRoomsError(e?.message || "Failed to update availability");
                         } finally {
                           setRoomsLoading(false);
+                          setStayUpdateLoading(false);
                         }
                       }}
+                      disabled={stayUpdateLoading}
                       className="bg-[#3754ED] hover:bg-[#2A3FB8]"
                     >
-                      Update
+                      {stayUpdateLoading ? (
+                        <span className="inline-flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Updating...
+                        </span>
+                      ) : (
+                        "Update"
+                      )}
                     </Button>
                   </div>
                 </div>
