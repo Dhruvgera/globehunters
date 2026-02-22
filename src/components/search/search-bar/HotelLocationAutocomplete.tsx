@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, MapPin } from "lucide-react";
 
 import { useHotelLocationSearch } from "@/hooks/useHotelLocationSearch";
@@ -10,11 +10,6 @@ interface HotelLocationAutocompleteProps {
   value: VyspaCityHotelLookupItem | null;
   onChange: (item: VyspaCityHotelLookupItem | null) => void;
   placeholder?: string;
-}
-
-function formatSecondary(item: VyspaCityHotelLookupItem) {
-  const parts = [item.city_name, item.country_name].filter(Boolean);
-  return parts.join(", ");
 }
 
 export function HotelLocationAutocomplete({
@@ -29,6 +24,7 @@ export function HotelLocationAutocomplete({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { results, loading, search } = useHotelLocationSearch({ limit: 10 });
+  const normalizedQuery = inputValue.trim().toLowerCase();
 
   const handleDropdownWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
@@ -74,13 +70,52 @@ export function HotelLocationAutocomplete({
     setSelectedIndex(-1);
   };
 
+  const displayResults = useMemo(() => {
+    const locationPriority = (loc: string) => {
+      const value = String(loc || "").toUpperCase();
+      if (value === "CITY") return 0;
+      if (value === "TOWN") return 1;
+      if (value === "LOC") return 2;
+      if (value === "HOTEL") return 3;
+      return 9;
+    };
+
+    const rankItem = (item: VyspaCityHotelLookupItem) => {
+      const label = String(item.label || "").trim().toLowerCase();
+      const exact = normalizedQuery && label === normalizedQuery ? 0 : 1;
+      const startsWith = normalizedQuery && label.startsWith(normalizedQuery) ? 0 : 1;
+      const contains = normalizedQuery && label.includes(normalizedQuery) ? 0 : 1;
+      return [exact, startsWith, contains, locationPriority(item.loc), label];
+    };
+
+    const compareRank = (a: VyspaCityHotelLookupItem, b: VyspaCityHotelLookupItem) => {
+      const ar = rankItem(a);
+      const br = rankItem(b);
+      for (let i = 0; i < ar.length - 1; i += 1) {
+        if (ar[i] !== br[i]) return Number(ar[i]) - Number(br[i]);
+      }
+      return String(ar[ar.length - 1]).localeCompare(String(br[br.length - 1]));
+    };
+
+    const byName = new Map<string, VyspaCityHotelLookupItem>();
+    for (const item of results) {
+      const labelKey = String(item.label || "").trim().toLowerCase();
+      if (!labelKey) continue;
+      const existing = byName.get(labelKey);
+      if (!existing || compareRank(item, existing) < 0) {
+        byName.set(labelKey, item);
+      }
+    }
+    return Array.from(byName.values()).sort(compareRank);
+  }, [results, normalizedQuery]);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (!isOpen || results.length === 0) return;
+    if (!isOpen || displayResults.length === 0) return;
 
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
-        setSelectedIndex((prev) => (prev < results.length - 1 ? prev + 1 : prev));
+        setSelectedIndex((prev) => (prev < displayResults.length - 1 ? prev + 1 : prev));
         break;
       case "ArrowUp":
         e.preventDefault();
@@ -88,8 +123,8 @@ export function HotelLocationAutocomplete({
         break;
       case "Enter":
         e.preventDefault();
-        if (selectedIndex >= 0 && selectedIndex < results.length) {
-          handleSelect(results[selectedIndex]!);
+        if (selectedIndex >= 0 && selectedIndex < displayResults.length) {
+          handleSelect(displayResults[selectedIndex]!);
         }
         break;
       case "Escape":
@@ -143,14 +178,23 @@ export function HotelLocationAutocomplete({
           data-lenis-prevent
           onWheel={handleDropdownWheel}
         >
-          {!loading && results.length === 0 && inputValue.trim() !== "" && (
+          {!loading && displayResults.length === 0 && inputValue.trim() !== "" && (
             <div className="p-4 text-center text-sm text-gray-500">No results</div>
           )}
 
-          {results.length > 0 && (
+          {displayResults.length > 0 && (
             <ul className="py-2">
-              {results.map((item, index) => (
-                <li key={`${item.id}-${item.label}`}>
+              {displayResults.map((item, index) => {
+                const city = String(item.city_name || "").trim();
+                const country = String(item.country_name || "").trim();
+                const label = String(item.label || "").trim();
+                const secondary =
+                  city && city.toLowerCase() === label.toLowerCase()
+                    ? country
+                    : [city, country].filter(Boolean).join(", ");
+
+                return (
+                <li key={`${item.loc}-${item.label}`}>
                   <button
                     type="button"
                     onClick={() => handleSelect(item)}
@@ -160,25 +204,19 @@ export function HotelLocationAutocomplete({
                       index === selectedIndex ? "bg-blue-50" : "",
                     ].join(" ")}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-gray-100 rounded-lg flex flex-col items-center justify-center flex-shrink-0">
-                        <span className="text-[10px] font-semibold text-gray-700">
-                          {(item.loc || "LOC").toString().toUpperCase()}
-                        </span>
-                        <span className="text-xs font-bold text-gray-700">{item.id}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-semibold text-gray-900 truncate">
+                        {highlightText(item.label, inputValue)}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold text-gray-900 truncate">
-                          {highlightText(item.label, inputValue)}
-                        </div>
+                      {secondary && (
                         <div className="text-xs text-gray-500 truncate">
-                          {formatSecondary(item)}
+                          {secondary}
                         </div>
-                      </div>
+                      )}
                     </div>
                   </button>
                 </li>
-              ))}
+              )})}
             </ul>
           )}
         </div>
@@ -186,6 +224,4 @@ export function HotelLocationAutocomplete({
     </div>
   );
 }
-
-
 
