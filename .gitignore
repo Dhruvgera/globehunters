@@ -1,4 +1,6 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+plan
+scripts/output
 .cursorignore
 .dockerignore
 CRM_Affilate Details (1).csv
