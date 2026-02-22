@@ -49,6 +49,22 @@ function formatIsoDateLabel(d?: string): string {
   return s;
 }
 
+function formatStayDate(d?: string): string {
+  const s = String(d || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "—";
+  const dt = new Date(`${s}T12:00:00`);
+  if (Number.isNaN(dt.getTime())) return s;
+  return dt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function calculateStayNights(checkIn?: string, checkOut?: string): number {
+  const inDate = new Date(`${String(checkIn || "").slice(0, 10)}T00:00:00`);
+  const outDate = new Date(`${String(checkOut || "").slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(inDate.getTime()) || Number.isNaN(outDate.getTime())) return 0;
+  const nights = Math.round((outDate.getTime() - inDate.getTime()) / (1000 * 60 * 60 * 24));
+  return Math.max(0, nights);
+}
+
 type UnknownRecord = Record<string, unknown>;
 
 interface RoomAmenity {
@@ -218,6 +234,22 @@ function sanitizeHotelText(value: unknown): string {
     .map((line) => line.replace(/\s+/g, " ").trim())
     .filter(Boolean)
     .join("\n");
+}
+
+function sanitizeRoomDisplayText(value: unknown): string {
+  const text = sanitizeHotelText(value).replace(/\s+/g, " ").trim();
+  if (!text) return "";
+
+  const lettersOnly = text.replace(/[^A-Za-z]/g, "");
+  const isAllCaps = lettersOnly.length > 0 && lettersOnly === lettersOnly.toUpperCase();
+  if (!isAllCaps) return text;
+
+  return text
+    .toLowerCase()
+    .replace(/\b[a-z]/g, (match) => match.toUpperCase())
+    .replace(/\bAnd\b/g, "and")
+    .replace(/\bOr\b/g, "or")
+    .replace(/\bOf\b/g, "of");
 }
 
 function extractAmenitiesFromDescription(description: string): string[] {
@@ -1041,23 +1073,20 @@ export default function HotelRoomsPage() {
       }
 
       // Format 2: <images><image path="..."> (Hotelbeds XML)
-      if (photos.length === 0) {
-        const imageNodes = Array.from(doc.querySelectorAll("images > image"));
-        imageNodes.forEach((img) => {
-          const path = normalizeUrl(img.getAttribute("path") || "");
-          if (!path) return;
+      // Always parse this too; some payloads include both formats.
+      const imageNodes = Array.from(doc.querySelectorAll("images > image"));
+      imageNodes.forEach((img) => {
+        const path = normalizeUrl(img.getAttribute("path") || "");
+        if (!path) return;
 
-          const roomCode = img.getAttribute("roomCode");
-          if (roomCode) {
-            // This is a room-specific image
-            if (!roomImages[roomCode]) roomImages[roomCode] = [];
-            roomImages[roomCode].push(path);
-          } else {
-            // General hotel image
-            photos.push(path);
-          }
-        });
-      }
+        const roomCode = img.getAttribute("roomCode");
+        if (roomCode) {
+          if (!roomImages[roomCode]) roomImages[roomCode] = [];
+          roomImages[roomCode].push(path);
+        }
+        // Keep all images in the hotel gallery (no separate room-image gallery).
+        photos.push(path);
+      });
 
       // Try both formats for amenities: <Amenity><Text> and <facilities><facility><description>
       let amenities: string[] = [];
@@ -1181,6 +1210,15 @@ export default function HotelRoomsPage() {
   }, [hotelId]);
 
   const hotel = useMemo(() => {
+    const mapQuery = (() => {
+      if (!coordinates) return "";
+      const name = (remoteHotelHeader?.name || "").trim();
+      const address = (remoteHotelHeader?.address || "").trim();
+      const placeText = [name, address].filter(Boolean).join(", ");
+      if (placeText) return `${placeText} (${coordinates.lat}, ${coordinates.lng})`;
+      return `${coordinates.lat},${coordinates.lng}`;
+    })();
+
     return {
       name: remoteHotelHeader?.name || "",
       starRating: remoteHotelHeader?.rating || 0,
@@ -1194,17 +1232,31 @@ export default function HotelRoomsPage() {
       reviews: { score: 0, label: "", count: 0, breakdown: {} as Record<string, number> },
       policies: cancellationText || "",
       mapUrl: coordinates
-        ? `https://www.google.com/maps/search/?api=1&query=${coordinates.lat},${coordinates.lng}&hl=en`
+        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}&hl=en`
         : "#",
       importantInfo: importantInfoText || "",
       coordinates,
+      mapQuery,
     };
   }, [cancellationText, coordinates, detailsText, galleryImages, importantInfoText, remoteAmenities, remoteHotelHeader]);
+  const staySummary = useMemo(() => {
+    const checkIn = hotelSearch?.checkIn || stayCheckIn || "";
+    const checkOut = hotelSearch?.checkOut || stayCheckOut || "";
+    const nights = calculateStayNights(checkIn, checkOut);
+    return {
+      nights,
+      checkInLabel: formatStayDate(checkIn),
+      checkOutLabel: formatStayDate(checkOut),
+    };
+  }, [hotelSearch?.checkIn, hotelSearch?.checkOut, stayCheckIn, stayCheckOut]);
   const hasPolicies = hotel.policies.trim().length > 0;
   const hasImportantInfo = hotel.importantInfo.trim().length > 0;
+  const hasAboutProperty = hotel.about.description.trim().length > 0;
+  const hasAmenitiesSection = hotel.amenities.length > 0;
+  const hasAboutSection = hasAboutProperty || hasAmenitiesSection;
   const navSections = useMemo(
-    () => ["Overview", "About", "Rooms", "Accessibilities", ...(hasPolicies ? ["Policies"] : [])],
-    [hasPolicies]
+    () => ["Overview", ...(hasAboutSection ? ["About"] : []), "Rooms", "Accessibilities", ...(hasPolicies ? ["Policies"] : [])],
+    [hasAboutSection, hasPolicies]
   );
   const rooms = useMemo(() => {
     const q = filterBoardQuery.trim().toLowerCase();
@@ -1764,71 +1816,81 @@ export default function HotelRoomsPage() {
 
               {/* Image Gallery - Main image left, 3 thumbnails stacked right */}
               <div className="flex flex-col lg:flex-row gap-3">
-                {/* Main Image - Takes up ~70% width */}
-                <div
-                  className="relative flex-[2] min-h-[300px] lg:min-h-[450px] rounded-2xl overflow-hidden cursor-pointer group"
-                  onClick={() => {
-                    if (hotel.galleryImages.length > 0) {
-                      setCurrentPhotoIndex(0);
-                      setGalleryOpen(true);
-                    }
-                  }}
-                >
-                  {hotel.mainImage ? (
-                    <Image
-                      src={hotel.mainImage}
-                      alt={hotel.name}
-                      fill
-                      className="object-cover transition-transform duration-500 group-hover:scale-105"
-                      priority
-                    />
-                  ) : (
-                    <div className="absolute inset-0 bg-[#F6F6F6]" />
-                  )}
-                  {/* Show All Photos Button - Bottom left of main image */}
-                  {hotel.galleryImages.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setGalleryOpen(true);
-                      }}
-                      className="absolute bottom-4 left-4 flex items-center gap-2 px-4 py-2 rounded-lg bg-white/90 backdrop-blur-sm hover:bg-white transition-all shadow-sm hover:shadow-md"
-                    >
-                      <Grid3X3 className="w-4 h-4 text-[#010D50]" />
-                      <span className="text-sm font-medium text-[#010D50]">Show All Photos</span>
-                    </button>
-                  )}
-                </div>
+                {(() => {
+                  const firstIsMain = hotel.galleryImages?.[0] === hotel.mainImage;
+                  const thumbImages = firstIsMain ? (hotel.galleryImages || []).slice(1, 4) : (hotel.galleryImages || []).slice(0, 3);
+                  const hasThumbImages = thumbImages.length > 0;
 
-                {/* Thumbnail Stack - 3 images vertically on right */}
-                <div className="flex flex-row lg:flex-col gap-3 lg:w-[220px]">
-                  {(() => {
-                    // Logic to skip the main image if it's the first one in galleryImages
-                    const firstIsMain = hotel.galleryImages?.[0] === hotel.mainImage;
-                    const thumbImages = firstIsMain ? (hotel.galleryImages || []).slice(1, 4) : (hotel.galleryImages || []).slice(0, 3);
-                    return thumbImages.map((img: string, idx: number) => {
-                      const imgIndex = firstIsMain ? idx + 1 : idx;
-                      return (
+                  return (
+                    <>
+                      {/* Main Image - full width when there are no side thumbnails */}
                       <div
-                        key={`${img}-${idx}`}
-                        className="relative flex-1 lg:flex-none lg:h-[140px] min-h-[100px] rounded-xl overflow-hidden bg-gray-100 cursor-pointer group"
+                        className={[
+                          "relative min-h-[300px] lg:min-h-[450px] rounded-2xl overflow-hidden cursor-pointer group",
+                          hasThumbImages ? "flex-[2]" : "w-full flex-1",
+                        ].join(" ")}
                         onClick={() => {
-                          setCurrentPhotoIndex(imgIndex);
-                          setGalleryOpen(true);
+                          if (hotel.galleryImages.length > 0) {
+                            setCurrentPhotoIndex(0);
+                            setGalleryOpen(true);
+                          }
                         }}
                       >
-                        <Image
-                          src={img}
-                          alt={`${hotel.name} - ${idx + 1}`}
-                          fill
-                          className="object-cover transition-transform duration-500 group-hover:scale-110"
-                        />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                        {hotel.mainImage ? (
+                          <Image
+                            src={hotel.mainImage}
+                            alt={hotel.name}
+                            fill
+                            className="object-cover transition-transform duration-500 group-hover:scale-105"
+                            priority
+                          />
+                        ) : (
+                          <div className="absolute inset-0 bg-[#F6F6F6]" />
+                        )}
+                        {/* Show All Photos Button - Bottom left of main image */}
+                        {hotel.galleryImages.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setGalleryOpen(true);
+                            }}
+                            className="absolute bottom-4 left-4 flex items-center gap-2 px-4 py-2 rounded-lg bg-white/90 backdrop-blur-sm hover:bg-white transition-all shadow-sm hover:shadow-md"
+                          >
+                            <Grid3X3 className="w-4 h-4 text-[#010D50]" />
+                            <span className="text-sm font-medium text-[#010D50]">Show All Photos</span>
+                          </button>
+                        )}
                       </div>
-                    )});
-                  })()}
-                </div>
+
+                      {hasThumbImages && (
+                        <div className="flex flex-row lg:flex-col gap-3 lg:w-[220px]">
+                          {thumbImages.map((img: string, idx: number) => {
+                            const imgIndex = firstIsMain ? idx + 1 : idx;
+                            return (
+                              <div
+                                key={`${img}-${idx}`}
+                                className="relative flex-1 lg:flex-none lg:h-[140px] min-h-[100px] rounded-xl overflow-hidden bg-gray-100 cursor-pointer group"
+                                onClick={() => {
+                                  setCurrentPhotoIndex(imgIndex);
+                                  setGalleryOpen(true);
+                                }}
+                              >
+                                <Image
+                                  src={img}
+                                  alt={`${hotel.name} - ${idx + 1}`}
+                                  fill
+                                  className="object-cover transition-transform duration-500 group-hover:scale-110"
+                                />
+                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -1923,45 +1985,51 @@ export default function HotelRoomsPage() {
 
           {/* Content Grid */}
           <div className="p-4 lg:p-6 space-y-8">
-            <div className="grid lg:grid-cols-[1fr_380px] gap-8">
+            <div className={hasAboutSection ? "grid lg:grid-cols-[1fr_380px] gap-8" : "grid lg:grid-cols-1 gap-8"}>
               {/* Left Column - About & Amenities */}
-              <div ref={aboutRef} className="space-y-8">
-                {/* About Section */}
-                <div className="space-y-4 pb-6 border-b border-[#DFE0E4]">
-                  <h2 className="text-xl lg:text-2xl font-semibold text-[#010D50]">
-                    About this property
-                  </h2>
-                  <div className="text-sm text-[#3A478A] leading-relaxed whitespace-pre-line">
-                    {hotel.about.description}
-                  </div>
-                </div>
-
-                {/* Amenities Section */}
-                <div className="space-y-4">
-                  <h2 className="text-xl lg:text-2xl font-semibold text-[#010D50]">
-                    Amenities
-                  </h2>
-                  <div className="flex flex-wrap gap-3">
-                    {displayedAmenities.map((amenity) => (
-                      <div
-                        key={amenity.label}
-                        className="flex items-center gap-2 px-4 py-3 border border-[#DFE0E4] rounded-xl"
-                      >
-                        {getAmenityIcon(amenity.icon)}
-                        <span className="text-sm text-[#010D50]">{amenity.label}</span>
+              {hasAboutSection && (
+                <div ref={aboutRef} className="space-y-8">
+                  {/* About Section */}
+                  {hasAboutProperty && (
+                    <div className={`space-y-4 ${hasAmenitiesSection ? "pb-6 border-b border-[#DFE0E4]" : ""}`}>
+                      <h2 className="text-xl lg:text-2xl font-semibold text-[#010D50]">
+                        About this property
+                      </h2>
+                      <div className="text-sm text-[#3A478A] leading-relaxed whitespace-pre-line">
+                        {hotel.about.description}
                       </div>
-                    ))}
-                  </div>
-                  {hotel.amenities.length > 6 && (
-                    <button
-                      onClick={() => setShowAllAmenities(!showAllAmenities)}
-                      className="text-sm font-medium text-[#3754ED] hover:underline"
-                    >
-                      {showAllAmenities ? "Show less" : "Show more"}
-                    </button>
+                    </div>
+                  )}
+
+                  {/* Amenities Section */}
+                  {hasAmenitiesSection && (
+                    <div className="space-y-4">
+                      <h2 className="text-xl lg:text-2xl font-semibold text-[#010D50]">
+                        Amenities
+                      </h2>
+                      <div className="flex flex-wrap gap-3">
+                        {displayedAmenities.map((amenity) => (
+                          <div
+                            key={amenity.label}
+                            className="flex items-center gap-2 px-4 py-3 border border-[#DFE0E4] rounded-xl"
+                          >
+                            {getAmenityIcon(amenity.icon)}
+                            <span className="text-sm text-[#010D50]">{amenity.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {hotel.amenities.length > 6 && (
+                        <button
+                          onClick={() => setShowAllAmenities(!showAllAmenities)}
+                          className="text-sm font-medium text-[#3754ED] hover:underline"
+                        >
+                          {showAllAmenities ? "Show less" : "Show more"}
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
-              </div>
+              )}
 
               {/* Right Column - Reviews Card & Map */}
               <div className="space-y-4">
@@ -2004,7 +2072,7 @@ export default function HotelRoomsPage() {
                   <div className="relative aspect-[4/3] bg-gray-200">
                     {hotel.coordinates ? (
                       <iframe
-                        src={`https://www.google.com/maps?q=${hotel.coordinates.lat},${hotel.coordinates.lng}&z=14&output=embed&hl=en`}
+                        src={`https://www.google.com/maps?q=${encodeURIComponent(hotel.mapQuery || `${hotel.coordinates.lat},${hotel.coordinates.lng}`)}&z=14&output=embed&hl=en`}
                         className="absolute inset-0 w-full h-full border-0"
                         style={{ border: 0 }}
                         loading="lazy"
@@ -2401,9 +2469,9 @@ export default function HotelRoomsPage() {
                         {/* Room Name & Bed Type */}
                         <div className="space-y-2">
                           <h3 className="text-lg font-semibold text-[#010D50]">
-                            {room.name}
+                            {sanitizeRoomDisplayText(room.name)}
                           </h3>
-                          <p className="text-sm text-[#3A478A]">{room.bedType}</p>
+                          <p className="text-sm text-[#3A478A]">{sanitizeRoomDisplayText(room.bedType)}</p>
                           {(roomCode || hbRateClass) && (
                             <p className="text-xs text-[#3A478A]">
                               {roomCode ? `Code: ${roomCode}` : ""}
@@ -2523,6 +2591,11 @@ export default function HotelRoomsPage() {
                         {/* Pricing & CTA */}
                         <div className="mt-auto pt-6 space-y-4">
                           <div className="flex flex-col items-end gap-1">
+                            {staySummary.nights > 0 && (
+                              <span className="text-xs text-[#3A478A]">
+                                {staySummary.nights} {staySummary.nights === 1 ? "night" : "nights"} • Check-in {staySummary.checkInLabel} • Check-out {staySummary.checkOutLabel}
+                              </span>
+                            )}
                             <span className="text-base text-[#010D50]">
                               {room.price.currency}{room.price.nightly.toLocaleString()} nightly
                             </span>

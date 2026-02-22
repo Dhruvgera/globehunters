@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Check, ChevronRight, Heart, PawPrint, Bus, Coffee, X, Star } from "lucide-react";
+import { Check, ChevronRight, PawPrint, Bus, Coffee, X, Star } from "lucide-react";
 import { motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
@@ -114,14 +114,6 @@ export function HotelResultCard({
               sizes="(max-width: 1024px) 100vw, 360px"
               priority={false}
             />
-            <button
-              type="button"
-              className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white grid place-content-center shadow-sm"
-              aria-label="Save"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Heart className="h-5 w-5 text-[#010D50]" />
-            </button>
           </div>
 
           {/* Content padded; CTA pinned to bottom so all cards align */}
@@ -191,6 +183,9 @@ export function HotelResultCard({
 
               {/* Meal plans and Price section - right aligned and bottom aligned */}
               <div className="mt-auto flex flex-col items-end gap-1">
+                <div className="text-xs text-[#3A478A]">
+                  for {hotel.price.nights} nights, {hotel.price.rooms} room
+                </div>
                 <div className="text-sm text-[#3A478A]">
                   {hotel.price.currency}{hotel.price.nightly.toLocaleString()} nightly
                 </div>
@@ -224,14 +219,6 @@ export function HotelResultCard({
               sizes="(max-width: 1024px) 100vw, 220px"
               priority={false}
             />
-            <button
-              type="button"
-              className="absolute top-3 right-3 w-10 h-10 rounded-full bg-white grid place-content-center shadow-sm"
-              aria-label="Save"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Heart className="h-5 w-5 text-[#010D50]" />
-            </button>
           </div>
 
           {/* Content area with padding */}

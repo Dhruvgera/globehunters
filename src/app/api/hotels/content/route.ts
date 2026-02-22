@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   const code = (url.searchParams.get('code') || '').trim();
   const provider = getHotelProvider();
 
-  if (provider !== 'hotelbeds') {
+  if (provider === 'vyspa') {
     return NextResponse.json({ error: 'NOT_ENABLED', message: 'HotelBeds provider not enabled' }, { status: 400 });
   }
 

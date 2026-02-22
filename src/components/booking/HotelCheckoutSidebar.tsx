@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useMemo } from "react";
 import { Phone, PawPrint, Bus } from "lucide-react";
 import { useBookingStore } from "@/store/bookingStore";
@@ -28,11 +29,13 @@ function formatDateDisplay(dateStr: string): string {
 interface HotelCheckoutSidebarProps {
   webRef: string;
   phoneNumber: string;
+  changeSelectionHref?: string;
 }
 
 export function HotelCheckoutSidebar({
   webRef,
   phoneNumber,
+  changeSelectionHref,
 }: HotelCheckoutSidebarProps) {
   const hotelSearch = useBookingStore((s) => s.hotelSearch);
   const selectedHotel = useBookingStore((s) => s.selectedHotel);
@@ -111,36 +114,6 @@ export function HotelCheckoutSidebar({
         </div>
       </div>
 
-      {/* Summary Card */}
-      <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
-        <span className="text-sm font-semibold text-[#010D50]">Summary</span>
-
-        <div className="flex flex-col gap-3">
-          {display.nightly != null && (
-            <div className="flex items-center justify-between text-sm font-medium text-[#010D50]">
-              <span>{display.nights} nights x {display.rooms} room x {formatMoney(display.currency, display.nightly)}</span>
-              <span>{formatMoney(display.currency, display.baseTotal)}</span>
-            </div>
-          )}
-
-          {display.taxes != null && display.taxes > 0 && (
-            <div className="flex items-center justify-between text-sm font-medium text-[#010D50]">
-              <span>Taxes</span>
-              <span>{formatMoney(display.currency, display.taxes)}</span>
-            </div>
-          )}
-
-          <div className="border-t border-[#DFE0E4]" />
-
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold text-[#010D50]">Total</span>
-            <span className="text-sm font-semibold text-[#010D50]">
-              {formatMoney(display.currency, display.total)}
-            </span>
-          </div>
-        </div>
-      </div>
-
       {/* Hotel Image + Info Card */}
       <div className="border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
         {display.img && (
@@ -195,7 +168,25 @@ export function HotelCheckoutSidebar({
 
       {/* Stay Details Card */}
       <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
-        <span className="text-sm font-semibold text-[#010D50]">Stay Details</span>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-semibold text-[#010D50]">Stay Details</span>
+          {changeSelectionHref ? (
+            <Link
+              href={changeSelectionHref}
+              className="text-sm font-semibold text-[#3754ED] hover:underline"
+            >
+              Change selection
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={() => window.history.back()}
+              className="text-sm font-semibold text-[#3754ED] hover:underline"
+            >
+              Change selection
+            </button>
+          )}
+        </div>
 
         <div className="flex gap-3">
           <div className="flex-1 bg-[#F5F7FF] border border-[#DFE0E4] rounded-lg p-3 flex flex-col gap-1.5">
@@ -233,6 +224,36 @@ export function HotelCheckoutSidebar({
             ))}
           </div>
         )}
+      </div>
+
+      {/* Summary Card */}
+      <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
+        <span className="text-sm font-semibold text-[#010D50]">Summary</span>
+
+        <div className="flex flex-col gap-3">
+          {display.nightly != null && (
+            <div className="flex items-center justify-between text-sm font-medium text-[#010D50]">
+              <span>{display.nights} nights x {display.rooms} room x {formatMoney(display.currency, display.nightly)}</span>
+              <span>{formatMoney(display.currency, display.baseTotal)}</span>
+            </div>
+          )}
+
+          {display.taxes != null && display.taxes > 0 && (
+            <div className="flex items-center justify-between text-sm font-medium text-[#010D50]">
+              <span>Taxes</span>
+              <span>{formatMoney(display.currency, display.taxes)}</span>
+            </div>
+          )}
+
+          <div className="border-t border-[#DFE0E4]" />
+
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-[#010D50]">Total</span>
+            <span className="text-sm font-semibold text-[#010D50]">
+              {formatMoney(display.currency, display.total)}
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Cancellation Policy Card */}

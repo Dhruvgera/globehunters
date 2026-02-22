@@ -21,6 +21,7 @@ import type { AddToFolderRequest } from "@/types/folder";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
 import { CountryCodeSelector } from "@/components/booking/CountryCodeSelector";
 import type { Passenger, PassengerType, PassengerTitle } from "@/types/booking";
+import { countryCodes } from "@/lib/utils/countryCodes";
 
 function InputField({
   label,
@@ -128,6 +129,7 @@ export default function HotelCheckoutPage() {
   const [phone, setPhone] = useState(leadPassenger?.phone || "");
   const [countryCode, setCountryCode] = useState(leadPassenger?.countryCode || "+44");
   const [passport, setPassport] = useState(leadPassenger?.nationality || "India");
+  const [otherTravellers, setOtherTravellers] = useState<Passenger[]>([]);
 
   // Booking for
   const [bookingFor, setBookingFor] = useState<"self" | "other">("self");
@@ -247,6 +249,75 @@ export default function HotelCheckoutPage() {
       : [{ name: selectedHotelRoomSummary?.roomName || "Room", count: 1, isRefundable: selectedHotelRoomSummary?.isRefundable }];
   }, [summary.hotelId, hotelDetailsCache, selectedHotelRoomIds, selectedHotelRoomSummary]);
 
+  const passportCountryOptions = useMemo(() => {
+    const uniqueByIso = new Map<string, string>();
+    for (const country of countryCodes) {
+      const iso = String(country.isoCode || "").toLowerCase();
+      if (!iso || uniqueByIso.has(iso)) continue;
+      uniqueByIso.set(iso, country.name);
+    }
+    return Array.from(uniqueByIso.entries()).map(([isoCode, name]) => ({ isoCode, name }));
+  }, []);
+
+  const travellerSlots = useMemo(() => {
+    const adults = Math.max(1, Number(hotelSearch?.adults || 1));
+    const children = Math.max(0, Number(hotelSearch?.children || 0));
+    const slots: PassengerType[] = [];
+    for (let i = 0; i < Math.max(0, adults - 1); i += 1) slots.push("adult");
+    for (let i = 0; i < children; i += 1) slots.push("child");
+    return slots;
+  }, [hotelSearch?.adults, hotelSearch?.children]);
+
+  useEffect(() => {
+    setOtherTravellers((prev) => {
+      const next = travellerSlots.map((slotType, idx) => {
+        const fromStore = passengers[idx + 1];
+        const existing = prev[idx];
+        const source = fromStore || existing;
+        const defaultTitle: PassengerTitle = slotType === "child" ? "Miss" : "Mr";
+        return {
+          title: (source?.title as PassengerTitle | undefined) || defaultTitle,
+          firstName: source?.firstName || "",
+          middleName: source?.middleName || "",
+          lastName: source?.lastName || "",
+          dateOfBirth: source?.dateOfBirth || "",
+          email: source?.email || email || "",
+          phone: source?.phone || phone || "",
+          countryCode: source?.countryCode || countryCode || "+44",
+          nationality: source?.nationality || passport || "",
+          type: slotType,
+        };
+      });
+      return next;
+    });
+  }, [travellerSlots, passengers, email, phone, countryCode, passport]);
+
+  useEffect(() => {
+    // Keep store passenger list aligned with all editable traveller forms.
+    otherTravellers.forEach((traveller, idx) => {
+      const storeIndex = idx + 1;
+      if (passengers[storeIndex]) {
+        updatePassenger(storeIndex, traveller);
+      } else {
+        addPassenger(traveller);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otherTravellers]);
+
+  const updateOtherTraveller = (index: number, patch: Partial<Passenger>) => {
+    setOtherTravellers((prev) =>
+      prev.map((traveller, i) => {
+        if (i !== index) return traveller;
+        const merged = { ...traveller, ...patch };
+        if (merged.type === "child" && merged.title === "Mr") {
+          merged.title = "Miss";
+        }
+        return merged;
+      })
+    );
+  };
+
   function validateForm(): boolean {
     const errors: Record<string, string> = {};
     if (!firstName.trim()) errors.firstName = "First name is required";
@@ -254,6 +325,12 @@ export default function HotelCheckoutPage() {
     if (!dateOfBirth) errors.dateOfBirth = "Date of birth is required";
     if (!email.trim()) errors.email = "Email is required";
     if (!phone.trim()) errors.phone = "Phone number is required";
+    for (let i = 0; i < otherTravellers.length; i += 1) {
+      const traveller = otherTravellers[i];
+      if (!traveller?.firstName?.trim()) errors[`traveller_${i}_firstName`] = "First name is required";
+      if (!traveller?.lastName?.trim()) errors[`traveller_${i}_lastName`] = "Last name is required";
+      if (!traveller?.dateOfBirth) errors[`traveller_${i}_dateOfBirth`] = "Date of birth is required";
+    }
     if (!tcAccepted) errors.tc = "You must accept the terms and conditions";
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -266,7 +343,18 @@ export default function HotelCheckoutPage() {
     setError(null);
 
     try {
-      const lead = { title, firstName, lastName, email, phone, countryCode, dateOfBirth, type: "adult" as PassengerType };
+      const lead = {
+        title,
+        firstName,
+        middleName,
+        lastName,
+        dateOfBirth,
+        email,
+        phone,
+        countryCode,
+        nationality: passport,
+        type: "adult" as PassengerType,
+      };
       setContactInfo(lead.email, `${countryCode}${lead.phone}`);
 
       let folderNo = vyspaFolderNumber ? Number(vyspaFolderNumber) : null;
@@ -295,7 +383,14 @@ export default function HotelCheckoutPage() {
         setVyspaFolderInfo({ folderNumber: String(folderNo), emailAddress: lead.email });
       }
 
-      const allPassengers = [lead, ...passengers.slice(1)];
+      const normalizedOtherTravellers = otherTravellers.map((traveller) => ({
+        ...traveller,
+        email: traveller.email || lead.email,
+        phone: traveller.phone || lead.phone,
+        countryCode: traveller.countryCode || lead.countryCode,
+        nationality: traveller.nationality || lead.nationality,
+      }));
+      const allPassengers = [lead, ...normalizedOtherTravellers];
       const folderPassengers = allPassengers.map((p, idx) => ({
         pax_no: idx + 1,
         title: p.title as any,
@@ -508,12 +603,11 @@ export default function HotelCheckoutPage() {
                     {formErrors.phone && <span className="text-xs text-red-500">{formErrors.phone}</span>}
                   </div>
                   <SelectField label="Passport" value={passport} onChange={setPassport} className="flex-1">
-                    <option value="India">India</option>
-                    <option value="United Kingdom">United Kingdom</option>
-                    <option value="United States">United States</option>
-                    <option value="Australia">Australia</option>
-                    <option value="Canada">Canada</option>
-                    <option value="Other">Other</option>
+                    {passportCountryOptions.map((country) => (
+                      <option key={country.isoCode} value={country.name}>
+                        {country.name}
+                      </option>
+                    ))}
                   </SelectField>
                 </div>
               </div>
@@ -560,6 +654,72 @@ export default function HotelCheckoutPage() {
                 </div>
               </div>
             ))}
+
+            {otherTravellers.length > 0 && (
+              <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
+                <span className="text-sm font-semibold text-[#010D50]">Other Traveller Details</span>
+                {otherTravellers.map((traveller, idx) => (
+                  <div key={`traveller-${idx}`} className="border border-[#DFE0E4] rounded-xl p-3 flex flex-col gap-3">
+                    <div className="text-xs font-semibold text-[#010D50]">
+                      {traveller.type === "child" ? `Child ${idx + 1}` : `Adult ${idx + 2}`}
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-medium text-[#010D50]">Name</label>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <div className="relative w-full sm:w-[90px] sm:flex-shrink-0">
+                          <select
+                            value={traveller.title}
+                            onChange={(e) => updateOtherTraveller(idx, { title: e.target.value as PassengerTitle })}
+                            className="h-12 w-full rounded-xl border border-[#DFE0E4] px-3 pr-8 text-sm text-[#010D50] outline-none focus:border-[#3754ED] appearance-none bg-white"
+                          >
+                            <option value="Mr">Mr.</option>
+                            <option value="Mrs">Mrs.</option>
+                            <option value="Miss">Miss</option>
+                            <option value="Ms">Ms.</option>
+                            <option value="Dr">Dr.</option>
+                          </select>
+                          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-[#3A478A] pointer-events-none" />
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="First Name"
+                          value={traveller.firstName}
+                          onChange={(e) => updateOtherTraveller(idx, { firstName: e.target.value })}
+                          className={`w-full min-w-0 sm:flex-1 h-12 rounded-xl border ${formErrors[`traveller_${idx}_firstName`] ? "border-red-500" : "border-[#DFE0E4]"} px-4 text-sm text-[#010D50] placeholder:text-[#3A478A] outline-none focus:border-[#3754ED]`}
+                        />
+                        <input
+                          type="text"
+                          placeholder="Middle Name"
+                          value={traveller.middleName || ""}
+                          onChange={(e) => updateOtherTraveller(idx, { middleName: e.target.value })}
+                          className="w-full min-w-0 sm:flex-1 h-12 rounded-xl border border-[#DFE0E4] px-4 text-sm text-[#010D50] placeholder:text-[#3A478A] outline-none focus:border-[#3754ED]"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Last Name"
+                          value={traveller.lastName}
+                          onChange={(e) => updateOtherTraveller(idx, { lastName: e.target.value })}
+                          className={`w-full min-w-0 sm:flex-1 h-12 rounded-xl border ${formErrors[`traveller_${idx}_lastName`] ? "border-red-500" : "border-[#DFE0E4]"} px-4 text-sm text-[#010D50] placeholder:text-[#3A478A] outline-none focus:border-[#3754ED]`}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <InputField
+                        label="Date of Birth"
+                        placeholder="DD/MM/YYYY"
+                        value={traveller.dateOfBirth}
+                        onChange={(value) => updateOtherTraveller(idx, { dateOfBirth: value })}
+                        type="date"
+                        className="flex-1"
+                        error={formErrors[`traveller_${idx}_dateOfBirth`]}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Special Request */}
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-3">
@@ -630,6 +790,7 @@ export default function HotelCheckoutPage() {
           <HotelCheckoutSidebar
             webRef={webRefNumber}
             phoneNumber={affiliatePhone}
+            changeSelectionHref={hotelDetailsBackUrl}
           />
         </div>
       </div>
