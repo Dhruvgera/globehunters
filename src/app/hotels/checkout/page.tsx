@@ -22,6 +22,7 @@ import { useAffiliatePhone } from "@/lib/AffiliateContext";
 import { CountryCodeSelector } from "@/components/booking/CountryCodeSelector";
 import type { Passenger, PassengerType, PassengerTitle } from "@/types/booking";
 import { countryCodes } from "@/lib/utils/countryCodes";
+import { validateDateOfBirthForType, validateEmail, validatePhone } from "@/utils/validation";
 
 function InputField({
   label,
@@ -133,6 +134,7 @@ export default function HotelCheckoutPage() {
 
   // Booking for
   const [bookingFor, setBookingFor] = useState<"self" | "other">("self");
+  const [otherTravellersExpanded, setOtherTravellersExpanded] = useState(false);
 
   // Special request
   const [specialRequest, setSpecialRequest] = useState("");
@@ -269,8 +271,8 @@ export default function HotelCheckoutPage() {
   }, [hotelSearch?.adults, hotelSearch?.children]);
 
   useEffect(() => {
-    setOtherTravellers((prev) => {
-      const next = travellerSlots.map((slotType, idx) => {
+    setOtherTravellers((prev) =>
+      travellerSlots.map((slotType, idx) => {
         const fromStore = passengers[idx + 1];
         const existing = prev[idx];
         const source = fromStore || existing;
@@ -287,23 +289,9 @@ export default function HotelCheckoutPage() {
           nationality: source?.nationality || passport || "",
           type: slotType,
         };
-      });
-      return next;
-    });
-  }, [travellerSlots, passengers, email, phone, countryCode, passport]);
-
-  useEffect(() => {
-    // Keep store passenger list aligned with all editable traveller forms.
-    otherTravellers.forEach((traveller, idx) => {
-      const storeIndex = idx + 1;
-      if (passengers[storeIndex]) {
-        updatePassenger(storeIndex, traveller);
-      } else {
-        addPassenger(traveller);
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [otherTravellers]);
+      })
+    );
+  }, [travellerSlots, email, phone, countryCode, passport, passengers]);
 
   const updateOtherTraveller = (index: number, patch: Partial<Passenger>) => {
     setOtherTravellers((prev) =>
@@ -318,21 +306,45 @@ export default function HotelCheckoutPage() {
     );
   };
 
+  useEffect(() => {
+    if (bookingFor === "other") setOtherTravellersExpanded(true);
+  }, [bookingFor]);
+
   function validateForm(): boolean {
     const errors: Record<string, string> = {};
     if (!firstName.trim()) errors.firstName = "First name is required";
     if (!lastName.trim()) errors.lastName = "Last name is required";
     if (!dateOfBirth) errors.dateOfBirth = "Date of birth is required";
     if (!email.trim()) errors.email = "Email is required";
+    if (email.trim() && !validateEmail(email.trim())) errors.email = "Please enter a valid email";
     if (!phone.trim()) errors.phone = "Phone number is required";
-    for (let i = 0; i < otherTravellers.length; i += 1) {
-      const traveller = otherTravellers[i];
-      if (!traveller?.firstName?.trim()) errors[`traveller_${i}_firstName`] = "First name is required";
-      if (!traveller?.lastName?.trim()) errors[`traveller_${i}_lastName`] = "Last name is required";
-      if (!traveller?.dateOfBirth) errors[`traveller_${i}_dateOfBirth`] = "Date of birth is required";
+    if (phone.trim() && !validatePhone(phone.trim())) errors.phone = "Please enter a valid phone number";
+    if (bookingFor === "other") {
+      for (let i = 0; i < otherTravellers.length; i += 1) {
+        const traveller = otherTravellers[i];
+        if (!traveller?.firstName?.trim()) errors[`traveller_${i}_firstName`] = "First name is required";
+        if (!traveller?.lastName?.trim()) errors[`traveller_${i}_lastName`] = "Last name is required";
+        if (!traveller?.dateOfBirth) {
+          errors[`traveller_${i}_dateOfBirth`] = "Date of birth is required";
+        } else {
+          const dobCheck = validateDateOfBirthForType(traveller.dateOfBirth, traveller.type === "child" ? "child" : "adult");
+          if (!dobCheck.valid) errors[`traveller_${i}_dateOfBirth`] = dobCheck.error || "Invalid date of birth";
+        }
+        if (!traveller?.email?.trim()) errors[`traveller_${i}_email`] = "Email is required";
+        if (traveller?.email?.trim() && !validateEmail(traveller.email.trim())) {
+          errors[`traveller_${i}_email`] = "Please enter a valid email";
+        }
+        if (!traveller?.phone?.trim()) errors[`traveller_${i}_phone`] = "Phone number is required";
+        if (traveller?.phone?.trim() && !validatePhone(traveller.phone.trim())) {
+          errors[`traveller_${i}_phone`] = "Please enter a valid phone number";
+        }
+      }
     }
     if (!tcAccepted) errors.tc = "You must accept the terms and conditions";
     setFormErrors(errors);
+    if (Object.keys(errors).some((k) => k.startsWith("traveller_"))) {
+      setOtherTravellersExpanded(true);
+    }
     return Object.keys(errors).length === 0;
   }
 
@@ -383,13 +395,14 @@ export default function HotelCheckoutPage() {
         setVyspaFolderInfo({ folderNumber: String(folderNo), emailAddress: lead.email });
       }
 
-      const normalizedOtherTravellers = otherTravellers.map((traveller) => ({
-        ...traveller,
-        email: traveller.email || lead.email,
-        phone: traveller.phone || lead.phone,
-        countryCode: traveller.countryCode || lead.countryCode,
-        nationality: traveller.nationality || lead.nationality,
-      }));
+      const normalizedOtherTravellers = (bookingFor === "other" ? otherTravellers : [])
+        .map((traveller) => ({
+          ...traveller,
+          email: traveller.email || lead.email,
+          phone: traveller.phone || lead.phone,
+          countryCode: traveller.countryCode || lead.countryCode,
+          nationality: traveller.nationality || lead.nationality,
+        }));
       const allPassengers = [lead, ...normalizedOtherTravellers];
       const folderPassengers = allPassengers.map((p, idx) => ({
         pax_no: idx + 1,
@@ -655,10 +668,17 @@ export default function HotelCheckoutPage() {
               </div>
             ))}
 
-            {otherTravellers.length > 0 && (
+            {bookingFor === "other" && otherTravellers.length > 0 && (
               <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
-                <span className="text-sm font-semibold text-[#010D50]">Other Traveller Details</span>
-                {otherTravellers.map((traveller, idx) => (
+                <button
+                  type="button"
+                  onClick={() => setOtherTravellersExpanded((prev) => !prev)}
+                  className="flex items-center justify-between text-left"
+                >
+                  <span className="text-sm font-semibold text-[#010D50]">Other Traveller Details</span>
+                  <ChevronDown className={`w-4 h-4 text-[#3A478A] transition-transform ${otherTravellersExpanded ? "rotate-180" : ""}`} />
+                </button>
+                {otherTravellersExpanded && otherTravellers.map((traveller, idx) => (
                   <div key={`traveller-${idx}`} className="border border-[#DFE0E4] rounded-xl p-3 flex flex-col gap-3">
                     <div className="text-xs font-semibold text-[#010D50]">
                       {traveller.type === "child" ? `Child ${idx + 1}` : `Adult ${idx + 2}`}
@@ -686,7 +706,7 @@ export default function HotelCheckoutPage() {
                           placeholder="First Name"
                           value={traveller.firstName}
                           onChange={(e) => updateOtherTraveller(idx, { firstName: e.target.value })}
-                          className={`w-full min-w-0 sm:flex-1 h-12 rounded-xl border ${formErrors[`traveller_${idx}_firstName`] ? "border-red-500" : "border-[#DFE0E4]"} px-4 text-sm text-[#010D50] placeholder:text-[#3A478A] outline-none focus:border-[#3754ED]`}
+                          className="w-full min-w-0 sm:flex-1 h-12 rounded-xl border border-[#DFE0E4] px-4 text-sm text-[#010D50] placeholder:text-[#3A478A] outline-none focus:border-[#3754ED]"
                         />
                         <input
                           type="text"
@@ -700,7 +720,7 @@ export default function HotelCheckoutPage() {
                           placeholder="Last Name"
                           value={traveller.lastName}
                           onChange={(e) => updateOtherTraveller(idx, { lastName: e.target.value })}
-                          className={`w-full min-w-0 sm:flex-1 h-12 rounded-xl border ${formErrors[`traveller_${idx}_lastName`] ? "border-red-500" : "border-[#DFE0E4]"} px-4 text-sm text-[#010D50] placeholder:text-[#3A478A] outline-none focus:border-[#3754ED]`}
+                          className="w-full min-w-0 sm:flex-1 h-12 rounded-xl border border-[#DFE0E4] px-4 text-sm text-[#010D50] placeholder:text-[#3A478A] outline-none focus:border-[#3754ED]"
                         />
                       </div>
                     </div>
@@ -715,6 +735,34 @@ export default function HotelCheckoutPage() {
                         className="flex-1"
                         error={formErrors[`traveller_${idx}_dateOfBirth`]}
                       />
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <InputField
+                        label="Email ID"
+                        placeholder="xyz123@gmail.com"
+                        value={traveller.email || ""}
+                        onChange={(value) => updateOtherTraveller(idx, { email: value })}
+                        type="email"
+                        className="flex-1"
+                        error={formErrors[`traveller_${idx}_email`]}
+                      />
+                      <div className="flex flex-col gap-1.5 flex-1">
+                        <label className="text-xs font-medium text-[#010D50]">Phone no.</label>
+                        <div className="flex gap-2">
+                          <CountryCodeSelector
+                            value={traveller.countryCode || "+44"}
+                            onChange={(value) => updateOtherTraveller(idx, { countryCode: value })}
+                          />
+                          <input
+                            type="tel"
+                            placeholder="1234567890"
+                            value={traveller.phone || ""}
+                            onChange={(e) => updateOtherTraveller(idx, { phone: e.target.value })}
+                            className={`flex-1 h-12 rounded-xl border px-4 text-sm text-[#010D50] placeholder:text-[#A0A3BD] outline-none focus:ring-2 focus:ring-[#3754ED]/30 ${formErrors[`traveller_${idx}_phone`] ? "border-red-400" : "border-[#DFE0E4]"}`}
+                          />
+                        </div>
+                        {formErrors[`traveller_${idx}_phone`] && <span className="text-xs text-red-500">{formErrors[`traveller_${idx}_phone`]}</span>}
+                      </div>
                     </div>
                   </div>
                 ))}

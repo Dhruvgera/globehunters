@@ -1567,6 +1567,8 @@ export default function HotelRoomsPage() {
         const defaultSelectedCounts = (() => {
           const next: Record<string, number> = {};
           if (effectiveRooms.length === 0) return next;
+          // For multi-room bookings, do not preselect rooms. User must choose explicitly.
+          if (requiredRoomsForSelection > 1) return next;
           for (let i = 0; i < requiredRoomsForSelection; i += 1) {
             const room = effectiveRooms[i % effectiveRooms.length];
             const roomId = String(room?.id || "");
