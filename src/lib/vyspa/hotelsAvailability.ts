@@ -59,6 +59,17 @@ function normalizeChildAge(value: unknown, childrenRoom: number[], defaultChildA
 export function normalizeVyspaAvailabilityCriteria(criteria: AvailabilityCriteria): AvailabilityCriteria {
   const normalized: AvailabilityCriteria = { ...criteria };
   normalized.hotel_cache = 'redis';
+  // Force Vyspa availability to Hotelbeds supplier only.
+  normalized.supplier_id = 100;
+
+  const rawFilters =
+    normalized.filters && typeof normalized.filters === 'object' && !Array.isArray(normalized.filters)
+      ? (normalized.filters as Record<string, unknown>)
+      : {};
+  normalized.filters = {
+    ...rawFilters,
+    sort_by: rawFilters.sort_by ?? 'preferred',
+  };
 
   const rooms = Math.max(1, toInt(normalized.rooms, 1));
   const adults = Math.max(1, toInt(normalized.adults, 2));

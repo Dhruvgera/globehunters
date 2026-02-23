@@ -213,7 +213,8 @@ export function HotelCheckoutSidebar({
         <div className="flex flex-col gap-1">
           <span className="text-xs text-[#3A478A]">You selected</span>
           <span className="text-sm font-semibold text-[#010D50]">
-            {display.rooms} room for {display.adults + display.children} {display.adults + display.children === 1 ? "guest" : "adults"}
+            {display.rooms} room{display.rooms === 1 ? "" : "s"} for {display.adults} adult{display.adults === 1 ? "" : "s"}
+            {display.children > 0 ? `, ${display.children} child${display.children === 1 ? "" : "ren"}` : ""}
           </span>
         </div>
 

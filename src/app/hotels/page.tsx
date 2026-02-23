@@ -63,6 +63,7 @@ function sanitizeHiddenHotelFilters(filters: HotelFiltersState): HotelFiltersSta
 
 function normalizeMealPlanLabel(raw: string): string {
   const s = String(raw || "").trim();
+  if (!s) return "";
   const upper = s.toUpperCase();
   // Common Vyspa meal plan codes
   if (upper === "RO") return "Room only";
@@ -72,7 +73,67 @@ function normalizeMealPlanLabel(raw: string): string {
   if (upper === "AI") return "All inclusive";
   // Sometimes API returns already-human labels
   if (upper.includes("BREAKFAST")) return "Breakfast";
-  return s;
+  const lettersOnly = s.replace(/[^A-Za-z]/g, "");
+  const isAllCaps = lettersOnly.length > 0 && lettersOnly === lettersOnly.toUpperCase();
+  if (!isAllCaps) return s;
+  return s
+    .toLowerCase()
+    .replace(/\b[a-z]/g, (m) => m.toUpperCase())
+    .replace(/\bAnd\b/g, "and")
+    .replace(/\bOf\b/g, "of");
+}
+
+function mealPlanKey(raw: string): string {
+  return normalizeMealPlanLabel(raw).toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function toReadableNeighborhoodCase(value: string): string {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const lettersOnly = text.replace(/[^A-Za-z]/g, "");
+  const isAllCaps = lettersOnly.length > 0 && lettersOnly === lettersOnly.toUpperCase();
+  if (!isAllCaps) return text;
+  return text
+    .toLowerCase()
+    .replace(/\b[a-z]/g, (m) => m.toUpperCase())
+    .replace(/\bUae\b/g, "UAE");
+}
+
+function normalizeNeighborhoodValue(
+  raw: string,
+  context: { city?: string; country?: string; searchLocation?: string } = {}
+): { key: string; label: string } {
+  const original = String(raw || "").replace(/\s+/g, " ").trim();
+  if (!original) return { key: "", label: "" };
+
+  let normalized = original;
+  const suffixes = [
+    context.country,
+    context.city,
+    context.searchLocation,
+  ]
+    .map((v) => String(v || "").trim())
+    .filter(Boolean);
+
+  for (const suffix of suffixes) {
+    const escaped = escapeRegExp(suffix);
+    normalized = normalized
+      .replace(new RegExp(`(?:\\s*[,-]\\s*|\\s+-\\s+)${escaped}$`, "i"), "")
+      .replace(new RegExp(`\\s+${escaped}$`, "i"), "")
+      .trim();
+  }
+
+  const label = toReadableNeighborhoodCase(normalized || original);
+  const key = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+  return { key, label };
 }
 
 function includesBreakfast(mealPlans: string[]): boolean {
@@ -579,9 +640,14 @@ function HotelsPageInner() {
           const total = parsePriceFromResult(r) ?? 0;
           const sellCur = r?.SellCur || r?.sellCur || r?.currency;
           const rawMealPlans = Array.isArray(r?.MealPlans) ? r.MealPlans.filter(Boolean) : [];
-          const mealPlans = rawMealPlans
-            .map((p: any) => normalizeMealPlanLabel(String(p)))
-            .filter(Boolean);
+          const mealPlansByKey = new Map<string, string>();
+          for (const rawPlan of rawMealPlans) {
+            const label = normalizeMealPlanLabel(String(rawPlan));
+            const key = mealPlanKey(label);
+            if (!label || !key) continue;
+            if (!mealPlansByKey.has(key)) mealPlansByKey.set(key, label);
+          }
+          const mealPlans = Array.from(mealPlansByKey.values());
           const reviewsRating = Number(r?.reviews_rating ?? 0) || 0;
           const amenities: Hotel["amenities"] = [];
           const hasBreakfast = includesBreakfast(rawMealPlans) || includesBreakfast(mealPlans);
@@ -859,11 +925,21 @@ function HotelsPageInner() {
     // Apply all filters except priceRange, so slider bounds reflect the "current result set"
     // when other filters (e.g. breakfast) are toggled.
     const q = filters.propertyQuery.trim().toLowerCase();
+    const selectedNeighborhoodKeys = new Set(
+      filters.neighborhoods
+        .map((n) => normalizeNeighborhoodValue(n, { searchLocation: resolvedSearch.location }).key)
+        .filter(Boolean)
+    );
     return hotels.filter((h) => {
       if (q && !h.name.toLowerCase().includes(q)) return false;
       if (filters.starRatings.length > 0 && !filters.starRatings.includes(h.starRating)) return false;
-      if (filters.neighborhoods.length > 0) {
-        if (!h.neighborhood || !filters.neighborhoods.includes(h.neighborhood)) return false;
+      if (selectedNeighborhoodKeys.size > 0) {
+        const hotelNeighborhoodKey = normalizeNeighborhoodValue(h.neighborhood || "", {
+          city: h.cityName,
+          country: h.countryName,
+          searchLocation: resolvedSearch.location,
+        }).key;
+        if (!hotelNeighborhoodKey || !selectedNeighborhoodKeys.has(hotelNeighborhoodKey)) return false;
       }
       if (filters.popular.breakfastIncluded) {
         const status = breakfastByHotelId[h.id] || "unknown";
@@ -879,6 +955,7 @@ function HotelsPageInner() {
     filters.popular.airportShuttle,
     filters.popular.reserveWithoutCard,
     filters.propertyQuery,
+    resolvedSearch.location,
     filters.starRatings,
     hotels,
   ]);
@@ -944,6 +1021,11 @@ function HotelsPageInner() {
   const filteredHotels = useMemo(() => {
     const q = filters.propertyQuery.trim().toLowerCase();
     const [minPrice, maxPrice] = filters.priceRange;
+    const selectedNeighborhoodKeys = new Set(
+      filters.neighborhoods
+        .map((n) => normalizeNeighborhoodValue(n, { searchLocation: resolvedSearch.location }).key)
+        .filter(Boolean)
+    );
 
     const base = hotels.filter((h) => {
       if (q && !h.name.toLowerCase().includes(q)) return false;
@@ -952,8 +1034,13 @@ function HotelsPageInner() {
 
       if (filters.fullyRefundableOnly && h.refundable !== true) return false;
 
-      if (filters.neighborhoods.length > 0) {
-        if (!h.neighborhood || !filters.neighborhoods.includes(h.neighborhood)) return false;
+      if (selectedNeighborhoodKeys.size > 0) {
+        const hotelNeighborhoodKey = normalizeNeighborhoodValue(h.neighborhood || "", {
+          city: h.cityName,
+          country: h.countryName,
+          searchLocation: resolvedSearch.location,
+        }).key;
+        if (!hotelNeighborhoodKey || !selectedNeighborhoodKeys.has(hotelNeighborhoodKey)) return false;
       }
 
       // Amenities not consistently available in list response; UI-only for now
@@ -961,10 +1048,8 @@ function HotelsPageInner() {
 
       // Meal plans filter - match if hotel has any of the selected meal plans
       if (filters.mealPlans.length > 0) {
-        const hotelMeals = h.mealPlans || [];
-        const hasMatchingMeal = filters.mealPlans.some((filterMeal) =>
-          hotelMeals.some((hotelMeal) => hotelMeal.toLowerCase().includes(filterMeal.toLowerCase()))
-        );
+        const hotelMealKeys = new Set((h.mealPlans || []).map((meal) => mealPlanKey(meal)).filter(Boolean));
+        const hasMatchingMeal = filters.mealPlans.some((filterMeal) => hotelMealKeys.has(mealPlanKey(filterMeal)));
         if (!hasMatchingMeal) return false;
       }
 
@@ -991,7 +1076,7 @@ function HotelsPageInner() {
     } // recommended: keep API order
 
     return sorted;
-  }, [filters, sortMode, hotels]);
+  }, [filters, hotels, resolvedSearch.location, sortMode]);
 
   const displayedHotels = useMemo(() => {
     return filteredHotels.slice(0, displayedHotelsCount);
@@ -1126,23 +1211,34 @@ function HotelsPageInner() {
 
   // Calculate available meal plans from all hotels
   const availableMealPlans = useMemo(() => {
-    const planSet = new Set<string>();
+    const planByKey = new Map<string, string>();
     for (const h of hotels) {
       for (const p of h.mealPlans || []) {
-        if (p) planSet.add(p);
+        const label = normalizeMealPlanLabel(String(p));
+        const key = mealPlanKey(label);
+        if (!label || !key) continue;
+        if (!planByKey.has(key)) planByKey.set(key, label);
       }
     }
-    return Array.from(planSet).sort();
+    return Array.from(planByKey.values()).sort((a, b) => a.localeCompare(b));
   }, [hotels]);
 
   const availableNeighborhoods = useMemo(() => {
-    const set = new Set<string>();
+    const byKey = new Map<string, string>();
     for (const h of hotels) {
-      const n = (h.neighborhood || "").trim();
-      if (n) set.add(n);
+      const { key, label } = normalizeNeighborhoodValue(h.neighborhood || "", {
+        city: h.cityName,
+        country: h.countryName,
+        searchLocation: resolvedSearch.location,
+      });
+      if (!key) continue;
+      const existing = byKey.get(key);
+      if (!existing || label.length < existing.length) {
+        byKey.set(key, label);
+      }
     }
-    return Array.from(set).sort();
-  }, [hotels]);
+    return Array.from(byKey.values()).sort((a, b) => a.localeCompare(b));
+  }, [hotels, resolvedSearch.location]);
 
   const refundableFilterEnabled = useMemo(
     () => hotels.some((h) => h.refundable === true || h.refundable === false),
