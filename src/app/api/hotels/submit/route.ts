@@ -34,6 +34,7 @@ type SubmitBody =
         phone?: string;
         telephone?: string;
       }>;
+      comments?: string[];
       selection: {
         total: number;
         nightly?: number;
@@ -86,6 +87,11 @@ export async function POST(req: Request) {
     body.selection?.boardName ? `Board: ${body.selection.boardName}` : null,
     body.selection?.refundable != null ? `Refundable: ${body.selection.refundable ? 'Yes' : 'No'}` : null,
     body.selection?.rateKey ? `RateKey: ${body.selection.rateKey}` : null,
+    ...(Array.isArray(body.comments)
+      ? body.comments
+          .map((line) => String(line || '').trim())
+          .filter(Boolean)
+      : []),
   ].filter(Boolean) as string[];
 
   const manualItem = {

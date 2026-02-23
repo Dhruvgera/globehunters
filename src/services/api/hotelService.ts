@@ -235,6 +235,7 @@ export class HotelService {
       phone?: string;
       telephone?: string;
     }>;
+    comments?: string[];
     selection: { total: number; nightly?: number; rateKey?: string; boardName?: string; refundable?: boolean };
   }): Promise<{ success: boolean; result?: unknown; message?: string }> {
     return jsonFetch<{ success: boolean; result?: unknown; message?: string }>('/api/hotels/submit', {

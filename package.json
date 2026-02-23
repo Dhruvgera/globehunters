@@ -14,7 +14,8 @@
     "test:api:gh": "node scripts/test-globehunters-api.mjs",
     "test:api:gh:airports": "node scripts/test-globehunters-airports.mjs",
     "test:portal:tkt": "node scripts/test-portal-tkt-per-pax.mjs",
-    "test:hotel:dedupe": "node scripts/test-hotel-dedupe-live.mjs"
+    "test:hotel:dedupe": "node scripts/test-hotel-dedupe-live.mjs",
+    "test:hotel:vyspa:timing": "node scripts/time-vyspa-hotels-search.mjs"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",

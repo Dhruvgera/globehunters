@@ -461,6 +461,11 @@ export default function HotelCheckoutPage() {
         return mapping;
       })();
 
+      const folderComments = [
+        specialRequest.trim() ? `Special Request: ${specialRequest.trim()}` : "",
+        arrivalTime.trim() ? `Arrival Time: ${arrivalTime.trim()}` : "",
+      ].filter(Boolean);
+
       if (isHotelbedsMode) {
         const submitResp = await hotelService.submitHotelbedsToFolder({
           folderNumber: Number(folderNo),
@@ -481,6 +486,7 @@ export default function HotelCheckoutPage() {
             boardName: selectedHotelRoomSummary?.mealName,
             refundable: selectedHotelRoomSummary?.isRefundable,
           },
+          comments: folderComments,
         });
         if (!submitResp?.success) throw new Error((submitResp as any)?.message || "Failed to submit HotelBeds hotel to folder");
 
@@ -489,7 +495,7 @@ export default function HotelCheckoutPage() {
           itineraryNumber: "1",
           foldcur: "GBP",
           travelPurpose: "Holiday",
-          comments: [],
+          comments: folderComments,
           set_as_preferred_itinerary: true,
           passengers: folderPassengers as any,
           requestData: [],
@@ -501,7 +507,7 @@ export default function HotelCheckoutPage() {
           itineraryNumber: "1",
           foldcur: "GBP",
           travelPurpose: "Holiday",
-          comments: [],
+          comments: folderComments,
           set_as_preferred_itinerary: true,
           passengers: folderPassengers as any,
           requestData: [
