@@ -7,7 +7,6 @@ import {
   ChevronDown,
   Ban,
   CreditCard,
-  Pencil,
 } from "lucide-react";
 
 import Navbar from "@/components/navigation/Navbar";
@@ -648,10 +647,6 @@ export default function HotelCheckoutPage() {
                   <span className="text-sm font-medium text-[#010D50]">
                     {room.name} {room.count > 1 ? `x${room.count}` : ""}
                   </span>
-                  <button className="flex items-center gap-1.5 text-xs text-[#3A478A] hover:text-[#3754ED]">
-                    <span>{firstName || "Add main guest details"}</span>
-                    {firstName && <Pencil className="w-3 h-3" />}
-                  </button>
                 </div>
                 <div className="flex gap-2">
                   <div className="border border-[#DFE0E4] rounded-lg px-2.5 py-1.5 flex items-center gap-1.5">

@@ -436,10 +436,6 @@ function extractPoliciesFromPayload(payload: unknown): string {
   extractRoomOptions(payload).forEach((option) => {
     add(option.cancellation_policy);
     add(option.cancellationPolicy);
-    const nonRefFlag = String(option.nonRef ?? "").trim();
-    if (nonRefFlag === "1") {
-      policyBlocks.push("This rate is non-refundable.");
-    }
 
     const hotelbeds = option._hotelbeds;
     if (!hotelbeds || typeof hotelbeds !== "object") return;
@@ -454,17 +450,6 @@ function extractPoliciesFromPayload(payload: unknown): string {
       add(cancellationRow.policy);
       add(cancellationRow.description);
       add(cancellationRow.text);
-
-      const from = sanitizeHotelText(cancellationRow.from);
-      const amount = Number(cancellationRow.amount);
-      const currency = sanitizeHotelText(cancellationRow.currency || row.SellCur);
-      const reducedFrom = from ? shiftIsoDateByDays(from.slice(0, 10), -1) || from : "";
-      if (reducedFrom && Number.isFinite(amount)) {
-        const amountText = amount.toFixed(2).replace(/\.00$/, "");
-        policyBlocks.push(
-          `Cancellation fee from ${reducedFrom}: ${currency ? `${currency} ` : ""}${amountText}`
-        );
-      }
     });
   });
 
@@ -2515,12 +2500,6 @@ export default function HotelRoomsPage() {
                     ? hbRaw.cancellationPolicies
                     : [];
                   const roomCode = String(roomRaw.room_code ?? roomRaw.roomCode ?? "").trim();
-                  const hbCancelFrom = (() => {
-                    const from = (hbCancellationPolicies[0] as Record<string, unknown> | undefined)?.from;
-                    if (typeof from !== "string" || !from) return "";
-                    const reduced = shiftIsoDateByDays(from.slice(0, 10), -1);
-                    return reduced || from.slice(0, 10);
-                  })();
                   const hbRateClass = String(hbRaw?.rateClass || "").trim();
                   const hbOffers: any[] = Array.isArray(hbRaw?.offers) ? hbRaw.offers
                     : [];
@@ -2533,22 +2512,13 @@ export default function HotelRoomsPage() {
                     if (!firstCancellation || typeof firstCancellation !== "object") return "";
 
                     const cancellationRow = firstCancellation as Record<string, unknown>;
-                    const fromRaw = sanitizeHotelText(cancellationRow.from);
-                    const from = fromRaw ? fromRaw.slice(0, 10) : "";
-                    const reducedFrom = from ? shiftIsoDateByDays(from, -1) || from : "";
-                    const amount = Number(cancellationRow.amount);
-                    const currency = sanitizeHotelText(cancellationRow.currency || room?._raw?.sell_currency_code || room?._raw?.currency_code);
-
-                    if (reducedFrom && Number.isFinite(amount) && amount > 0) {
-                      const amountText = amount.toFixed(2).replace(/\.00$/, "");
-                      return `Cancellation fee from ${reducedFrom}: ${currency ? `${currency} ` : ""}${amountText}`;
-                    }
-                    return "";
+                    return sanitizeHotelText(
+                      cancellationRow.policy ??
+                        cancellationRow.description ??
+                        cancellationRow.text
+                    );
                   })();
-                  const roomCancellationSummary =
-                    roomCancellationPolicy ||
-                    hbCancellationSummary ||
-                    (!room.isRefundable ? "This rate is non-refundable." : "");
+                  const roomCancellationSummary = roomCancellationPolicy || hbCancellationSummary;
                   const roomCancellationSummaryShort =
                     roomCancellationSummary.length > 240
                       ? `${roomCancellationSummary.slice(0, 237)}...`
@@ -2615,10 +2585,10 @@ export default function HotelRoomsPage() {
                     <div
                       key={room.id}
                       className={[
-                        "border rounded-[32px] bg-white overflow-hidden flex flex-col h-full",
-                        isActiveRoomCard ? "border-[#3754ED]" : "border-[#DFE0E4]",
+                        "border rounded-[32px] bg-white overflow-hidden flex flex-col h-full transform-gpu transition-all duration-200",
+                        isActiveRoomCard ? "border-[#3754ED] scale-[1.01] shadow-md" : "border-[#DFE0E4] scale-100",
                         isPackageMode || isMultiRoomSelectionMode || isSingleRoomSelectionMode
-                          ? "cursor-pointer hover:shadow-md transition-shadow"
+                          ? "cursor-pointer hover:scale-[1.005] hover:shadow-md"
                           : "",
                       ].join(" ")}
                       role={isPackageMode || isMultiRoomSelectionMode || isSingleRoomSelectionMode ? "button" : undefined}
@@ -2686,11 +2656,6 @@ export default function HotelRoomsPage() {
                             <X className="w-3.5 h-3.5" />
                             {room.isRefundable ? "Refundable" : "Non-refundable"}
                           </div>
-                          {room.isRefundable && hbCancelFrom && (
-                            <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-green-50 text-xs text-green-700">
-                              Free cancellation until {hbCancelFrom}
-                            </div>
-                          )}
                         </div>
                         {roomCancellationSummaryShort && (
                           <p className="mt-3 text-xs text-[#3A478A] leading-relaxed">

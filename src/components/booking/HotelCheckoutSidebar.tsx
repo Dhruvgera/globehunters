@@ -26,6 +26,41 @@ function formatDateDisplay(dateStr: string): string {
   return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
 }
 
+function sanitizePolicyText(value: unknown): string {
+  const raw = String(value || "");
+  if (!raw.trim()) return "";
+
+  const text = raw
+    .replace(/<br\s*\/?\s*>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "• ")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\r/g, "")
+    .trim();
+
+  const lines = text
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  const deduped: string[] = [];
+  const seen = new Set<string>();
+  for (const line of lines) {
+    const key = line
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .replace(/[.,;:!?]+$/g, "")
+      .trim();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(line);
+  }
+
+  return deduped.join("\n");
+}
+
 interface HotelCheckoutSidebarProps {
   webRef: string;
   phoneNumber: string;
@@ -52,7 +87,50 @@ export function HotelCheckoutSidebar({
     const img = cached?.mainImage;
     const rating = cached?.hotelRating;
     const amenities = cached?.amenities || [];
-    const cancellationText = cached?.cancellationText || "";
+    const roomPolicyTexts: string[] = [];
+    const selectedRoomId = String(
+      selectedHotelRoomSummary?.roomId || selectedHotelRoomIds[0] || ""
+    ).trim();
+    if (Array.isArray(cached?.rooms) && selectedRoomId) {
+      const selectedRoom = (cached.rooms as any[]).find(
+        (room) => String(room?.id || "").trim() === selectedRoomId
+      );
+      const raw = selectedRoom?._raw;
+      const directPolicy =
+        typeof raw?.cancellation_policy === "string"
+          ? raw.cancellation_policy.trim()
+          : typeof raw?.cancellationPolicy === "string"
+            ? raw.cancellationPolicy.trim()
+            : "";
+      const directPolicyText = sanitizePolicyText(directPolicy);
+      if (directPolicyText) roomPolicyTexts.push(directPolicyText);
+
+      const hbPolicies = Array.isArray(raw?._hotelbeds?.cancellationPolicies)
+        ? raw._hotelbeds.cancellationPolicies
+        : [];
+      for (const p of hbPolicies) {
+        if (!p || typeof p !== "object") continue;
+        const policy =
+          typeof p.policy === "string"
+            ? p.policy.trim()
+            : typeof p.description === "string"
+              ? p.description.trim()
+              : typeof p.text === "string"
+                ? p.text.trim()
+                : "";
+        const policyText = sanitizePolicyText(policy);
+        if (policyText) roomPolicyTexts.push(policyText);
+      }
+    }
+
+    const dedupedPolicyTexts = Array.from(
+      new Set(
+        roomPolicyTexts
+          .map((t) => sanitizePolicyText(t))
+          .filter(Boolean)
+      )
+    );
+    const cancellationText = dedupedPolicyTexts.join("\n\n");
 
     const roomSummary = selectedHotelRoomSummary;
     const currency = roomSummary?.currency || "$";
@@ -261,10 +339,8 @@ export function HotelCheckoutSidebar({
       <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-3">
         <span className="text-sm font-semibold text-[#010D50]">Cancellation Policy</span>
 
-        {display.isRefundable === true && hotelSearch?.checkIn && (
-          <p className="text-sm font-semibold text-[#008234]">
-            Free cancellation before {formatDateDisplay(hotelSearch.checkIn).replace(/,\s*\d{4}$/, "")}
-          </p>
+        {display.isRefundable === true && (
+          <p className="text-sm font-semibold text-[#008234]">Refundable</p>
         )}
 
         {display.isRefundable === false && (
@@ -272,14 +348,7 @@ export function HotelCheckoutSidebar({
         )}
 
         {display.cancellationText && (
-          <p className="text-xs text-[#3A478A]">{display.cancellationText}</p>
-        )}
-
-        {display.total != null && display.isRefundable === true && hotelSearch?.checkIn && (
-          <div className="flex items-center justify-between text-sm font-medium text-[#3A478A]">
-            <span>After 12:00 AM on {formatDateDisplay(hotelSearch.checkIn).replace(/,\s*\d{4}$/, "").replace(/^\w+,\s*/, "")}</span>
-            <span>{formatMoney(display.currency, display.total)}</span>
-          </div>
+          <p className="text-xs text-[#3A478A] whitespace-pre-line">{display.cancellationText}</p>
         )}
       </div>
     </aside>
