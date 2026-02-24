@@ -1,7 +1,29 @@
 import crypto from 'crypto';
+import type { HotelTaxBreakdown, HotelBedsTaxItem } from '@/types/hotel';
 
 function clampInt(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
+}
+
+function extractTaxBreakdown(rate: any): HotelTaxBreakdown | null {
+  const taxesNode = rate?.taxes;
+  if (!taxesNode || typeof taxesNode !== 'object') return null;
+  const items: HotelBedsTaxItem[] = [];
+  const rawItems = Array.isArray(taxesNode.taxes) ? taxesNode.taxes : [];
+  for (const t of rawItems) {
+    if (!t || typeof t !== 'object') continue;
+    items.push({
+      included: !!t.included,
+      amount: String(t.amount ?? '0'),
+      currency: String(t.currency ?? ''),
+      type: String(t.type ?? ''),
+      subType: t.subType ? String(t.subType) : undefined,
+      clientAmount: t.clientAmount ? String(t.clientAmount) : undefined,
+      clientCurrency: t.clientCurrency ? String(t.clientCurrency) : undefined,
+    });
+  }
+  if (items.length === 0) return null;
+  return { allIncluded: !!taxesNode.allIncluded, taxes: items };
 }
 
 // Note: some properties don't have an `xl/` variant (403), while `bigger/` typically exists.
@@ -69,6 +91,7 @@ export function hotelbedsHotelToVyspaResult(
           paymentType: String(rate?.paymentType || '').trim() || undefined,
           rateKey: String(rate?.rateKey || '').trim() || undefined,
           refundable: String(rate?.rateClass || '').toUpperCase() !== 'NRF',
+          taxes: extractTaxBreakdown(rate),
         };
       }
     }
@@ -123,6 +146,7 @@ export function hotelbedsHotelToVyspaRoomsResponse(
       const rateKey = String(rate?.rateKey || '');
       if (!rateKey) continue;
       const net = rate?.net != null ? Number(rate.net) : 0;
+      const taxes = extractTaxBreakdown(rate);
       room1options.push({
         id: stableRateId(rateKey),
         room_code: roomCode || undefined,
@@ -134,6 +158,7 @@ export function hotelbedsHotelToVyspaRoomsResponse(
         sell_currency_code: currency || undefined,
         nonRef: String(rate?.rateClass || '').toUpperCase() === 'NRF' ? 1 : 0,
         rateKey,
+        hotelBedsTaxes: taxes,
         _hotelbeds: {
           rateKey,
           rateClass: rate?.rateClass,
@@ -144,6 +169,7 @@ export function hotelbedsHotelToVyspaRoomsResponse(
           promotions: rate?.promotions,
           offers: rate?.offers,
           allotment: rate?.allotment,
+          taxes,
         },
       });
     }

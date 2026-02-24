@@ -109,11 +109,51 @@ export async function POST(req: Request) {
     Math.round((new Date(decoded.checkOut).getTime() - new Date(decoded.checkIn).getTime()) / (1000 * 60 * 60 * 24))
   );
 
+  // Collect all rateKeys for a batch checkrates call to get tax breakdowns + validated prices.
+  const allRateKeys: string[] = [];
+  for (const room of firstHotel.rooms ?? []) {
+    for (const rate of room.rates ?? []) {
+      if (rate.rateKey) allRateKeys.push(String(rate.rateKey));
+    }
+  }
+
+  // Run checkrates and content enrichment in parallel to avoid extra latency.
+  const [checkratesResult, contentResult] = await Promise.all([
+    allRateKeys.length > 0
+      ? hotelbedsBookingPost<any>('/checkrates', {
+          rooms: allRateKeys.map((rk) => ({ rateKey: rk })),
+        }).catch(() => null)
+      : Promise.resolve(null),
+    hotelbedsContentGet<any>(`/hotels/${encodeURIComponent(hotelCode)}/details?language=ENG`).catch(
+      () => null
+    ),
+  ]);
+
+  // Merge tax data from checkrates back into the availability hotel object.
+  if (checkratesResult?.ok) {
+    const crRooms = checkratesResult.data?.hotel?.rooms ?? [];
+    const taxByRateKey = new Map<string, any>();
+    for (const crRoom of crRooms) {
+      for (const crRate of crRoom.rates ?? []) {
+        if (crRate.rateKey && crRate.taxes) {
+          taxByRateKey.set(String(crRate.rateKey), crRate.taxes);
+        }
+      }
+    }
+    if (taxByRateKey.size > 0) {
+      for (const room of firstHotel.rooms ?? []) {
+        for (const rate of room.rates ?? []) {
+          const taxes = taxByRateKey.get(String(rate.rateKey));
+          if (taxes) rate.taxes = taxes;
+        }
+      }
+    }
+  }
+
   let enrich: { imageUrl?: string; address1?: string; cityName?: string; countryName?: string } | undefined;
-  try {
-    const contentRes = await hotelbedsContentGet<any>(`/hotels/${encodeURIComponent(hotelCode)}/details?language=ENG`);
-    if (contentRes.ok) {
-      const hotel = (contentRes.data as any)?.hotel ?? (contentRes.data as any);
+  if (contentResult?.ok) {
+    try {
+      const hotel = (contentResult.data as any)?.hotel ?? (contentResult.data as any);
       const images = Array.isArray(hotel?.images) ? hotel.images : [];
       const firstImage = images.find((x: any) => x?.path) || images[0];
       const imagePath = firstImage?.path ? String(firstImage.path) : '';
@@ -137,9 +177,9 @@ export async function POST(req: Request) {
         cityName: cityName || undefined,
         countryName: countryName || undefined,
       };
+    } catch {
+      // ignore content parsing errors
     }
-  } catch {
-    // ignore
   }
 
   return NextResponse.json(

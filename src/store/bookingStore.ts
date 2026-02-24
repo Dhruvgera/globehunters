@@ -278,6 +278,7 @@ interface BookingState {
     total?: number;
     nightly?: number;
     hotelbedsRateKey?: string;
+    hotelBedsTaxes?: import('@/types/hotel').HotelTaxBreakdown | null;
   } | null;
   setSelectedHotelRoomSummary: (summary: BookingState['selectedHotelRoomSummary']) => void;
 

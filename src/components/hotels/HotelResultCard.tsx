@@ -83,6 +83,18 @@ export function HotelResultCard({
     : `/hotels/${hotel.id}`;
   const isHotelDatesDebugMode = process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES === "true";
 
+  const localTaxLabel = (() => {
+    const hb = raw?._hotelbeds as Record<string, unknown> | null | undefined;
+    const cheapest = hb?.cheapest as Record<string, unknown> | null | undefined;
+    const taxes = cheapest?.taxes as import('@/types/hotel').HotelTaxBreakdown | null | undefined;
+    if (!taxes?.taxes) return null;
+    const notIncluded = taxes.taxes.filter(t => !t.included);
+    if (notIncluded.length === 0) return null;
+    const total = notIncluded.reduce((s, t) => s + Number(t.clientAmount || t.amount || 0), 0);
+    const cur = notIncluded[0]?.clientCurrency || notIncluded[0]?.currency || hotel.price.currency;
+    return `+ ${cur} ${total.toFixed(2)} local taxes at hotel`;
+  })();
+
   const rootClass = [
     "bg-white border rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden w-full max-w-full cursor-pointer",
     selected ? "border-[#3754ED] bg-[rgba(55,84,237,0.08)]" : "border-[#DFE0E4]",
@@ -192,9 +204,15 @@ export function HotelResultCard({
                 <div className="text-2xl font-bold text-[#010D50]">
                   {hotel.price.currency}{hotel.price.total.toLocaleString()} total
                 </div>
-                <div className="text-xs text-[#3A478A]">
-                  * Total with taxes and fees
-                </div>
+                {localTaxLabel ? (
+                  <div className="text-xs text-[#B07930] bg-[#FFF8F0] border border-[#F5D9B3] rounded px-2 py-0.5">
+                    {localTaxLabel}
+                  </div>
+                ) : (
+                  <div className="text-xs text-[#3A478A]">
+                    * Total with taxes and fees
+                  </div>
+                )}
               </div>
             </div>
 
@@ -289,10 +307,16 @@ export function HotelResultCard({
                   {hotel.price.currency}
                   {hotel.price.total.toLocaleString()} total
                 </div>
-                <div className="flex items-center gap-2 text-xs text-[#3A478A]">
-                  <span>*</span>
-                  <span>Locally payable taxes</span>
-                </div>
+                {localTaxLabel ? (
+                  <div className="text-xs text-[#B07930] bg-[#FFF8F0] border border-[#F5D9B3] rounded px-2 py-0.5 text-right">
+                    {localTaxLabel}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-xs text-[#3A478A]">
+                    <span>*</span>
+                    <span>Locally payable taxes</span>
+                  </div>
+                )}
               </div>
 
               <div className="mt-auto w-full flex justify-end">

@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useMemo } from "react";
 
 import { useBookingStore } from "@/store/bookingStore";
+import type { HotelTaxBreakdown, HotelBedsTaxItem } from "@/types/hotel";
 
 function formatMoney(currency: string | undefined, amount: number | undefined) {
   const c = currency || "";
@@ -58,7 +59,11 @@ export function HotelSummaryCard(props: HotelSummaryCardProps) {
     const currency = roomSummary?.currency || room?.price?.currency;
     const total = roomSummary?.total ?? room?.price?.total;
     const nightly = roomSummary?.nightly ?? room?.price?.nightly;
-    return { name, address, img, roomName, mealName, isRefundable, currency, total, nightly };
+    const hbTaxBreakdown: HotelTaxBreakdown | null = roomSummary?.hotelBedsTaxes ?? null;
+    const localTaxes: HotelBedsTaxItem[] = hbTaxBreakdown?.taxes?.filter((t: HotelBedsTaxItem) => !t.included) ?? [];
+    const localTaxTotal = localTaxes.reduce((s: number, t: HotelBedsTaxItem) => s + Number(t.clientAmount || t.amount || 0), 0);
+    const localTaxCurrency = localTaxes[0]?.clientCurrency || localTaxes[0]?.currency || currency;
+    return { name, address, img, roomName, mealName, isRefundable, currency, total, nightly, localTaxes, localTaxTotal, localTaxCurrency };
   }, [cached, roomSummary, selectedHotel, selectedRoomIds]);
 
   return (
@@ -114,6 +119,34 @@ export function HotelSummaryCard(props: HotelSummaryCardProps) {
           </div>
         </div>
       </div>
+
+      {display.localTaxes.length > 0 && (
+        <div className="bg-[#FFF8F0] border border-[#F5D9B3] rounded-lg p-3 flex flex-col gap-1.5">
+          <span className="text-xs font-semibold text-[#8B5E20]">
+            Local taxes payable at hotel
+          </span>
+          {display.localTaxes.map((tax, i) => (
+            <div key={i} className="flex items-center justify-between text-xs text-[#8B5E20]">
+              <span>{tax.subType || tax.type || "Taxes & fees"}</span>
+              <span>
+                {formatMoney(
+                  tax.clientCurrency || tax.currency || display.localTaxCurrency,
+                  Number(tax.clientAmount || tax.amount || 0)
+                )}
+              </span>
+            </div>
+          ))}
+          {display.localTaxes.length > 1 && (
+            <div className="flex items-center justify-between text-xs font-semibold text-[#8B5E20] border-t border-[#F5D9B3] pt-1">
+              <span>Total</span>
+              <span>{formatMoney(display.localTaxCurrency, display.localTaxTotal)}</span>
+            </div>
+          )}
+          <span className="text-[10px] text-[#B07930]">
+            Not included in the price above. Payable directly at the property.
+          </span>
+        </div>
+      )}
     </div>
   );
 }

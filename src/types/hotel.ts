@@ -16,6 +16,21 @@ export interface HotelReviewSummary {
   count: number; // e.g. 900
 }
 
+export interface HotelBedsTaxItem {
+  included: boolean;
+  amount: string;
+  currency: string;
+  type: string;          // "TAX" | "FEE" | "TAXESANDFEES"
+  subType?: string;      // e.g. "City Tax", "Resort Fee", "VAT"
+  clientAmount?: string;
+  clientCurrency?: string;
+}
+
+export interface HotelTaxBreakdown {
+  allIncluded: boolean;
+  taxes: HotelBedsTaxItem[];
+}
+
 export interface HotelPriceSummary {
   currency: string; // e.g. "$"
   nightly: number;

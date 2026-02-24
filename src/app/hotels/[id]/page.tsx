@@ -138,6 +138,24 @@ function buildSelectedRoomSummary(
   const uniqueMealPlans = Array.from(new Set(selectedRooms.map((room) => room.bedType).filter(Boolean)));
   const allRefundable = selectedRooms.every((room) => room.isRefundable);
 
+  const aggregatedTaxes = (() => {
+    const allTaxItems: import('@/types/hotel').HotelBedsTaxItem[] = [];
+    let hasAny = false;
+    let allInc = true;
+    for (const room of selectedRooms) {
+      const raw = room._raw as Record<string, unknown>;
+      const hbTaxes = (raw.hotelBedsTaxes ?? (raw._hotelbeds as any)?.taxes) as
+        import('@/types/hotel').HotelTaxBreakdown | null | undefined;
+      if (hbTaxes && Array.isArray(hbTaxes.taxes)) {
+        hasAny = true;
+        if (!hbTaxes.allIncluded) allInc = false;
+        allTaxItems.push(...hbTaxes.taxes);
+      }
+    }
+    if (!hasAny) return null;
+    return { allIncluded: allInc, taxes: allTaxItems } as import('@/types/hotel').HotelTaxBreakdown;
+  })();
+
   return {
     hotelId,
     roomId: String(firstRoom.id),
@@ -149,6 +167,7 @@ function buildSelectedRoomSummary(
     nightly,
     hotelbedsRateKey:
       selectedRooms.length === 1 ? (selectedRooms[0]?._raw?.rateKey as string | undefined) : undefined,
+    hotelBedsTaxes: aggregatedTaxes,
   };
 }
 
@@ -520,7 +539,6 @@ function extractImportantInfoFromPayload(payload: unknown): string {
 
   addLabeledLine("Check-in", row.checkInHour ?? row.check_in_hour ?? row.check_in);
   addLabeledLine("Check-out", row.checkOutHour ?? row.check_out_hour ?? row.check_out);
-  addLabeledLine("Total number of rooms", row.numOfRooms ?? row.no_of_rooms ?? row.total_rooms);
 
   collectImportantInfoFromArray(row.Facility);
   collectImportantInfoFromArray(row.facilities);
@@ -636,7 +654,8 @@ function isLikelyAmenityLabel(text: string): boolean {
 
 function isLikelyImportantInfoLabel(text: string): boolean {
   if (!text || isLikelyAmenityLabel(text)) return false;
-  return /(year of|total number of|number of floors|check-in|check out|check-out|minimum check-in age|minimum age|credit card|identity card|identification|small pets allowed|pets allowed|deposit|city tax|tourism tax)/i.test(
+  if (/(total number of|number of floors|number of rooms|year of (construction|renovation|last renovation|build))/i.test(text)) return false;
+  return /(check-in|check out|check-out|minimum check-in age|minimum age|credit card|identity card|identification|small pets allowed|pets allowed|deposit|city tax|tourism tax)/i.test(
     text
   );
 }
@@ -650,6 +669,10 @@ function normalizeImportantInfoLine(value: unknown): string {
     /^total number of rooms:?$/i.test(text) ||
     /^(hour|time)$/i.test(text)
   ) {
+    return "";
+  }
+
+  if (/(total number of rooms|number of floors|number of rooms|year of (construction|renovation|last renovation|build))/i.test(text)) {
     return "";
   }
 
@@ -759,7 +782,6 @@ function extractVyspaGetHotelDetailsData(payload: unknown): {
       .filter((text) => isLikelyImportantInfoLabel(text))
       .map((line) => normalizeImportantInfoLine(line))
       .filter(Boolean),
-    normalizeImportantInfoLine(hotelContent?.numOfRooms ? `Total number of rooms: ${hotelContent.numOfRooms}` : ""),
     ...normalizeImportantInfoText(hotelContent?.roomDetail)
       .split("\n")
       .filter(Boolean),
@@ -2531,6 +2553,9 @@ export default function HotelRoomsPage() {
                   const handlePackageRoomContinue = () => {
                     const chosenRoom = room;
                     const rid = chosenRoom.id;
+                    const chosenRaw = chosenRoom._raw as Record<string, unknown>;
+                    const chosenTaxes = (chosenRaw.hotelBedsTaxes ?? (chosenRaw._hotelbeds as any)?.taxes) as
+                      import('@/types/hotel').HotelTaxBreakdown | null | undefined;
                     setSelectedHotelRoomIds([String(rid)]);
                     setSelectedHotelRoomSummary({
                       hotelId,
@@ -2542,6 +2567,7 @@ export default function HotelRoomsPage() {
                       total: chosenRoom?.price?.total,
                       nightly: chosenRoom?.price?.nightly,
                       hotelbedsRateKey: (chosenRoom as any)?._raw?.rateKey,
+                      hotelBedsTaxes: chosenTaxes ?? null,
                     });
                     const params = new URLSearchParams();
                     params.set("type", "package");
@@ -2748,9 +2774,26 @@ export default function HotelRoomsPage() {
                             <span className="text-xl font-semibold text-[#010D50]">
                               {room.price.currency}{room.price.total.toLocaleString()} total
                             </span>
-                            <span className="text-xs text-[#3A478A]">
-                              * Locally payable taxes
-                            </span>
+                            {(() => {
+                              const rawForTax = room._raw as Record<string, unknown>;
+                              const hbTaxes = (rawForTax.hotelBedsTaxes ?? (rawForTax._hotelbeds as any)?.taxes) as
+                                import('@/types/hotel').HotelTaxBreakdown | null | undefined;
+                              const notIncluded = hbTaxes?.taxes?.filter(t => !t.included) ?? [];
+                              if (notIncluded.length > 0) {
+                                const localTotal = notIncluded.reduce((s, t) => s + Number(t.clientAmount || t.amount || 0), 0);
+                                const localCur = notIncluded[0]?.clientCurrency || notIncluded[0]?.currency || room.price.currency;
+                                return (
+                                  <span className="text-xs text-[#B07930] bg-[#FFF8F0] border border-[#F5D9B3] rounded px-2 py-0.5">
+                                    + {localCur} {localTotal.toFixed(2)} local taxes at hotel
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span className="text-xs text-[#3A478A]">
+                                  * Locally payable taxes
+                                </span>
+                              );
+                            })()}
                           </div>
 
                           {isPackageMode ? (
