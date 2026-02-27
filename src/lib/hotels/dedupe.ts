@@ -54,6 +54,11 @@ function minPositive(a: unknown, b: unknown): number | undefined {
   return Number.isFinite(v) ? v : undefined;
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object') return {};
+  return value as Record<string, unknown>;
+}
+
 export function dedupeVyspaWithHotelbedsByLiveProperties(input: {
   vyspaResults: any[];
   hotelbedsResults: any[];
@@ -90,10 +95,18 @@ export function dedupeVyspaWithHotelbedsByLiveProperties(input: {
     const mappedVyspaId = input.hotelbedsToVyspaId.get(hbCode);
     if (!mappedVyspaId) {
       unmapped += 1;
+      const hbMeta = asRecord(hb?._hotelbeds);
       if (includeUnmappedHotelbeds) {
         mergedByVyspaId.set(`hb:${hbCode}`, {
           ...hb,
           suppliers: mergeUniqueStrings(hb?.suppliers || [], ['hotelbeds']),
+          providerHotelCode: String((hb as any)?.providerHotelCode || hbCode),
+          hotelbedsCode: hbCode,
+          _hotelbeds: {
+            ...hbMeta,
+            providerHotelCode: String((hb as any)?.providerHotelCode || hbCode),
+            hotelCode: hbCode,
+          },
           _dedupe: { matchedBy: 'none', hbCode, mappedVyspaId: null },
         });
       }
@@ -103,10 +116,18 @@ export function dedupeVyspaWithHotelbedsByLiveProperties(input: {
     const existing = mergedByVyspaId.get(mappedVyspaId);
     if (!existing) {
       mappedNoVyspaResult += 1;
+      const hbMeta = asRecord(hb?._hotelbeds);
       if (includeUnmappedHotelbeds) {
         mergedByVyspaId.set(`hb-map:${mappedVyspaId}`, {
           ...hb,
           suppliers: mergeUniqueStrings(hb?.suppliers || [], ['hotelbeds']),
+          providerHotelCode: String((hb as any)?.providerHotelCode || hbCode),
+          hotelbedsCode: hbCode,
+          _hotelbeds: {
+            ...hbMeta,
+            providerHotelCode: String((hb as any)?.providerHotelCode || hbCode),
+            hotelCode: hbCode,
+          },
           _dedupe: { matchedBy: 'liveProperties', hbCode, mappedVyspaId },
         });
       }
@@ -114,6 +135,9 @@ export function dedupeVyspaWithHotelbedsByLiveProperties(input: {
     }
 
     matched += 1;
+    const existingHb = asRecord(existing?._hotelbeds);
+    const hbMeta = asRecord(hb?._hotelbeds);
+    const providerHotelCode = String((hb as any)?.providerHotelCode || hbCode);
     mergedByVyspaId.set(mappedVyspaId, {
       ...existing,
       image_name: existing?.image_name || hb?.image_name,
@@ -130,7 +154,14 @@ export function dedupeVyspaWithHotelbedsByLiveProperties(input: {
         hbCode,
         mappedVyspaId,
       },
-      _hotelbeds: hb?._hotelbeds || existing?._hotelbeds,
+      providerHotelCode: providerHotelCode || (existing as any)?.providerHotelCode,
+      hotelbedsCode: hbCode || (existing as any)?.hotelbedsCode,
+      _hotelbeds: {
+        ...existingHb,
+        ...hbMeta,
+        providerHotelCode: providerHotelCode || String(existingHb.providerHotelCode || ''),
+        hotelCode: hbCode || String(existingHb.hotelCode || ''),
+      },
     });
   }
 

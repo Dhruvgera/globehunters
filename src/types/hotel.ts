@@ -41,6 +41,8 @@ export interface HotelPriceSummary {
 
 export interface Hotel {
   id: string;
+  /** TrustYou hotel ID (UUID) when resolved */
+  tyId?: string;
   name: string;
   distanceLabel: string; // e.g. "15.11 mi from Hong Kong Intl. (HKG)"
   neighborhood?: string;

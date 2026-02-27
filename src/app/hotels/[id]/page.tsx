@@ -39,6 +39,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { hotelService } from "@/services/api/hotelService";
 import { useBookingStore } from "@/store/bookingStore";
 import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
+import { resolveTrustYouHotelId } from "@/lib/trustyou/hotelMapping";
+import type { TrustYouHotelReviewSummary } from "@/types/trustyou";
 
 function LoadingBlock({ className }: { className: string }) {
   return <div className={`animate-pulse bg-gray-200/70 rounded-xl ${className}`} />;
@@ -834,6 +836,24 @@ function toPositiveNumericId(value: unknown): string | null {
   return s;
 }
 
+function trustYouIdFromRecord(row: Record<string, unknown> | null | undefined): string | null {
+  if (!row) return null;
+  const nestedHotelBeds = asRecord(row._hotelbeds);
+  return resolveTrustYouHotelId({
+    candidateIds: [
+      row.ty_id,
+      row.tyId,
+      row.trustyou_id,
+      row.trustyouId,
+      row.trust_you_id,
+      nestedHotelBeds.ty_id,
+      nestedHotelBeds.tyId,
+      nestedHotelBeds.trustyou_id,
+      nestedHotelBeds.trustyouId,
+    ].map((value) => String(value || "").trim()),
+  });
+}
+
 function resolveHotelResultId(result: unknown): string {
   const row = asRecord(result);
   const hotelId = toPositiveNumericId(row.hotel_id ?? row.hotelId);
@@ -851,6 +871,7 @@ export default function HotelRoomsPage() {
   const urlSearchCriteriaId = searchParams.get("searchCriteriaId");
   const urlSrId = searchParams.get("srId");
   const urlProvider = searchParams.get("provider");
+  const urlTyId = searchParams.get("tyId");
 
   // Detect if we're in package (flight+hotel) mode
   const isPackageMode = searchParams.get("type") === "package";
@@ -900,9 +921,11 @@ export default function HotelRoomsPage() {
   const [stayRooms, setStayRooms] = useState<number>(() => hotelSearch?.rooms || 1);
   const [filterRefundableOnly, setFilterRefundableOnly] = useState(false);
   const [filterBoardQuery, setFilterBoardQuery] = useState<string>("");
+  const [trustYouReview, setTrustYouReview] = useState<TrustYouHotelReviewSummary | null>(null);
   const [activeRoomCardId, setActiveRoomCardId] = useState<string | null>(null);
   const [rawGetRoomsV3Response, setRawGetRoomsV3Response] = useState<unknown>(null);
   const [rawAccommodationDetailsResponse, setRawAccommodationDetailsResponse] = useState<unknown>(null);
+  const trustYouFetchKeyRef = useRef<string>("");
   const isHotelDatesDebugMode = process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES === "true";
 
   useEffect(() => {
@@ -1055,6 +1078,13 @@ export default function HotelRoomsPage() {
         address2: typeof hitRow.address2 === "string" ? hitRow.address2 : nextMeta[String(hotelId)]?.address2,
         hotelRating:
           Number.isFinite(Number(hitRow.hotel_rating)) ? Number(hitRow.hotel_rating) : nextMeta[String(hotelId)]?.hotelRating,
+        trustyouId:
+          trustYouIdFromRecord(hitRow) ||
+          resolveTrustYouHotelId({
+            hotelName: String(hitRow.hotel_name || hitRow.hotelName || ""),
+            location: [hitRow.address1, hitRow.address2].filter(Boolean).join(", "),
+          }) ||
+          nextMeta[String(hotelId)]?.trustyouId,
         rawSearchResult: hitRow ?? nextMeta[String(hotelId)]?.rawSearchResult,
       };
       setHotelResultsMeta(nextMeta);
@@ -1211,7 +1241,9 @@ export default function HotelRoomsPage() {
   const overviewRef = useRef<HTMLDivElement>(null);
   const aboutRef = useRef<HTMLDivElement>(null);
   const roomsRef = useRef<HTMLDivElement>(null);
+  const reviewsRef = useRef<HTMLDivElement>(null);
   const accessibilitiesRef = useRef<HTMLDivElement>(null);
+  const policiesRef = useRef<HTMLDivElement>(null);
 
   // Hydrate from cache to avoid mock-first / flicker.
   useEffect(() => {
@@ -1231,8 +1263,97 @@ export default function HotelRoomsPage() {
     if (Array.isArray(cached.rooms)) setRemoteRooms(cached.rooms);
     if (typeof cached.detailsText === "string") setDetailsText(cached.detailsText);
     if (typeof cached.cancellationText === "string") setCancellationText(cached.cancellationText);
+    if (cached.trustYou) setTrustYouReview(cached.trustYou);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hotelId]);
+
+  useEffect(() => {
+    const meta = hotelResultsMeta?.[hotelId];
+    const rawSearchResult = asRecord(meta?.rawSearchResult);
+    const dedupe = asRecord(rawSearchResult._dedupe);
+    const partnerHotelIds = Array.from(
+      new Set(
+        [
+          hotelId,
+          String(meta?.vyspaHotelId || ""),
+          String(rawSearchResult.hotel_id || ""),
+          String(rawSearchResult.hotelId || ""),
+          String(rawSearchResult.id || ""),
+          String(rawSearchResult.code || ""),
+          String(rawSearchResult.providerHotelCode || ""),
+          String(rawSearchResult.hotelbedsCode || ""),
+          String(dedupe.hbCode || ""),
+          String(asRecord(rawSearchResult._hotelbeds).providerHotelCode || ""),
+          String(asRecord(rawSearchResult._hotelbeds).hotelCode || ""),
+        ]
+          .map((value) => String(value || "").trim())
+          .filter(Boolean)
+      )
+    );
+    const resolvedTyId = resolveTrustYouHotelId({
+      hotelName: remoteHotelHeader?.name || meta?.hotelName,
+      location: [remoteHotelHeader?.address, meta?.address1, meta?.address2].filter(Boolean).join(", "),
+      candidateIds: [urlTyId, meta?.trustyouId, trustYouIdFromRecord(rawSearchResult)],
+    });
+
+    const hotelName = (remoteHotelHeader?.name || meta?.hotelName || "").trim();
+    const location = [remoteHotelHeader?.address, meta?.address1, meta?.address2].filter(Boolean).join(", ");
+    if (!resolvedTyId && !hotelName) return;
+
+    const requestParams = new URLSearchParams();
+    if (resolvedTyId) requestParams.set("tyId", resolvedTyId);
+    if (hotelName) requestParams.set("hotelName", hotelName);
+    if (location) requestParams.set("location", location);
+    if (hotelId) requestParams.set("hotelId", hotelId);
+    if (partnerHotelIds.length > 0) requestParams.set("partnerHotelIds", partnerHotelIds.join(","));
+    requestParams.set("details", "1");
+
+    const requestKey = `${hotelId}:${requestParams.toString()}`;
+    if (trustYouFetchKeyRef.current === requestKey) return;
+    trustYouFetchKeyRef.current = requestKey;
+
+    let cancelled = false;
+    const run = async () => {
+      const response = await fetch(`/api/hotels/trustyou?${requestParams.toString()}`);
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.ok || !data?.review) return;
+      if (cancelled) return;
+      setTrustYouReview(data.review as TrustYouHotelReviewSummary);
+    };
+
+    run().catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    hotelId,
+    hotelResultsMeta,
+    remoteHotelHeader?.address,
+    remoteHotelHeader?.name,
+    urlTyId,
+  ]);
+
+  useEffect(() => {
+    if (!hotelId || !trustYouReview) return;
+    const cached = hotelDetailsCache?.[hotelId];
+    if (!cached) return;
+    const previous = cached.trustYou;
+    if (
+      previous &&
+      previous.tyId === trustYouReview.tyId &&
+      previous.score === trustYouReview.score &&
+      previous.reviewsCount === trustYouReview.reviewsCount
+    ) {
+      return;
+    }
+
+    setHotelDetailsCache(hotelId, {
+      ...cached,
+      trustYou: trustYouReview,
+      fetchedAt: cached.fetchedAt || Date.now(),
+    });
+  }, [hotelDetailsCache, hotelId, setHotelDetailsCache, trustYouReview]);
 
   const hotel = useMemo(() => {
     const mapQuery = (() => {
@@ -1243,6 +1364,14 @@ export default function HotelRoomsPage() {
       if (placeText) return `${placeText} (${coordinates.lat}, ${coordinates.lng})`;
       return `${coordinates.lat},${coordinates.lng}`;
     })();
+    const trustYouBreakdown = (trustYouReview?.categoryBreakdown || []).reduce<Record<string, number>>(
+      (acc, item) => {
+        if (!item?.label || !Number.isFinite(item.score) || item.score <= 0) return acc;
+        acc[item.label] = Math.round(item.score * 10) / 10;
+        return acc;
+      },
+      {}
+    );
 
     return {
       name: remoteHotelHeader?.name || "",
@@ -1254,7 +1383,12 @@ export default function HotelRoomsPage() {
         description: detailsText || "",
       },
       amenities: transformAmenities(remoteAmenities || []),
-      reviews: { score: 0, label: "", count: 0, breakdown: {} as Record<string, number> },
+      reviews: {
+        score: trustYouReview?.score || 0,
+        label: trustYouReview?.scoreDescription || "",
+        count: trustYouReview?.reviewsCount || 0,
+        breakdown: trustYouBreakdown,
+      },
       policies: cancellationText || "",
       mapUrl: coordinates
         ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}&hl=en`
@@ -1263,7 +1397,16 @@ export default function HotelRoomsPage() {
       coordinates,
       mapQuery,
     };
-  }, [cancellationText, coordinates, detailsText, galleryImages, importantInfoText, remoteAmenities, remoteHotelHeader]);
+  }, [
+    cancellationText,
+    coordinates,
+    detailsText,
+    galleryImages,
+    importantInfoText,
+    remoteAmenities,
+    remoteHotelHeader,
+    trustYouReview,
+  ]);
   const staySummary = useMemo(() => {
     const checkIn = hotelSearch?.checkIn || stayCheckIn || "";
     const checkOut = hotelSearch?.checkOut || stayCheckOut || "";
@@ -1285,6 +1428,7 @@ export default function HotelRoomsPage() {
       "Overview",
       ...(hasAboutSection ? ["About"] : []),
       "Rooms",
+      "Reviews",
       ...(hasAccessibilitySection ? ["Accessibilities"] : []),
       ...(hasPolicies ? ["Policies"] : []),
     ],
@@ -1325,7 +1469,19 @@ export default function HotelRoomsPage() {
     title: string;
     body: string;
     rating: number;
-  }> = [];
+  }> = (trustYouReview?.snippets || []).map((snippet, index) => ({
+    id: `trustyou-snippet-${index}`,
+    author: "TrustYou insight",
+    date: "",
+    title: "",
+    body: snippet,
+    rating: trustYouReview?.score || 0,
+  }));
+  const hasReviewData =
+    hotel.reviews.count > 0 ||
+    hotel.reviews.score > 0 ||
+    reviews.length > 0 ||
+    (trustYouReview?.highlights?.length || 0) > 0;
   const faqs: Array<{ id: string; question: string; answer: string }> = [];
 
   const displayedAmenities = showAllAmenities ? hotel.amenities : hotel.amenities.slice(0, 6);
@@ -1815,7 +1971,9 @@ export default function HotelRoomsPage() {
       Overview: overviewRef,
       About: aboutRef,
       Rooms: roomsRef,
+      Reviews: reviewsRef,
       Accessibilities: accessibilitiesRef,
+      Policies: policiesRef,
     };
     refs[section]?.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
@@ -2172,11 +2330,11 @@ export default function HotelRoomsPage() {
                     {/* Featured Review */}
                     <div className="bg-[#F5F7FF] rounded-xl p-4 space-y-3">
                       <p className="text-sm text-[#010D50] leading-relaxed">
-                        Great location and view. Check-out was easy and they even had water and tea available. Would stay again
+                        {trustYouReview?.summaryText || reviews[0]?.body || "Guest sentiment summary unavailable."}
                       </p>
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-gray-300" />
-                        <span className="text-sm font-medium text-[#010D50]">Sarah M.</span>
+                        <span className="text-sm font-medium text-[#010D50]">TrustYou</span>
                       </div>
                     </div>
                   </div>
@@ -2658,20 +2816,21 @@ export default function HotelRoomsPage() {
                           )}
                         </div>
 
-                        {/* Rating */}
-                        <div className="flex items-center gap-2 mt-4">
-                          <div className="w-10 h-10 rounded-xl bg-[#008234] text-white flex items-center justify-center font-medium text-sm">
-                            {room.reviews.score.toFixed(1)}
+                        {(room.reviews.score > 0 || room.reviews.count > 0) && (
+                          <div className="flex items-center gap-2 mt-4">
+                            <div className="w-10 h-10 rounded-xl bg-[#008234] text-white flex items-center justify-center font-medium text-sm">
+                              {room.reviews.score.toFixed(1)}
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium text-[#010D50]">
+                                {room.reviews.label}
+                              </span>
+                              <span className="text-xs text-[#010D50]">
+                                {room.reviews.count} reviews
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium text-[#010D50]">
-                              {room.reviews.label}
-                            </span>
-                            <span className="text-xs text-[#010D50]">
-                              {room.reviews.count} reviews
-                            </span>
-                          </div>
-                        </div>
+                        )}
 
                         {/* Refund & Payment Tags */}
                         <div className="flex flex-wrap gap-2 mt-4">
@@ -2871,93 +3030,113 @@ export default function HotelRoomsPage() {
             </div>
           </div>
 
-          {/* Guest Reviews Section */}
-          {hotel.reviews?.count > 0 && (
-            <div className="mx-4 lg:mx-6 mb-6 bg-[#F5F7FF] rounded-3xl p-6 lg:p-8 space-y-8">
-              <h2 className="text-xl lg:text-2xl font-semibold text-[#010D50]">
-                Guest review
-              </h2>
+          {/* Reviews Section */}
+          <div ref={reviewsRef} className="mx-4 lg:mx-6 mb-6 bg-[#F5F7FF] rounded-3xl p-6 lg:p-8 space-y-8">
+            <h2 className="text-xl lg:text-2xl font-semibold text-[#010D50]">
+              Reviews
+            </h2>
 
+            {hasReviewData ? (
               <div className="grid lg:grid-cols-[1fr_300px] gap-8">
                 {/* Reviews & Cards */}
                 <div className="space-y-6">
                   {/* Score & Label */}
-                  <div className="flex items-center gap-4">
-                    <div className="w-[178px] h-[165px] rounded-xl bg-[#008234] text-white flex flex-col items-center justify-center">
-                      <span className="text-6xl font-medium">
-                        {hotel.reviews.score.toFixed(1)}
-                      </span>
-                    </div>
-                    <div className="flex flex-col gap-3">
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-medium text-[#010D50]">
-                          {hotel.reviews.label}
-                        </span>
-                        <span className="w-1 h-1 rounded-full bg-[#3A478A]" />
-                        <span className="text-xs text-[#010D50]">
-                          {hotel.reviews.count} reviews
+                  {hotel.reviews.score > 0 ? (
+                    <div className="flex items-center gap-4">
+                      <div className="w-[178px] h-[165px] rounded-xl bg-[#008234] text-white flex flex-col items-center justify-center">
+                        <span className="text-6xl font-medium">
+                          {hotel.reviews.score.toFixed(1)}
                         </span>
                       </div>
-                      <button className="text-xs text-[#3754ED] font-medium text-left">
-                        Read all reviews
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Review Cards Grid */}
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    {reviews.slice(0, 4).map((review) => (
-                      <div
-                        key={review.id}
-                        className="bg-white border border-[#DFE0E4] rounded-2xl p-6 space-y-4"
-                      >
-                        <div className="flex items-center justify-between">
+                      <div className="flex flex-col gap-3">
+                        <div className="flex items-center gap-3">
                           <span className="text-sm font-medium text-[#010D50]">
-                            {review.author}
+                            {hotel.reviews.label}
                           </span>
-                          <span className="text-sm font-medium text-[#010D50]">
-                            {review.rating}
+                          <span className="w-1 h-1 rounded-full bg-[#3A478A]" />
+                          <span className="text-xs text-[#010D50]">
+                            {hotel.reviews.count} reviews
                           </span>
                         </div>
-                        <p className="text-sm text-[#010D50] leading-relaxed line-clamp-3">
-                          {review.body}
-                        </p>
-                        <button className="text-sm text-[#3754ED] font-medium">
-                          Read more
-                        </button>
+                        <span className="text-xs text-[#3A478A]">Powered by TrustYou</span>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ) : null}
+
+                  {/* Review Cards Grid */}
+                  {reviews.length > 0 ? (
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      {reviews.slice(0, 4).map((review) => (
+                        <div
+                          key={review.id}
+                          className="bg-white border border-[#DFE0E4] rounded-2xl p-6 space-y-4"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium text-[#010D50]">
+                              {review.author}
+                            </span>
+                            <span className="text-sm font-medium text-[#010D50]">
+                              {review.rating.toFixed(1)}
+                            </span>
+                          </div>
+                          <p className="text-sm text-[#010D50] leading-relaxed line-clamp-3">
+                            {review.body}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : trustYouReview?.highlights?.length ? (
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      {trustYouReview.highlights.slice(0, 4).map((highlight, index) => (
+                        <div
+                          key={`${highlight}-${index}`}
+                          className="bg-white border border-[#DFE0E4] rounded-2xl p-6"
+                        >
+                          <p className="text-sm text-[#010D50] leading-relaxed">{highlight}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* Rating Breakdown */}
                 <div className="space-y-6">
-                  {Object.entries(hotel.reviews.breakdown as Record<string, number>).map(([key, value]) => (
-                    <div key={key} className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-base font-medium text-[#010D50] capitalize">
-                          {key === "freeWifi" ? "Free WiFi" : key === "valueForMoney" ? "Value for money" : key}
-                        </span>
-                        <span className="text-base font-medium text-[#010D50]">
-                          {value.toFixed(1)}
-                        </span>
+                  {Object.entries(hotel.reviews.breakdown as Record<string, number>).length > 0 ? (
+                    Object.entries(hotel.reviews.breakdown as Record<string, number>).map(([key, value]) => (
+                      <div key={key} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-base font-medium text-[#010D50]">
+                            {key}
+                          </span>
+                          <span className="text-base font-medium text-[#010D50]">
+                            {value.toFixed(1)}
+                          </span>
+                        </div>
+                        <div className="h-2 bg-white rounded-lg overflow-hidden">
+                          <div
+                            className="h-full bg-[rgba(55,84,237,0.12)] rounded-lg"
+                            style={{ width: `${(value / 10) * 100}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="h-2 bg-white rounded-lg overflow-hidden">
-                        <div
-                          className="h-full bg-[rgba(55,84,237,0.12)] rounded-lg"
-                          style={{ width: `${(value / 10) * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <p className="text-sm text-[#3A478A]">
+                      Detailed category breakdown is currently unavailable.
+                    </p>
+                  )}
                 </div>
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="rounded-2xl border border-[#DFE0E4] bg-white p-6 text-sm text-[#3A478A]">
+                Reviews are not available yet for this property.
+              </div>
+            )}
+          </div>
 
           {/* Policies Section */}
           {hasPolicies && (
-            <div className="mx-4 lg:mx-6 mb-6 py-6 border-t border-[#DFE0E4]">
+            <div ref={policiesRef} className="mx-4 lg:mx-6 mb-6 py-6 border-t border-[#DFE0E4]">
               <div className="space-y-6">
                 <h2 className="text-xl lg:text-2xl font-semibold text-[#010D50]">
                   Policies

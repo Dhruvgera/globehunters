@@ -2,10 +2,12 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Phone, PawPrint, Bus } from "lucide-react";
 import { useBookingStore } from "@/store/bookingStore";
 import type { HotelTaxBreakdown, HotelBedsTaxItem } from "@/types/hotel";
+import { resolveTrustYouHotelId } from "@/lib/trustyou/hotelMapping";
+import type { TrustYouHotelReviewSummary } from "@/types/trustyou";
 
 function formatMoney(currency: string | undefined, amount: number | undefined) {
   const c = currency || "$";
@@ -76,17 +78,93 @@ export function HotelCheckoutSidebar({
   const hotelSearch = useBookingStore((s) => s.hotelSearch);
   const selectedHotel = useBookingStore((s) => s.selectedHotel);
   const hotelDetailsCache = useBookingStore((s) => s.hotelDetailsCache);
+  const hotelResultsMeta = useBookingStore((s) => s.hotelResultsMeta);
   const selectedHotelRoomSummary = useBookingStore((s) => s.selectedHotelRoomSummary);
   const selectedHotelRoomIds = useBookingStore((s) => s.selectedHotelRoomIds);
 
   const hotelId = selectedHotel?.hotelId;
   const cached = hotelId ? hotelDetailsCache?.[hotelId] : undefined;
+  const [trustYouReview, setTrustYouReview] = useState<TrustYouHotelReviewSummary | null>(cached?.trustYou || null);
+
+  useEffect(() => {
+    setTrustYouReview(cached?.trustYou || null);
+  }, [cached?.trustYou, hotelId]);
+
+  useEffect(() => {
+    if (!hotelId || cached?.trustYou) return;
+
+    const meta = hotelResultsMeta?.[hotelId];
+    const raw = (meta?.rawSearchResult ?? null) as Record<string, unknown> | null;
+    const rawHb = raw?._hotelbeds && typeof raw._hotelbeds === "object"
+      ? (raw._hotelbeds as Record<string, unknown>)
+      : null;
+    const dedupe = raw?._dedupe && typeof raw._dedupe === "object"
+      ? (raw._dedupe as Record<string, unknown>)
+      : null;
+    const partnerHotelIds = Array.from(
+      new Set(
+        [
+          hotelId,
+          String(meta?.vyspaHotelId || ""),
+          String(raw?.hotel_id || ""),
+          String(raw?.hotelId || ""),
+          String(raw?.id || ""),
+          String(raw?.code || ""),
+          String(raw?.providerHotelCode || ""),
+          String(raw?.hotelbedsCode || ""),
+          String(dedupe?.hbCode || ""),
+          String(rawHb?.providerHotelCode || ""),
+          String(rawHb?.hotelCode || ""),
+        ]
+          .map((value) => String(value || "").trim())
+          .filter(Boolean)
+      )
+    );
+    const resolvedTyId = resolveTrustYouHotelId({
+      hotelName: selectedHotel?.hotelName || meta?.hotelName || cached?.hotelName,
+      location: [cached?.address, meta?.address1, meta?.address2].filter(Boolean).join(", "),
+      candidateIds: [meta?.trustyouId],
+    });
+    const hotelName = selectedHotel?.hotelName || meta?.hotelName || cached?.hotelName || "";
+    if (!resolvedTyId && !hotelName) return;
+
+    const params = new URLSearchParams();
+    if (resolvedTyId) params.set("tyId", resolvedTyId);
+    if (hotelName) params.set("hotelName", hotelName);
+    if (cached?.address) params.set("location", cached.address);
+    params.set("hotelId", hotelId);
+    if (partnerHotelIds.length > 0) params.set("partnerHotelIds", partnerHotelIds.join(","));
+
+    let cancelled = false;
+    fetch(`/api/hotels/trustyou?${params.toString()}`)
+      .then((response) => response.json().catch(() => null))
+      .then((data) => {
+        if (cancelled) return;
+        if (!data?.ok || !data?.review) return;
+        setTrustYouReview(data.review as TrustYouHotelReviewSummary);
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    cached?.address,
+    cached?.hotelName,
+    cached?.trustYou,
+    hotelId,
+    hotelResultsMeta,
+    selectedHotel?.hotelName,
+  ]);
 
   const display = useMemo(() => {
     const name = selectedHotel?.hotelName || cached?.hotelName || "Selected Hotel";
     const address = cached?.address || "";
     const img = cached?.mainImage;
-    const rating = cached?.hotelRating;
+    const starRating = cached?.hotelRating;
+    const reviewScore = trustYouReview?.score || 0;
+    const reviewLabel = trustYouReview?.scoreDescription || "";
+    const reviewCount = trustYouReview?.reviewsCount || 0;
     const amenities = cached?.amenities || [];
     const roomPolicyTexts: string[] = [];
     const selectedRoomId = String(
@@ -179,12 +257,12 @@ export function HotelCheckoutSidebar({
     const includedTaxTotal = includedTaxes.reduce((s, t) => s + Number(t.amount || 0), 0);
 
     return {
-      name, address, img, rating, amenities, cancellationText,
+      name, address, img, starRating, reviewScore, reviewLabel, reviewCount, amenities, cancellationText,
       currency, total, nightly, roomName, isRefundable,
       nights, rooms, adults, children, roomNames, baseTotal, taxes,
       hbTaxBreakdown, includedTaxes, localTaxes, localTaxTotal, localTaxCurrency, includedTaxTotal,
     };
-  }, [cached, selectedHotel, selectedHotelRoomSummary, selectedHotelRoomIds, hotelSearch]);
+  }, [cached, hotelSearch, selectedHotel, selectedHotelRoomIds, selectedHotelRoomSummary, trustYouReview]);
 
   return (
     <aside className="w-full lg:w-[482px] flex flex-col gap-4">
@@ -229,18 +307,25 @@ export function HotelCheckoutSidebar({
             )}
           </div>
 
-          {display.rating != null && (
+          {display.reviewScore > 0 ? (
             <div className="flex items-center gap-2">
               <div className="bg-[#008234] rounded-lg px-2 py-1 flex items-center justify-center">
-                <span className="text-xs font-medium text-white">{display.rating}</span>
+                <span className="text-xs font-medium text-white">{display.reviewScore.toFixed(1)}</span>
               </div>
               <div className="flex flex-col">
                 <span className="text-xs font-medium text-[#010D50]">
-                  {display.rating >= 9 ? "Exceptional" : display.rating >= 8 ? "Excellent" : display.rating >= 7 ? "Very Good" : "Good"}
+                  {display.reviewLabel || "Guest rating"}
+                </span>
+                <span className="text-[11px] text-[#3A478A]">
+                  {display.reviewCount} reviews
                 </span>
               </div>
             </div>
-          )}
+          ) : display.starRating != null ? (
+            <div className="text-xs font-medium text-[#010D50]">
+              Hotel rating: {display.starRating}★
+            </div>
+          ) : null}
 
           {display.amenities.length > 0 && (
             <div className="flex flex-wrap items-center gap-2">

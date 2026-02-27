@@ -11,6 +11,7 @@ import { PaymentDetails } from '@/types/payment';
 import { PriceCheckResult, TransformedPriceOption } from '@/types/priceCheck';
 import { normalizeCabinClass } from '@/lib/utils';
 import type { Hotel } from '@/types/hotel';
+import type { TrustYouHotelReviewSummary } from '@/types/trustyou';
 import type { VyspaCityHotelLookupItem } from '@/types/vyspaHotels';
 import type { HotelFiltersState } from '@/components/hotels/HotelFiltersSidebar';
 import type {
@@ -237,6 +238,7 @@ interface BookingState {
       address1?: string;
       address2?: string;
       hotelRating?: number;
+      trustyouId?: string;
       rawSearchResult?: unknown;
     }
   >;
@@ -262,6 +264,7 @@ interface BookingState {
       detailsText?: string;
       cancellationText?: string;
       amenities?: string[];
+      trustYou?: TrustYouHotelReviewSummary;
       fetchedAt: number;
     }
   >;

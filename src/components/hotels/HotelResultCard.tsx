@@ -77,11 +77,13 @@ export function HotelResultCard({
   // Avoid `.../hotels/<srId>?srId=<srId>` when our route param already equals srId.
   if (srId != null && String(srId).trim() && String(srId) !== String(hotel.id)) detailParams.set("srId", String(srId));
   if (typeof provider === "string" && provider.trim()) detailParams.set("provider", provider.trim().toLowerCase());
+  if (hotel.tyId) detailParams.set("tyId", hotel.tyId);
   if (isPackageMode) detailParams.set("type", "package");
   const hotelDetailUrl = detailParams.toString()
     ? `/hotels/${hotel.id}?${detailParams.toString()}`
     : `/hotels/${hotel.id}`;
   const isHotelDatesDebugMode = process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES === "true";
+  const hasReviewRating = hotel.reviews.score > 0;
 
   const localTaxLabel = (() => {
     const hb = raw?._hotelbeds as Record<string, unknown> | null | undefined;
@@ -160,20 +162,23 @@ export function HotelResultCard({
               </div>
 
               
-              {/* Review score row - score badge on left, label/count stacked on right */}
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-lg bg-[#008234] text-white grid place-content-center font-bold text-sm">
-                  {hotel.reviews.score > 0 ? hotel.reviews.score.toFixed(1) : "—"}
+              {hasReviewRating ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded-lg bg-[#008234] text-white grid place-content-center font-bold text-sm">
+                    {hotel.reviews.score.toFixed(1)}
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold text-[#010D50]">
+                      {hotel.reviews.label}
+                    </span>
+                    <span className="text-xs text-[#3A478A]">
+                      {hotel.reviews.count > 0 ? `${hotel.reviews.count} reviews` : "Guest reviews"}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-sm font-semibold text-[#010D50]">
-                    {hotel.reviews.label}
-                  </span>
-                  <span className="text-xs text-[#3A478A]">
-                    {hotel.reviews.count > 0 ? `${hotel.reviews.count} reviews` : "—"}
-                  </span>
-                </div>
-              </div>
+              ) : (
+                <div className="text-xs text-[#3A478A]">No guest rating available yet</div>
+              )}
 
               {/* Amenities with icons */}
               <div className="flex flex-wrap items-center gap-2">
@@ -285,15 +290,21 @@ export function HotelResultCard({
 
             {/* Right (keeps CTA pinned and prevents dropping) */}
             <div className="flex flex-col items-end gap-3 h-full">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-lg bg-[#008234] text-white grid place-content-center font-semibold text-sm">
-                  {hotel.reviews.score.toFixed(1)}
+              {hasReviewRating ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded-lg bg-[#008234] text-white grid place-content-center font-semibold text-sm">
+                    {hotel.reviews.score.toFixed(1)}
+                  </div>
+                  <div className="flex flex-col">
+                    <div className="text-sm font-medium text-[#010D50]">{hotel.reviews.label}</div>
+                    <div className="text-xs text-[#010D50]">
+                      {hotel.reviews.count > 0 ? `${hotel.reviews.count} reviews` : "Guest reviews"}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex flex-col">
-                  <div className="text-sm font-medium text-[#010D50]">{hotel.reviews.label}</div>
-                  <div className="text-xs text-[#010D50]">{hotel.reviews.count} reviews</div>
-                </div>
-              </div>
+              ) : (
+                <div className="text-xs text-[#3A478A]">No guest rating available yet</div>
+              )}
 
               <div className="flex flex-col items-end gap-2">
                 <div className="text-xs text-[#3A478A]">
