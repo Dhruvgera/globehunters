@@ -21,6 +21,8 @@ export interface HotelSearchParams {
   adult_room?: number[];
   children_room?: number[];
   child_age?: Array<Record<string, number>>;
+  timeout?: number;
+  searchCriteriaId?: number | string;
 }
 
 export interface CreateHotelFolderParams {
@@ -70,11 +72,23 @@ export class HotelService {
       Math.round((new Date(params.checkOut).getTime() - new Date(params.checkIn).getTime()) / (1000 * 60 * 60 * 24))
     );
 
+    const defaultTimeoutSec = (() => {
+      const raw = Number(process.env.NEXT_PUBLIC_VYSPA_HOTELS_TIMEOUT_SEC || 5);
+      if (!Number.isFinite(raw) || raw <= 0) return 5;
+      return Math.trunc(raw);
+    })();
+    const timeoutSec = (() => {
+      const raw = typeof params.timeout === 'number' ? params.timeout : Number(params.timeout);
+      if (!Number.isFinite(raw) || raw <= 0) return Math.max(5, defaultTimeoutSec);
+      return Math.max(5, Math.trunc(raw));
+    })();
+
     const criteria: Record<string, any> = {
       location: params.location,
       hidden_id: params.hidden_id,
       hidden_key: params.hidden_key,
       minimalResponse: false,
+      timeout: timeoutSec,
       nights: String(nights),
       rooms: String(params.rooms),
       adults: String(params.adults),
@@ -86,6 +100,10 @@ export class HotelService {
       optionsRadios: 'hotels',
       branches: params.branches,
     };
+
+    if (params.searchCriteriaId !== undefined && params.searchCriteriaId !== null && String(params.searchCriteriaId).trim()) {
+      criteria.searchCriteriaId = params.searchCriteriaId;
+    }
 
     if (params.children > 0) {
       const rooms = Math.max(1, Number(params.rooms || 1));

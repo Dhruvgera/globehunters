@@ -48,6 +48,26 @@ const SHOW_HYBRID_PROVIDER_IN_RESULTS = ["1", "true", "yes", "on"].includes(
   String(process.env.NEXT_PUBLIC_SHOW_HOTEL_PROVIDER_IN_RESULTS || "").trim().toLowerCase()
 );
 
+const VYSPA_SEARCH_TIMEOUT_SEC = (() => {
+  const raw = Number(process.env.NEXT_PUBLIC_VYSPA_HOTELS_TIMEOUT_SEC || 5);
+  if (!Number.isFinite(raw) || raw <= 0) return 5;
+  return Math.max(5, Math.trunc(raw));
+})();
+
+const HYBRID_POLL_INTERVAL_MS = (() => {
+  const raw = Number(process.env.NEXT_PUBLIC_HYBRID_VYSPA_POLL_INTERVAL_MS || 5000);
+  if (!Number.isFinite(raw) || raw <= 0) return 5000;
+  return Math.max(5000, Math.trunc(raw));
+})();
+
+const HYBRID_MAX_POLLS = (() => {
+  const raw = Number(process.env.NEXT_PUBLIC_HYBRID_VYSPA_MAX_POLLS || 5);
+  if (!Number.isFinite(raw) || raw <= 0) return 5;
+  return Math.max(1, Math.trunc(raw));
+})();
+
+const ENABLE_TRUSTYOU_ENRICHMENT = false;
+
 function sanitizeHiddenHotelFilters(filters: HotelFiltersState): HotelFiltersState {
   return {
     ...filters,
@@ -166,6 +186,16 @@ function hasBreakfastInRoomsResponse(resp: any): boolean {
   return walk(resp);
 }
 
+function parseSearchComplete(value: unknown): boolean | null {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") return true;
+    if (normalized === "false") return false;
+  }
+  return null;
+}
+
 function matchesPopular(hotel: Hotel, filters: HotelFiltersState) {
   const wantsShuttle = filters.popular.airportShuttle;
   const wantsNoCard = filters.popular.reserveWithoutCard;
@@ -228,6 +258,7 @@ function HotelsPageInner() {
   const [searchCriteriaId, setSearchCriteriaId] = useState<number | string | null>(null);
   const [breakfastByHotelId, setBreakfastByHotelId] = useState<Record<string, BreakfastStatus>>({});
   const [breakfastEnriching, setBreakfastEnriching] = useState(false);
+  const [loadingMoreHotels, setLoadingMoreHotels] = useState(false);
   const [contentEnriching, setContentEnriching] = useState(false);
   const [trustYouEnriching, setTrustYouEnriching] = useState(false);
   const trustYouInflightRef = useRef<Set<string>>(new Set());
@@ -478,12 +509,14 @@ function HotelsPageInner() {
             }
           }
           setLoading(false);
+          setLoadingMoreHotels(false);
           setHasAttemptedFetch(true);
         }
         return;
       }
 
       setLoading(true);
+      setLoadingMoreHotels(false);
       setError(null);
       // Clear stale results immediately on a new search (match flights UX).
       setHotels([]);
@@ -595,6 +628,7 @@ function HotelsPageInner() {
               setSelectedHotelKey("");
             }
             setLoading(false);
+            setLoadingMoreHotels(false);
             setHasAttemptedFetch(true);
           }
         } catch (err) {
@@ -604,6 +638,7 @@ function HotelsPageInner() {
             setHotels([]);
             setSelectedHotelKey("");
             setLoading(false);
+            setLoadingMoreHotels(false);
             setHasAttemptedFetch(true);
           }
         }
@@ -643,24 +678,8 @@ function HotelsPageInner() {
           adults: search.adults,
           children: search.children,
           branches: search.branches,
+          timeout: VYSPA_SEARCH_TIMEOUT_SEC,
         });
-
-        const rawResults = availability?.Results || [];
-        const criteria = availability?.Criteria;
-        const rawCriteriaId = (criteria as any)?.searchCriteriaId;
-        const criteriaId =
-          typeof rawCriteriaId === "number" || typeof rawCriteriaId === "string" ? rawCriteriaId : null;
-        const isHybridProviderResponse = String((criteria as any)?.provider || "").trim().toLowerCase() === "hybrid";
-
-        // Filter out non-object results (e.g. [true, "No hotels found"] becomes empty array)
-        const results = rawResults.filter(
-          (r: any) => r && typeof r === "object" && !Array.isArray(r) && (r.hotel_id || r.hotelId || r.id)
-        );
-
-        // Debug logging - track what we receive from API vs what we render
-        console.log('[Hotels Page] Raw API Results Count:', rawResults.length);
-        console.log('[Hotels Page] Valid Hotel Objects Count:', results.length);
-        console.log('[Hotels Page] Search Criteria ID:', criteriaId);
 
         const nights =
           Math.max(
@@ -670,219 +689,316 @@ function HotelsPageInner() {
             )
           ) || 1;
 
-        const mapped: Hotel[] = results.map((r: any, idx: number) => {
-          const hotelId = resolveHotelResultId(r, idx);
-          const rowProvider = String(r?.provider || "").trim().toLowerCase() === "hotelbeds" ? "hotelbeds" : "vyspa";
-          const rawSearchResult = (r ?? null) as Record<string, unknown> | null;
-          const total = parsePriceFromResult(r) ?? 0;
-          const sellCur = r?.SellCur || r?.sellCur || r?.currency;
-          const rawMealPlans = Array.isArray(r?.MealPlans) ? r.MealPlans.filter(Boolean) : [];
-          const mealPlansByKey = new Map<string, string>();
-          for (const rawPlan of rawMealPlans) {
-            const label = normalizeMealPlanLabel(String(rawPlan));
-            const key = mealPlanKey(label);
-            if (!label || !key) continue;
-            if (!mealPlansByKey.has(key)) mealPlansByKey.set(key, label);
-          }
-          const mealPlans = Array.from(mealPlansByKey.values());
-          const reviewsRating = Number(r?.reviews_rating ?? 0) || 0;
-          const reviewsLabelRaw = String(r?.reviews_label || r?.reviews_description || r?.reviews_desc || "").trim();
-          const amenitiesSet = new Set<string>();
-          const hasBreakfast = includesBreakfast(rawMealPlans) || includesBreakfast(mealPlans);
-          if (hasBreakfast) {
-            amenitiesSet.add("Breakfast included");
-          }
-          if (Array.isArray(r?.amenities)) {
-            for (const amenity of r.amenities) {
-              const value = String(amenity || "").trim();
-              if (!value) continue;
-              amenitiesSet.add(value);
-              if (amenitiesSet.size >= 24) break;
+        type ParsedAvailability = {
+          mapped: Hotel[];
+          meta: Record<string, any>;
+          results: any[];
+          criteriaId: number | string | null;
+          isHybridProviderResponse: boolean;
+          searchComplete: boolean | null;
+        };
+
+        const mapAvailability = (availabilityResponse: any): ParsedAvailability => {
+          const rawResults = availabilityResponse?.Results || [];
+          const criteria = availabilityResponse?.Criteria;
+          const rawCriteriaId = (criteria as any)?.searchCriteriaId;
+          const criteriaId =
+            typeof rawCriteriaId === "number" || typeof rawCriteriaId === "string" ? rawCriteriaId : null;
+          const isHybridProviderResponse = String((criteria as any)?.provider || "").trim().toLowerCase() === "hybrid";
+          const searchComplete = parseSearchComplete((criteria as any)?.searchComplete);
+
+          // Filter out non-object results (e.g. [true, "No hotels found"] becomes empty array)
+          const results = rawResults.filter(
+            (r: any) => r && typeof r === "object" && !Array.isArray(r) && (r.hotel_id || r.hotelId || r.id)
+          );
+
+          // Debug logging - track what we receive from API vs what we render
+          console.log('[Hotels Page] Raw API Results Count:', rawResults.length);
+          console.log('[Hotels Page] Valid Hotel Objects Count:', results.length);
+          console.log('[Hotels Page] Search Criteria ID:', criteriaId);
+          console.log('[Hotels Page] Search Complete:', searchComplete);
+
+          const mapped: Hotel[] = results.map((r: any, idx: number) => {
+            const hotelId = resolveHotelResultId(r, idx);
+            const rowProvider = String(r?.provider || "").trim().toLowerCase() === "hotelbeds" ? "hotelbeds" : "vyspa";
+            const rawSearchResult = (r ?? null) as Record<string, unknown> | null;
+            const total = parsePriceFromResult(r) ?? 0;
+            const sellCur = r?.SellCur || r?.sellCur || r?.currency;
+            const rawMealPlans = Array.isArray(r?.MealPlans) ? r.MealPlans.filter(Boolean) : [];
+            const mealPlansByKey = new Map<string, string>();
+            for (const rawPlan of rawMealPlans) {
+              const label = normalizeMealPlanLabel(String(rawPlan));
+              const key = mealPlanKey(label);
+              if (!label || !key) continue;
+              if (!mealPlansByKey.has(key)) mealPlansByKey.set(key, label);
             }
-          }
-          const amenities: Hotel["amenities"] = Array.from(amenitiesSet);
+            const mealPlans = Array.from(mealPlansByKey.values());
+            const reviewsRating = Number(r?.reviews_rating ?? 0) || 0;
+            const reviewsLabelRaw = String(r?.reviews_label || r?.reviews_description || r?.reviews_desc || "").trim();
+            const amenitiesSet = new Set<string>();
+            const hasBreakfast = includesBreakfast(rawMealPlans) || includesBreakfast(mealPlans);
+            if (hasBreakfast) {
+              amenitiesSet.add("Breakfast included");
+            }
+            if (Array.isArray(r?.amenities)) {
+              for (const amenity of r.amenities) {
+                const value = String(amenity || "").trim();
+                if (!value) continue;
+                amenitiesSet.add(value);
+                if (amenitiesSet.size >= 24) break;
+              }
+            }
+            const amenities = Array.from(amenitiesSet) as Hotel["amenities"];
 
-          const totalReviews = Number(r?.total_reviews ?? 0) || 0;
-          const cityName = r?.cityName || r?.city_name || "";
-          const countryName = r?.countryName || r?.country_name || "";
-          const quickDesc = r?.quickDescription || "";
-          const starRating = clampStar(r?.hotel_rating ?? r?.hotelRating);
-          const hbCheapest = (r as any)?._hotelbeds?.cheapest;
-          const resolvedTrustYouId =
-            trustYouIdFromRawResult(rawSearchResult) ||
-            resolveTrustYouHotelId({
-              hotelName: r?.hotel_name || r?.hotelName,
-              location: [r?.address1, r?.address2, cityName, countryName].filter(Boolean).join(", "),
-            });
-
-          return {
-            id: hotelId,
-            tyId: resolvedTrustYouId || undefined,
-            name: r?.hotel_name || r?.hotelName || `Hotel ${hotelId}`,
-            distanceLabel:
-              r?.address1 || r?.address2
-                ? [r?.address1, r?.address2].filter(Boolean).join(", ")
-                : "",
-            neighborhood: cityName && countryName ? `${cityName}, ${countryName}` : cityName || countryName || undefined,
-            starRating,
-            amenities,
-            room: {
-              name:
-                hbCheapest?.roomName
-                  ? `${hbCheapest.roomName}${hbCheapest.boardName ? ` · ${normalizeMealPlanLabel(String(hbCheapest.boardName))}` : ""}`
-                  : mealPlans.length > 0
-                    ? `Meal plans: ${mealPlans.slice(0, 2).join(", ")}${mealPlans.length > 2 ? " +" : ""}`
-                    : "Room options available",
-              highlights: [
-                ...(r?.AvailabilityStatuses ? [`Availability: ${r.AvailabilityStatuses}`] : []),
-                ...(SHOW_HYBRID_PROVIDER_IN_RESULTS && isHybridProviderResponse ? [`Provider: ${rowProvider}`] : []),
-                ...(r?.suppliers?.[0] ? [`Supplier: ${r.suppliers[0]}`] : []),
-                ...(hbCheapest?.refundable === true ? ["Refundable"] : hbCheapest?.refundable === false ? ["Non-refundable"] : []),
-              ].slice(0, 2),
-            },
-            reviews: {
-              score: reviewsRating,
-              label: reviewsRating > 0 ? reviewsLabelRaw || "Guest rating" : "No guest rating yet",
-              count: totalReviews,
-            },
-            price: {
-              currency: currencySymbol(sellCur),
-              nightly: nights > 0 ? Math.round((total / nights) * 100) / 100 : total,
-              total,
-              nights,
-              rooms: search.rooms,
-            },
-            imageSrc: r?.image_name || "/hotel-placeholder.jpg",
-            description: quickDesc,
-            cityName,
-            countryName,
-            mealPlans,
-            refundable: hbCheapest?.refundable === true ? true : hbCheapest?.refundable === false ? false : null,
-            rawSearchResult,
-          };
-        });
-
-        const meta: Record<string, any> = {};
-        for (const r of results as any[]) {
-          const hid = resolveHotelResultId(r);
-          if (!hid) continue;
-          const rowProvider = String(r?.provider || "").trim().toLowerCase() === "hotelbeds" ? "hotelbeds" : "vyspa";
-          const rowSearchCriteriaAny =
-            rowProvider === "hotelbeds"
-              ? ((r as any)?.searchCriteriaId ?? (r as any)?._hotelbeds?.searchToken ?? criteriaId)
-              : criteriaId;
-          const rowSearchCriteriaId =
-            typeof rowSearchCriteriaAny === "string" || typeof rowSearchCriteriaAny === "number"
-              ? rowSearchCriteriaAny
-              : undefined;
-          meta[hid] = {
-            hotelId: hid,
-            hotelName: r?.hotel_name || r?.hotelName,
-            provider: rowProvider,
-            searchCriteriaId: rowSearchCriteriaId,
-            searchResultId: r?.id ? String(r.id) : undefined,
-            srId: r?.id ? String(r.id) : undefined,
-            vyspaHotelId: toPositiveNumericId(r?.hotel_id ?? r?.hotelId) || undefined,
-            vMapId: toPositiveNumericId(r?.VmapId ?? r?.vMapId) || undefined,
-            imageName: typeof r?.image_name === "string" ? r.image_name : undefined,
-            address1: typeof r?.address1 === "string" ? r.address1 : undefined,
-            address2: typeof r?.address2 === "string" ? r.address2 : undefined,
-            hotelRating: Number.isFinite(Number(r?.hotel_rating)) ? Number(r.hotel_rating) : undefined,
-            trustyouId:
-              trustYouIdFromRawResult((r ?? null) as Record<string, unknown> | null) ||
+            const totalReviews = Number(r?.total_reviews ?? 0) || 0;
+            const cityName = r?.cityName || r?.city_name || "";
+            const countryName = r?.countryName || r?.country_name || "";
+            const quickDesc = r?.quickDescription || "";
+            const starRating = clampStar(r?.hotel_rating ?? r?.hotelRating);
+            const hbCheapest = (r as any)?._hotelbeds?.cheapest;
+            const resolvedTrustYouId =
+              trustYouIdFromRawResult(rawSearchResult) ||
               resolveTrustYouHotelId({
                 hotelName: r?.hotel_name || r?.hotelName,
-                location: [r?.address1, r?.address2, r?.city_name, r?.country_name].filter(Boolean).join(", "),
-              }) ||
-              undefined,
-            rawSearchResult: r,
-          };
-        }
+                location: [r?.address1, r?.address2, cityName, countryName].filter(Boolean).join(", "),
+              });
 
-        if (cancelled || requestSeq !== activeRequestSeq.current) return;
+            return {
+              id: hotelId,
+              tyId: resolvedTrustYouId || undefined,
+              name: r?.hotel_name || r?.hotelName || `Hotel ${hotelId}`,
+              distanceLabel:
+                r?.address1 || r?.address2
+                  ? [r?.address1, r?.address2].filter(Boolean).join(", ")
+                  : "",
+              neighborhood: cityName && countryName ? `${cityName}, ${countryName}` : cityName || countryName || undefined,
+              starRating,
+              amenities,
+              room: {
+                name:
+                  hbCheapest?.roomName
+                    ? `${hbCheapest.roomName}${hbCheapest.boardName ? ` · ${normalizeMealPlanLabel(String(hbCheapest.boardName))}` : ""}`
+                    : mealPlans.length > 0
+                      ? `Meal plans: ${mealPlans.slice(0, 2).join(", ")}${mealPlans.length > 2 ? " +" : ""}`
+                      : "Room options available",
+                highlights: [
+                  ...(r?.AvailabilityStatuses ? [`Availability: ${r.AvailabilityStatuses}`] : []),
+                  ...(SHOW_HYBRID_PROVIDER_IN_RESULTS && isHybridProviderResponse ? [`Provider: ${rowProvider}`] : []),
+                  ...(r?.suppliers?.[0] ? [`Supplier: ${r.suppliers[0]}`] : []),
+                  ...(hbCheapest?.refundable === true ? ["Refundable"] : hbCheapest?.refundable === false ? ["Non-refundable"] : []),
+                ].slice(0, 2),
+              },
+              reviews: {
+                score: reviewsRating,
+                label: reviewsRating > 0 ? reviewsLabelRaw || "Guest rating" : "No guest rating yet",
+                count: totalReviews,
+              },
+              price: {
+                currency: currencySymbol(sellCur),
+                nightly: nights > 0 ? Math.round((total / nights) * 100) / 100 : total,
+                total,
+                nights,
+                rooms: search.rooms,
+              },
+              imageSrc: r?.image_name || "/hotel-placeholder.jpg",
+              description: quickDesc,
+              cityName,
+              countryName,
+              mealPlans,
+              refundable: hbCheapest?.refundable === true ? true : hbCheapest?.refundable === false ? false : null,
+              rawSearchResult,
+            };
+          });
 
-        setHotels(mapped);
-        setBreakfastByHotelId((prev) => {
-          const next = { ...prev };
-          for (const h of mapped) {
-            if (!(h.id in next)) next[h.id] = "unknown";
-            if (h.amenities.includes("Breakfast included")) next[h.id] = "yes";
+          const meta: Record<string, any> = {};
+          for (const r of results as any[]) {
+            const hid = resolveHotelResultId(r);
+            if (!hid) continue;
+            const rowProvider = String(r?.provider || "").trim().toLowerCase() === "hotelbeds" ? "hotelbeds" : "vyspa";
+            const rowSearchCriteriaAny =
+              rowProvider === "hotelbeds"
+                ? ((r as any)?.searchCriteriaId ?? (r as any)?._hotelbeds?.searchToken ?? criteriaId)
+                : criteriaId;
+            const rowSearchCriteriaId =
+              typeof rowSearchCriteriaAny === "string" || typeof rowSearchCriteriaAny === "number"
+                ? rowSearchCriteriaAny
+                : undefined;
+            meta[hid] = {
+              hotelId: hid,
+              hotelName: r?.hotel_name || r?.hotelName,
+              provider: rowProvider,
+              searchCriteriaId: rowSearchCriteriaId,
+              searchResultId: r?.id ? String(r.id) : undefined,
+              srId: r?.id ? String(r.id) : undefined,
+              vyspaHotelId: toPositiveNumericId(r?.hotel_id ?? r?.hotelId) || undefined,
+              vMapId: toPositiveNumericId(r?.VmapId ?? r?.vMapId) || undefined,
+              imageName: typeof r?.image_name === "string" ? r.image_name : undefined,
+              address1: typeof r?.address1 === "string" ? r.address1 : undefined,
+              address2: typeof r?.address2 === "string" ? r.address2 : undefined,
+              hotelRating: Number.isFinite(Number(r?.hotel_rating)) ? Number(r.hotel_rating) : undefined,
+              trustyouId:
+                trustYouIdFromRawResult((r ?? null) as Record<string, unknown> | null) ||
+                resolveTrustYouHotelId({
+                  hotelName: r?.hotel_name || r?.hotelName,
+                  location: [r?.address1, r?.address2, r?.city_name, r?.country_name].filter(Boolean).join(", "),
+                }) ||
+                undefined,
+              rawSearchResult: r,
+            };
           }
-          return next;
-        });
-        setSelectedHotelKey(mapped.length > 0 ? `${mapped[0]?.id}-0` : "");
-        // Only cache if we have actual results (don't cache empty "no results" responses)
-        if (mapped.length > 0) {
-          const selectedHotelKey = `${mapped[0]?.id}-0`;
-          setHotelResultsCache({ queryKey, hotels: mapped, selectedHotelKey, fetchedAt: Date.now() });
-        }
 
-        // If user hasn't interacted yet, set price slider bounds from real data (total).
-        setFilters((prev) => {
-          const isDefault =
-            prev.propertyQuery === "" &&
-            prev.starRatings.length === 0 &&
-            prev.priceRange[0] === 20 &&
-            prev.priceRange[1] === 250;
-          if (!isDefault) return prev;
-          const totals = mapped.map((h) => h.price.total).filter((n) => typeof n === "number" && n > 0);
-          if (totals.length === 0) return prev;
-          const min = Math.floor(Math.min(...totals));
-          const max = Math.ceil(Math.max(...totals));
-          return { ...prev, priceMode: "total", priceRange: [min, max] };
-        });
+          return { mapped, meta, results, criteriaId, isHybridProviderResponse, searchComplete };
+        };
 
-        const firstResult = results[0] as any;
-        const firstResultProvider = String(firstResult?.provider || "").trim().toLowerCase();
-        const provider =
-          firstResultProvider === "hotelbeds" || typeof criteriaId === "string" ? "hotelbeds" : "vyspa";
-        const searchCriteriaForStore =
-          provider === "hotelbeds"
-            ? (firstResult?.searchCriteriaId ?? firstResult?._hotelbeds?.searchToken ?? criteriaId)
-            : criteriaId;
+        const applyAvailabilityToState = (parsed: ParsedAvailability) => {
+          if (cancelled || requestSeq !== activeRequestSeq.current) return;
 
-        setHotelSearch({
-          provider,
-          location: pick.label,
-          hidden_id: String(pick.id),
-          hidden_key: String(pick.loc),
-          checkIn: search.checkIn,
-          checkOut: search.checkOut,
-          rooms: search.rooms,
-          adults: search.adults,
-          children: search.children,
-          branches: search.branches,
-          searchCriteriaId:
-            typeof searchCriteriaForStore === "string" || typeof searchCriteriaForStore === "number"
+          const { mapped, meta, results, criteriaId } = parsed;
+
+          setHotels(mapped);
+          setBreakfastByHotelId((prev) => {
+            const next = { ...prev };
+            for (const h of mapped) {
+              if (!(h.id in next)) next[h.id] = "unknown";
+              if (h.amenities.includes("Breakfast included")) next[h.id] = "yes";
+            }
+            return next;
+          });
+          setSelectedHotelKey(mapped.length > 0 ? `${mapped[0]?.id}-0` : "");
+          // Only cache if we have actual results (don't cache empty "no results" responses)
+          if (mapped.length > 0) {
+            const selectedHotelKey = `${mapped[0]?.id}-0`;
+            setHotelResultsCache({ queryKey, hotels: mapped, selectedHotelKey, fetchedAt: Date.now() });
+          }
+
+          // If user hasn't interacted yet, set price slider bounds from real data (total).
+          setFilters((prev) => {
+            const isDefault =
+              prev.propertyQuery === "" &&
+              prev.starRatings.length === 0 &&
+              prev.priceRange[0] === 20 &&
+              prev.priceRange[1] === 250;
+            if (!isDefault) return prev;
+            const totals = mapped.map((h) => h.price.total).filter((n) => typeof n === "number" && n > 0);
+            if (totals.length === 0) return prev;
+            const min = Math.floor(Math.min(...totals));
+            const max = Math.ceil(Math.max(...totals));
+            return { ...prev, priceMode: "total", priceRange: [min, max] };
+          });
+
+          const firstResult = results[0] as any;
+          const firstResultProvider = String(firstResult?.provider || "").trim().toLowerCase();
+          const provider =
+            firstResultProvider === "hotelbeds" || typeof criteriaId === "string" ? "hotelbeds" : "vyspa";
+          const searchCriteriaForStore =
+            provider === "hotelbeds"
+              ? (firstResult?.searchCriteriaId ?? firstResult?._hotelbeds?.searchToken ?? criteriaId)
+              : criteriaId;
+
+          setHotelSearch({
+            provider,
+            location: pick.label,
+            hidden_id: String(pick.id),
+            hidden_key: String(pick.loc),
+            checkIn: search.checkIn,
+            checkOut: search.checkOut,
+            rooms: search.rooms,
+            adults: search.adults,
+            children: search.children,
+            branches: search.branches,
+            searchCriteriaId:
+              typeof searchCriteriaForStore === "string" || typeof searchCriteriaForStore === "number"
+                ? searchCriteriaForStore
+                : undefined,
+            arrivalPointCode: pick.arrival_point_code,
+          });
+          setSearchCriteriaId(
+            typeof searchCriteriaForStore === "number" || typeof searchCriteriaForStore === "string"
               ? searchCriteriaForStore
-              : undefined,
-          arrivalPointCode: pick.arrival_point_code,
-        });
-        setSearchCriteriaId(
-          typeof searchCriteriaForStore === "number" || typeof searchCriteriaForStore === "string"
-            ? searchCriteriaForStore
-            : null
-        );
+              : null
+          );
 
-        // Set searchRequestId for consistent web reference (same as flight logic).
-        // For HotelBeds, criteriaId is an opaque token (too long for UI), so derive a short display ref.
-        if (searchCriteriaForStore) {
-          const displayRef =
-            typeof searchCriteriaForStore === "string"
-              ? shortWebRefFromToken(searchCriteriaForStore)
-              : String(searchCriteriaForStore);
-          useBookingStore.getState().setSearchRequestId(displayRef);
+          // Set searchRequestId for consistent web reference (same as flight logic).
+          // For HotelBeds, criteriaId is an opaque token (too long for UI), so derive a short display ref.
+          if (searchCriteriaForStore) {
+            const displayRef =
+              typeof searchCriteriaForStore === "string"
+                ? shortWebRefFromToken(searchCriteriaForStore)
+                : String(searchCriteriaForStore);
+            useBookingStore.getState().setSearchRequestId(displayRef);
+          }
+          setHotelResultsMeta(meta);
+        };
+
+        const parsedInitial = mapAvailability(availability);
+        if (cancelled || requestSeq !== activeRequestSeq.current) return;
+        applyAvailabilityToState(parsedInitial);
+
+        // As soon as we have the first batch, enable result interactions (filters/sort/cards)
+        // while background polling continues to append/refresh results.
+        if (!cancelled && requestSeq === activeRequestSeq.current) {
+          setLoading(false);
+          setHasAttemptedFetch(true);
         }
-        setHotelResultsMeta(meta);
+
+        const shouldPollHybridMore =
+          parsedInitial.isHybridProviderResponse &&
+          parsedInitial.searchComplete === false &&
+          (typeof parsedInitial.criteriaId === "number" || typeof parsedInitial.criteriaId === "string");
+
+        if (shouldPollHybridMore) {
+          setLoadingMoreHotels(true);
+          let latestCriteriaId: number | string | null = parsedInitial.criteriaId;
+
+          for (let attempt = 0; attempt < HYBRID_MAX_POLLS; attempt += 1) {
+            if (cancelled || requestSeq !== activeRequestSeq.current) break;
+            await new Promise((resolve) => setTimeout(resolve, HYBRID_POLL_INTERVAL_MS));
+            if (cancelled || requestSeq !== activeRequestSeq.current) break;
+            if (latestCriteriaId == null || (typeof latestCriteriaId !== "number" && typeof latestCriteriaId !== "string")) break;
+
+            try {
+              const polledAvailability = await hotelService.searchAvailabilityV3({
+                location: pick.label,
+                hidden_id: String(pick.id),
+                hidden_key: String(pick.loc),
+                checkIn: search.checkIn,
+                checkOut: search.checkOut,
+                rooms: search.rooms,
+                adults: search.adults,
+                children: search.children,
+                branches: search.branches,
+                timeout: VYSPA_SEARCH_TIMEOUT_SEC,
+                searchCriteriaId: latestCriteriaId,
+              });
+
+              const parsedPoll = mapAvailability(polledAvailability);
+              if (cancelled || requestSeq !== activeRequestSeq.current) break;
+
+              applyAvailabilityToState(parsedPoll);
+              if (typeof parsedPoll.criteriaId === "number" || typeof parsedPoll.criteriaId === "string") {
+                latestCriteriaId = parsedPoll.criteriaId;
+              }
+              if (parsedPoll.searchComplete === true) break;
+            } catch (pollError) {
+              console.warn("[Hotels Page] Hybrid poll request failed", pollError);
+              break;
+            }
+          }
+          if (!cancelled && requestSeq === activeRequestSeq.current) {
+            setLoadingMoreHotels(false);
+          }
+        }
       } catch (e: any) {
         if (cancelled || requestSeq !== activeRequestSeq.current) return;
         setError(e?.message || "Failed to fetch hotels");
         setHotels([]);
         setSearchCriteriaId(null);
+        setLoadingMoreHotels(false);
         setBreakfastByHotelId({});
       } finally {
         if (!cancelled && requestSeq === activeRequestSeq.current) {
           setLoading(false);
+          setLoadingMoreHotels(false);
           setHasAttemptedFetch(true);
         }
       }
@@ -1158,6 +1274,7 @@ function HotelsPageInner() {
 
   // TrustYou enrichment: fetch live review scores for visible hotels and merge into card ratings.
   useEffect(() => {
+    if (!ENABLE_TRUSTYOU_ENRICHMENT) return;
     if (!hasHydrated) return;
     if (filteredHotels.length === 0) return;
 
@@ -1569,19 +1686,10 @@ function HotelsPageInner() {
               </div>
             )}
 
-            {filters.popular.breakfastIncluded && breakfastEnriching && (
-              <div className="text-xs text-[#3A478A]">
-                Checking breakfast availability…
-              </div>
-            )}
-            {contentEnriching && (
-              <div className="text-xs text-[#3A478A]">
-                Loading hotel photos and addresses…
-              </div>
-            )}
-            {trustYouEnriching && (
-              <div className="text-xs text-[#3A478A]">
-                Loading live guest review scores…
+            {hotels.length > 0 && (loadingMoreHotels || breakfastEnriching || contentEnriching || trustYouEnriching) && (
+              <div className="inline-flex items-center gap-2 text-xs text-[#3A478A]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#3754ED] animate-pulse" />
+                {loadingMoreHotels ? "More hotels are being added…" : "Updating hotel details…"}
               </div>
             )}
 

@@ -16,6 +16,7 @@
     "test:portal:tkt": "node scripts/test-portal-tkt-per-pax.mjs",
     "test:hotel:dedupe": "node scripts/test-hotel-dedupe-live.mjs",
     "test:hotel:vyspa:timing": "node scripts/time-vyspa-hotels-search.mjs",
+    "test:hotel:vyspa:timeout-poll": "node scripts/verify-vyspa-timeout-poll.mjs",
     "test:trustyou": "node scripts/test-trustyou-api.mjs"
   },
   "dependencies": {

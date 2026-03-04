@@ -10,6 +10,7 @@ export interface VyspaCityHotelLookupItem {
 
 export interface VyspaAvailabilityV3Criteria {
   searchCriteriaId?: number | string;
+  searchComplete?: boolean | string;
   [key: string]: any;
 }
 

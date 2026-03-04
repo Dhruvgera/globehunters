@@ -28,6 +28,11 @@ const nextConfig: NextConfig = {
         hostname: 'photos.hotelbeds.com',
         pathname: '/**',
       },
+      {
+        protocol: 'https' as const,
+        hostname: 'cdn.worldota.net',
+        pathname: '/**',
+      },
     ],
   },
   // Production source maps - disable to avoid source map warnings

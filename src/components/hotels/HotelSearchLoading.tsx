@@ -42,9 +42,8 @@ export function HotelSearchLoading() {
           <div className="h-[120px]" />
         )}
       </div>
-      <div>Loading hotels…</div>
+      <div>Searching live hotel inventory…</div>
     </div>
   );
 }
-
 

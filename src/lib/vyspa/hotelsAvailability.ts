@@ -5,6 +5,12 @@ function toInt(value: unknown, fallback: number): number {
   return Number.isFinite(parsed) ? Math.trunc(parsed) : fallback;
 }
 
+function toPositiveIntOrNull(value: unknown): number | null {
+  const parsed = typeof value === 'string' ? Number(value) : typeof value === 'number' ? value : NaN;
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.trunc(parsed);
+}
+
 function toNonNegativeInt(value: unknown, fallback: number): number {
   return Math.max(0, toInt(value, fallback));
 }
@@ -61,6 +67,10 @@ export function normalizeVyspaAvailabilityCriteria(criteria: AvailabilityCriteri
   normalized.hotel_cache = 'redis';
   // Always request full response payload from Vyspa for stage-1 hotel search.
   normalized.minimalResponse = false;
+  // Enforce Vyspa search timeout (seconds). Vyspa requires minimum 5s.
+  const defaultTimeoutSec = Math.max(5, toInt(process.env.VYSPA_HOTELS_SEARCH_TIMEOUT_SEC || '5', 5));
+  const requestedTimeoutSec = toPositiveIntOrNull(normalized.timeout);
+  normalized.timeout = Math.max(5, requestedTimeoutSec ?? defaultTimeoutSec);
   // Force Vyspa availability to Hotelbeds supplier only.
   normalized.supplier_id = 100;
 
