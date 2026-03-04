@@ -67,6 +67,8 @@ export interface HolidayPackageSearchRequest {
   nights: string;
   /** Number of rooms requested */
   rooms: string;
+  /** Request full supplier details in stage-1 package results */
+  minimalResponse?: boolean;
   /** Number of adults per room as string array */
   adults: string[];
   /** Number of children per room as string array */

@@ -74,6 +74,7 @@ export class HotelService {
       location: params.location,
       hidden_id: params.hidden_id,
       hidden_key: params.hidden_key,
+      minimalResponse: false,
       nights: String(nights),
       rooms: String(params.rooms),
       adults: String(params.adults),

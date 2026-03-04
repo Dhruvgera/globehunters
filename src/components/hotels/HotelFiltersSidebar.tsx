@@ -1,20 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import {
-  Search,
-  Snowflake,
-  UtensilsCrossed,
-  Wine,
-  WashingMachine,
-  TreePine,
-  Dices,
-  Zap,
-  BedDouble,
-  Car,
-  Waves,
-  CircleDot,
-} from "lucide-react";
+import { useMemo } from "react";
+import { Search } from "lucide-react";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -40,19 +27,10 @@ export interface HotelFiltersState {
   accessibility: string[];
 }
 
-const AMENITIES_WITH_ICONS = [
-  { key: "Air Conditioned", icon: Snowflake },
-  { key: "Kitchen", icon: UtensilsCrossed },
-  { key: "Bar", icon: Wine },
-  { key: "Washer and dryer", icon: WashingMachine },
-  { key: "Outdoor space", icon: TreePine },
-  { key: "Casino", icon: Dices },
-  { key: "Electric car charging station", icon: Zap },
-  { key: "Cots", icon: BedDouble },
-  { key: "Parking", icon: Car },
-  { key: "Water park", icon: Waves },
-  { key: "Golf course", icon: CircleDot },
-] as const;
+export interface HotelAmenityOption {
+  label: string;
+  count: number;
+}
 
 export function HotelFiltersSidebar({
   resultCount,
@@ -67,6 +45,7 @@ export function HotelFiltersSidebar({
   onToggleExpanded,
   availableMealPlans = [],
   availableNeighborhoods = [],
+  availableAmenities = [],
   minPriceByStarRating = {},
   refundableFilterEnabled = false,
 }: {
@@ -84,13 +63,15 @@ export function HotelFiltersSidebar({
   availableMealPlans?: string[];
   /** Available neighborhoods from current hotel data */
   availableNeighborhoods?: string[];
+  /** Available amenities from current hotel data */
+  availableAmenities?: HotelAmenityOption[];
   /** Minimum price per star rating from current hotel data */
   minPriceByStarRating?: Record<number, number>;
   /** Enable refundable filter only when provider returns refundable flags in list results */
   refundableFilterEnabled?: boolean;
 }) {
   const unsupportedNote =
-    "Note: Property name, Price, Star rating, Meal plans, and Breakfast are powered by the hotel list. Neighborhood is available when present in results. Other filters are shown for UI parity but may not affect results yet.";
+    "Note: Property name, Price, Star rating, Amenities, Meal plans, and Breakfast are powered by the hotel list. Neighborhood is available when present in results. Other filters are shown for UI parity but may not affect results yet.";
 
   const priceText = useMemo(() => {
     const [min, max] = value.priceRange;
@@ -225,7 +206,11 @@ export function HotelFiltersSidebar({
             step={1}
             onValueChange={(v) => {
               const next: [number, number] = [v[0]!, v[1]!];
-              onPriceRangeChange ? onPriceRangeChange(next) : onChange({ ...value, priceRange: next });
+              if (onPriceRangeChange) {
+                onPriceRangeChange(next);
+              } else {
+                onChange({ ...value, priceRange: next });
+              }
             }}
             className="w-full"
           />
@@ -326,44 +311,36 @@ export function HotelFiltersSidebar({
         </label>
       </FilterSection>
 
-      {/* Amenities with icons in a grid */}
-      {/* Amenities filter (temporarily hidden) */}
-      {/*
-        <FilterSection
-          title="Amenities"
-          isExpanded={!!expanded.amenities}
-          onToggle={() => onToggleExpanded("amenities")}
-        >
-          <div className="text-xs text-[#3A478A] mb-2">Content missing from API: amenities list</div>
-          <div className="grid grid-cols-2 gap-2">
-            {AMENITIES_WITH_ICONS.map(({ key, icon: Icon }) => {
-              const isSelected = value.amenities.includes(key);
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => {
-                    // UI-only for now
-                    const next = isSelected
-                      ? value.amenities.filter((x) => x !== key)
-                      : [...value.amenities, key];
-                    onChange({ ...value, amenities: next });
-                  }}
-                  className={[
-                    "flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border text-center transition-colors",
-                    isSelected
-                      ? "border-[#3754ED] bg-[rgba(55,84,237,0.08)]"
-                      : "border-[#DFE0E4] bg-white hover:border-[#3754ED]/50",
-                  ].join(" ")}
-                >
-                  <Icon className="h-5 w-5 text-[#010D50]" />
-                  <span className="text-xs text-[#010D50] leading-tight">{key}</span>
-                </button>
-              );
-            })}
+      <FilterSection
+        title="Amenities"
+        isExpanded={!!expanded.amenities}
+        onToggle={() => onToggleExpanded("amenities")}
+      >
+        {availableAmenities.length === 0 ? (
+          <div className="text-xs text-[#3A478A]">No amenities available in current results</div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {availableAmenities.map((amenity) => (
+              <label key={amenity.label} className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    checked={value.amenities.includes(amenity.label)}
+                    onCheckedChange={(c) => {
+                      const nextChecked = Boolean(c);
+                      const next = nextChecked
+                        ? Array.from(new Set([...value.amenities, amenity.label]))
+                        : value.amenities.filter((x) => x !== amenity.label);
+                      onChange({ ...value, amenities: next });
+                    }}
+                  />
+                  <span className="text-sm text-[#010D50]">{amenity.label}</span>
+                </div>
+                <span className="text-xs text-[#3A478A]">{amenity.count}</span>
+              </label>
+            ))}
           </div>
-        </FilterSection>
-      */}
+        )}
+      </FilterSection>
 
       {/* Meal plans available */}
       <FilterSection

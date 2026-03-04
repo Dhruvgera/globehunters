@@ -7,7 +7,7 @@ import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
 import { ContactCard } from "@/components/search/ContactCard";
 import SearchBar from "@/components/search/SearchBar";
-import { HotelFiltersSidebar, HotelFiltersState } from "@/components/hotels/HotelFiltersSidebar";
+import { HotelFiltersSidebar, HotelFiltersState, type HotelAmenityOption } from "@/components/hotels/HotelFiltersSidebar";
 import { HotelSearchLoading } from "@/components/hotels/HotelSearchLoading";
 import {
   HotelResultsToolbar,
@@ -51,7 +51,6 @@ const SHOW_HYBRID_PROVIDER_IN_RESULTS = ["1", "true", "yes", "on"].includes(
 function sanitizeHiddenHotelFilters(filters: HotelFiltersState): HotelFiltersState {
   return {
     ...filters,
-    amenities: [],
     popular: {
       breakfastIncluded: false,
       reserveWithoutCard: false,
@@ -688,11 +687,20 @@ function HotelsPageInner() {
           const mealPlans = Array.from(mealPlansByKey.values());
           const reviewsRating = Number(r?.reviews_rating ?? 0) || 0;
           const reviewsLabelRaw = String(r?.reviews_label || r?.reviews_description || r?.reviews_desc || "").trim();
-          const amenities: Hotel["amenities"] = [];
+          const amenitiesSet = new Set<string>();
           const hasBreakfast = includesBreakfast(rawMealPlans) || includesBreakfast(mealPlans);
           if (hasBreakfast) {
-            amenities.push("Breakfast included");
+            amenitiesSet.add("Breakfast included");
           }
+          if (Array.isArray(r?.amenities)) {
+            for (const amenity of r.amenities) {
+              const value = String(amenity || "").trim();
+              if (!value) continue;
+              amenitiesSet.add(value);
+              if (amenitiesSet.size >= 24) break;
+            }
+          }
+          const amenities: Hotel["amenities"] = Array.from(amenitiesSet);
 
           const totalReviews = Number(r?.total_reviews ?? 0) || 0;
           const cityName = r?.cityName || r?.city_name || "";
@@ -993,6 +1001,11 @@ function HotelsPageInner() {
         }).key;
         if (!hotelNeighborhoodKey || !selectedNeighborhoodKeys.has(hotelNeighborhoodKey)) return false;
       }
+      if (filters.amenities.length > 0) {
+        const hotelAmenitySet = new Set((h.amenities || []).map((amenity) => String(amenity).toLowerCase().trim()));
+        const matchesAll = filters.amenities.every((amenity) => hotelAmenitySet.has(String(amenity).toLowerCase().trim()));
+        if (!matchesAll) return false;
+      }
       if (filters.popular.breakfastIncluded) {
         const status = breakfastByHotelId[h.id] || "unknown";
         if (status !== "yes") return false;
@@ -1003,6 +1016,7 @@ function HotelsPageInner() {
   }, [
     breakfastByHotelId,
     filters.neighborhoods,
+    filters.amenities,
     filters.popular.breakfastIncluded,
     filters.popular.airportShuttle,
     filters.popular.reserveWithoutCard,
@@ -1095,8 +1109,11 @@ function HotelsPageInner() {
         if (!hotelNeighborhoodKey || !selectedNeighborhoodKeys.has(hotelNeighborhoodKey)) return false;
       }
 
-      // Amenities not consistently available in list response; UI-only for now
-      if (filters.amenities.length > 0) return true;
+      if (filters.amenities.length > 0) {
+        const hotelAmenitySet = new Set((h.amenities || []).map((amenity) => String(amenity).toLowerCase().trim()));
+        const matchesAll = filters.amenities.every((amenity) => hotelAmenitySet.has(String(amenity).toLowerCase().trim()));
+        if (!matchesAll) return false;
+      }
 
       // Meal plans filter - match if hotel has any of the selected meal plans
       if (filters.mealPlans.length > 0) {
@@ -1414,6 +1431,29 @@ function HotelsPageInner() {
     return Array.from(planByKey.values()).sort((a, b) => a.localeCompare(b));
   }, [hotels]);
 
+  const availableAmenities = useMemo<HotelAmenityOption[]>(() => {
+    const countByAmenity = new Map<string, { label: string; count: number }>();
+    for (const h of hotels) {
+      for (const amenity of h.amenities || []) {
+        const label = String(amenity || "").trim();
+        if (!label) continue;
+        const key = label.toLowerCase();
+        const prev = countByAmenity.get(key);
+        if (prev) {
+          prev.count += 1;
+        } else {
+          countByAmenity.set(key, { label, count: 1 });
+        }
+      }
+    }
+    return Array.from(countByAmenity.values())
+      .sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        return a.label.localeCompare(b.label);
+      })
+      .slice(0, 24);
+  }, [hotels]);
+
   const availableNeighborhoods = useMemo(() => {
     const byKey = new Map<string, string>();
     for (const h of hotels) {
@@ -1489,6 +1529,7 @@ function HotelsPageInner() {
                   onToggleExpanded={(key) => setExpanded((prev) => ({ ...prev, [key]: !prev[key] }))}
                   availableMealPlans={availableMealPlans}
                   availableNeighborhoods={availableNeighborhoods}
+                  availableAmenities={availableAmenities}
                   minPriceByStarRating={minPriceByStarRating}
                   refundableFilterEnabled={refundableFilterEnabled}
                 />

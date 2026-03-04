@@ -67,6 +67,7 @@ function buildVyspaRequest(criteria: PackageSearchCriteria): HolidayPackageSearc
     departure_date: formatDateForVyspa(criteria.checkIn),
     nights: String(criteria.nights),
     rooms: String(criteria.rooms.length),
+    minimalResponse: false,
     adults,
     children,
     child_ages: childAges,

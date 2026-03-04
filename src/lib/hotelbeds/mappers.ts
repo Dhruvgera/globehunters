@@ -55,6 +55,7 @@ export function hotelbedsHotelToVyspaResult(
     address2?: string;
     cityName?: string;
     countryName?: string;
+    amenities?: string[];
   }
 ): any {
   const code = h?.code != null ? String(h.code) : '';
@@ -107,6 +108,7 @@ export function hotelbedsHotelToVyspaResult(
     address2: enrich?.address2 || undefined,
     cityName: enrich?.cityName || undefined,
     countryName: enrich?.countryName || undefined,
+    amenities: Array.isArray(enrich?.amenities) ? enrich.amenities : [],
     minPrice: minRate ?? undefined,
     maxPrice: maxRate ?? undefined,
     SellCur: currency || undefined,

@@ -6,7 +6,7 @@ import { encodeHotelSearchToken } from '@/lib/hotels/searchToken';
 import { hotelbedsBookingPost } from '@/lib/hotelbeds/client';
 import { hotelbedsContentGet } from '@/lib/hotelbeds/client';
 import { buildHotelbedsImageUrl, hotelbedsHotelToVyspaResult } from '@/lib/hotelbeds/mappers';
-import { extractHotelbedsContentEnrichment } from '@/lib/hotelbeds/contentExtract';
+import { extractHotelbedsContentDetails, extractHotelbedsContentEnrichment } from '@/lib/hotelbeds/contentExtract';
 import { buildHotelbedsOccupancy } from '@/lib/hotelbeds/occupancy';
 import { fetchVyspaLiveProperties } from '@/lib/vyspa/liveProperties';
 import { buildHotelbedsToVyspaIdMap, dedupeVyspaWithHotelbedsByLiveProperties } from '@/lib/hotels/dedupe';
@@ -23,6 +23,7 @@ type HotelbedsEnrichment = {
   address2?: string;
   cityName?: string;
   countryName?: string;
+  amenities?: string[];
 };
 
 type HotelbedsSearchSuccess = {
@@ -185,16 +186,21 @@ async function runHotelbedsSearch(first: any, debug: boolean, debugSample: numbe
           const res = await hotelbedsContentGet<any>(path, { signal: controller.signal });
           if (!res.ok) return;
           const extracted = extractHotelbedsContentEnrichment(res.data as any);
+          const details = extractHotelbedsContentDetails(res.data as any);
           const imagePath = extracted.imagePath ? String(extracted.imagePath) : '';
           const address1 = extracted.address1 || '';
           const cityName = extracted.cityName || '';
           const countryName = extracted.countryName || '';
+          const amenities = Array.isArray(details.amenities)
+            ? details.amenities.filter((a) => typeof a === 'string' && a.trim()).slice(0, 24)
+            : [];
 
           const data: HotelbedsEnrichment = {
             imageUrl: imagePath ? buildHotelbedsImageUrl(imagePath, 'bigger') : undefined,
             address1: address1 || undefined,
             cityName: cityName || undefined,
             countryName: countryName || undefined,
+            amenities,
           };
           hbContentCache.set(code, { at: Date.now(), data });
           enrichMap.set(code, data);

@@ -59,6 +59,8 @@ function normalizeChildAge(value: unknown, childrenRoom: number[], defaultChildA
 export function normalizeVyspaAvailabilityCriteria(criteria: AvailabilityCriteria): AvailabilityCriteria {
   const normalized: AvailabilityCriteria = { ...criteria };
   normalized.hotel_cache = 'redis';
+  // Always request full response payload from Vyspa for stage-1 hotel search.
+  normalized.minimalResponse = false;
   // Force Vyspa availability to Hotelbeds supplier only.
   normalized.supplier_id = 100;
 
