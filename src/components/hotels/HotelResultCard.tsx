@@ -8,6 +8,8 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import type { Hotel } from "@/types/hotel";
 import type { HotelViewMode } from "./HotelResultsToolbar";
+import { useBookingStore } from "@/store/bookingStore";
+import { serializeHotelChildAges } from "@/lib/hotels/childAges";
 
 function getAmenityIcon(text: string) {
   const lower = text.toLowerCase();
@@ -68,6 +70,7 @@ export function HotelResultCard({
   isPackageMode?: boolean;
 }) {
   const isGrid = view === "grid";
+  const hotelSearch = useBookingStore((state) => state.hotelSearch);
   const raw = (hotel.rawSearchResult ?? null) as Record<string, unknown> | null;
   const detailParams = new URLSearchParams();
   const criteriaId = raw?.searchCriteriaId;
@@ -78,6 +81,9 @@ export function HotelResultCard({
   if (srId != null && String(srId).trim() && String(srId) !== String(hotel.id)) detailParams.set("srId", String(srId));
   if (typeof provider === "string" && provider.trim()) detailParams.set("provider", provider.trim().toLowerCase());
   if (hotel.tyId) detailParams.set("tyId", hotel.tyId);
+  if (hotelSearch?.children && hotelSearch.child_age) {
+    detailParams.set("child_age", serializeHotelChildAges(hotelSearch.child_age, hotelSearch.rooms, hotelSearch.children));
+  }
   if (isPackageMode) detailParams.set("type", "package");
   const hotelDetailUrl = detailParams.toString()
     ? `/hotels/${hotel.id}?${detailParams.toString()}`

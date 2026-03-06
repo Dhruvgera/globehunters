@@ -113,7 +113,8 @@ function extractFolderEntries(folderDetails: unknown): FolderEntry[] {
 }
 
 function entryLooksHotel(entry: FolderEntry): boolean {
-  if (entry.fiType.toUpperCase() === 'HTL') return true;
+  const fiType = entry.fiType.toUpperCase();
+  if (fiType === 'HTL' || fiType === 'HOT') return true;
   if (entry.accommodationBookingId) return true;
 
   const haystack = [entry.description, ...entry.pricingDescriptions].join(' ').toLowerCase();
@@ -138,6 +139,15 @@ async function fetchFolderDetails(apiUrl: string, basicAuth: string, apiVersion:
     data,
     entries: extractFolderEntries(data),
   };
+}
+
+function approximateBirthDateFromAge(age: unknown): string | undefined {
+  const years = Number(age);
+  if (!Number.isFinite(years) || years < 0) return undefined;
+  const date = new Date();
+  date.setFullYear(date.getFullYear() - Math.trunc(years));
+  date.setDate(date.getDate() - 1);
+  return date.toISOString().split('T')[0];
 }
 
 export async function POST(req: Request) {
@@ -179,7 +189,7 @@ export async function POST(req: Request) {
     // - keep indices stable (pax_no is optional but preferred)
     const normalizedPassengers = (body.passengers || []).map((p, idx) => {
       const paxType = (p as any)?.pax_type;
-      const birthDate = (p as any)?.birth_date;
+      const birthDate = (p as any)?.birth_date || (paxType === 'CHD' ? approximateBirthDateFromAge((p as any)?.age) : undefined);
       if ((paxType === 'CHD' || paxType === 'INF') && !birthDate) {
         throw new Error(`Passenger ${idx + 1} (${paxType}) is missing date of birth (birth_date).`);
       }
@@ -187,6 +197,7 @@ export async function POST(req: Request) {
       return {
         ...p,
         pax_no: (p as any)?.pax_no ?? idx + 1,
+        birth_date: birthDate,
         // Support both key names to keep Vyspa compatible.
         phone: phone || undefined,
         telephone: phone || undefined,

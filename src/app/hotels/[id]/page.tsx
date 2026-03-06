@@ -41,6 +41,11 @@ import { useBookingStore } from "@/store/bookingStore";
 import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
 import { resolveTrustYouHotelId } from "@/lib/trustyou/hotelMapping";
 import type { TrustYouHotelReviewSummary } from "@/types/trustyou";
+import {
+  buildHotelChildAgesFromFlat,
+  flattenHotelChildAges,
+  serializeHotelChildAges,
+} from "@/lib/hotels/childAges";
 
 function LoadingBlock({ className }: { className: string }) {
   return <div className={`animate-pulse bg-gray-200/70 rounded-xl ${className}`} />;
@@ -89,6 +94,7 @@ interface RoomAmenity {
 
 interface RoomCardData {
   id: string;
+  sourceRoomOptionId?: string;
   name: string;
   bedType: string;
   reviews: {
@@ -919,6 +925,9 @@ export default function HotelRoomsPage() {
   const [stayAdults, setStayAdults] = useState<number>(() => hotelSearch?.adults || 2);
   const [stayChildren, setStayChildren] = useState<number>(() => hotelSearch?.children || 0);
   const [stayRooms, setStayRooms] = useState<number>(() => hotelSearch?.rooms || 1);
+  const [stayChildAges, setStayChildAges] = useState<number[]>(() =>
+    flattenHotelChildAges(hotelSearch?.child_age ?? [], hotelSearch?.rooms || 1, hotelSearch?.children || 0)
+  );
   const [filterRefundableOnly, setFilterRefundableOnly] = useState(false);
   const [filterBoardQuery, setFilterBoardQuery] = useState<string>("");
   const [trustYouReview, setTrustYouReview] = useState<TrustYouHotelReviewSummary | null>(null);
@@ -935,7 +944,20 @@ export default function HotelRoomsPage() {
     setStayAdults(hotelSearch?.adults || 2);
     setStayChildren(hotelSearch?.children || 0);
     setStayRooms(hotelSearch?.rooms || 1);
-  }, [hotelSearch?.checkIn, hotelSearch?.checkOut, hotelSearch?.adults, hotelSearch?.children, hotelSearch?.rooms]);
+    setStayChildAges(
+      flattenHotelChildAges(hotelSearch?.child_age ?? [], hotelSearch?.rooms || 1, hotelSearch?.children || 0)
+    );
+  }, [hotelSearch?.checkIn, hotelSearch?.checkOut, hotelSearch?.adults, hotelSearch?.children, hotelSearch?.rooms, hotelSearch?.child_age]);
+
+  useEffect(() => {
+    setStayChildAges((prev) => {
+      const next = Array.from({ length: Math.max(0, stayChildren) }, (_, index) => {
+        const age = prev[index];
+        return Number.isFinite(age) ? age : 9;
+      });
+      return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+    });
+  }, [stayChildren]);
 
   function shortWebRefFromToken(token: string): string {
     let h = 2166136261;
@@ -1000,7 +1022,14 @@ export default function HotelRoomsPage() {
     return { hotelImages: Array.from(new Set(hotelImages)), roomImages: dedupedRoomImages };
   }
 
-  async function runStaySearch(next: { checkIn: string; checkOut: string; adults: number; children: number; rooms: number }) {
+  async function runStaySearch(next: {
+    checkIn: string;
+    checkOut: string;
+    adults: number;
+    children: number;
+    rooms: number;
+    childAges: number[];
+  }) {
     if (!hotelSearch?.location || !hotelSearch?.hidden_id || !hotelSearch?.hidden_key) {
       throw new Error("Missing search context (destination) to update availability.");
     }
@@ -1014,6 +1043,7 @@ export default function HotelRoomsPage() {
       rooms: next.rooms,
       adults: next.adults,
       children: next.children,
+      child_age: buildHotelChildAgesFromFlat(next.childAges, next.rooms, next.children),
       branches: hotelSearch.branches,
     });
 
@@ -1048,6 +1078,7 @@ export default function HotelRoomsPage() {
       rooms: next.rooms,
       adults: next.adults,
       children: next.children,
+      child_age: buildHotelChildAgesFromFlat(next.childAges, next.rooms, next.children),
       branches: hotelSearch.branches,
       searchCriteriaId: effectiveSearchCriteriaId,
       arrivalPointCode: hotelSearch.arrivalPointCode,
@@ -1493,6 +1524,9 @@ export default function HotelRoomsPage() {
     if (hotelSearch?.rooms != null) params.set("rooms", String(hotelSearch.rooms));
     if (hotelSearch?.adults != null) params.set("adults", String(hotelSearch.adults));
     if (hotelSearch?.children != null) params.set("children", String(hotelSearch.children));
+    if (hotelSearch?.children && hotelSearch.child_age) {
+      params.set("child_age", serializeHotelChildAges(hotelSearch.child_age, hotelSearch.rooms, hotelSearch.children));
+    }
     if (hotelSearch?.branches) params.set("branches", hotelSearch.branches);
     if (hotelSearch?.hidden_id) params.set("hidden_id", hotelSearch.hidden_id);
     if (hotelSearch?.hidden_key) params.set("hidden_key", hotelSearch.hidden_key);
@@ -1611,6 +1645,7 @@ export default function HotelRoomsPage() {
               rooms: hotelSearch.rooms,
               adults: hotelSearch.adults,
               children: hotelSearch.children,
+              child_age: hotelSearch.child_age,
               branches: hotelSearch.branches,
             });
             const refreshedCriteriaId = (refreshedAvailability as any)?.Criteria?.searchCriteriaId;
@@ -1757,37 +1792,43 @@ export default function HotelRoomsPage() {
             : [];
         const roomsApiDesc = typeof respAny?.desc === "string" ? respAny.desc.trim() : "";
 
-        const flattened: any[] = room1options.map((opt: any) => ({
-          id: String(opt?.id),
-          name: opt?.room_name || "Room",
-          bedType: opt?.meal_name || opt?.MealPlan || "Meal plan",
-          reviews: { score: 0, label: "No reviews", count: 0 },
-          isRefundable: opt?.nonRef === 0,
-          paymentType: "Pay now",
-          amenities: [],
-          price: {
-            currency: opt?.sell_currency_code === "GBP" ? "£" : opt?.sell_currency_code || "£",
-            nightly: Number(opt?.days_spent) > 0 ? Number(opt?.net_price || 0) / Number(opt?.days_spent) : Number(opt?.net_price || 0),
-            total: Number(opt?.net_price || 0),
-          },
-          _raw: opt,
-        }));
-
         let accommodationDetailsResp: any = null;
         let accommodationFallbackRooms: any[] = [];
+        const bookingRoomIdBySourceId = new Map<string, string>();
         if (effectiveProvider === "vyspa") {
           const roomCodes = room1options
-            .map((opt: any) => {
-              const s = String(opt?.id ?? "").trim();
-              return /^\d+$/.test(s) ? Number(s) : null;
-            })
-            .filter((v: number | null): v is number => v !== null);
+            .map((opt: any) => String(opt?.id ?? "").trim())
+            .filter(Boolean);
 
           if (roomCodes.length > 0) {
             try {
               accommodationDetailsResp = await hotelService.accommodationDetails([{ roomCode: roomCodes }]);
               if (!cancelled) setRawAccommodationDetailsResponse(accommodationDetailsResp ?? null);
               const detailsRooms = Array.isArray(accommodationDetailsResp?.rooms) ? accommodationDetailsResp.rooms : [];
+              detailsRooms.forEach((row: any, index: number) => {
+                const d = row?.SearchResultRoomDetail || row;
+                const bookingRoomId = String(d?.id ?? d?.search_result_detail_id ?? "").trim();
+                if (!bookingRoomId) return;
+
+                const candidates = [
+                  row?.roomCode,
+                  row?.room_code,
+                  d?.roomCode,
+                  d?.room_code,
+                  d?.source_room_code,
+                  d?.request_room_code,
+                  roomCodes[index],
+                ]
+                  .map((value) => String(value ?? "").trim())
+                  .filter(Boolean);
+
+                for (const candidate of candidates) {
+                  if (!bookingRoomIdBySourceId.has(candidate)) {
+                    bookingRoomIdBySourceId.set(candidate, bookingRoomId);
+                  }
+                }
+              });
+
               accommodationFallbackRooms = detailsRooms
                 .map((row: any) => {
                   const d = row?.SearchResultRoomDetail || row;
@@ -1822,6 +1863,31 @@ export default function HotelRoomsPage() {
         } else if (!cancelled) {
           setRawAccommodationDetailsResponse(null);
         }
+
+        const flattened: any[] = room1options.map((opt: any) => {
+          const sourceRoomOptionId = String(opt?.id ?? "").trim();
+          const bookingRoomId = bookingRoomIdBySourceId.get(sourceRoomOptionId) || sourceRoomOptionId;
+          return {
+            id: bookingRoomId,
+            sourceRoomOptionId,
+            name: opt?.room_name || "Room",
+            bedType: opt?.meal_name || opt?.MealPlan || "Meal plan",
+            reviews: { score: 0, label: "No reviews", count: 0 },
+            isRefundable: opt?.nonRef === 0,
+            paymentType: "Pay now",
+            amenities: [],
+            price: {
+              currency: opt?.sell_currency_code === "GBP" ? "£" : opt?.sell_currency_code || "£",
+              nightly: Number(opt?.days_spent) > 0 ? Number(opt?.net_price || 0) / Number(opt?.days_spent) : Number(opt?.net_price || 0),
+              total: Number(opt?.net_price || 0),
+            },
+            _raw: {
+              ...opt,
+              sourceRoomOptionId,
+              bookingRoomId,
+            },
+          };
+        });
 
         const effectiveRooms = flattened.length > 0 ? flattened : accommodationFallbackRooms;
         // Sort rooms low -> high (user request)
@@ -2448,6 +2514,7 @@ export default function HotelRoomsPage() {
                         adults: stayAdults,
                         children: stayChildren,
                         rooms: stayRooms,
+                        childAges: stayChildAges,
                       });
                     } catch (e: any) {
                       setRoomsError(e?.message || "Failed to update availability");
@@ -2527,6 +2594,34 @@ export default function HotelRoomsPage() {
                       />
                     </label>
                   </div>
+                  {stayChildren > 0 && (
+                    <div className="space-y-3">
+                      <div className="text-sm font-medium text-[#010D50]">Child ages</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {Array.from({ length: stayChildren }, (_, index) => (
+                          <label key={`stay-child-age-${index}`} className="flex flex-col gap-1 text-sm text-[#010D50]">
+                            Child {index + 1}
+                            <select
+                              value={stayChildAges[index] ?? 9}
+                              onChange={(e) =>
+                                setStayChildAges((prev) =>
+                                  prev.map((age, ageIndex) => (ageIndex === index ? Number(e.target.value) : age))
+                                )
+                              }
+                              disabled={stayUpdateLoading}
+                              className="border border-[#DFE0E4] rounded-lg px-3 py-2 bg-white text-[#010D50]"
+                            >
+                              {Array.from({ length: 18 }, (_, age) => (
+                                <option key={age} value={age}>
+                                  {age} years
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {stayUpdateLoading && (
                     <div className="flex items-center gap-2 text-sm text-[#3A478A]">
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -2549,6 +2644,7 @@ export default function HotelRoomsPage() {
                             adults: stayAdults,
                             children: stayChildren,
                             rooms: stayRooms,
+                            childAges: stayChildAges,
                           });
                           setStayEditorOpen(false);
                         } catch (e: any) {

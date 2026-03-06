@@ -6,6 +6,7 @@ import { ChevronLeft } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useBookingStore } from "@/store/bookingStore";
 import { SearchParams } from "@/types/flight";
+import { serializeHotelChildAges } from "@/lib/hotels/childAges";
 
 interface BookingHeaderProps {
   currentStep?: number;
@@ -99,6 +100,9 @@ function buildHotelSearchUrl(
   params.set("adults", String(hotelSearch.adults));
   params.set("children", String(hotelSearch.children));
   params.set("rooms", String(hotelSearch.rooms));
+  if (hotelSearch.children > 0 && hotelSearch.child_age) {
+    params.set("child_age", serializeHotelChildAges(hotelSearch.child_age, hotelSearch.rooms, hotelSearch.children));
+  }
   if (hotelSearch.hidden_id) params.set("hidden_id", hotelSearch.hidden_id);
   if (hotelSearch.hidden_key) params.set("hidden_key", hotelSearch.hidden_key);
   if (hotelSearch.branches) params.set("branches", hotelSearch.branches);

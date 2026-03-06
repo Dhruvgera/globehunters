@@ -32,9 +32,16 @@ export function RefundShieldSection({
         </span>
       </div>
 
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onToggle}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onToggle();
+          }
+        }}
         className={`text-left border rounded-xl p-4 transition-colors ${
           selected
             ? "border-[#3754ED] bg-[#F5F7FF]"
@@ -69,7 +76,7 @@ export function RefundShieldSection({
             </div>
           ))}
         </div>
-      </button>
+      </div>
     </div>
   );
 }

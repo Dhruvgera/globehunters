@@ -21,7 +21,8 @@ import { useAffiliatePhone } from "@/lib/AffiliateContext";
 import { CountryCodeSelector } from "@/components/booking/CountryCodeSelector";
 import type { Passenger, PassengerType, PassengerTitle } from "@/types/booking";
 import { countryCodes } from "@/lib/utils/countryCodes";
-import { validateDateOfBirthForType, validateEmail, validatePhone } from "@/utils/validation";
+import { flattenHotelChildAges } from "@/lib/hotels/childAges";
+import { calculateAge, validateDateOfBirthForType, validateEmail, validatePhone } from "@/utils/validation";
 
 function InputField({
   label,
@@ -87,6 +88,14 @@ function SelectField({
       </div>
     </div>
   );
+}
+
+function approximateBirthDateFromAge(age: number): string {
+  const years = Math.max(0, Math.trunc(Number(age) || 0));
+  const date = new Date();
+  date.setFullYear(date.getFullYear() - years);
+  date.setDate(date.getDate() - 1);
+  return date.toISOString().split("T")[0];
 }
 
 export default function HotelCheckoutPage() {
@@ -281,19 +290,25 @@ export default function HotelCheckoutPage() {
   const travellerSlots = useMemo(() => {
     const adults = Math.max(1, Number(hotelSearch?.adults || 1));
     const children = Math.max(0, Number(hotelSearch?.children || 0));
+    const childAges = flattenHotelChildAges(hotelSearch?.child_age ?? [], hotelSearch?.rooms || 1, children);
     const slots: PassengerType[] = [];
     for (let i = 0; i < Math.max(0, adults - 1); i += 1) slots.push("adult");
     for (let i = 0; i < children; i += 1) slots.push("child");
-    return slots;
-  }, [hotelSearch?.adults, hotelSearch?.children]);
+    return { slots, childAges };
+  }, [hotelSearch?.adults, hotelSearch?.children, hotelSearch?.child_age, hotelSearch?.rooms]);
+
+  const hasAdditionalTravellers = travellerSlots.slots.length > 0;
 
   useEffect(() => {
     setOtherTravellers((prev) =>
-      travellerSlots.map((slotType, idx) => {
+      travellerSlots.slots.map((slotType, idx) => {
         const fromStore = passengers[idx + 1];
         const existing = prev[idx];
         const source = fromStore || existing;
         const defaultTitle: PassengerTitle = slotType === "child" ? "Miss" : "Mr";
+        const childAge = slotType === "child"
+          ? travellerSlots.childAges[idx - Math.max(0, Number(hotelSearch?.adults || 1) - 1)]
+          : undefined;
         return {
           title: (source?.title as PassengerTitle | undefined) || defaultTitle,
           firstName: source?.firstName || "",
@@ -304,11 +319,12 @@ export default function HotelCheckoutPage() {
           phone: source?.phone || phone || "",
           countryCode: source?.countryCode || countryCode || "+44",
           nationality: source?.nationality || passport || "",
+          age: source?.age ?? childAge,
           type: slotType,
         };
       })
     );
-  }, [travellerSlots, email, phone, countryCode, passport, passengers]);
+  }, [travellerSlots, email, phone, countryCode, passport, passengers, hotelSearch?.adults]);
 
   const updateOtherTraveller = (index: number, patch: Partial<Passenger>) => {
     setOtherTravellers((prev) =>
@@ -327,6 +343,27 @@ export default function HotelCheckoutPage() {
     if (bookingFor === "other") setOtherTravellersExpanded(true);
   }, [bookingFor]);
 
+  const hasCustomizedTravellerDetails = (traveller: Passenger | undefined) =>
+    !!(
+      traveller?.firstName?.trim() ||
+      traveller?.middleName?.trim() ||
+      traveller?.lastName?.trim() ||
+      traveller?.dateOfBirth ||
+      (traveller?.email?.trim() && traveller.email.trim() !== email.trim()) ||
+      (traveller?.phone?.trim() && traveller.phone.trim() !== phone.trim()) ||
+      ((traveller?.countryCode || "+44") !== (countryCode || "+44")) ||
+      ((traveller?.nationality || "") !== (passport || ""))
+    );
+
+  const hasCompleteTravellerDetails = (traveller: Passenger | undefined) =>
+    !!(
+      traveller?.firstName?.trim() &&
+      traveller?.lastName?.trim() &&
+      traveller?.dateOfBirth &&
+      traveller?.email?.trim() &&
+      traveller?.phone?.trim()
+    );
+
   function validateForm(): boolean {
     const errors: Record<string, string> = {};
     if (!firstName.trim()) errors.firstName = "First name is required";
@@ -336,25 +373,24 @@ export default function HotelCheckoutPage() {
     if (email.trim() && !validateEmail(email.trim())) errors.email = "Please enter a valid email";
     if (!phone.trim()) errors.phone = "Phone number is required";
     if (phone.trim() && !validatePhone(phone.trim())) errors.phone = "Please enter a valid phone number";
-    if (bookingFor === "other") {
-      for (let i = 0; i < otherTravellers.length; i += 1) {
-        const traveller = otherTravellers[i];
-        if (!traveller?.firstName?.trim()) errors[`traveller_${i}_firstName`] = "First name is required";
-        if (!traveller?.lastName?.trim()) errors[`traveller_${i}_lastName`] = "Last name is required";
-        if (!traveller?.dateOfBirth) {
-          errors[`traveller_${i}_dateOfBirth`] = "Date of birth is required";
-        } else {
-          const dobCheck = validateDateOfBirthForType(traveller.dateOfBirth, traveller.type === "child" ? "child" : "adult");
-          if (!dobCheck.valid) errors[`traveller_${i}_dateOfBirth`] = dobCheck.error || "Invalid date of birth";
-        }
-        if (!traveller?.email?.trim()) errors[`traveller_${i}_email`] = "Email is required";
-        if (traveller?.email?.trim() && !validateEmail(traveller.email.trim())) {
-          errors[`traveller_${i}_email`] = "Please enter a valid email";
-        }
-        if (!traveller?.phone?.trim()) errors[`traveller_${i}_phone`] = "Phone number is required";
-        if (traveller?.phone?.trim() && !validatePhone(traveller.phone.trim())) {
-          errors[`traveller_${i}_phone`] = "Please enter a valid phone number";
-        }
+    for (let i = 0; i < otherTravellers.length; i += 1) {
+      const traveller = otherTravellers[i];
+      if (!hasCustomizedTravellerDetails(traveller)) continue;
+      if (!traveller?.firstName?.trim()) errors[`traveller_${i}_firstName`] = "First name is required";
+      if (!traveller?.lastName?.trim()) errors[`traveller_${i}_lastName`] = "Last name is required";
+      if (!traveller?.dateOfBirth) {
+        errors[`traveller_${i}_dateOfBirth`] = "Date of birth is required";
+      } else {
+        const dobCheck = validateDateOfBirthForType(traveller.dateOfBirth, traveller.type === "child" ? "child" : "adult");
+        if (!dobCheck.valid) errors[`traveller_${i}_dateOfBirth`] = dobCheck.error || "Invalid date of birth";
+      }
+      if (!traveller?.email?.trim()) errors[`traveller_${i}_email`] = "Email is required";
+      if (traveller?.email?.trim() && !validateEmail(traveller.email.trim())) {
+        errors[`traveller_${i}_email`] = "Please enter a valid email";
+      }
+      if (!traveller?.phone?.trim()) errors[`traveller_${i}_phone`] = "Phone number is required";
+      if (traveller?.phone?.trim() && !validatePhone(traveller.phone.trim())) {
+        errors[`traveller_${i}_phone`] = "Please enter a valid phone number";
       }
     }
     if (!tcAccepted) errors.tc = "You must accept the terms and conditions";
@@ -372,7 +408,7 @@ export default function HotelCheckoutPage() {
     setError(null);
 
     try {
-      const lead = {
+      const lead: Passenger = {
         title,
         firstName,
         middleName,
@@ -412,22 +448,79 @@ export default function HotelCheckoutPage() {
         setVyspaFolderInfo({ folderNumber: String(folderNo), emailAddress: lead.email });
       }
 
-      const normalizedOtherTravellers = (bookingFor === "other" ? otherTravellers : [])
-        .map((traveller) => ({
-          ...traveller,
-          email: traveller.email || lead.email,
-          phone: traveller.phone || lead.phone,
-          countryCode: traveller.countryCode || lead.countryCode,
-          nationality: traveller.nationality || lead.nationality,
-        }));
+      const normalizedOtherTravellers = travellerSlots.slots.flatMap((slotType, index): Passenger[] => {
+        const traveller = otherTravellers[index];
+        const childAge =
+          slotType === "child"
+            ? travellerSlots.childAges[index - Math.max(0, Number(hotelSearch?.adults || 1) - 1)]
+            : undefined;
+
+        if (hasCustomizedTravellerDetails(traveller) && hasCompleteTravellerDetails(traveller)) {
+          return [{
+            title: traveller?.title || (slotType === "child" ? "Miss" : "Mr"),
+            firstName: traveller.firstName,
+            middleName: traveller.middleName || "",
+            lastName: traveller.lastName,
+            dateOfBirth: traveller.dateOfBirth,
+            email: traveller.email || lead.email,
+            phone: traveller.phone || lead.phone,
+            countryCode: traveller.countryCode || lead.countryCode,
+            nationality: traveller.nationality || lead.nationality,
+            age: traveller.dateOfBirth
+              ? calculateAge(traveller.dateOfBirth)
+              : typeof traveller.age === "number"
+              ? traveller.age
+              : childAge,
+            type: slotType,
+          }];
+        }
+
+        if (slotType !== "child") return [];
+
+        return [{
+          title: "Miss",
+          firstName: "unnamed",
+          middleName: "",
+          lastName: "unnamed",
+          dateOfBirth: "",
+          email: lead.email,
+          phone: lead.phone,
+          countryCode: lead.countryCode,
+          nationality: lead.nationality,
+          age: childAge,
+          type: "child",
+        }];
+      });
       const allPassengers = [lead, ...normalizedOtherTravellers];
+      if (passengers[0]) updatePassenger(0, lead);
+      else addPassenger(lead);
+      otherTravellers.forEach((traveller, index) => {
+        if (hasCustomizedTravellerDetails(traveller) && hasCompleteTravellerDetails(traveller)) {
+          const savedTraveller: Passenger = {
+            title: traveller.title || (traveller.type === "child" ? "Miss" : "Mr"),
+            firstName: traveller.firstName,
+            middleName: traveller.middleName || "",
+            lastName: traveller.lastName,
+            dateOfBirth: traveller.dateOfBirth,
+            email: traveller.email || lead.email,
+            phone: traveller.phone || lead.phone,
+            countryCode: traveller.countryCode || lead.countryCode,
+            nationality: traveller.nationality || lead.nationality,
+            age: traveller.dateOfBirth ? calculateAge(traveller.dateOfBirth) : traveller.age,
+            type: traveller.type,
+          };
+          if (passengers[index + 1]) updatePassenger(index + 1, savedTraveller);
+          else addPassenger(savedTraveller);
+        }
+      });
       const folderPassengers = allPassengers.map((p, idx) => ({
         pax_no: idx + 1,
         title: p.title as any,
         first_name: p.firstName,
         middle_name: "",
         last_name: p.lastName,
-        birth_date: p.dateOfBirth || undefined,
+        birth_date: p.dateOfBirth || (typeof p.age === "number" ? approximateBirthDateFromAge(p.age) : undefined),
+        age: p.dateOfBirth ? calculateAge(p.dateOfBirth) : p.age,
         pax_type: ((p as any).type === "child" ? "CHD" : (p as any).type === "infant" ? "INF" : "ADT") as any,
         api_gender: (p.title === "Mr" ? "M" : "F") as any,
         email: p.email,
@@ -508,18 +601,6 @@ export default function HotelCheckoutPage() {
           comments: folderComments,
         });
         if (!submitResp?.success) throw new Error((submitResp as any)?.message || "Failed to submit HotelBeds hotel to folder");
-
-        const paxSyncResp = await folderService.addToFolder({
-          folderNumber: Number(folderNo),
-          itineraryNumber: "1",
-          foldcur: "GBP",
-          travelPurpose: "Holiday",
-          comments: folderComments,
-          set_as_preferred_itinerary: true,
-          passengers: folderPassengers as any,
-          requestData: [],
-        });
-        if (!paxSyncResp.success) throw new Error(paxSyncResp.message || "Failed to sync hotel passengers to folder");
       } else {
         const addToFolderRequest: AddToFolderRequest = {
           folderNumber: Number(folderNo),
@@ -688,20 +769,25 @@ export default function HotelCheckoutPage() {
               </div>
             ))}
 
-            {bookingFor === "other" && otherTravellers.length > 0 && (
+            {hasAdditionalTravellers && (
               <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
                 <button
                   type="button"
                   onClick={() => setOtherTravellersExpanded((prev) => !prev)}
                   className="flex items-center justify-between text-left"
                 >
-                  <span className="text-sm font-semibold text-[#010D50]">Other Traveller Details</span>
+                  <span className="text-sm font-semibold text-[#010D50]">Additional Traveller Details (optional)</span>
                   <ChevronDown className={`w-4 h-4 text-[#3A478A] transition-transform ${otherTravellersExpanded ? "rotate-180" : ""}`} />
                 </button>
+                <p className="text-xs text-[#3A478A]">
+                  Only the lead traveller is required. If you skip these details, we will create the remaining passengers automatically using the searched occupancy and child ages.
+                </p>
                 {otherTravellersExpanded && otherTravellers.map((traveller, idx) => (
                   <div key={`traveller-${idx}`} className="border border-[#DFE0E4] rounded-xl p-3 flex flex-col gap-3">
                     <div className="text-xs font-semibold text-[#010D50]">
-                      {traveller.type === "child" ? `Child ${idx + 1}` : `Adult ${idx + 2}`}
+                      {traveller.type === "child"
+                        ? `Child ${idx + 1 - Math.max(0, Number(hotelSearch?.adults || 1) - 1)}${typeof traveller.age === "number" ? ` • Age ${traveller.age}` : ""}`
+                        : `Adult ${idx + 2}`}
                     </div>
 
                     <div className="flex flex-col gap-1.5">

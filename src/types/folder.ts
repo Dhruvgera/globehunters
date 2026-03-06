@@ -24,6 +24,8 @@ export interface FolderPassenger {
   last_name: string;
   /** Date of birth (YYYY-MM-DD). Optional for ADT, mandatory for CHD */
   birth_date?: string;
+  /** Passenger age in years when required by downstream APIs */
+  age?: number;
   /** Passenger type: ADT (Adult), CHD (Child), INF (Infant) */
   pax_type: PassengerType;
   /** Gender for APIS */

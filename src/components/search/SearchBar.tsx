@@ -23,6 +23,11 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { format } from "date-fns";
 import type { VyspaCityHotelLookupItem } from "@/types/vyspaHotels";
 import { useBookingStore } from "@/store/bookingStore";
+import {
+  buildHotelChildAgesFromFlat,
+  flattenHotelChildAges,
+  serializeHotelChildAges,
+} from "@/lib/hotels/childAges";
 
 interface SearchBarProps {
   compact?: boolean;
@@ -97,6 +102,7 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
   const [hotelGuests, setHotelGuests] = useState(2);
   const [hotelChildren, setHotelChildren] = useState(0);
   const [hotelRooms, setHotelRooms] = useState(1);
+  const [hotelChildAges, setHotelChildAges] = useState<number[]>([]);
   const [isHotelDatesOpen, setIsHotelDatesOpen] = useState(false);
   const [isHotelGuestsOpen, setIsHotelGuestsOpen] = useState(false);
   const [openMultiCityDateIndex, setOpenMultiCityDateIndex] = useState<number | null>(null);
@@ -141,6 +147,7 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
       const adults = Number(urlParams.get("adults") || savedHotelSearch?.adults || "") || undefined;
       const children = Number(urlParams.get("children") || savedHotelSearch?.children || "") || 0;
       const rms = Number(urlParams.get("rooms") || savedHotelSearch?.rooms || "") || undefined;
+      const childAgeParam = urlParams.get("child_age");
 
       if (inStr) {
         const d = new Date(inStr);
@@ -153,8 +160,26 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
       if (adults) setHotelGuests(adults);
       setHotelChildren(Math.max(0, Number(children) || 0));
       if (rms) setHotelRooms(rms);
+      setHotelChildAges(
+        flattenHotelChildAges(
+          childAgeParam ?? savedHotelSearch?.child_age ?? [],
+          Math.max(1, Number(rms) || savedHotelSearch?.rooms || 1),
+          Math.max(0, Number(children) || 0)
+        )
+      );
     }
   }, [pathname, savedHotelLocation, savedHotelSearch, urlParams]);
+
+  useEffect(() => {
+    setHotelChildAges((prev) => {
+      const childCount = Math.max(0, hotelChildren);
+      const next = Array.from({ length: childCount }, (_, index) => {
+        const age = prev[index];
+        return Number.isFinite(age) ? age : 9;
+      });
+      return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+    });
+  }, [hotelChildren]);
 
   const {
     tripType,
@@ -218,6 +243,16 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
       params.set("adults", String(Math.max(1, hotelGuests)));
       params.set("children", String(Math.max(0, hotelChildren)));
       params.set("rooms", String(Math.max(1, hotelRooms)));
+      if (hotelChildren > 0) {
+        params.set(
+          "child_age",
+          serializeHotelChildAges(
+            buildHotelChildAgesFromFlat(hotelChildAges, Math.max(1, hotelRooms), Math.max(0, hotelChildren)),
+            Math.max(1, hotelRooms),
+            Math.max(0, hotelChildren)
+          )
+        );
+      }
       // Include flight origin if available
       if (from?.code) params.set("fromCode", from.code);
       if (from?.city) params.set("from", from.city);
@@ -239,6 +274,16 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
       params.set("adults", String(Math.max(1, hotelGuests)));
       params.set("children", String(Math.max(0, hotelChildren)));
       params.set("rooms", String(Math.max(1, hotelRooms)));
+      if (hotelChildren > 0) {
+        params.set(
+          "child_age",
+          serializeHotelChildAges(
+            buildHotelChildAgesFromFlat(hotelChildAges, Math.max(1, hotelRooms), Math.max(0, hotelChildren)),
+            Math.max(1, hotelRooms),
+            Math.max(0, hotelChildren)
+          )
+        );
+      }
       if (hotelLocationItem?.id != null) params.set("hidden_id", String(hotelLocationItem.id));
       if (hotelLocationItem?.loc) params.set("hidden_key", String(hotelLocationItem.loc));
       if (hotelLocationItem?.arrival_point_code) params.set("arrival_point_code", String(hotelLocationItem.arrival_point_code));
@@ -578,6 +623,34 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
                     </Button>
                   </div>
                 </div>
+
+                {hotelChildren > 0 && (
+                  <div className="rounded-xl border border-[#DFE0E4] p-3">
+                    <div className="text-sm font-semibold text-[#010D50] mb-3">Child ages</div>
+                    <div className="grid grid-cols-1 gap-3">
+                      {Array.from({ length: hotelChildren }, (_, index) => (
+                        <label key={`hotel-child-age-${index}`} className="flex items-center justify-between gap-3">
+                          <span className="text-sm text-[#010D50]">Child {index + 1}</span>
+                          <select
+                            value={hotelChildAges[index] ?? 9}
+                            onChange={(e) =>
+                              setHotelChildAges((prev) =>
+                                prev.map((age, ageIndex) => (ageIndex === index ? Number(e.target.value) : age))
+                              )
+                            }
+                            className="h-10 min-w-[110px] rounded-lg border border-[#DFE0E4] px-3 text-sm text-[#010D50] outline-none focus:border-[#3754ED] bg-white"
+                          >
+                            {Array.from({ length: 18 }, (_, age) => (
+                              <option key={age} value={age}>
+                                {age} years
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between">
                   <div>

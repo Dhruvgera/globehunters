@@ -28,6 +28,7 @@ type SubmitBody =
         middle_name?: string;
         last_name: string;
         birth_date?: string;
+        age?: number;
         pax_type: 'ADT' | 'CHD' | 'INF';
         api_gender?: 'M' | 'F';
         email?: string;
@@ -224,6 +225,7 @@ export async function POST(req: Request) {
           first_name: String(p?.first_name || '').toUpperCase(),
           middle_name: String(p?.middle_name || ''),
           last_name: String(p?.last_name || '').toUpperCase(),
+          age: typeof p?.age === 'number' ? p.age : undefined,
           api_gender: p?.api_gender || 'M',
           email: p?.email || '',
           telephone,

@@ -249,6 +249,7 @@ export class HotelService {
       middle_name?: string;
       last_name: string;
       birth_date?: string;
+      age?: number;
       pax_type: 'ADT' | 'CHD' | 'INF';
       api_gender?: 'M' | 'F';
       email?: string;

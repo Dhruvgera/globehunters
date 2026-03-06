@@ -24,6 +24,7 @@ import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
 import type { PackageSearchResult } from "@/types/holidayPackage";
 import { resolveTrustYouHotelId } from "@/lib/trustyou/hotelMapping";
 import type { TrustYouBulkResultItem } from "@/types/trustyou";
+import { parseHotelChildAges, serializeHotelChildAges } from "@/lib/hotels/childAges";
 
 const DEFAULT_FILTERS: HotelFiltersState = {
   propertyQuery: "",
@@ -364,6 +365,13 @@ function HotelsPageInner() {
     const adults = Math.max(1, Number(p.get("adults") || savedHotelSearch?.adults || "2") || 2);
     const children = Math.max(0, Number(p.get("children") || savedHotelSearch?.children || "0") || 0);
     const rooms = Math.max(1, Number(p.get("rooms") || savedHotelSearch?.rooms || "1") || 1);
+    const child_age = p.get("child_age")
+      ? parseHotelChildAges(p.get("child_age"), rooms, children)
+      : parseHotelChildAges(
+          savedHotelSearch?.child_age ? JSON.stringify(savedHotelSearch.child_age) : null,
+          rooms,
+          children
+        );
     const branches = p.get("branches") || savedHotelSearch?.branches || "UK";
     const hidden_id = p.get("hidden_id") || savedHotelSearch?.hidden_id || null;
     const hidden_key = p.get("hidden_key") || savedHotelSearch?.hidden_key || null;
@@ -375,6 +383,7 @@ function HotelsPageInner() {
       checkOut,
       adults,
       children,
+      child_age,
       rooms,
       branches,
       hidden_id,
@@ -396,6 +405,7 @@ function HotelsPageInner() {
       checkOut: resolvedSearch.checkOut,
       adults: resolvedSearch.adults,
       children: resolvedSearch.children,
+      child_age: serializeHotelChildAges(resolvedSearch.child_age, resolvedSearch.rooms, resolvedSearch.children),
       rooms: resolvedSearch.rooms,
       hidden_id: resolvedSearch.hidden_id,
       hidden_key: resolvedSearch.hidden_key,
@@ -490,6 +500,7 @@ function HotelsPageInner() {
               rooms: search.rooms,
               adults: search.adults,
               children: search.children,
+              child_age: search.child_age,
               branches: search.branches,
               searchCriteriaId:
                 typeof firstCriteria === "string" || typeof firstCriteria === "number"
@@ -677,6 +688,7 @@ function HotelsPageInner() {
           rooms: search.rooms,
           adults: search.adults,
           children: search.children,
+          child_age: search.child_age,
           branches: search.branches,
           timeout: VYSPA_SEARCH_TIMEOUT_SEC,
         });
@@ -905,6 +917,7 @@ function HotelsPageInner() {
             rooms: search.rooms,
             adults: search.adults,
             children: search.children,
+            child_age: search.child_age,
             branches: search.branches,
             searchCriteriaId:
               typeof searchCriteriaForStore === "string" || typeof searchCriteriaForStore === "number"
@@ -966,6 +979,7 @@ function HotelsPageInner() {
                 rooms: search.rooms,
                 adults: search.adults,
                 children: search.children,
+                child_age: search.child_age,
                 branches: search.branches,
                 timeout: VYSPA_SEARCH_TIMEOUT_SEC,
                 searchCriteriaId: latestCriteriaId,

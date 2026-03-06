@@ -18,6 +18,7 @@ export interface Passenger {
   phone: string;
   countryCode?: string; // Phone country code e.g., "+44"
   type: PassengerType;
+  age?: number;
   // Optional fields for international travel
   passportNumber?: string;
   passportExpiry?: string;

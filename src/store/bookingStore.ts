@@ -14,6 +14,7 @@ import type { Hotel } from '@/types/hotel';
 import type { TrustYouHotelReviewSummary } from '@/types/trustyou';
 import type { VyspaCityHotelLookupItem } from '@/types/vyspaHotels';
 import type { HotelFiltersState } from '@/components/hotels/HotelFiltersSidebar';
+import type { HotelChildAges } from '@/lib/hotels/childAges';
 import type {
   PackageSearchCriteria,
   PackageSearchResult,
@@ -191,6 +192,7 @@ interface BookingState {
     rooms: number;
     adults: number;
     children: number;
+    child_age?: HotelChildAges;
     branches?: string;
     searchCriteriaId?: number | string;
     arrivalPointCode?: string;
