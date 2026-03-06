@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type { HotelProvider } from "@/lib/hotels/provider";
 
 export type HotelViewMode = "list" | "grid" | "map";
 
@@ -22,6 +23,9 @@ export function HotelResultsToolbar({
   sortMode,
   onSortModeChange,
   onOpenFilters,
+  providerMode,
+  onProviderModeChange,
+  showProviderToggle = false,
 }: {
   resultCount: number;
   viewMode: HotelViewMode;
@@ -29,10 +33,13 @@ export function HotelResultsToolbar({
   sortMode: HotelSortMode;
   onSortModeChange: (mode: HotelSortMode) => void;
   onOpenFilters?: () => void;
+  providerMode?: HotelProvider;
+  onProviderModeChange?: (mode: HotelProvider) => void;
+  showProviderToggle?: boolean;
 }) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
         <div className="w-full sm:w-[260px]">
           <Select value={sortMode} onValueChange={(v) => onSortModeChange(v as HotelSortMode)}>
             <SelectTrigger className="h-9 min-h-9 rounded-xl border border-[#DFE0E4] bg-white px-3 text-sm">
@@ -45,6 +52,30 @@ export function HotelResultsToolbar({
             </SelectContent>
           </Select>
         </div>
+
+        {showProviderToggle && providerMode && onProviderModeChange && (
+          <div className="flex items-center rounded-xl border border-[#DFE0E4] bg-white p-1">
+            {(["vyspa", "hotelbeds", "hybrid"] as HotelProvider[]).map((mode) => {
+              const active = providerMode === mode;
+              return (
+                <Button
+                  key={mode}
+                  type="button"
+                  variant="ghost"
+                  onClick={() => onProviderModeChange(mode)}
+                  className={[
+                    "h-8 rounded-lg px-3 text-xs font-medium capitalize",
+                    active
+                      ? "bg-[#E0E7FF] text-[#010D50] hover:bg-[#D7E0FF]"
+                      : "text-[#3754ED] hover:bg-[#F5F7FF]",
+                  ].join(" ")}
+                >
+                  {mode}
+                </Button>
+              );
+            })}
+          </div>
+        )}
 
         <div className="hidden sm:flex items-center gap-2 text-sm text-[#3A478A]">
           <span>Showing</span>
@@ -109,4 +140,3 @@ export function HotelResultsToolbar({
     </div>
   );
 }
-

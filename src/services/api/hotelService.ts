@@ -5,6 +5,7 @@ import type {
   VyspaHotelSearchDetailsResponse,
   VyspaCreateCustomerFolderResponse,
 } from '@/types/vyspaHotels';
+import type { HotelProvider } from '@/lib/hotels/provider';
 
 export interface HotelSearchParams {
   location: string;
@@ -23,6 +24,7 @@ export interface HotelSearchParams {
   child_age?: Array<Record<string, number>>;
   timeout?: number;
   searchCriteriaId?: number | string;
+  providerOverride?: HotelProvider;
 }
 
 export interface CreateHotelFolderParams {
@@ -103,6 +105,9 @@ export class HotelService {
 
     if (params.searchCriteriaId !== undefined && params.searchCriteriaId !== null && String(params.searchCriteriaId).trim()) {
       criteria.searchCriteriaId = params.searchCriteriaId;
+    }
+    if (params.providerOverride) {
+      criteria.providerOverride = params.providerOverride;
     }
 
     if (params.children > 0) {

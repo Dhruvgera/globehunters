@@ -25,6 +25,7 @@ import type { PackageSearchResult } from "@/types/holidayPackage";
 import { resolveTrustYouHotelId } from "@/lib/trustyou/hotelMapping";
 import type { TrustYouBulkResultItem } from "@/types/trustyou";
 import { parseHotelChildAges, serializeHotelChildAges } from "@/lib/hotels/childAges";
+import { getHotelProvider, parseHotelProvider, type HotelProvider } from "@/lib/hotels/provider";
 
 const DEFAULT_FILTERS: HotelFiltersState = {
   propertyQuery: "",
@@ -68,6 +69,10 @@ const HYBRID_MAX_POLLS = (() => {
 })();
 
 const ENABLE_TRUSTYOU_ENRICHMENT = false;
+const HOTEL_PROVIDER_TOGGLE_ENABLED = ["1", "true", "yes", "on"].includes(
+  String(process.env.NEXT_PUBLIC_ENABLE_HOTEL_PROVIDER_TOGGLE || "").trim().toLowerCase()
+);
+const HOTEL_PROVIDER_OVERRIDE_STORAGE_KEY = "gh-hotel-provider-override";
 
 function sanitizeHiddenHotelFilters(filters: HotelFiltersState): HotelFiltersState {
   return {
@@ -245,6 +250,9 @@ function HotelsPageInner() {
   // Default: low -> high (user request), but keep other options available.
   const [sortMode, setSortMode] = useState<HotelSortMode>("price_low");
   const [selectedHotelKey, setSelectedHotelKey] = useState<string>("");
+  const [providerOverride, setProviderOverride] = useState<HotelProvider | null>(null);
+  const [providerMode, setProviderMode] = useState<HotelProvider>(getHotelProvider());
+  const [providerOverrideReady, setProviderOverrideReady] = useState(!HOTEL_PROVIDER_TOGGLE_ENABLED);
 
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(false);
@@ -264,6 +272,29 @@ function HotelsPageInner() {
   const [trustYouEnriching, setTrustYouEnriching] = useState(false);
   const trustYouInflightRef = useRef<Set<string>>(new Set());
   const trustYouAttemptRef = useRef<Map<string, { attempts: number; lastAttemptAt: number; ok: boolean }>>(new Map());
+
+  useEffect(() => {
+    if (!HOTEL_PROVIDER_TOGGLE_ENABLED || typeof window === "undefined") {
+      setProviderOverrideReady(true);
+      return;
+    }
+
+    const saved = parseHotelProvider(window.localStorage.getItem(HOTEL_PROVIDER_OVERRIDE_STORAGE_KEY));
+    setProviderOverride(saved);
+    if (saved) {
+      setProviderMode(saved);
+    }
+    setProviderOverrideReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!HOTEL_PROVIDER_TOGGLE_ENABLED || typeof window === "undefined") return;
+    if (providerOverride) {
+      window.localStorage.setItem(HOTEL_PROVIDER_OVERRIDE_STORAGE_KEY, providerOverride);
+      return;
+    }
+    window.localStorage.removeItem(HOTEL_PROVIDER_OVERRIDE_STORAGE_KEY);
+  }, [providerOverride]);
 
   useEffect(() => {
     hotelResultsCacheRef.current = hotelResultsCache;
@@ -400,6 +431,7 @@ function HotelsPageInner() {
 
   const queryKey = useMemo(() => {
     return JSON.stringify({
+      providerOverride,
       location: resolvedSearch.location,
       checkIn: resolvedSearch.checkIn,
       checkOut: resolvedSearch.checkOut,
@@ -411,7 +443,7 @@ function HotelsPageInner() {
       hidden_key: resolvedSearch.hidden_key,
       branches: resolvedSearch.branches,
     });
-  }, [resolvedSearch]);
+  }, [providerOverride, resolvedSearch]);
 
   // Hydrate filters for this queryKey (so opening a hotel and coming back doesn't reset price slider).
   useEffect(() => {
@@ -439,6 +471,7 @@ function HotelsPageInner() {
 
     async function load() {
       if (!hasHydrated) return;
+      if (!providerOverrideReady) return;
 
       const requestSeq = ++activeRequestSeq.current;
 
@@ -680,6 +713,7 @@ function HotelsPageInner() {
         }
 
         const availability = await hotelService.searchAvailabilityV3({
+          providerOverride: providerOverride || undefined,
           location: pick.label,
           hidden_id: String(pick.id),
           hidden_key: String(pick.loc),
@@ -706,6 +740,7 @@ function HotelsPageInner() {
           meta: Record<string, any>;
           results: any[];
           criteriaId: number | string | null;
+          criteriaProvider: HotelProvider;
           isHybridProviderResponse: boolean;
           searchComplete: boolean | null;
         };
@@ -716,7 +751,8 @@ function HotelsPageInner() {
           const rawCriteriaId = (criteria as any)?.searchCriteriaId;
           const criteriaId =
             typeof rawCriteriaId === "number" || typeof rawCriteriaId === "string" ? rawCriteriaId : null;
-          const isHybridProviderResponse = String((criteria as any)?.provider || "").trim().toLowerCase() === "hybrid";
+          const criteriaProvider = getHotelProvider((criteria as any)?.provider);
+          const isHybridProviderResponse = criteriaProvider === "hybrid";
           const searchComplete = parseSearchComplete((criteria as any)?.searchComplete);
 
           // Filter out non-object results (e.g. [true, "No hotels found"] becomes empty array)
@@ -859,13 +895,23 @@ function HotelsPageInner() {
             };
           }
 
-          return { mapped, meta, results, criteriaId, isHybridProviderResponse, searchComplete };
+          return {
+            mapped,
+            meta,
+            results,
+            criteriaId,
+            isHybridProviderResponse,
+            searchComplete,
+            criteriaProvider,
+          };
         };
 
         const applyAvailabilityToState = (parsed: ParsedAvailability) => {
           if (cancelled || requestSeq !== activeRequestSeq.current) return;
 
-          const { mapped, meta, results, criteriaId } = parsed;
+          const { mapped, meta, results, criteriaId, criteriaProvider } = parsed;
+
+          setProviderMode(criteriaProvider);
 
           setHotels(mapped);
           setBreakfastByHotelId((prev) => {
@@ -971,6 +1017,7 @@ function HotelsPageInner() {
 
             try {
               const polledAvailability = await hotelService.searchAvailabilityV3({
+                providerOverride: providerOverride || undefined,
                 location: pick.label,
                 hidden_id: String(pick.id),
                 hidden_key: String(pick.loc),
@@ -1023,7 +1070,16 @@ function HotelsPageInner() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- resolvedSearch accessed via ref to avoid loop
-  }, [queryKey, setHotelResultsCache, setHotelResultsMeta, setHotelSearch, isPackageMode, hasHydrated]);
+  }, [
+    queryKey,
+    setHotelResultsCache,
+    setHotelResultsMeta,
+    setHotelSearch,
+    isPackageMode,
+    hasHydrated,
+    providerOverride,
+    providerOverrideReady,
+  ]);
 
   // On-demand breakfast enrichment: when user enables breakfast filter, use getRoomsV3 to detect breakfast
   // for hotels where availability doesn't expose meal plans reliably.
@@ -1676,6 +1732,12 @@ function HotelsPageInner() {
               onViewModeChange={setViewMode}
               sortMode={sortMode}
               onSortModeChange={setSortMode}
+              providerMode={providerMode}
+              onProviderModeChange={(mode) => {
+                setProviderOverride(mode);
+                setProviderMode(mode);
+              }}
+              showProviderToggle={HOTEL_PROVIDER_TOGGLE_ENABLED}
             />
 
             {loading && hotels.length === 0 && <HotelSearchLoading />}

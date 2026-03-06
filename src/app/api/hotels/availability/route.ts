@@ -521,11 +521,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'INVALID_REQUEST', message: 'Missing request body' }, { status: 400 });
   }
 
-  const provider = getHotelProvider();
   const payload = Array.isArray(body) ? body : [body];
   if (!Array.isArray(payload) || payload.length === 0) {
     return NextResponse.json({ error: 'INVALID_REQUEST', message: 'Payload must be a non-empty array' }, { status: 400 });
   }
+  const requestedProvider = payload[0] && typeof payload[0] === 'object' && !Array.isArray(payload[0])
+    ? (payload[0] as Record<string, unknown>).providerOverride
+    : undefined;
+  const provider = getHotelProvider(requestedProvider);
   const vyspaPayload = normalizeVyspaAvailabilityPayload(payload);
   const firstCriteria = (vyspaPayload[0] as any) || {};
   const searchTimeoutSec = extractSearchTimeoutSec(firstCriteria);

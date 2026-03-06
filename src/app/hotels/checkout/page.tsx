@@ -527,8 +527,28 @@ export default function HotelCheckoutPage() {
         phone: p.phone,
       }));
 
+      let bookingRoomIds = [...summary.roomIds];
+      if (!isHotelbedsMode && bookingRoomIds.length > 0 && bookingRoomIds.some((roomId) => !/^\d+$/.test(String(roomId)))) {
+        try {
+          const accommodationDetailsResp = await hotelService.accommodationDetails([{ roomCode: bookingRoomIds }]) as any;
+          const detailsRooms = Array.isArray(accommodationDetailsResp?.rooms) ? accommodationDetailsResp.rooms : [];
+          const resolvedRoomIds = detailsRooms
+            .map((row: any) => {
+              const detail = row?.SearchResultRoomDetail || row;
+              return String(detail?.id ?? detail?.search_result_detail_id ?? "").trim();
+            })
+            .filter(Boolean);
+
+          if (resolvedRoomIds.length === bookingRoomIds.length) {
+            bookingRoomIds = resolvedRoomIds;
+          }
+        } catch {
+          // Fall back to the currently selected room ids; the API route will surface the exact failure.
+        }
+      }
+
       const roomPassengers = (() => {
-        const roomIds = summary.roomIds;
+        const roomIds = bookingRoomIds;
         const mapping: Record<string, string> = {};
         if (roomIds.length === 0) return mapping;
         const allocations = roomIds.map(() => [] as number[]);
@@ -614,8 +634,8 @@ export default function HotelCheckoutPage() {
             {
               type: "hotel",
               search_result_id: summary.searchResultId,
-              roomCodes: summary.roomIds.join(","),
-              roomIds: summary.roomIds.join(","),
+              roomCodes: bookingRoomIds.join(","),
+              roomIds: bookingRoomIds.join(","),
               passengers: roomPassengers,
               expectedNetPrice,
             } as any,
