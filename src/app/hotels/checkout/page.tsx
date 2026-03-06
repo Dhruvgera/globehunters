@@ -116,8 +116,6 @@ export default function HotelCheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isHotelbedsMode = hotelSearch?.provider === "hotelbeds";
-
   // Traveller form state
   const leadPassenger = passengers[0];
   const [title, setTitle] = useState<PassengerTitle>(leadPassenger?.title || "Mr");
@@ -188,6 +186,26 @@ export default function HotelCheckoutPage() {
       roomIds: selectedHotelRoomIds.map((roomId) => String(roomId).trim()).filter(Boolean),
     };
   }, [hotelResultsMeta, selectedHotel, selectedHotelRoomIds]);
+
+  const selectedHotelMeta = useMemo(() => {
+    if (!summary.hotelId) return undefined;
+    return hotelResultsMeta?.[summary.hotelId];
+  }, [hotelResultsMeta, summary.hotelId]);
+
+  const effectiveProvider = useMemo(() => {
+    if (selectedHotelMeta?.provider === "hotelbeds" || selectedHotelMeta?.provider === "vyspa") {
+      return selectedHotelMeta.provider;
+    }
+    if (hotelSearch?.provider === "hotelbeds" || hotelSearch?.provider === "vyspa") {
+      return hotelSearch.provider;
+    }
+    if (selectedHotelRoomSummary?.hotelbedsRateKey) {
+      return "hotelbeds";
+    }
+    return "vyspa";
+  }, [hotelSearch?.provider, selectedHotelMeta?.provider, selectedHotelRoomSummary?.hotelbedsRateKey]);
+
+  const isHotelbedsMode = effectiveProvider === "hotelbeds";
 
   const hotelDetailsBackUrl = useMemo(() => {
     const hotelId = summary.hotelId;
@@ -468,6 +486,7 @@ export default function HotelCheckoutPage() {
 
       if (isHotelbedsMode) {
         const submitResp = await hotelService.submitHotelbedsToFolder({
+          provider: "hotelbeds",
           folderNumber: Number(folderNo),
           currency: "GBP",
           hotel: { hotelId: summary.hotelId, hotelName: summary.hotelName },

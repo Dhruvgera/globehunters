@@ -237,6 +237,7 @@ export class HotelService {
   }
 
   async submitHotelbedsToFolder(payload: {
+    provider?: 'hotelbeds';
     folderNumber: number;
     currency: string;
     hotel: { hotelId: string; hotelName: string };

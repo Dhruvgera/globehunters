@@ -12,6 +12,134 @@ import type { AddToFolderRequest } from '@/types/folder';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
+function extractBusinessErrors(payload: unknown): string[] {
+  if (!payload || typeof payload !== 'object') return [];
+  const parsed = payload as {
+    error?: unknown;
+    errors?: unknown;
+    message?: unknown;
+    status?: unknown;
+  };
+
+  const messages: string[] = [];
+
+  const collect = (value: unknown) => {
+    if (!value) return;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (trimmed) messages.push(trimmed);
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(collect);
+      return;
+    }
+    if (typeof value === 'object') {
+      for (const entry of Object.values(value as Record<string, unknown>)) {
+        collect(entry);
+      }
+    }
+  };
+
+  collect(parsed.error);
+  collect(parsed.errors);
+
+  if (typeof parsed.status === 'string' && parsed.status.toLowerCase() === 'error' && typeof parsed.message === 'string') {
+    collect(parsed.message);
+  }
+
+  return Array.from(new Set(messages));
+}
+
+type FolderEntry = {
+  fiType: string;
+  description: string;
+  pricingDescriptions: string[];
+  accommodationBookingId: string;
+};
+
+function extractFolderEntries(folderDetails: unknown): FolderEntry[] {
+  const root = folderDetails as { pagedata?: unknown[]; items?: unknown[]; folderItems?: unknown[] } | null;
+  const entries = [
+    ...(Array.isArray(root?.pagedata) ? root!.pagedata : []),
+    ...(Array.isArray(root?.items) ? root!.items : []),
+    ...(Array.isArray(root?.folderItems) ? root!.folderItems : []),
+  ];
+
+  return entries.map((item) => {
+    const current = item as {
+      Segment?: { fi_type?: unknown; desc?: unknown; textdesc?: unknown };
+      FolderItem?: { fi_type?: unknown; description?: unknown };
+      FolderPricing?: { desc?: unknown };
+      SegmentPricing?: Array<{ FolderPricing?: { desc?: unknown } }>;
+      AccommodationBooking?: { id?: unknown; confirmationNumber?: unknown };
+      description?: unknown;
+      fi_type?: unknown;
+    };
+
+    const fiType = String(
+      current?.Segment?.fi_type ??
+        current?.FolderItem?.fi_type ??
+        current?.fi_type ??
+        ''
+    ).trim();
+
+    const description = String(
+      current?.Segment?.desc ??
+        current?.Segment?.textdesc ??
+        current?.FolderItem?.description ??
+        current?.FolderPricing?.desc ??
+        current?.description ??
+        ''
+    ).trim();
+
+    const pricingDescriptions = Array.isArray(current?.SegmentPricing)
+      ? current.SegmentPricing
+          .map((segmentPricing) => String(segmentPricing?.FolderPricing?.desc ?? '').trim())
+          .filter(Boolean)
+      : [];
+
+    const accommodationBookingId = String(
+      current?.AccommodationBooking?.id ?? current?.AccommodationBooking?.confirmationNumber ?? ''
+    ).trim();
+
+    return {
+      fiType,
+      description,
+      pricingDescriptions,
+      accommodationBookingId,
+    };
+  });
+}
+
+function entryLooksHotel(entry: FolderEntry): boolean {
+  if (entry.fiType.toUpperCase() === 'HTL') return true;
+  if (entry.accommodationBookingId) return true;
+
+  const haystack = [entry.description, ...entry.pricingDescriptions].join(' ').toLowerCase();
+  return haystack.includes('hotel') || haystack.includes('accommodation');
+}
+
+async function fetchFolderDetails(apiUrl: string, basicAuth: string, apiVersion: string, folderNumber: number) {
+  const response = await fetch(`${apiUrl}/rest/v4/getFolderDetails/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Basic ${basicAuth}`,
+      'Api-Version': apiVersion,
+    },
+    body: JSON.stringify([{ fold_no: folderNumber }]),
+  });
+
+  const data = await response.json().catch(() => null);
+  return {
+    ok: response.ok,
+    status: response.status,
+    data,
+    entries: extractFolderEntries(data),
+  };
+}
+
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as AddToFolderRequest;
@@ -105,6 +233,18 @@ export async function POST(req: Request) {
       passengers: normalizedPassengers,
       requestData: normalizedRequestData,
     }];
+    const requiresHotelVerification = normalizedRequestData.some((item: any) => item?.type === 'hotel');
+    const requiresMutationVerification = normalizedRequestData.length > 0;
+    let beforeEntryCount = 0;
+
+    if (requiresMutationVerification) {
+      try {
+        const beforeResponse = await fetchFolderDetails(apiUrl, basicAuth, VYSPA_CONFIG.apiVersion, body.folderNumber);
+        beforeEntryCount = beforeResponse.entries.length;
+      } catch (beforeError) {
+        console.error('❌ Vyspa getFolderDetails pre-check error:', beforeError);
+      }
+    }
 
     console.log('➡️ Calling Vyspa ApiAddToFolder', {
       folderNumber: body.folderNumber,
@@ -153,6 +293,23 @@ export async function POST(req: Request) {
       console.error('❌ Vyspa ApiAddToFolder JSON parse failed', jsonError);
       return {};
     });
+    const businessErrors = extractBusinessErrors(addToFolderData);
+
+    if (businessErrors.length > 0) {
+      console.error('❌ Vyspa ApiAddToFolder business error', {
+        folderNumber: body.folderNumber,
+        errors: businessErrors,
+        response: addToFolderData,
+      });
+      return NextResponse.json(
+        {
+          error: 'API_ERROR',
+          message: businessErrors.join(' | '),
+          details: addToFolderData,
+        },
+        { status: 502 }
+      );
+    }
 
     console.log('✅ Add to folder success', {
       folderNumber: body.folderNumber,
@@ -161,30 +318,40 @@ export async function POST(req: Request) {
 
     // Fetch folder details to verify the items were added
     let folderDetails = null;
+    const verification = {
+      beforeEntryCount,
+      afterEntryCount: 0,
+      entriesAdded: false,
+      hotelEntryFound: false,
+      businessErrors,
+    };
     try {
-      const folderDetailsPayload = [{
-        fold_no: body.folderNumber,
-      }];
-
       console.log('➡️ Calling Vyspa getFolderDetails to verify');
-
-      const folderDetailsResponse = await fetch(`${apiUrl}/rest/v4/getFolderDetails/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${basicAuth}`,
-          'Api-Version': VYSPA_CONFIG.apiVersion,
-        },
-        body: JSON.stringify(folderDetailsPayload),
-      });
-
-      folderDetails = await folderDetailsResponse.json().catch(() => null);
+      const folderDetailsResponse = await fetchFolderDetails(apiUrl, basicAuth, VYSPA_CONFIG.apiVersion, body.folderNumber);
+      folderDetails = folderDetailsResponse.data;
+      verification.afterEntryCount = folderDetailsResponse.entries.length;
+      verification.entriesAdded = verification.afterEntryCount > beforeEntryCount;
+      verification.hotelEntryFound = folderDetailsResponse.entries.some(entryLooksHotel);
 
       console.log('📁 Vyspa getFolderDetails response:', {
         ok: folderDetailsResponse.ok,
         status: folderDetailsResponse.status,
         data: folderDetails,
+        verification,
       });
+
+      if (requiresHotelVerification && (!verification.entriesAdded || !verification.hotelEntryFound)) {
+        return NextResponse.json(
+          {
+            error: 'VERIFICATION_FAILED',
+            message: 'Hotel was not added to folder after ApiAddToFolder completed',
+            details: addToFolderData,
+            folderDetails,
+            verification,
+          },
+          { status: 502 }
+        );
+      }
     } catch (fdError) {
       console.error('❌ Vyspa getFolderDetails error:', fdError);
     }
@@ -241,6 +408,7 @@ export async function POST(req: Request) {
       itineraryNumber: body.itineraryNumber || '1',
       addToFolderResponse: addToFolderData,
       folderDetails: folderDetails,
+      verification,
       bookingHistory: bookingHistory,
     });
 

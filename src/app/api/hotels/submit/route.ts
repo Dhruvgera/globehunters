@@ -58,6 +58,93 @@ function formatDateForPortal(dateStr: string): string {
   return dateStr;
 }
 
+function isPortalSuccess(payload: unknown): boolean {
+  if (!payload || typeof payload !== 'object') return false;
+  const parsed = payload as { success?: unknown; status?: unknown; errors?: unknown; error?: unknown };
+
+  if (typeof parsed.success !== 'undefined') {
+    if (parsed.success === true || parsed.success === 1 || parsed.success === '1') return true;
+    if (parsed.success === false || parsed.success === 0 || parsed.success === '0') return false;
+  }
+
+  if (typeof parsed.status === 'string' && parsed.status.toLowerCase() === 'error') return false;
+  if (Array.isArray(parsed.errors) && parsed.errors.length > 0) return false;
+  if (Array.isArray(parsed.error) && parsed.error.length > 0) return false;
+
+  return true;
+}
+
+function extractFolderEntries(folderDetails: unknown): Array<{ fiType: string; description: string }> {
+  const root = folderDetails as { pagedata?: unknown[]; items?: unknown[]; folderItems?: unknown[] } | null;
+  const entries = [
+    ...(Array.isArray(root?.pagedata) ? root!.pagedata : []),
+    ...(Array.isArray(root?.items) ? root!.items : []),
+    ...(Array.isArray(root?.folderItems) ? root!.folderItems : []),
+  ];
+
+  return entries.map((item) => {
+    const current = item as {
+      Segment?: { fi_type?: unknown; desc?: unknown; textdesc?: unknown };
+      FolderItem?: { fi_type?: unknown; description?: unknown };
+      FolderPricing?: { desc?: unknown };
+      description?: unknown;
+      fi_type?: unknown;
+    };
+
+    const fiType = String(
+      current?.Segment?.fi_type ??
+        current?.FolderItem?.fi_type ??
+        current?.fi_type ??
+        ''
+    ).trim();
+
+    const description = String(
+      current?.Segment?.desc ??
+        current?.Segment?.textdesc ??
+        current?.FolderItem?.description ??
+        current?.FolderPricing?.desc ??
+        current?.description ??
+        ''
+    ).trim();
+
+    return { fiType, description };
+  });
+}
+
+async function fetchPortalFolderDetails(
+  apiUrl: string,
+  credentials: { username: string; password: string; token: string },
+  folderNumber: number
+) {
+  const formData = new URLSearchParams();
+  formData.append('username', credentials.username);
+  formData.append('password', credentials.password);
+  formData.append('token', credentials.token);
+  formData.append('method', 'getFolderDetails');
+  formData.append('params', JSON.stringify([{ fold_no: String(folderNumber) }]));
+
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: formData.toString(),
+  });
+
+  const rawText = await response.text().catch(() => '');
+  let parsed: unknown = null;
+  try {
+    parsed = rawText ? JSON.parse(rawText) : null;
+  } catch {
+    parsed = { raw: rawText };
+  }
+
+  return {
+    ok: response.ok,
+    status: response.status,
+    data: parsed,
+    entries: extractFolderEntries(parsed),
+  };
+}
+
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as SubmitBody | null;
   if (!body) {
@@ -78,6 +165,8 @@ export async function POST(req: Request) {
 
   // HotelBeds selection is saved into the Vyspa folder as a manual itinerary item (CRM capture).
   const { apiUrl, credentials, timeout } = VYSPA_PORTAL_CONFIG;
+  const folderDetailsBefore = await fetchPortalFolderDetails(apiUrl, credentials, Number(body.folderNumber));
+  const beforeCount = folderDetailsBefore.entries.length;
 
   const descLines = [
     `HOTELBEDS HOTEL REQUEST`,
@@ -173,14 +262,70 @@ export async function POST(req: Request) {
       parsed = { raw: rawText };
     }
 
-    if (!response.ok) {
+    const portalSuccess = isPortalSuccess(parsed);
+
+    if (!response.ok || !portalSuccess) {
       return NextResponse.json(
-        { error: 'API_ERROR', message: `saveBasketToFolder failed with HTTP ${response.status}`, details: parsed },
-        { status: response.status }
+        {
+          error: 'API_ERROR',
+          message: response.ok ? 'Portal API returned business error while adding hotel to folder' : `saveBasketToFolder failed with HTTP ${response.status}`,
+          details: parsed,
+        },
+        { status: response.ok ? 502 : response.status }
       );
     }
 
-    return NextResponse.json({ success: true, result: parsed }, { status: 200 });
+    let verifiedFolderDetails = folderDetailsBefore.data;
+    let hotelPersisted = false;
+    let afterCount = beforeCount;
+
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      if (attempt > 0) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+      const currentFolderDetails = await fetchPortalFolderDetails(apiUrl, credentials, Number(body.folderNumber));
+      verifiedFolderDetails = currentFolderDetails.data;
+      afterCount = currentFolderDetails.entries.length;
+      hotelPersisted = currentFolderDetails.entries.some((entry) => {
+        const description = entry.description.toLowerCase();
+        return entry.fiType === 'OTH' && description.includes(String(body.hotel.hotelName || '').trim().toLowerCase());
+      });
+      if (hotelPersisted && afterCount > beforeCount) {
+        break;
+      }
+    }
+
+    if (!hotelPersisted || afterCount <= beforeCount) {
+      return NextResponse.json(
+        {
+          error: 'VERIFICATION_FAILED',
+          message: 'Hotel was not persisted to the folder after saveBasketToFolder completed',
+          details: parsed,
+          folderDetails: verifiedFolderDetails,
+          verification: {
+            beforeCount,
+            afterCount,
+            hotelName: body.hotel.hotelName,
+          },
+        },
+        { status: 502 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: true,
+        result: parsed,
+        folderDetails: verifiedFolderDetails,
+        verification: {
+          beforeCount,
+          afterCount,
+          hotelPersisted,
+          hotelName: body.hotel.hotelName,
+        },
+      },
+      { status: 200 }
+    );
   } catch (e: any) {
     clearTimeout(timeoutId);
     if (e?.name === 'AbortError') {
