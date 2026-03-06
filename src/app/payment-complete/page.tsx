@@ -1406,38 +1406,12 @@ function PaymentCompleteContent() {
                 )}
 
                 {/* Cancellation Policy - hotel mode only */}
-                {isHotelMode && hotelConfirmDisplay && (
+                {isHotelMode && hotelConfirmDisplay?.cancellationText && (
                   <div className="border border-[#E5E7EB] rounded-xl p-4 flex flex-col gap-3">
                     <span className="text-sm font-semibold text-[#010D50]">Cancellation Policy</span>
-
-                    {hotelConfirmDisplay.isRefundable === true && hotelSearchForDisplay?.checkIn && (
-                      <p className="text-sm font-semibold text-[#008234]">
-                        Free cancellation before{" "}
-                        {new Date(hotelSearchForDisplay.checkIn + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                      </p>
-                    )}
-
-                    {hotelConfirmDisplay.isRefundable === false && (
-                      <p className="text-sm font-medium text-[#010D50]">Non-refundable</p>
-                    )}
-
-                    {hotelConfirmDisplay.cancellationText && (
-                      <p className="text-xs text-[#3A478A]">{hotelConfirmDisplay.cancellationText}</p>
-                    )}
-
-                    {hotelConfirmDisplay.isRefundable === true && hotelSearchForDisplay?.checkIn && hotelConfirmDisplay.total != null && (
-                      <div className="flex items-center justify-between text-sm font-medium text-[#3A478A]">
-                        <span>
-                          After 12:00 AM on{" "}
-                          {new Date(hotelSearchForDisplay.checkIn + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-                        </span>
-                        <span>
-                          {hotelConfirmDisplay.currency === "£" || hotelConfirmDisplay.currency === "$" || hotelConfirmDisplay.currency === "€"
-                            ? `${hotelConfirmDisplay.currency}${hotelConfirmDisplay.total.toFixed(2)}`
-                            : `${hotelConfirmDisplay.currency || ""} ${hotelConfirmDisplay.total.toFixed(2)}`}
-                        </span>
-                      </div>
-                    )}
+                    <p className="text-xs text-[#3A478A] whitespace-pre-line">
+                      {hotelConfirmDisplay.cancellationText}
+                    </p>
                   </div>
                 )}
               </div>
