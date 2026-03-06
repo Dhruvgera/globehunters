@@ -81,6 +81,10 @@ export const IASSURE_PRICING = {
   },
 } as const;
 
+export const REFUND_SHIELD_PRICING = {
+  rate: 0.1,
+} as const;
+
 // Filter constraints
 export const FILTER_CONSTRAINTS = {
   maxPrice: 2000,

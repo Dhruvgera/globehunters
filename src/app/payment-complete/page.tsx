@@ -50,6 +50,8 @@ import { FOLDER_STATUS_CODES } from "@/types/portal";
 
 // Check if mock mode is enabled
 const isMockMode = process.env.NEXT_PUBLIC_MOCK_BOOKING_CONFIRMATION === "true";
+const REFUNDABLE_TERMS_URL = "https://refundablebooking.com/refundable-terms";
+const REFUNDABLE_CLAIMS_URL = "https://form.refundablebooking.com";
 
 // Confetti particle component
 function ConfettiParticle({
@@ -602,8 +604,9 @@ function PaymentCompleteContent() {
   const searchParams = useSearchParams();
   const { inquirePayment, loading: inquiryLoading } = useBoxPay();
   const { phoneNumber: affiliatePhone } = useAffiliatePhone();
-  const isPackageMode = searchParams?.get("type") === "package";
-  const isHotelMode = searchParams?.get("type") === "hotel";
+  const queryType = searchParams?.get("type") || "";
+  const queryIsPackageMode = queryType === "package";
+  const queryIsHotelMode = queryType === "hotel";
 
   const [paymentInfo, setPaymentInfo] = useState<PaymentCompletionInfo | null>(
     null
@@ -634,6 +637,12 @@ function PaymentCompleteContent() {
 
   const [bookingContext, setBookingContext] = useState<any>(null);
 
+  const isHotelMode =
+    queryIsHotelMode ||
+    Boolean(bookingContext?.hotelRoomSummary) ||
+    (!storeSelectedFlight && Boolean(storeRoomSummary));
+  const isPackageMode = queryIsPackageMode;
+
   const loadBookingContext = useCallback((id: string) => {
     try {
       const raw = sessionStorage.getItem(`bookingContext_${id}`);
@@ -647,12 +656,15 @@ function PaymentCompleteContent() {
 
   const hotelConfirmDisplay = useMemo(() => {
     if (!isHotelMode) return null;
-    const hotelId = storeSelectedHotel?.hotelId;
-    const cached = hotelId ? storeHotelDetailsCache?.[hotelId] : undefined;
+    const hotelSummary = bookingContext?.hotelSummary || storeSelectedHotel;
+    const roomSummary = bookingContext?.hotelRoomSummary || storeRoomSummary;
+    const selectedRoomIds = bookingContext?.selectedHotelRoomIds || storeSelectedHotelRoomIds;
+    const hs = bookingContext?.hotelSearch || storeHotelSearch;
+    const hotelId = hotelSummary?.hotelId;
+    const cached = bookingContext?.hotelDetailsSnapshot || (hotelId ? storeHotelDetailsCache?.[hotelId] : undefined);
     const cancellationText = cached?.cancellationText || "";
-    const isRefundable = storeRoomSummary?.isRefundable;
-    const roomName = storeRoomSummary?.roomName || "Selected Room";
-    const hs = storeHotelSearch;
+    const isRefundable = roomSummary?.isRefundable;
+    const roomName = roomSummary?.roomName || "Selected Room";
     const nightsCount = hs
       ? Math.max(1, Math.round((new Date(hs.checkOut).getTime() - new Date(hs.checkIn).getTime()) / (1000 * 60 * 60 * 24)))
       : 0;
@@ -661,24 +673,35 @@ function PaymentCompleteContent() {
     const children = hs?.children || 0;
 
     const roomNames: string[] = [];
-    if (Array.isArray(cached?.rooms) && storeSelectedHotelRoomIds.length > 0) {
+    if (Array.isArray(cached?.rooms) && selectedRoomIds.length > 0) {
       const roomMap = new Map(cached!.rooms!.map((r: any) => [String(r.id), r.name || "Room"]));
       const counts: Record<string, number> = {};
-      for (const rid of storeSelectedHotelRoomIds) {
+      for (const rid of selectedRoomIds) {
         const n = roomMap.get(String(rid)) || roomName;
         counts[n] = (counts[n] || 0) + 1;
       }
       for (const [n, c] of Object.entries(counts)) {
         roomNames.push(c > 1 ? `${n} x${c}` : n);
       }
-    } else if (storeSelectedHotelRoomIds.length > 0) {
+    } else if (selectedRoomIds.length > 0) {
       roomNames.push(
-        storeSelectedHotelRoomIds.length > 1 ? `${roomName} x${storeSelectedHotelRoomIds.length}` : roomName
+        selectedRoomIds.length > 1 ? `${roomName} x${selectedRoomIds.length}` : roomName
       );
     }
 
-    return { cancellationText, isRefundable, nightsCount, rooms, adults, children, roomNames, roomName, currency: storeRoomSummary?.currency, total: storeRoomSummary?.total };
-  }, [isHotelMode, storeSelectedHotel, storeHotelDetailsCache, storeRoomSummary, storeHotelSearch, storeSelectedHotelRoomIds]);
+    return { cancellationText, isRefundable, nightsCount, rooms, adults, children, roomNames, roomName, currency: roomSummary?.currency, total: roomSummary?.total };
+  }, [isHotelMode, bookingContext, storeSelectedHotel, storeHotelDetailsCache, storeRoomSummary, storeHotelSearch, storeSelectedHotelRoomIds]);
+
+  const hotelDetailsCacheForDisplay = useMemo(() => {
+    const hotelSummary = bookingContext?.hotelSummary || storeSelectedHotel;
+    const hotelSnapshot = bookingContext?.hotelDetailsSnapshot;
+    const hotelId = hotelSummary?.hotelId;
+    if (!hotelId || !hotelSnapshot) return storeHotelDetailsCache;
+    return {
+      ...storeHotelDetailsCache,
+      [hotelId]: hotelSnapshot,
+    };
+  }, [bookingContext, storeSelectedHotel, storeHotelDetailsCache]);
 
   // Record payment to Vyspa Portal (non-blocking)
   const recordPaymentToVyspa = useCallback(async (
@@ -798,7 +821,11 @@ function PaymentCompleteContent() {
                 [`Payment failed: ${result.payment.error || 'Unknown error'}`]
               );
             }
-            router.replace(`/payment?error=payment_failed${isPackageMode ? '&type=package' : ''}`);
+            router.replace(
+              `/payment?error=payment_failed${
+                isPackageMode ? "&type=package" : isHotelMode ? "&type=hotel" : ""
+              }`
+            );
             return;
           }
 
@@ -1010,7 +1037,9 @@ function PaymentCompleteContent() {
       if (isHotelMode) {
         const hotelSummary = ctx?.hotelSummary || storeSelectedHotel;
         const roomSummaryForEmail = ctx?.hotelRoomSummary || storeRoomSummary;
-        const hotelDetails = hotelSummary?.hotelId ? storeHotelDetailsCache[hotelSummary.hotelId] : null;
+        const hotelDetails =
+          ctx?.hotelDetailsSnapshot ||
+          (hotelSummary?.hotelId ? storeHotelDetailsCache[hotelSummary.hotelId] : null);
 
         emailData = transformHotelBookingToEmailData({
           orderNumber: orderId,
@@ -1123,6 +1152,17 @@ function PaymentCompleteContent() {
     return Number.isFinite(n) ? n : 0;
   })();
   const fareAtCheckout = typeof ctx?.pricing?.baseFare === "number" ? ctx.pricing.baseFare : null;
+  const selectedProtectionPlan = ctx?.addOns?.protectionPlan || storeAddOns?.protectionPlan;
+  const protectionPlanPaid = typeof ctx?.pricing?.protectionPlanCost === "number"
+    ? ctx.pricing.protectionPlanCost
+    : selectedProtectionPlan
+      ? Math.max(0, chargedAmount - (fareAtCheckout || 0))
+      : 0;
+  const showHotelRefundableGuidance = isHotelMode && protectionPlanPaid > 0.005;
+  const hotelSearchForDisplay = ctx?.hotelSearch || storeHotelSearch;
+  const termsText = isHotelMode
+    ? "I acknowledge that guest information matches the passport or official ID for travel, and that name changes are not allowed. I confirm that I have reviewed the hotel details and agree to the Refund & Cancellation Policy. I understand bookings are non-transferable and non-changeable unless stated otherwise. I accept full responsibility for valid travel documentation and understand Globehunters cannot be held responsible for denied boarding due to passport or visa validity."
+    : "I acknowledge that passenger information matches the passport or official ID for travel, and that name changes are not allowed. I confirm that I have reviewed the flight itinerary and agree to the Refund & Cancellation Policy. I understand tickets are non-transferable and non-changeable unless stated otherwise. I accept full responsibility for valid travel documentation and understand Globehunters cannot be held responsible for denied boarding due to passport or visa validity.";
 
   return (
     <div className="min-h-screen bg-[#F9FAFB]">
@@ -1303,7 +1343,11 @@ function PaymentCompleteContent() {
               <div className="bg-white rounded-xl shadow-sm border border-[#E5E7EB] p-6 flex flex-col gap-4">
                 <h3 className="font-semibold text-[#3754ED]">Hotel Details</h3>
                 <HotelSummaryCard
+                  hotelSearch={ctx?.hotelSearch}
+                  selectedHotel={ctx?.hotelSummary}
+                  selectedRoomIds={ctx?.selectedHotelRoomIds}
                   roomSummary={ctx?.hotelRoomSummary}
+                  detailsCache={hotelDetailsCacheForDisplay}
                 />
 
                 {/* Stay Details - hotel mode only */}
@@ -1318,8 +1362,8 @@ function PaymentCompleteContent() {
                           <span className="text-xs text-[#3A478A]">Check-In</span>
                         </div>
                         <span className="text-sm font-semibold text-[#010D50]">
-                          {storeHotelSearch?.checkIn
-                            ? new Date(storeHotelSearch.checkIn + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })
+                          {hotelSearchForDisplay?.checkIn
+                            ? new Date(hotelSearchForDisplay.checkIn + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })
                             : "—"}
                         </span>
                       </div>
@@ -1329,8 +1373,8 @@ function PaymentCompleteContent() {
                           <span className="text-xs text-[#3A478A]">Check-Out</span>
                         </div>
                         <span className="text-sm font-semibold text-[#010D50]">
-                          {storeHotelSearch?.checkOut
-                            ? new Date(storeHotelSearch.checkOut + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })
+                          {hotelSearchForDisplay?.checkOut
+                            ? new Date(hotelSearchForDisplay.checkOut + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" })
                             : "—"}
                         </span>
                       </div>
@@ -1366,10 +1410,10 @@ function PaymentCompleteContent() {
                   <div className="border border-[#E5E7EB] rounded-xl p-4 flex flex-col gap-3">
                     <span className="text-sm font-semibold text-[#010D50]">Cancellation Policy</span>
 
-                    {hotelConfirmDisplay.isRefundable === true && storeHotelSearch?.checkIn && (
+                    {hotelConfirmDisplay.isRefundable === true && hotelSearchForDisplay?.checkIn && (
                       <p className="text-sm font-semibold text-[#008234]">
                         Free cancellation before{" "}
-                        {new Date(storeHotelSearch.checkIn + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                        {new Date(hotelSearchForDisplay.checkIn + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
                       </p>
                     )}
 
@@ -1381,11 +1425,11 @@ function PaymentCompleteContent() {
                       <p className="text-xs text-[#3A478A]">{hotelConfirmDisplay.cancellationText}</p>
                     )}
 
-                    {hotelConfirmDisplay.isRefundable === true && storeHotelSearch?.checkIn && hotelConfirmDisplay.total != null && (
+                    {hotelConfirmDisplay.isRefundable === true && hotelSearchForDisplay?.checkIn && hotelConfirmDisplay.total != null && (
                       <div className="flex items-center justify-between text-sm font-medium text-[#3A478A]">
                         <span>
                           After 12:00 AM on{" "}
-                          {new Date(storeHotelSearch.checkIn + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                          {new Date(hotelSearchForDisplay.checkIn + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                         </span>
                         <span>
                           {hotelConfirmDisplay.currency === "£" || hotelConfirmDisplay.currency === "$" || hotelConfirmDisplay.currency === "€"
@@ -1481,13 +1525,45 @@ function PaymentCompleteContent() {
                   <h3 className="font-semibold text-[#3754ED]">Terms and Conditions</h3>
                 </div>
                 <p className="text-xs text-[#4B5563] leading-relaxed">
-                  I acknowledge that passenger information matches the passport or official ID for travel, and that name changes are not allowed. I confirm that I have reviewed the flight itinerary and agree to the Refund &amp; Cancellation Policy. I understand tickets are non-transferable and non-changeable unless stated otherwise. I accept full responsibility for valid travel documentation and understand Globehunters cannot be held responsible for denied boarding due to passport or visa validity. At the time of booking you confirmed that you have read and agreed to our General Terms and Conditions of Carriage. Please{' '}
+                  {termsText} At the time of booking you confirmed that you have read and agreed to our General Terms and Conditions of Carriage. Please{" "}
                   <a href="https://www.globehunters.com/terms" target="_blank" rel="noopener noreferrer" className="text-[#3754ED] hover:underline font-medium">
                     Click Here
-                  </a>{' '}
+                  </a>{" "}
                   to review these again if necessary.
                 </p>
               </div>
+
+              {showHotelRefundableGuidance && (
+                <div className="bg-white rounded-xl shadow-sm border border-[#E5E7EB] p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="w-8 h-8 bg-[#EEF2FF] rounded-lg flex items-center justify-center">
+                      <CheckCircle2 className="w-4 h-4 text-[#3754ED]" />
+                    </div>
+                    <h3 className="font-semibold text-[#3754ED]">Refund Shield</h3>
+                  </div>
+                  <p className="text-xs text-[#4B5563] leading-relaxed">
+                    You selected Refund Shield and may be eligible to apply for a refund if you cannot attend your booking due to any reason listed in the{" "}
+                    <a
+                      href={REFUNDABLE_TERMS_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#3754ED] hover:underline font-medium"
+                    >
+                      Refundable Terms
+                    </a>
+                    .{" "}
+                    <a
+                      href={REFUNDABLE_CLAIMS_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#3754ED] hover:underline font-medium"
+                    >
+                      Click here to make a refund request
+                    </a>
+                    .
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Footer disclaimer */}
@@ -1597,7 +1673,13 @@ function PaymentCompleteContent() {
               {isFailed && (
                 <>
                   <Button
-                    onClick={() => router.push("/payment")}
+                    onClick={() =>
+                      router.push(
+                        `/payment${
+                          isPackageMode ? "?type=package" : isHotelMode ? "?type=hotel" : ""
+                        }`
+                      )
+                    }
                     className="gap-2 bg-[#3754ED] hover:bg-[#2942D1]"
                   >
                     Try Again

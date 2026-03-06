@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
 import { useBookingStore, useSelectedFlight, useStoreHydration } from "@/store/bookingStore";
-import { PRICING_CONFIG, IASSURE_PRICING } from "@/config/constants";
+import { PRICING_CONFIG, IASSURE_PRICING, REFUND_SHIELD_PRICING } from "@/config/constants";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
 import { useTranslations } from "next-intl";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -24,6 +24,7 @@ import { formatFareLabel } from "@/lib/utils";
 import { PaymentHeader } from "@/components/payment/PaymentHeader";
 import { BaggageSection } from "@/components/payment/BaggageSection";
 import { ProtectionPlanSection } from "@/components/payment/ProtectionPlanSection";
+import { RefundShieldSection } from "@/components/payment/RefundShieldSection";
 import { PaymentSummary } from "@/components/payment/PaymentSummary";
 import { FlightSummaryCard } from "@/components/booking/FlightSummaryCard";
 import { WebRefCard } from "@/components/booking/WebRefCard";
@@ -33,6 +34,8 @@ import { HotelSummaryCard } from "@/components/booking/HotelSummaryCard";
 
 import { FOLDER_STATUS_CODES } from "@/types/portal";
 import { countryCodes } from "@/lib/utils/countryCodes";
+
+const REFUNDABLE_TERMS_URL = "https://refundablebooking.com/refundable-terms";
 
 function PaymentContent() {
   const t = useTranslations('payment');
@@ -245,6 +248,14 @@ function PaymentContent() {
   };
 
   const protectionPlanPercentages = (() => {
+    if (isHotelMode) {
+      return {
+        basic: REFUND_SHIELD_PRICING.rate,
+        premium: REFUND_SHIELD_PRICING.rate,
+        all: REFUND_SHIELD_PRICING.rate,
+      };
+    }
+
     // Fallback to global config if base fare is not available
     if (!baseFare) {
       return IASSURE_PRICING.global;
@@ -275,7 +286,9 @@ function PaymentContent() {
       : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
   }, [flight]);
 
-  const normalizedProtectionPlan = protectionPlan;
+  const normalizedProtectionPlan = isHotelMode
+    ? (protectionPlan ? "basic" : undefined)
+    : protectionPlan;
   const protectionPlanCost = normalizedProtectionPlan
     ? protectionPlanPrices[normalizedProtectionPlan]
     : 0;
@@ -290,13 +303,19 @@ function PaymentContent() {
   const tripTotal = subtotal - discountAmount;
 
   const protectionPlanName =
-    normalizedProtectionPlan === "basic"
+    isHotelMode
+      ? "Refund Shield"
+      : normalizedProtectionPlan === "basic"
       ? "Basic"
       : normalizedProtectionPlan === "premium"
         ? "Premium"
         : normalizedProtectionPlan === "all"
           ? "All Included"
           : "None";
+
+  const paymentTermsText = isHotelMode
+    ? "By checking this box, I acknowledge that guest information matches the passport or official ID for travel, and that name changes are not allowed. I confirm that I have reviewed the hotel details and agree to the Refund & Cancellation Policy. I understand bookings are non-transferable and non-changeable unless stated otherwise. I accept full responsibility for valid travel documentation and understand Globehunters cannot be held responsible for denied boarding due to passport or visa validity."
+    : t('form.termsCheckbox');
 
   const summaryLegs = useMemo(() => {
     return journeySegments.map((seg) => ({
@@ -551,13 +570,38 @@ function PaymentContent() {
               />
             )}
 
-            {/* iAssure Protection Plan */}
-            <ProtectionPlanSection
-              selectedPlan={normalizedProtectionPlan}
-              onSelectPlan={setProtectionPlan}
-              planPrices={protectionPlanPrices}
-              currency={currency || 'GBP'}
-            />
+            {isHotelMode ? (
+              <RefundShieldSection
+                selected={Boolean(normalizedProtectionPlan)}
+                onToggle={() => setProtectionPlan(normalizedProtectionPlan ? undefined : "basic")}
+                price={protectionPlanPrices.basic}
+                currency={currency || "GBP"}
+              />
+            ) : (
+              <ProtectionPlanSection
+                selectedPlan={normalizedProtectionPlan}
+                onSelectPlan={setProtectionPlan}
+                planPrices={protectionPlanPrices}
+                currency={currency || 'GBP'}
+              />
+            )}
+
+            {isHotelMode && (
+              <div className="bg-[#F5F7FF] border border-[#DFE0E4] rounded-xl p-3">
+                <p className="text-xs text-[#3A478A] leading-relaxed">
+                  By selecting Refund Shield, you agree to the{" "}
+                  <a
+                    href={REFUNDABLE_TERMS_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[#3754ED] font-semibold hover:underline"
+                  >
+                    Refundable Terms
+                  </a>
+                  .
+                </p>
+              </div>
+            )}
 
             {/* Billing Address Form */}
             <PaymentForm onSubmit={async (billingAddress) => {
@@ -574,14 +618,24 @@ function PaymentContent() {
               try {
                 // Sync extras (insurance/baggage) to Vyspa folder before payment (non-blocking)
                 {
-                  const extras: Array<{ type: 'insurance' | 'baggage'; planType?: string; price?: number; quantity?: number; pricePerBag?: number }> = [];
+                  const extras: Array<{
+                    type: 'insurance' | 'baggage';
+                    planType?: string;
+                    price?: number;
+                    quantity?: number;
+                    pricePerBag?: number;
+                    productName?: string;
+                    vendorMode?: 'iassure' | 'refund-shield';
+                  }> = [];
 
                   // Add protection plan if selected
-                  if (protectionPlan && protectionPlanPrices[protectionPlan]) {
+                  if (normalizedProtectionPlan && protectionPlanPrices[normalizedProtectionPlan]) {
                     extras.push({
                       type: 'insurance',
-                      planType: protectionPlan,
-                      price: protectionPlanPrices[protectionPlan],
+                      planType: normalizedProtectionPlan,
+                      price: protectionPlanPrices[normalizedProtectionPlan],
+                      productName: isHotelMode ? 'Refund Shield' : 'iAssure Insurance',
+                      vendorMode: isHotelMode ? 'refund-shield' : 'iassure',
                     });
                   }
 
@@ -616,7 +670,7 @@ function PaymentContent() {
 
                     if (!folderNumberForExtras) {
                       if (hasInsuranceExtra) {
-                        throw new Error("Could not apply iAssure because the booking reference is missing. Please restart checkout.");
+                        throw new Error(`Could not apply ${isHotelMode ? 'Refund Shield' : 'iAssure'} because the booking reference is missing. Please restart checkout.`);
                       }
                       console.warn('⚠️ Skipping extras sync because folder number is unavailable');
                     } else {
@@ -673,7 +727,7 @@ function PaymentContent() {
                           insuranceFailed,
                         });
                         if (hasInsuranceExtra || insuranceFailed) {
-                          throw new Error('Could not add iAssure to booking in CMS. Payment not started. Please retry.');
+                          throw new Error(`Could not add ${isHotelMode ? 'Refund Shield' : 'iAssure'} to booking in CMS. Payment not started. Please retry.`);
                         }
                         // Continue for non-insurance extras failures
                       }
@@ -734,6 +788,19 @@ function PaymentContent() {
                   // Persist a per-order snapshot so the confirmation page/email can't pick up stale store data
                   // (e.g. multi-tab or navigating around during payment redirects).
                   try {
+                    const hotelNights = hotelSearch
+                      ? Math.max(
+                        1,
+                        Math.round(
+                          (new Date(hotelSearch.checkOut).getTime() - new Date(hotelSearch.checkIn).getTime()) /
+                          (1000 * 60 * 60 * 24)
+                        )
+                      )
+                      : undefined;
+                    const hotelCacheEntry = selectedHotel?.hotelId
+                      ? hotelDetailsCache?.[selectedHotel.hotelId]
+                      : undefined;
+
                     const bookingContext = {
                       orderId,
                       createdAt: new Date().toISOString(),
@@ -743,7 +810,26 @@ function PaymentContent() {
                       contactPhone: shopperPhone,
                       passengers,
                       flight,
+                      hotelSummary: selectedHotel,
+                      hotelDetailsSnapshot: hotelCacheEntry
+                        ? {
+                            hotelId: hotelCacheEntry.hotelId,
+                            hotelName: hotelCacheEntry.hotelName,
+                            hotelRating: hotelCacheEntry.hotelRating,
+                            mainImage: hotelCacheEntry.mainImage,
+                            address: hotelCacheEntry.address,
+                            rooms: hotelCacheEntry.rooms,
+                            cancellationText: hotelCacheEntry.cancellationText,
+                            amenities: hotelCacheEntry.amenities,
+                          }
+                        : null,
                       hotelRoomSummary,
+                      hotelSearch,
+                      selectedHotelRoomIds,
+                      checkIn: hotelSearch?.checkIn,
+                      checkOut: hotelSearch?.checkOut,
+                      nights: hotelNights,
+                      rooms: hotelSearch?.rooms,
                       selectedUpgradeOption: selectedUpgrade,
                       addOns,
                       pricing: {
@@ -807,7 +893,7 @@ function PaymentContent() {
                   htmlFor="payment-terms"
                   className="text-sm font-medium text-[#010D50] leading-relaxed"
                 >
-                  {t('form.termsCheckbox')}
+                  {paymentTermsText}
                 </label>
               </div>
 

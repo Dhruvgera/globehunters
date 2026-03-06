@@ -9,6 +9,8 @@ import { BookingConfirmationEmailData, JourneyEmail, FlightSegmentEmail } from '
 
 // Hosted logo URL - works better across email clients than embedded images
 const LOGO_URL = 'https://www.globehunters.com/assets/newimages/gh-logo.png';
+const REFUNDABLE_TERMS_URL = 'https://refundablebooking.com/refundable-terms';
+const REFUNDABLE_CLAIMS_URL = 'https://form.refundablebooking.com';
 
 // Create reusable transporter
 const createTransporter = () => {
@@ -78,7 +80,7 @@ export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData
       ` : ''}
       ${hasProtection ? `
       <tr>
-        <td width="250" style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; padding: 6px 0;">iAssure Protection Plan</td>
+        <td width="250" style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; padding: 6px 0;">${hotel ? 'Refund Shield' : 'iAssure Protection Plan'}</td>
         <td style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; padding: 6px 0; text-align: right;">${formatCurrency(payment.protectionPlan)}</td>
       </tr>
       ` : ''}
@@ -89,6 +91,23 @@ export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData
       </tr>
       ` : ''}
   `;
+
+  const refundableGuidanceSection = hasProtection && hotel
+    ? `
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F8F9FA; border-radius: 12px; margin-bottom: 24px;">
+                <tr>
+                  <td style="padding: 16px;">
+                    <div style="font-family: 'Inter', Arial, sans-serif; font-weight: 700; font-size: 14px; color: #3754ED; margin-bottom: 12px;">Refund Shield</div>
+                    <p style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 12px; color: #0A0A0A; line-height: 1.6; margin: 0;">
+                      You selected Refund Shield and may be eligible to apply for a refund if you cannot attend your booking due to any reason listed in the
+                      <a href="${REFUNDABLE_TERMS_URL}" style="color: #3754ED; font-weight: 600;"> Refundable Terms</a>.
+                      <a href="${REFUNDABLE_CLAIMS_URL}" style="color: #3754ED; font-weight: 600;"> Click here to make a refund request</a>.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            `
+    : '';
 
   return `
 <!DOCTYPE html>
@@ -196,6 +215,8 @@ export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData
                 </tr>
               </table>
 
+              ${refundableGuidanceSection}
+
               <!-- Documents Section -->
               <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F8F9FA; border-radius: 12px; margin-bottom: 24px;">
                 <tr>
@@ -213,7 +234,7 @@ export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData
                 <tr>
                   <td style="padding: 16px;">
                     <div style="font-family: 'Inter', Arial, sans-serif; font-weight: 700; font-size: 14px; color: #3754ED; margin-bottom: 12px;">Terms and Conditions</div>
-                    <p style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 12px; color: #0A0A0A; line-height: 1.6; margin: 0;">I acknowledge that passenger information matches the passport or official ID for travel, and that name changes are not allowed. I confirm that I have reviewed the ${hotel ? 'hotel details' : 'flight itinerary'} and agree to the Refund &amp; Cancellation Policy. I understand tickets are non-transferable and non-changeable unless stated otherwise. I accept full responsibility for valid travel documentation and understand Globehunters cannot be held responsible for denied boarding due to passport or visa validity. At the time of booking you confirmed that you have read and agreed to our General Terms and Conditions of Carriage. Please <a href="https://www.globehunters.com/terms" style="color: #3754ED; font-weight: 600;">Click Here</a> to review these again if necessary.</p>
+                    <p style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 12px; color: #0A0A0A; line-height: 1.6; margin: 0;">I acknowledge that ${hotel ? 'guest' : 'passenger'} information matches the passport or official ID for travel, and that name changes are not allowed. I confirm that I have reviewed the ${hotel ? 'hotel details' : 'flight itinerary'} and agree to the Refund &amp; Cancellation Policy. I understand ${hotel ? 'bookings' : 'tickets'} are non-transferable and non-changeable unless stated otherwise. I accept full responsibility for valid travel documentation and understand Globehunters cannot be held responsible for denied boarding due to passport or visa validity. At the time of booking you confirmed that you have read and agreed to our General Terms and Conditions of Carriage. Please <a href="https://www.globehunters.com/terms" style="color: #3754ED; font-weight: 600;">Click Here</a> to review these again if necessary.</p>
                   </td>
                 </tr>
               </table>

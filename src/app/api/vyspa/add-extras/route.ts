@@ -14,6 +14,8 @@ interface InsuranceExtra {
     type: 'insurance';
     planType: 'basic' | 'premium' | 'all';
     price: number;
+    productName?: string;
+    vendorMode?: 'iassure' | 'refund-shield';
 }
 
 interface BaggageExtra {
@@ -58,6 +60,13 @@ function getIAssurePlanDescription(planType: string): string {
         all: 'All Included',
     };
     return descriptions[planType] || 'Basic';
+}
+
+function getInsuranceDisplayName(extra: InsuranceExtra): string {
+    if (extra.vendorMode === 'refund-shield') {
+        return extra.productName || 'Refund Shield';
+    }
+    return extra.productName || 'iAssure Insurance';
 }
 
 function isPortalSuccess(payload: unknown): boolean {
@@ -123,23 +132,25 @@ export async function POST(request: NextRequest) {
             let manualItem: unknown;
 
             if (extra.type === 'insurance') {
+                const isRefundShield = extra.vendorMode === 'refund-shield';
+                const displayName = getInsuranceDisplayName(extra);
                 manualItem = {
                     Segment: {
                         fi_type: 'OTH',
                         start_date_time_dt: formatDateForPortal(body.startDate),
                         end_date_time_dt: formatDateForPortal(body.endDate),
                         status: 'OK',
-                        finan_vend_id: iAssureVendorId,
-                        itin_vend_id: iAssureVendorId,
+                        finan_vend_id: isRefundShield ? 0 : iAssureVendorId,
+                        itin_vend_id: isRefundShield ? 0 : iAssureVendorId,
                         num_bum: '1',
                         pax_no: '1',
-                        desc: getIAssurePlanDescription(extra.planType),
+                        desc: isRefundShield ? displayName : getIAssurePlanDescription(extra.planType),
                         printing_note: 'OTH',
                     },
                     FolderPricings: [{
                         tot_net_amt: String(extra.price.toFixed(2)),
                         tot_sell_amt: String(extra.price.toFixed(2)),
-                        desc: 'iAssure Insurance',
+                        desc: displayName,
                         cu_curr_code: body.currency,
                     }],
                 };
@@ -306,9 +317,12 @@ export async function POST(request: NextRequest) {
 
                     verificationResult.itemsInFolder.push(`${fiType}: ${description}`);
 
-                    // Check for iAssure (OTH type with iAssure in description)
+                    // Check for insurance extras
                     if (fiType === 'OTH' && description.toLowerCase().includes('iassure')) {
                         verificationResult.iAssureFound = true;
+                        verificationResult.extrasFound = true;
+                    }
+                    if (fiType === 'OTH' && description.toLowerCase().includes('refund shield')) {
                         verificationResult.extrasFound = true;
                     }
 
