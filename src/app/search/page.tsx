@@ -12,13 +12,15 @@ import { filterFlights, filterFlightsExcludingStops, parseDurationToMinutes, sor
 import { airportCache } from "@/lib/cache/airportCache";
 import { shortenAirportName } from "@/lib/vyspa/utils";
 import { normalizeCabinClass } from "@/lib/utils";
-import { FilterState, SearchParams } from "@/types/flight";
+import { FilterState, Flight, SearchParams } from "@/types/flight";
 import { mockFlights, mockDatePrices, mockAirlines, mockAirports } from "@/data/mockFlights";
 import { useFilterExpansion } from "@/hooks/useFilterExpansion";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ErrorMessage } from "@/components/ui/error-message";
 import { useAffiliate } from "@/lib/AffiliateContext";
+import { packageService } from "@/services/api/packageService";
+import { buildPackageFlightFilters, mapPackageAlternateFlightToFlight } from "@/lib/package/flights";
 
 // Import new modular components
 import { SearchHeader } from "@/components/search/SearchHeader";
@@ -33,7 +35,6 @@ import { SortOption } from "@/utils/flightFilter";
 import { FlightSearchLoading } from "@/components/flights/FlightSearchLoading";
 import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
 import { PackageStaySummary } from "@/components/packages/PackageStaySummary";
-import { mockPackageFlights } from "@/data/mockPackageFlights";
 
 // Default search params
 const DEFAULT_SEARCH_PARAMS: SearchParams = {
@@ -66,12 +67,14 @@ function SearchPageContent() {
   const isPackageMode = urlParams.get("type") === "package";
   const packageHotelId = urlParams.get("hotelId");
   const packageHotelName = urlParams.get("hotelName");
+  const packageFlightResultId = urlParams.get("flightResultId");
   
   const setStoreSearchParams = useBookingStore((state) => state.setSearchParams);
   const storeSearchParams = useBookingStore((state) => state.searchParams);
   const setSearchRequestId = useBookingStore((state) => state.setSearchRequestId);
   const searchRequestId = useBookingStore((state) => state.searchRequestId);
   const setSelectedFlight = useBookingStore((state) => state.setSelectedFlight);
+  const packageResultsMeta = useBookingStore((state) => state.packageResultsMeta);
   const setAffiliateData = useBookingStore((state) => state.setAffiliateData);
   const setIsFromDeeplink = useBookingStore((state) => state.setIsFromDeeplink);
   const clearForNewSearch = useBookingStore((state) => state.clearForNewSearch);
@@ -82,6 +85,9 @@ function SearchPageContent() {
   const [isDateChanging, setIsDateChanging] = useState(false);
   const [fareExpiredOpen, setFareExpiredOpen] = useState(false);
   const [isDeeplinkLoading, setIsDeeplinkLoading] = useState(false);
+  const [packageFlights, setPackageFlights] = useState<Flight[]>([]);
+  const [packageFlightsLoading, setPackageFlightsLoading] = useState(false);
+  const [packageFlightsError, setPackageFlightsError] = useState<Error | null>(null);
 
   // Handle flight deeplink parameter - redirect directly to booking
   useEffect(() => {
@@ -303,10 +309,10 @@ function SearchPageContent() {
   const { flights, filters: apiFilters, requestId, loading, error } = useFlights(
     isInitialized ? effectiveSearchParams : null,
     { 
-      enabled: isInitialized,
+      enabled: isInitialized && !isPackageMode,
       // Pass the searchRequestId from store to restore previous search results
       // This is crucial for "Back" navigation from booking flow
-      requestId: searchRequestId 
+      requestId: isPackageMode ? null : searchRequestId 
     }
   );
 
@@ -316,6 +322,56 @@ function SearchPageContent() {
       setSearchRequestId(requestId);
     }
   }, [requestId, setSearchRequestId]);
+
+  useEffect(() => {
+    const effectiveFlightResultId = packageFlightResultId || packageResultsMeta?.selectedFlightResultId || "";
+
+    if (!isPackageMode || !packageHotelId || !effectiveFlightResultId) {
+      setPackageFlights([]);
+      setPackageFlightsError(null);
+      setPackageFlightsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const run = async () => {
+      setPackageFlightsLoading(true);
+      setPackageFlightsError(null);
+      try {
+        const packageRequestId = packageResultsMeta?.requestId;
+        const response = await packageService.getAlternateFlights({
+          flightResultId: effectiveFlightResultId,
+          hotelResultId: Number(packageHotelId),
+        });
+
+        if (cancelled) return;
+
+        const mappedFlights = response.flights
+          .map((flight) => mapPackageAlternateFlightToFlight(flight, searchRequestId || String(packageRequestId || "")))
+          .filter((flight): flight is Flight => !!flight);
+
+        setPackageFlights(mappedFlights);
+        setHasAttemptedFetch(true);
+      } catch (err) {
+        if (cancelled) return;
+        setPackageFlights([]);
+        setPackageFlightsError(err instanceof Error ? err : new Error("Failed to fetch package flights"));
+        setHasAttemptedFetch(true);
+      } finally {
+        if (!cancelled) {
+          setPackageFlightsLoading(false);
+          setIsDateChanging(false);
+        }
+      }
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isPackageMode, packageFlightResultId, packageHotelId, packageResultsMeta, searchRequestId]);
 
   // State for resolved airport names (loaded from cache)
   const [resolvedAirportNames, setResolvedAirportNames] = useState<{
@@ -364,12 +420,13 @@ function SearchPageContent() {
 
   // Calculate actual minimum price from flights for current dates
   const actualMinPrice = useMemo(() => {
-    if (flights.length === 0) return null;
-    const minFlight = flights.reduce((min, flight) =>
+    const sourceFlights = isPackageMode ? packageFlights : flights;
+    if (sourceFlights.length === 0) return null;
+    const minFlight = sourceFlights.reduce((min, flight) =>
       flight.pricePerPerson < min.pricePerPerson ? flight : min
-      , flights[0]);
+      , sourceFlights[0]);
     return minFlight.pricePerPerson;
-  }, [flights]);
+  }, [flights, isPackageMode, packageFlights]);
 
   // Fetch date prices with background loading and lazy fetching
   const {
@@ -379,10 +436,11 @@ function SearchPageContent() {
     fetchDatePrice,
     fetchDatePricesBatch,
     getDateFromIndex
-  } = useDatePrices(isInitialized ? effectiveSearchParams : null, actualMinPrice);
+  } = useDatePrices(isInitialized && !isPackageMode ? effectiveSearchParams : null, actualMinPrice);
 
   // Auto-prefetch date prices in background; start early for better concurrency
   useEffect(() => {
+    if (isPackageMode) return;
     if (departureDates.length > 0) {
       const departureCenter = Math.floor(departureDates.length / 2);
       const departureIndices = departureDates
@@ -410,14 +468,11 @@ function SearchPageContent() {
         });
       }
     }
-  }, [departureDates.length, returnDates.length, fetchDatePricesBatch, effectiveSearchParams.tripType]);
+  }, [departureDates.length, returnDates.length, fetchDatePricesBatch, effectiveSearchParams.tripType, isPackageMode]);
 
-  // Only use mock data if explicitly in error state and no real data
-  // For package mode, always use mock package flights
   const effectiveFlights = useMemo(() => {
-    // Package mode: use mock package flights (no API calls)
     if (isPackageMode) {
-      return mockPackageFlights;
+      return packageFlights;
     }
     // While loading after initial results, keep showing last results
     if (loading) {
@@ -430,9 +485,20 @@ function SearchPageContent() {
     if (error) return mockFlights;
     // Otherwise empty
     return [];
-  }, [flights, loading, error, isPackageMode]);
+  }, [flights, loading, error, isPackageMode, packageFlights]);
 
   const effectiveFilters = useMemo(() => {
+    if (isPackageMode) {
+      const derived = buildPackageFlightFilters(packageFlights);
+      return {
+        airlines: derived.airlines,
+        departureAirports: derived.departureAirports,
+        arrivalAirports: derived.arrivalAirports,
+        minPrice: derived.minPrice,
+        maxPrice: derived.maxPrice || 5000,
+      };
+    }
+
     // Always return filters (even empty during loading)
     const baseFilters = apiFilters || {
       airlines: loading ? [] : mockAirlines,
@@ -459,16 +525,15 @@ function SearchPageContent() {
     }
 
     return baseFilters;
-  }, [apiFilters, loading, resolvedAirportNames]);
+  }, [apiFilters, isPackageMode, loading, packageFlights, resolvedAirportNames]);
 
   // Initialize/adjust price range when real API filters arrive or bounds change
   // For package mode, use a wide price range to show all mock flights
   useEffect(() => {
     if (isPackageMode) {
-      // For package mode with mock data, ensure wide price range
       setFilterState((prev) => ({
         ...prev,
-        priceRange: [0, 5000],
+        priceRange: [effectiveFilters.minPrice || 0, effectiveFilters.maxPrice || 5000],
         departureAirports: [],
         arrivalAirports: [],
         airlines: [],
@@ -490,7 +555,7 @@ function SearchPageContent() {
         return prev;
       });
     }
-  }, [apiFilters?.minPrice, apiFilters?.maxPrice, isPackageMode]);
+  }, [apiFilters?.minPrice, apiFilters?.maxPrice, effectiveFilters.maxPrice, effectiveFilters.minPrice, isPackageMode]);
 
   // Track date changes from date slider to reset filters
   const prevDatesRef = useRef<{ departure: number | null; return: number | null }>({
@@ -936,6 +1001,9 @@ function SearchPageContent() {
     router.push(`/packages/review?${params.toString()}`);
   };
 
+  const activeLoading = isPackageMode ? packageFlightsLoading : loading;
+  const activeError = isPackageMode ? packageFlightsError : error;
+
   // Inactivity: 30 minutes -> show fare expired popup
   useIdleTimer({
     timeoutMs: 30 * 60 * 1000,
@@ -984,7 +1052,7 @@ function SearchPageContent() {
 
       {/* Package Mode: Step Progress */}
       {isPackageMode && (
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-6">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-7 pb-2">
           <PackageStepProgress currentStep="flight" />
           {/* Hotel/Stay Summary for package mode */}
           {packageHotelName && (
@@ -1000,7 +1068,7 @@ function SearchPageContent() {
       )}
 
       {/* Date Price Selector - Show for one-way and round-trip only (not multi-city) */}
-      {!error && departureDates.length > 0 && effectiveSearchParams.tripType !== 'multi-city' && (
+      {!isPackageMode && !activeError && departureDates.length > 0 && effectiveSearchParams.tripType !== 'multi-city' && (
         <div className="relative">
           <DatePriceSelector
             departureDates={departureDates}
@@ -1017,7 +1085,7 @@ function SearchPageContent() {
       )}
 
       {/* Loading State - Show during bootstrap, first fetch, and any date change (skip for package mode with mock data) */}
-      {!isPackageMode && (!isInitialized || loading || isDateChanging || (isInitialized && !loading && flights.length === 0 && !hasAttemptedFetch)) && (
+      {!isPackageMode && (!isInitialized || activeLoading || isDateChanging || (isInitialized && !activeLoading && flights.length === 0 && !hasAttemptedFetch)) && (
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
           <div className="flex flex-col items-center justify-center gap-4">
             <FlightSearchLoading showText={false} lottieClassName="w-[220px] max-w-full" />
@@ -1026,8 +1094,17 @@ function SearchPageContent() {
         </div>
       )}
 
+      {isPackageMode && activeLoading && (
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
+          <div className="flex flex-col items-center justify-center gap-4">
+            <FlightSearchLoading showText={false} lottieClassName="w-[220px] max-w-full" />
+            <p className="text-gray-600">Loading package flight options...</p>
+          </div>
+        </div>
+      )}
+
       {/* Error State */}
-      {error && !loading && (
+      {activeError && !activeLoading && (
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
           <div className="bg-red-50 border border-red-200 rounded-lg p-6">
             <div className="flex items-start gap-3">
@@ -1036,7 +1113,7 @@ function SearchPageContent() {
               </svg>
               <div className="flex-1">
                 <h3 className="text-lg font-semibold text-red-900 mb-1">{t('states.error.title')}</h3>
-                <p className="text-red-800">{error.message}</p>
+                <p className="text-red-800">{activeError.message}</p>
                 <button
                   onClick={() => window.location.reload()}
                   className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
@@ -1050,7 +1127,7 @@ function SearchPageContent() {
       )}
 
       {/* No Results State - Show when no flights from API */}
-      {hasAttemptedFetch && !loading && !error && flights.length === 0 && (
+      {hasAttemptedFetch && !activeLoading && !activeError && effectiveFlights.length === 0 && (
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
             <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1071,7 +1148,7 @@ function SearchPageContent() {
 
 
       {/* Mobile Filter Sheet */}
-      {!loading && !error && !isDateChanging && <FilterSheet
+      {!activeLoading && !activeError && !isDateChanging && <FilterSheet
         isOpen={isFilterSheetOpen}
         onOpenChange={setIsFilterSheetOpen}
         filterState={filterState}
@@ -1101,11 +1178,11 @@ function SearchPageContent() {
       />
       }
       {/* Main Content - Hide during date change; show when we have flights */}
-      {!error && !isDateChanging && preparedFlights.length > 0 && (
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-8">
-          <div className="flex flex-col lg:flex-row gap-4">
+      {!activeError && !isDateChanging && preparedFlights.length > 0 && (
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-3 pb-10">
+          <div className="flex flex-col lg:flex-row gap-5">
             {/* Filters Sidebar - Desktop Only */}
-            <div className="hidden lg:flex w-full lg:w-72 flex-col gap-4 order-3 lg:order-1">
+            <div className="hidden lg:flex w-full lg:w-72 flex-col gap-5 order-3 lg:order-1">
               <SearchSummary />
               <FilterSidebar
                 filterState={filterState}
@@ -1136,7 +1213,7 @@ function SearchPageContent() {
             </div>
 
             {/* Flight Results */}
-            <div className="flex-1 flex flex-col gap-2 order-2 lg:order-2 min-w-0 overflow-hidden">
+            <div className="flex-1 flex flex-col gap-3 order-2 lg:order-2 min-w-0 overflow-hidden">
               {filteredFlights.length > 0 ? (
                 <>
                   <FlightSortTabs
@@ -1186,7 +1263,7 @@ function SearchPageContent() {
             </div>
 
             {/* Right Sidebar - Contact Card */}
-            <div className="w-full lg:w-80 flex flex-col gap-4 order-1 lg:order-3">
+            <div className="w-full lg:w-80 flex flex-col gap-5 order-1 lg:order-3">
               <ContactCard webRef={preparedFlights[0]?.webRef} />
             </div>
           </div>

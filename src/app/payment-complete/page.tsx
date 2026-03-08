@@ -844,21 +844,22 @@ function PaymentCompleteContent() {
 	            sessionStorage.removeItem("pendingOrderAmount");
 	            sessionStorage.removeItem("pendingOrderCurrency");
 
-	            // Hotels: confirm itinerary only after successful payment so extras can be added before payment.
-	            if (isHotelMode) {
+	            // Hotels and packages: confirm itinerary only after successful payment so extras can be added before payment.
+	            if (isHotelMode || isPackageMode) {
 	              const folderNumberForConfirm =
 	                String(result.payment.orderId || vyspaFolderNumber || orderId || "").trim();
 	              if (folderNumberForConfirm) {
-	                const confirmGuardKey = `hotelItineraryConfirmed_${folderNumberForConfirm}`;
+	                const confirmGuardKey = `${isPackageMode ? "package" : "hotel"}ItineraryConfirmed_${folderNumberForConfirm}`;
 	                if (sessionStorage.getItem(confirmGuardKey) !== "1") {
 	                  try {
 	                    await confirmVyspaItinerary(folderNumberForConfirm);
 	                    sessionStorage.setItem(confirmGuardKey, "1");
-	                    console.log("✅ Hotel itinerary confirmed after payment", {
+	                    console.log("✅ Itinerary confirmed after payment", {
 	                      folderNumber: folderNumberForConfirm,
+                        flow: isPackageMode ? "package" : "hotel",
 	                    });
 	                  } catch (confirmError) {
-	                    console.error("❌ Failed to confirm hotel itinerary after payment", confirmError);
+	                    console.error("❌ Failed to confirm itinerary after payment", confirmError);
 	                  }
 	                }
 	              }

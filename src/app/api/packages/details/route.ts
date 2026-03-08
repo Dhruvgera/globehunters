@@ -8,10 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { VYSPA_CONFIG } from '@/config/vyspa';
-import type {
-  HolidayDetailRequest,
-  HolidayDetailResponse,
-} from '@/types/holidayPackage';
+import type { HolidayDetailRequest } from '@/types/holidayPackage';
 
 function buildBasicAuthHeader(): string {
   const username = VYSPA_CONFIG.credentials.username;
@@ -22,24 +19,19 @@ function buildBasicAuthHeader(): string {
 
 /** Request body for the package details endpoint */
 interface PackageDetailsRequestBody {
-  /** Priced flight result identifier (psw_result_id) */
-  pswResultId: number;
+  /** Selected/default flight result ID */
+  flightResultId: string;
   /** Selected room IDs (array of IDs) */
-  roomIds: string[] | number[];
+  hotelResultRoomIds: string[];
 }
 
 /**
  * Transform frontend request to Vyspa API request format
  */
 function buildVyspaRequest(body: PackageDetailsRequestBody): HolidayDetailRequest {
-  // Convert roomIds array to comma-separated string
-  const roomidsString = Array.isArray(body.roomIds) 
-    ? body.roomIds.map(String).join(',') 
-    : String(body.roomIds);
-
   return {
-    psw_result_id: body.pswResultId,
-    roomids: roomidsString,
+    FlightResultId: body.flightResultId,
+    HotelResultRoomIds: body.hotelResultRoomIds,
   };
 }
 
@@ -125,101 +117,141 @@ interface TransformedPackageDetails {
 /**
  * Transform Vyspa response to frontend format
  */
-function transformResponse(vyspaResponse: HolidayDetailResponse): TransformedPackageDetails {
+function asRecord(value: unknown): Record<string, any> {
+  return value && typeof value === 'object' ? (value as Record<string, any>) : {};
+}
+
+function transformResponse(vyspaResponse: any): TransformedPackageDetails {
+  const packageBlock = asRecord(vyspaResponse?.PackageDetails);
+  const hotelBlock = asRecord(vyspaResponse?.HotelDetails);
+  const flightBlock = asRecord(vyspaResponse?.FlightDetails);
+
+  const legacyHotel = asRecord(vyspaResponse?.hotels);
+  const legacyFlightData = asRecord(vyspaResponse?.flight_data);
+  const liveHotel = asRecord(hotelBlock.hotels);
+  const hotelSource = Object.keys(liveHotel).length > 0 ? liveHotel : legacyHotel;
+
+  const legacyFlightResult = asRecord(legacyFlightData.result);
+  const liveFlightData = asRecord(flightBlock.flight_data);
+  const liveFlightResult = asRecord(liveFlightData.result?.FlightPswResult || liveFlightData.result);
+  const flightResult = Object.keys(liveFlightResult).length > 0 ? liveFlightResult : legacyFlightResult;
+
   const result: TransformedPackageDetails = {
-    quoteId: vyspaResponse.quoteId,
-    packagePrice: vyspaResponse.packageprice,
-    success: vyspaResponse.success === 1,
+    quoteId:
+      Number(packageBlock.quoteId ?? hotelBlock.quoteId ?? vyspaResponse?.quoteId) || undefined,
+    packagePrice:
+      String(packageBlock.packageprice ?? vyspaResponse?.packageprice ?? '').trim() || undefined,
+    success:
+      Number(packageBlock.success ?? flightBlock.success ?? vyspaResponse?.success ?? 0) === 1,
   };
 
-  // Transform hotel details
-  if (vyspaResponse.hotels) {
-    const h = vyspaResponse.hotels;
+  if (Object.keys(hotelSource).length > 0) {
+    const rawRooms = Array.isArray(hotelBlock.rooms)
+      ? hotelBlock.rooms
+      : Array.isArray(hotelSource.rooms)
+        ? hotelSource.rooms
+        : [];
+
     result.hotel = {
-      id: h.id,
-      hotelId: h.hotel_id,
-      name: h.hotel_name,
-      description: h.quickDescription,
-      imageUrl: h.image_name,
-      starRating: h.hotel_rating,
-      checkOutDate: h.checkOutDate,
-      visaInfo: h.visaInfo,
-      countryRemarks: h.countryRemarks,
-      vendorRemarks: h.vendorRemarks,
-      rooms: h.rooms?.map(room => ({
-        id: room.id,
-        name: room.room_name,
-        nights: room.days_spent,
-        checkIn: room.fromDate || room.checkInDate,
-        checkOut: room.toDate,
-        price: room.room_price,
-        netPrice: room.net_price,
-        mealCode: room.display_meal_code,
-        mealName: room.meal_name,
-        currency: room.currency_code || room.branch_currency,
-        nonRefundable: room.nonRef === 1,
-        remarks: room.quote_remarks,
-      })),
+      id: Number(hotelSource.id || 0),
+      hotelId: Number(hotelSource.hotel_id || 0),
+      name: String(hotelSource.hotel_name || 'Selected hotel'),
+      description: hotelBlock.description || hotelSource.quickDescription,
+      imageUrl: hotelSource.image_name,
+      starRating: Number(hotelSource.hotel_rating || 0) || undefined,
+      checkOutDate: hotelSource.checkOutDate,
+      visaInfo: hotelSource.visaInfo,
+      countryRemarks: hotelSource.countryRemarks,
+      vendorRemarks: hotelSource.vendorRemarks,
+      rooms: rawRooms.map((room) => {
+        const roomDetail = asRecord(room?.SearchResultRoomDetail || room);
+        return {
+          id: Number(roomDetail.id || 0),
+          selectionKey: String(roomDetail.error || roomDetail.additional_data || '').trim() || undefined,
+          name: roomDetail.room_name,
+          nights: Number(roomDetail.days_spent || hotelBlock.nights || 0) || undefined,
+          checkIn: roomDetail.fromDate || roomDetail.checkInDate,
+          checkOut: roomDetail.toDate,
+          price: Number(
+            roomDetail.room_price ??
+              roomDetail.FolderPricing?.cust_tot_sell_amt ??
+              roomDetail.FolderPricing?.tot_sell_amt ??
+              0
+          ) || undefined,
+          netPrice: Number(roomDetail.net_price ?? roomDetail.FolderPricing?.cust_tot_net_amt ?? 0) || undefined,
+          mealCode: roomDetail.display_meal_code || roomDetail.meal_code,
+          mealName: roomDetail.meal_name,
+          currency: roomDetail.currency_code || roomDetail.branch_currency,
+          nonRefundable: Number(roomDetail.nonRef ?? 0) === 1,
+          remarks: roomDetail.non_printing_notes || roomDetail.quote_remarks,
+        };
+      }),
     };
   }
 
-  // Transform cancellation policies
-  if (vyspaResponse.Cancellation && vyspaResponse.Cancellation.length > 0) {
-    result.cancellationPolicies = vyspaResponse.Cancellation.map(c => ({
-      id: c.id,
-      roomName: c.roomName,
-      effectiveDate: c.effectiveDate,
-      endEffectiveDate: c.endEffectiveDate,
-      policy: c.cancellationPolicy,
-      chargeType: c.chargeType,
-      penalty: c.finalRate || c.remoteRate,
-      penaltyCurrency: c.finalCurrency || c.remoteCurrency,
-    }));
+  const rawCancellationPolicies = Array.isArray(hotelBlock.Cancellation)
+    ? hotelBlock.Cancellation
+    : Array.isArray(vyspaResponse?.Cancellation)
+      ? vyspaResponse.Cancellation
+      : [];
+  if (rawCancellationPolicies.length > 0) {
+    result.cancellationPolicies = rawCancellationPolicies.map((entry: any) => {
+      const policy = asRecord(entry?.SearchResultCancellation || entry);
+      return {
+        id: Number(policy.id || 0),
+        roomName: policy.roomName,
+        effectiveDate: policy.effectiveDate,
+        endEffectiveDate: policy.endEffectiveDate,
+        policy: policy.cancellationPolicy,
+        chargeType: policy.chargeType,
+        penalty: Number(policy.finalRate || policy.remoteRate || 0) || undefined,
+        penaltyCurrency: policy.finalCurrency || policy.remoteCurrency,
+      };
+    });
   }
 
-  // Transform flight details
-  if (vyspaResponse.flight_data) {
-    const f = vyspaResponse.flight_data;
-    const flightResult = f.result;
-    
+  if (Object.keys(flightResult).length > 0 || Object.keys(flightBlock).length > 0) {
+    const passengers = Array.isArray(flightBlock.passengers)
+      ? flightBlock.passengers
+      : Array.isArray(legacyFlightData.passengers)
+        ? legacyFlightData.passengers
+        : [];
+    const priceData = Array.isArray(flightBlock.price_data)
+      ? flightBlock.price_data
+      : Array.isArray(legacyFlightData.price_data)
+        ? legacyFlightData.price_data
+        : [];
+
     result.flight = {
-      pswResultId: f.psw_result_id,
-      origin: flightResult?.Origin,
-      destination: flightResult?.Destination,
-      totalFare: flightResult?.total_fare,
-      baseFare: flightResult?.base_fare,
-      tax: flightResult?.tax,
-      currency: flightResult?.iso_currency_code,
-      fareCategory: flightResult?.FareCat,
-      lastTicketDate: flightResult?.last_ticket_date,
-      validatingCarrier: flightResult?.validating_carrier,
-      refundable: flightResult?.refundable === 1,
-    };
-
-    // Transform passenger breakdown
-    if (f.passengers && f.passengers.length > 0) {
-      result.flight.passengers = f.passengers.map(p => ({
-        type: p.pax_type,
-        count: p.num_pax,
-        baseFare: p.base_fare,
-        totalFare: p.total_fare,
-        tax: p.tax,
-      }));
-    }
-
-    // Transform brand/price options
-    if (f.price_data && f.price_data.length > 0) {
-      result.flight.brandOptions = f.price_data.map(pd => ({
+      pswResultId: Number(flightBlock.psw_result_id ?? legacyFlightData.psw_result_id ?? 0) || undefined,
+      origin: flightResult.Origin,
+      destination: flightResult.Destination,
+      totalFare: Number(flightResult.total_fare || 0) || undefined,
+      baseFare: Number(flightResult.base_fare || 0) || undefined,
+      tax: Number(flightResult.tax || 0) || undefined,
+      currency: flightResult.iso_currency_code,
+      fareCategory: flightResult.FareCat,
+      lastTicketDate: flightResult.last_ticket_date || flightBlock.last_ticket_date,
+      validatingCarrier: flightResult.validating_carrier,
+      refundable: Number(flightResult.refundable || 0) === 1,
+      passengers: passengers.map((p: any) => ({
+        type: String(p.pax_type || ''),
+        count: Number(p.num_pax || 0),
+        baseFare: Number(p.base_fare || 0),
+        totalFare: Number(p.total_fare || 0),
+        tax: Number(p.tax || 0),
+      })),
+      brandOptions: priceData.map((pd: any) => ({
         brandId: pd.Total_Fare?.BrandId,
         name: pd.Total_Fare?.Name,
-        total: pd.Total_Fare?.total ?? 0,
-        base: pd.Total_Fare?.base ?? 0,
-        tax: pd.Total_Fare?.tax ?? 0,
+        total: Number(pd.Total_Fare?.total || 0),
+        base: Number(pd.Total_Fare?.base || 0),
+        tax: Number(pd.Total_Fare?.tax || 0),
         currency: pd.Total_Fare?.sellcurr,
         cabinClass: pd.Total_Fare?.CabinClass,
-        selected: pd.selected === 1,
-      }));
-    }
+        selected: Number(pd.selected || 0) === 1,
+      })),
+    };
   }
 
   return result;
@@ -230,9 +262,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json() as PackageDetailsRequestBody;
 
     // Validate required fields
-    if (!body.pswResultId || !body.roomIds || (Array.isArray(body.roomIds) && body.roomIds.length === 0)) {
+    if (!body.flightResultId || !body.hotelResultRoomIds || body.hotelResultRoomIds.length === 0) {
       return NextResponse.json(
-        { error: 'Missing required fields: pswResultId, roomIds' },
+        { error: 'Missing required fields: flightResultId, hotelResultRoomIds' },
         { status: 400 }
       );
     }
@@ -240,12 +272,12 @@ export async function POST(request: NextRequest) {
     // Build Vyspa request
     const vyspaRequest = buildVyspaRequest(body);
 
-    const baseUrl = VYSPA_CONFIG.apiUrl.replace(/\/+$/, '');
+    const baseUrl = VYSPA_CONFIG.apiUrl.replace(/\/anon\.php\/?$/, '').replace(/\/+$/, '');
     const url = `${baseUrl}/rest/v4/holiday_detail/`;
 
     console.log('[PackageDetails] Fetching package details:', {
-      psw_result_id: vyspaRequest.psw_result_id,
-      roomids: vyspaRequest.roomids,
+      flightResultId: vyspaRequest.FlightResultId,
+      hotelResultRoomIds: vyspaRequest.HotelResultRoomIds,
     });
 
     const controller = new AbortController();
@@ -256,7 +288,7 @@ export async function POST(request: NextRequest) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': buildBasicAuthHeader(),
-        'Api-Version': '1',
+        'Api-Version': '2',
       },
       body: JSON.stringify([vyspaRequest]), // API expects array
       signal: controller.signal,
@@ -277,7 +309,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const vyspaResponse = await response.json() as HolidayDetailResponse;
+    const vyspaResponse = await response.json();
 
     // Transform response to frontend format
     const details = transformResponse(vyspaResponse);

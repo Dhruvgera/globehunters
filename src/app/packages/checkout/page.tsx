@@ -2,6 +2,8 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Loader2 } from "lucide-react";
+
 import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
 import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
@@ -16,6 +18,88 @@ import { useBookingStore, useSelectedFlight, useStoreHydration } from "@/store/b
 import { airportCache } from "@/lib/cache/airportCache";
 import { shortenAirportName } from "@/lib/vyspa/utils";
 import { formatFareLabel } from "@/lib/utils";
+import { folderService } from "@/services/api/folderService";
+import { hotelService } from "@/services/api/hotelService";
+import { packageService } from "@/services/api/packageService";
+
+function toIsoCurrency(currency: string | undefined) {
+  const normalized = String(currency || "").trim().toUpperCase();
+  if (normalized === "£") return "GBP";
+  if (normalized === "$") return "USD";
+  if (normalized === "€") return "EUR";
+  return normalized || "GBP";
+}
+
+function mapPassengerType(type?: string) {
+  if (type === "child") return "CHD" as const;
+  if (type === "infant") return "INF" as const;
+  return "ADT" as const;
+}
+
+function mapPassengerGender(title?: string) {
+  const normalized = String(title || "").toLowerCase();
+  return normalized === "mr" || normalized === "mstr" ? "M" as const : "F" as const;
+}
+
+function buildPackageRoomPassengers(
+  roomIds: string[],
+  roomConfigs: Array<{ adults: number; children: number; infants: number }>,
+  passengers: Array<{ type?: string }>
+) {
+  const byType = {
+    adult: [] as number[],
+    child: [] as number[],
+    infant: [] as number[],
+  };
+
+  passengers.forEach((passenger, index) => {
+    const paxNo = index + 1;
+    if (passenger.type === "child") byType.child.push(paxNo);
+    else if (passenger.type === "infant") byType.infant.push(paxNo);
+    else byType.adult.push(paxNo);
+  });
+
+  const mapping: Record<string, string> = {};
+
+  roomIds.forEach((roomId, index) => {
+    const room = roomConfigs[index] || roomConfigs[roomConfigs.length - 1] || { adults: 1, children: 0, infants: 0 };
+    const assigned = [
+      ...byType.adult.splice(0, room.adults),
+      ...byType.child.splice(0, room.children),
+      ...byType.infant.splice(0, room.infants),
+    ];
+    if (assigned.length > 0) {
+      mapping[roomId] = assigned.join(",");
+    }
+  });
+
+  const leftovers = [...byType.adult, ...byType.child, ...byType.infant];
+  if (leftovers.length > 0 && roomIds.length > 0) {
+    const lastRoomId = roomIds[roomIds.length - 1];
+    mapping[lastRoomId] = [mapping[lastRoomId], leftovers.join(",")].filter(Boolean).join(",");
+  }
+
+  return mapping;
+}
+
+function selectPackageRoomDetails(
+  rooms: Array<{ id?: number; selectionKey?: string }>,
+  selectedRoomCount: number
+) {
+  const uniqueRooms: Array<{ id?: number; selectionKey?: string }> = [];
+  const seenSelectionKeys = new Set<string>();
+
+  for (const room of rooms) {
+    const selectionKey = String(room.selectionKey || "").trim();
+    if (selectionKey) {
+      if (seenSelectionKeys.has(selectionKey)) continue;
+      seenSelectionKeys.add(selectionKey);
+    }
+    uniqueRooms.push(room);
+  }
+
+  return uniqueRooms.slice(0, Math.max(1, selectedRoomCount));
+}
 
 function PackageTravellerDetailsInner() {
   const router = useRouter();
@@ -27,38 +111,37 @@ function PackageTravellerDetailsInner() {
   const selectedUpgrade = useBookingStore((s) => s.selectedUpgradeOption);
   const setSearchParams = useBookingStore((s) => s.setSearchParams);
   const storeSearchParams = useBookingStore((s) => s.searchParams);
+  const packageSearch = useBookingStore((s) => s.packageSearch);
+  const hotelSearch = useBookingStore((s) => s.hotelSearch);
+  const selectedHotel = useBookingStore((s) => s.selectedHotel);
+  const hotelDetailsCache = useBookingStore((s) => s.hotelDetailsCache);
+  const selectedHotelRoomIds = useBookingStore((s) => s.selectedHotelRoomIds);
   const passengersSaved = useBookingStore((s) => s.passengersSaved);
   const passengers = useBookingStore((s) => s.passengers);
+  const vyspaFolderNumber = useBookingStore((s) => s.vyspaFolderNumber);
+  const setVyspaFolderInfo = useBookingStore((s) => s.setVyspaFolderInfo);
+  const setContactInfo = useBookingStore((s) => s.setContactInfo);
 
   const { phoneNumber: affiliatePhone } = useAffiliatePhone();
 
   const [showFlightInfo, setShowFlightInfo] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [marketingConsent, setMarketingConsent] = useState(false);
+  const [airportNameCache, setAirportNameCache] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Hotel dummy data passed from review page
-  const hotelName = sp.get("hotelName") ? decodeURIComponent(sp.get("hotelName") as string) : "Selected hotel";
-  const hotelImage = sp.get("hotelImage") || "/hotels/hotel-placeholder.jpg";
-  const hotelRating = parseFloat(sp.get("hotelRating") || "0") || 0;
-  const hotelReviewCount = parseInt(sp.get("hotelReviewCount") || "0", 10) || 0;
-  const hotelDistance = sp.get("hotelDistance") || "";
-  const hotelAmenities = (sp.get("hotelAmenities") || "")
-    .split("|")
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  // Ensure search params exist so PassengerFormsSection renders correct passenger slots
   useEffect(() => {
-    const from = sp.get("from") || "LHR";
-    const to = sp.get("to") || "HKG";
-    const depStr = sp.get("departureDate") || sp.get("checkIn") || "";
-    const retStr = sp.get("returnDate") || sp.get("checkOut") || "";
+    const from = packageSearch?.departureCode || storeSearchParams?.from || sp.get("from") || "";
+    const to = packageSearch?.destinationCode || storeSearchParams?.to || sp.get("to") || "";
+    const depStr = hotelSearch?.checkIn || packageSearch?.checkIn || sp.get("departureDate") || "";
+    const retStr = hotelSearch?.checkOut || sp.get("returnDate") || "";
 
-    const adults = parseInt(sp.get("adults") || sp.get("guests") || "2", 10) || 2;
-    const children = parseInt(sp.get("children") || "0", 10) || 0;
-    const infants = parseInt(sp.get("infants") || "0", 10) || 0;
+    const roomConfigs = packageSearch?.rooms || [];
+    const adults = roomConfigs.reduce((sum, room) => sum + Number(room.adults || 0), 0) || parseInt(sp.get("adults") || "2", 10) || 2;
+    const children = roomConfigs.reduce((sum, room) => sum + Number(room.children || 0), 0) || parseInt(sp.get("children") || "0", 10) || 0;
+    const infants = roomConfigs.reduce((sum, room) => sum + Number(room.infants || 0), 0) || parseInt(sp.get("infants") || "0", 10) || 0;
 
-    // Only set if missing or clearly not for this flow
     if (storeSearchParams?.from && storeSearchParams?.to && storeSearchParams?.passengers) return;
 
     setSearchParams({
@@ -73,7 +156,6 @@ function PackageTravellerDetailsInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Redirect back to flight selection if no flight selected
   useEffect(() => {
     if (hasHydrated && !flight) {
       const params = new URLSearchParams(sp.toString());
@@ -82,8 +164,6 @@ function PackageTravellerDetailsInner() {
     }
   }, [hasHydrated, flight, router, sp]);
 
-  // Airport name cache (same logic as booking/payment)
-  const [airportNameCache, setAirportNameCache] = useState<Record<string, string>>({});
   useEffect(() => {
     const load = async () => {
       await airportCache.getAirports();
@@ -143,30 +223,153 @@ function PackageTravellerDetailsInner() {
   }, [storeSearchParams?.passengers]);
 
   const cabinLabel = formatFareLabel(selectedUpgrade?.cabinClassDisplay || selectedFareType);
-  const refNumber = useBookingStore.getState().vyspaFolderNumber || useBookingStore.getState().searchRequestId || flight?.webRef || "—";
+  const refNumber = vyspaFolderNumber || useBookingStore.getState().searchRequestId || flight?.webRef || "—";
 
-  const handleContinue = () => {
-    if (!termsAccepted) return;
+  const hotelDisplay = useMemo(() => {
+    const cached = selectedHotel?.hotelId ? hotelDetailsCache?.[selectedHotel.hotelId] : undefined;
+    return {
+      name: selectedHotel?.hotelName || cached?.hotelName || "Selected hotel",
+      image: cached?.mainImage || "/hotels/hotel-placeholder.jpg",
+      rating: cached?.hotelRating || 0,
+      reviewCount: cached?.trustYou?.reviewsCount || 0,
+      distance: cached?.address || "",
+      amenities: cached?.amenities || [],
+    };
+  }, [hotelDetailsCache, selectedHotel]);
+
+  const handleContinue = async () => {
+    if (!termsAccepted || !flight || !selectedHotel?.hotelId || selectedHotelRoomIds.length === 0) return;
     if (!passengersSaved) {
       alert("Please complete all traveller details before continuing.");
       return;
     }
-    // Minimal validation - mirror booking expectations
+
     const counts = storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 };
     const required = (counts.adults || 0) + (counts.children || 0) + (counts.infants || 0);
     for (let i = 0; i < required; i += 1) {
-      const p = passengers[i];
-      if (!p?.firstName || !p?.lastName || !p?.dateOfBirth || !p?.email || !p?.phone) {
+      const passenger = passengers[i];
+      if (!passenger?.firstName || !passenger?.lastName || !passenger?.dateOfBirth || !passenger?.email || !passenger?.phone) {
         alert("Please complete all traveller details before continuing.");
         return;
       }
     }
 
-    const params = new URLSearchParams(sp.toString());
-    params.set("type", "package");
-    // Carry consent for analytics (non-blocking)
-    if (marketingConsent) params.set("marketing", "1");
-    router.push(`/payment?${params.toString()}`);
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const leadPassenger = passengers[0];
+      setContactInfo(leadPassenger.email, `${leadPassenger.countryCode || ""}${leadPassenger.phone || ""}`);
+
+      const currency = toIsoCurrency(selectedUpgrade?.currency || flight.currency);
+      const packageDetail = await packageService.getPackageDetails({
+        flightResultId: flight.segmentResultId || flight.id,
+        hotelResultRoomIds: selectedHotelRoomIds,
+      });
+      const liveHotel = packageDetail.details.hotel;
+      const liveFlight = packageDetail.details.flight;
+      const resolvedRoomIds = selectPackageRoomDetails(
+        liveHotel?.rooms || [],
+        selectedHotelRoomIds.length
+      )
+        .map((room) => String(room.id || "").trim())
+        .filter(Boolean);
+      if (!liveHotel?.id || resolvedRoomIds.length === 0) {
+        throw new Error("Failed to resolve the selected package rooms for booking.");
+      }
+
+      let folderNumber = vyspaFolderNumber ? Number(vyspaFolderNumber) : null;
+
+      if (!folderNumber) {
+        const createFolderResponse = await hotelService.createCustomerFolder({
+          title: leadPassenger.title || "Mr",
+          firstName: leadPassenger.firstName,
+          lastName: leadPassenger.lastName,
+          email: leadPassenger.email,
+          phone: leadPassenger.phone,
+          branchCode: hotelSearch?.branches || "UK",
+          desAirportCode: hotelSearch?.arrivalPointCode || packageSearch?.destinationCode,
+          departureDate: hotelSearch?.checkIn || packageSearch?.checkIn || "",
+          address: "NA",
+          zipCode: "NA",
+        });
+
+        folderNumber = (() => {
+          if (typeof createFolderResponse === "number") return createFolderResponse;
+          if (typeof createFolderResponse === "string" && /^\d+$/.test(createFolderResponse)) return Number(createFolderResponse);
+          if (Array.isArray(createFolderResponse)) return (createFolderResponse as any)[0]?.folder_no;
+          return (createFolderResponse as any)?.folder_no;
+        })();
+
+        if (!folderNumber) {
+          throw new Error("Failed to create package customer folder.");
+        }
+
+        setVyspaFolderInfo({
+          folderNumber: String(folderNumber),
+          emailAddress: leadPassenger.email,
+        });
+      }
+
+      const packageAddedKey = `packageItineraryAdded_${folderNumber}`;
+      if (sessionStorage.getItem(packageAddedKey) !== "1") {
+        const folderPassengers = passengers.slice(0, required).map((passenger, index) => ({
+          pax_no: index + 1,
+          title: passenger.title as any,
+          first_name: passenger.firstName,
+          middle_name: passenger.middleName || "",
+          last_name: passenger.lastName,
+          birth_date: passenger.dateOfBirth,
+          pax_type: mapPassengerType(passenger.type) as any,
+          api_gender: mapPassengerGender(passenger.title) as any,
+          email: passenger.email,
+          phone: passenger.phone,
+        }));
+
+        const roomPassengers = buildPackageRoomPassengers(
+          resolvedRoomIds,
+          packageSearch?.rooms || [{ adults: counts.adults, children: counts.children, infants: counts.infants }],
+          passengers.slice(0, required)
+        );
+
+        const addResponse = await folderService.addToFolder({
+          folderNumber: Number(folderNumber),
+          itineraryNumber: "1",
+          foldcur: currency,
+          travelPurpose: "Holiday",
+          comments: ["Holiday package itinerary"],
+          set_as_preferred_itinerary: true,
+          passengers: folderPassengers as any,
+          requestData: [
+            {
+              type: "flight",
+              psw_result_id: liveFlight?.pswResultId || flight.segmentResultId || flight.id,
+              passengers: Array.from({ length: required }, (_, index) => index + 1).join(","),
+              holiday_package: 1,
+            },
+            {
+              type: "hotel",
+              roomIds: resolvedRoomIds.join(","),
+              passengers: roomPassengers,
+              holiday_package: 1,
+            },
+          ] as any,
+        });
+        if (!addResponse.success) {
+          throw new Error(addResponse.message || "Failed to add package itinerary to folder");
+        }
+        sessionStorage.setItem(packageAddedKey, "1");
+      }
+
+      const params = new URLSearchParams(sp.toString());
+      params.set("type", "package");
+      if (marketingConsent) params.set("marketing", "1");
+      router.push(`/payment?${params.toString()}`);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Failed to prepare package booking");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -176,57 +379,55 @@ function PackageTravellerDetailsInner() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
         <PackageStepProgress currentStep="payment" />
 
-        {/* Web Ref (Mobile) */}
         <div className="mt-4">
           <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={true} />
         </div>
 
         <div className="mt-6 flex flex-col lg:flex-row gap-6">
-          {/* Left column */}
           <div className="flex-1 flex flex-col gap-4">
-            {/* Summary cards */}
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
               <div className="text-sm font-semibold text-[#010D50]">Your hotel</div>
               <div className="flex gap-3">
                 <div className="relative w-[96px] h-[72px] rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                   <img
-                    src={hotelImage}
-                    alt={hotelName}
+                    src={hotelDisplay.image}
+                    alt={hotelDisplay.name}
                     className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).src =
+                    onError={(event) => {
+                      (event.target as HTMLImageElement).src =
                         "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&auto=format&fit=crop";
                     }}
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold text-[#010D50] truncate">{hotelName}</div>
-                  {hotelDistance ? (
-                    <div className="text-xs text-[#3A478A] truncate">{hotelDistance}</div>
+                  <div className="text-sm font-semibold text-[#010D50] truncate">{hotelDisplay.name}</div>
+                  {hotelDisplay.distance ? (
+                    <div className="text-xs text-[#3A478A] truncate">{hotelDisplay.distance}</div>
                   ) : null}
-                  {hotelRating ? (
+                  {hotelDisplay.rating ? (
                     <div className="mt-1 flex items-center gap-2">
                       <span className="bg-[#3754ED] text-white text-xs font-semibold px-2 py-0.5 rounded">
-                        {hotelRating.toFixed(1)}
+                        {hotelDisplay.rating.toFixed(1)}
                       </span>
                       <span className="text-xs text-[#3A478A]">
-                        {hotelReviewCount ? `${hotelReviewCount} reviews` : ""}
+                        {hotelDisplay.reviewCount ? `${hotelDisplay.reviewCount} reviews` : ""}
                       </span>
                     </div>
                   ) : null}
                 </div>
               </div>
-              {hotelAmenities.length ? (
+              {hotelDisplay.amenities.length ? (
                 <div className="flex flex-wrap gap-3 text-xs text-[#3A478A]">
-                  {hotelAmenities.slice(0, 4).map((a) => (
-                    <span key={a} className="flex items-center gap-1">
+                  {hotelDisplay.amenities.slice(0, 4).map((amenity) => (
+                    <span key={amenity} className="flex items-center gap-1">
                       <span className="w-1.5 h-1.5 bg-[#3A478A] rounded-full" />
-                      {a}
+                      {amenity}
                     </span>
                   ))}
                 </div>
               ) : null}
             </div>
+
             <div className="flex flex-col gap-3">
               {summaryLegs.map((leg, idx) => (
                 <FlightSummaryCard
@@ -239,20 +440,18 @@ function PackageTravellerDetailsInner() {
               ))}
             </div>
 
-            {/* Traveller forms */}
             <PassengerFormsSection />
 
-            {/* Terms + CTA */}
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
               <div className="flex items-start gap-3">
                 <Checkbox
                   id="pkg-terms"
                   className="mt-1"
                   checked={termsAccepted}
-                  onCheckedChange={(c) => setTermsAccepted(!!c)}
+                  onCheckedChange={(checked) => setTermsAccepted(!!checked)}
                 />
                 <label htmlFor="pkg-terms" className="text-sm font-medium text-[#010D50] leading-relaxed">
-                  I confirm that the traveller details match the passport/official ID and I agree to the terms &amp; conditions.
+                  I confirm that the traveller details match the passport or official ID and I agree to the terms &amp; conditions.
                 </label>
               </div>
 
@@ -261,24 +460,32 @@ function PackageTravellerDetailsInner() {
                   id="pkg-marketing"
                   className="mt-1"
                   checked={marketingConsent}
-                  onCheckedChange={(c) => setMarketingConsent(!!c)}
+                  onCheckedChange={(checked) => setMarketingConsent(!!checked)}
                 />
                 <label htmlFor="pkg-marketing" className="text-sm text-[#3A478A] leading-relaxed">
                   By clicking this checkbox, I consent to receive marketing messages via calls, texts, and emails from Globehunters.
                 </label>
               </div>
 
+              {error ? <div className="text-sm text-red-600">{error}</div> : null}
+
               <Button
                 onClick={handleContinue}
-                disabled={!termsAccepted}
+                disabled={!termsAccepted || submitting}
                 className="w-full bg-[#3754ED] hover:bg-[#2A41C9] text-white rounded-full py-3 h-auto text-sm font-bold disabled:opacity-50"
               >
-                Continue to payment
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Preparing booking...
+                  </>
+                ) : (
+                  "Continue to payment"
+                )}
               </Button>
             </div>
           </div>
 
-          {/* Right column */}
           <div className="w-full lg:w-[482px] flex flex-col gap-4">
             <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={false} />
 
@@ -306,9 +513,14 @@ function PackageTravellerDetailsInner() {
 
 export default function PackageTravellerDetailsPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-white flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[#3754ED]" />
+        </div>
+      }
+    >
       <PackageTravellerDetailsInner />
     </Suspense>
   );
 }
-

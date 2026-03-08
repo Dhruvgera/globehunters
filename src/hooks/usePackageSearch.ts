@@ -45,8 +45,8 @@ export interface UsePackageSearchReturn {
   lookupDestinations: (query: string) => Promise<HolidayDestination[]>;
   searchPackages: (criteria: PackageSearchCriteria) => Promise<PackageSearchResponse>;
   getAlternateFlights: (hotelId?: number, roomId?: number) => Promise<AlternateFlightsResponse>;
-  selectAlternateFlight: (pswResultId: number) => void;
-  getPackageDetails: (pswResultId: number, roomIds: string[]) => Promise<PackageDetailsResponse>;
+  selectAlternateFlight: (flightResultId: string) => void;
+  getPackageDetails: (flightResultId: string, roomIds: string[]) => Promise<PackageDetailsResponse>;
   selectPackage: (pkg: SelectedPackage | null) => void;
   selectRooms: (roomIds: string[]) => void;
   setDestination: (destination: HolidayDestination | null) => void;
@@ -158,7 +158,7 @@ export function usePackageSearch(): UsePackageSearchReturn {
    */
   const getAlternateFlights = useCallback(async (
     hotelId?: number,
-    roomId?: number
+    _roomId?: number
   ): Promise<AlternateFlightsResponse> => {
     if (!meta) {
       throw new Error('No package search results available');
@@ -168,12 +168,14 @@ export function usePackageSearch(): UsePackageSearchReturn {
     setError(null);
 
     try {
+      const effectiveHotelResultId = hotelId || selectedPackage?.hotel?.id;
+      if (!effectiveHotelResultId || !meta.selectedFlightResultId) {
+        throw new Error('Missing hotelResultId or selectedFlightResultId');
+      }
+
       const params: ChangeFlightsParams = {
-        flightSearchCriteriaId: meta.flightSearchCriteriaId,
-        selectedFlightPswResultId: meta.selectedFlightPswResultId,
-        hotelSearchCriteriaIds: meta.hotelSearchCriteriaIds,
-        hotelId,
-        hotelResultRoomId: roomId,
+        flightResultId: meta.selectedFlightResultId,
+        hotelResultId: effectiveHotelResultId,
       };
 
       const response = await packageService.getAlternateFlights(params);
@@ -194,20 +196,20 @@ export function usePackageSearch(): UsePackageSearchReturn {
     } finally {
       setLoading(false);
     }
-  }, [meta, setAlternateFlights]);
+  }, [meta, selectedPackage?.hotel?.id, setAlternateFlights]);
 
   /**
    * Select an alternate flight and update the selected package
    */
-  const selectAlternateFlight = useCallback((pswResultId: number) => {
+  const selectAlternateFlight = useCallback((flightResultId: string) => {
     if (!alternateFlights || !selectedPackage) {
       console.warn('[usePackageSearch] Cannot select alternate flight: no flights or package selected');
       return;
     }
 
-    const flight = alternateFlights.find((f) => f.pswResultId === pswResultId);
+    const flight = alternateFlights.find((f) => f.resultId === flightResultId);
     if (!flight) {
-      console.warn('[usePackageSearch] Alternate flight not found:', pswResultId);
+      console.warn('[usePackageSearch] Alternate flight not found:', flightResultId);
       return;
     }
 
@@ -216,14 +218,14 @@ export function usePackageSearch(): UsePackageSearchReturn {
     // re-fetch the package details with the new flight
     setSelectedPackage({
       ...selectedPackage,
-      pswResultId,
+      flightResultId: flight.resultId,
       totalPrice: selectedPackage.totalPrice 
         ? selectedPackage.totalPrice + flight.priceDifference 
         : flight.totalFare,
     });
 
     console.log('[usePackageSearch] Alternate flight selected:', {
-      pswResultId,
+      flightResultId,
       priceDifference: flight.priceDifference,
     });
   }, [alternateFlights, selectedPackage, setSelectedPackage]);
@@ -232,7 +234,7 @@ export function usePackageSearch(): UsePackageSearchReturn {
    * Get full package details
    */
   const getPackageDetails = useCallback(async (
-    pswResultId: number,
+    flightResultId: string,
     roomIds: string[]
   ): Promise<PackageDetailsResponse> => {
     setLoading(true);
@@ -240,8 +242,8 @@ export function usePackageSearch(): UsePackageSearchReturn {
 
     try {
       const params: PackageDetailParams = {
-        pswResultId,
-        roomIds,
+        flightResultId,
+        hotelResultRoomIds: roomIds,
       };
 
       const response = await packageService.getPackageDetails(params);

@@ -46,8 +46,8 @@ export function PackageStaySummary({
   };
 
   return (
-    <div className="mt-4 bg-[#F5F7FF] rounded-2xl p-5 border border-[#E5E8F5]">
-      <div className="flex flex-col sm:flex-row gap-4">
+    <div className="mt-5 bg-[#F5F7FF] rounded-2xl p-6 lg:p-7 border border-[#E5E8F5]">
+      <div className="flex flex-col sm:flex-row gap-5">
         {/* Hotel Image - optional */}
         {hotelImage && (
           <div className="w-full sm:w-32 h-24 rounded-xl overflow-hidden flex-shrink-0">
@@ -61,7 +61,7 @@ export function PackageStaySummary({
 
         {/* Hotel Details */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start justify-between gap-5">
             <div className="flex-1 min-w-0">
               {/* Hotel Name */}
               <div className="flex items-center gap-2 mb-1">
@@ -86,7 +86,7 @@ export function PackageStaySummary({
               )}
 
               {/* Stay Details Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
                 {/* Check-in */}
                 <div className="flex flex-col">
                   <div className="flex items-center gap-1.5 text-xs text-[#3A478A] mb-0.5">

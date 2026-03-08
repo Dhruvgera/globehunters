@@ -1,38 +1,30 @@
 "use client";
 
-import { Suspense, useMemo, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ChevronRight, Edit2, Info, Loader2 } from "lucide-react";
+
 import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
 import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
 import { Button } from "@/components/ui/button";
-import {
-  ChevronRight,
-  Info,
-  Edit2,
-} from "lucide-react";
-import { mockPackageFlights } from "@/data/mockPackageFlights";
 import { FlightSummaryCard } from "@/components/booking/FlightSummaryCard";
 import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
 import { WebRefCard } from "@/components/booking/WebRefCard";
 import { BaggageSection } from "@/components/payment/BaggageSection";
 import { ProtectionPlanSection } from "@/components/payment/ProtectionPlanSection";
+import { useAffiliatePhone } from "@/lib/AffiliateContext";
+import { useBookingStore, useSelectedFlight } from "@/store/bookingStore";
+import { packageService } from "@/services/api/packageService";
+import { PRICING_CONFIG, IASSURE_PRICING } from "@/config/constants";
+import { getRegion } from "@/lib/utils/domainMapping";
+import { formatFareLabel } from "@/lib/utils";
 
-// Mock hotel data - in real app would come from API/store
-const mockHotelData = {
-  id: "h-1",
-  name: "The Peninsula Hong Kong",
-  image: "/hotels/peninsula-hk.jpg",
-  rating: 9.3,
-  reviewCount: 900,
-  distance: "15.11 mi from Hong Kong Intl. (HKG)",
-  amenities: ["Pet-friendly", "Airport shuttle included"],
-};
-
-function formatDate(dateStr: string) {
-  if (!dateStr) return "";
-  const date = new Date(dateStr);
+function formatDateLabel(value?: string) {
+  if (!value) return "—";
+  const date = new Date(`${value.slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString("en-GB", {
     weekday: "short",
     day: "numeric",
@@ -41,214 +33,302 @@ function formatDate(dateStr: string) {
   });
 }
 
-function PackageReviewPageInner() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const [showFlightInfo, setShowFlightInfo] = useState(false);
-  const [additionalBaggage, setAdditionalBaggage] = useState(0);
-  const [selectedProtectionPlan, setSelectedProtectionPlan] = useState<"basic" | "premium" | "all" | undefined>(undefined);
-
-  // Protection plan prices (mock)
-  const protectionPlanPrices = {
-    basic: 12.99,
-    premium: 24.99,
-    all: 38.99,
+function parseMoneyString(value?: string | null) {
+  const raw = String(value || "").trim();
+  const match = raw.match(/^([A-Z]{3}|£|\$|€)?\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Z]{3}|£|\$|€)?$/i);
+  if (!match) return { amount: undefined, currency: undefined as string | undefined };
+  const leading = match[1];
+  const trailing = match[3];
+  return {
+    amount: Number(match[2]),
+    currency: String(leading || trailing || "").trim() || undefined,
   };
+}
 
-  // Get params from URL
-  const hotelId = searchParams.get("hotelId") || "";
-  const hotelName = searchParams.get("hotelName") || mockHotelData.name;
-  const flightId = searchParams.get("flightId") || "";
-  const checkIn = searchParams.get("checkIn") || "";
-  const checkOut = searchParams.get("checkOut") || "";
-  const guests = parseInt(searchParams.get("guests") || "2");
-  const rooms = parseInt(searchParams.get("rooms") || "1");
+function formatMoney(currency: string | undefined, amount: number | undefined) {
+  if (amount == null || Number.isNaN(amount)) return "—";
+  const normalized = String(currency || "").trim();
+  if (normalized === "£" || normalized === "$" || normalized === "€") {
+    return `${normalized}${amount.toFixed(2)}`;
+  }
+  if (/^[A-Z]{3}$/.test(normalized)) {
+    return `${amount.toFixed(2)} ${normalized}`;
+  }
+  return amount.toFixed(2);
+}
 
-  // Calculate nights
+function getUniquePackageRooms<T>(rooms: T[] | undefined) {
+  if (!Array.isArray(rooms) || rooms.length === 0) return [];
+
+  const uniqueRooms: T[] = [];
+  const seenSelectionKeys = new Set<string>();
+
+  for (const room of rooms) {
+    const selectionKey = String((room as { selectionKey?: string } | null)?.selectionKey || "").trim();
+    if (selectionKey) {
+      if (seenSelectionKeys.has(selectionKey)) continue;
+      seenSelectionKeys.add(selectionKey);
+    }
+    uniqueRooms.push(room);
+  }
+
+  return uniqueRooms;
+}
+
+function PackageReviewPageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { phoneNumber: affiliatePhone } = useAffiliatePhone();
+
+  const searchRequestId = useBookingStore((state) => state.searchRequestId);
+  const vyspaFolderNumber = useBookingStore((state) => state.vyspaFolderNumber);
+  const selectedHotel = useBookingStore((state) => state.selectedHotel);
+  const hotelSearch = useBookingStore((state) => state.hotelSearch);
+  const hotelDetailsCache = useBookingStore((state) => state.hotelDetailsCache);
+  const selectedHotelRoomIds = useBookingStore((state) => state.selectedHotelRoomIds);
+  const hotelRoomSummary = useBookingStore((state) => state.selectedHotelRoomSummary);
+  const addOns = useBookingStore((state) => state.addOns);
+  const setProtectionPlan = useBookingStore((state) => state.setProtectionPlan);
+  const setAdditionalBaggage = useBookingStore((state) => state.setAdditionalBaggage);
+  const storeSearchParams = useBookingStore((state) => state.searchParams);
+  const selectedFareType = useBookingStore((state) => state.selectedFareType);
+  const selectedUpgrade = useBookingStore((state) => state.selectedUpgradeOption);
+  const selectedFlight = useSelectedFlight();
+
+  const [showFlightInfo, setShowFlightInfo] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [packageDetails, setPackageDetails] = useState<Awaited<ReturnType<typeof packageService.getPackageDetails>>["details"] | null>(null);
+
+  const hotelId = selectedHotel?.hotelId || searchParams.get("hotelId") || "";
+  const flightResultId =
+    selectedFlight?.segmentResultId ||
+    searchParams.get("flightId") ||
+    searchParams.get("flightResultId") ||
+    "";
+
+  useEffect(() => {
+    if (!flightResultId || selectedHotelRoomIds.length === 0) return;
+    let cancelled = false;
+
+    async function loadDetails() {
+      try {
+        setDetailLoading(true);
+        setDetailError(null);
+        const response = await packageService.getPackageDetails({
+          flightResultId,
+          hotelResultRoomIds: selectedHotelRoomIds,
+        });
+        if (!cancelled) {
+          setPackageDetails(response.details);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setDetailError(error instanceof Error ? error.message : "Failed to load package details");
+        }
+      } finally {
+        if (!cancelled) setDetailLoading(false);
+      }
+    }
+
+    loadDetails();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [flightResultId, selectedHotelRoomIds]);
+
   const nights = useMemo(() => {
-    if (!checkIn || !checkOut) return 6; // Default
-    const startDate = new Date(checkIn);
-    const endDate = new Date(checkOut);
-    const diffTime = endDate.getTime() - startDate.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  }, [checkIn, checkOut]);
-
-  // Get selected flight from mock data
-  const selectedFlight = useMemo(() => {
-    if (flightId) {
-      return mockPackageFlights.find((f) => f.id === flightId) || mockPackageFlights[0];
+    if (hotelSearch?.checkIn && hotelSearch?.checkOut) {
+      const start = new Date(`${hotelSearch.checkIn}T12:00:00`);
+      const end = new Date(`${hotelSearch.checkOut}T12:00:00`);
+      return Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
     }
-    return mockPackageFlights[0];
-  }, [flightId]);
+    return packageDetails?.hotel?.rooms?.[0]?.nights || 1;
+  }, [hotelSearch?.checkIn, hotelSearch?.checkOut, packageDetails?.hotel?.rooms]);
 
-  // Transform flight data to FlightSummaryCard format (same as booking page)
-  const flightSummaryLegs = useMemo(() => {
+  const passengerLabel = useMemo(() => {
+    const counts = storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 };
+    const parts: string[] = [];
+    if (counts.adults) parts.push(`${counts.adults} Adult${counts.adults > 1 ? "s" : ""}`);
+    if (counts.children) parts.push(`${counts.children} Child${counts.children > 1 ? "ren" : ""}`);
+    if (counts.infants) parts.push(`${counts.infants} Infant${counts.infants > 1 ? "s" : ""}`);
+    return parts.join(", ");
+  }, [storeSearchParams?.passengers]);
+
+  const summaryLegs = useMemo(() => {
     if (!selectedFlight) return [];
-    
-    const legs = [];
-    
-    // Outbound leg
-    if (selectedFlight.outbound) {
-      legs.push({
-        from: selectedFlight.outbound.departureAirport.city || selectedFlight.outbound.departureAirport.name,
-        to: selectedFlight.outbound.arrivalAirport.city || selectedFlight.outbound.arrivalAirport.name,
-        fromCode: selectedFlight.outbound.departureAirport.code,
-        toCode: selectedFlight.outbound.arrivalAirport.code,
-        departureTime: selectedFlight.outbound.departureTime,
-        arrivalTime: selectedFlight.outbound.arrivalTime,
-        date: selectedFlight.outbound.date,
-        duration: selectedFlight.outbound.duration,
-        stops: selectedFlight.outbound.stops === 0 
-          ? "Direct" 
-          : `${selectedFlight.outbound.stops} Stop${selectedFlight.outbound.stops > 1 ? "s" : ""}`,
-        airline: selectedFlight.airline.name,
-        airlineCode: selectedFlight.airline.code,
-      });
-    }
-    
-    // Inbound leg (return flight)
-    if (selectedFlight.inbound) {
-      legs.push({
-        from: selectedFlight.inbound.departureAirport.city || selectedFlight.inbound.departureAirport.name,
-        to: selectedFlight.inbound.arrivalAirport.city || selectedFlight.inbound.arrivalAirport.name,
-        fromCode: selectedFlight.inbound.departureAirport.code,
-        toCode: selectedFlight.inbound.arrivalAirport.code,
-        departureTime: selectedFlight.inbound.departureTime,
-        arrivalTime: selectedFlight.inbound.arrivalTime,
-        date: selectedFlight.inbound.date,
-        duration: selectedFlight.inbound.duration,
-        stops: selectedFlight.inbound.stops === 0 
-          ? "Direct" 
-          : `${selectedFlight.inbound.stops} Stop${selectedFlight.inbound.stops > 1 ? "s" : ""}`,
-        airline: selectedFlight.airline.name,
-        airlineCode: selectedFlight.airline.code,
-      });
-    }
-    
-    return legs;
+    const journeySegments =
+      selectedFlight.segments && selectedFlight.segments.length > 0
+        ? selectedFlight.segments
+        : [selectedFlight.outbound, ...(selectedFlight.inbound ? [selectedFlight.inbound] : [])];
+
+    return journeySegments.map((segment) => ({
+      from: segment.departureAirport.city || segment.departureAirport.name || segment.departureAirport.code,
+      to: segment.arrivalAirport.city || segment.arrivalAirport.name || segment.arrivalAirport.code,
+      fromCode: segment.departureAirport.code,
+      toCode: segment.arrivalAirport.code,
+      departureTime: segment.departureTime,
+      arrivalTime: segment.arrivalTime,
+      date: segment.date,
+      duration: segment.totalJourneyTime || segment.duration,
+      stops: segment.stopDetails || `${segment.stops} Stop${segment.stops !== 1 ? "s" : ""}`,
+      airline: segment.carrierName || selectedFlight.airline.name,
+      airlineCode: segment.carrierCode || selectedFlight.airline.code,
+    }));
   }, [selectedFlight]);
 
-  // Passenger label for flight summary
-  const passengerLabel = `${guests} Adult${guests > 1 ? "s" : ""}`;
+  const region = getRegion();
+  const baseFare = selectedUpgrade?.totalPrice || selectedFlight?.price || 0;
+  const protectionPlanPercentages = !baseFare
+    ? IASSURE_PRICING.global
+    : region === "UK"
+      ? IASSURE_PRICING.uk.slabs.find((slab) => baseFare <= slab.max) || IASSURE_PRICING.uk.slabs[IASSURE_PRICING.uk.slabs.length - 1]
+      : IASSURE_PRICING.global;
+  const protectionPlanPrices = {
+    basic: baseFare * protectionPlanPercentages.basic,
+    premium: baseFare * protectionPlanPercentages.premium,
+    all: baseFare * protectionPlanPercentages.all,
+  };
 
-  // Calculate prices (mock)
+  const parsedPackagePrice = parseMoneyString(packageDetails?.packagePrice);
+  const uniqueHotelRooms = useMemo(
+    () => getUniquePackageRooms(packageDetails?.hotel?.rooms),
+    [packageDetails?.hotel?.rooms]
+  );
   const pricing = useMemo(() => {
-    const hotelPerNight = 450;
-    const hotelTotal = hotelPerNight * nights;
-    const flightTotal = selectedFlight?.price || 899;
-    const taxesAndFees = Math.round((hotelTotal + flightTotal) * 0.12);
-    const total = hotelTotal + flightTotal + taxesAndFees;
-
+    const hotelTotal =
+      uniqueHotelRooms.reduce((sum, room) => sum + Number(room.price || 0), 0) ||
+      hotelRoomSummary?.total ||
+      0;
+    const flightTotal = packageDetails?.flight?.totalFare || selectedFlight?.price || 0;
+    const packageTotal = parsedPackagePrice.amount ?? hotelTotal + flightTotal;
     return {
-      hotelPerNight,
       hotelTotal,
       flightTotal,
-      taxesAndFees,
-      total,
+      packageTotal,
+      currency:
+        parsedPackagePrice.currency ||
+        packageDetails?.flight?.currency ||
+        hotelRoomSummary?.currency ||
+        selectedFlight?.currency ||
+        "GBP",
     };
-  }, [nights, selectedFlight]);
+  }, [
+    hotelRoomSummary?.currency,
+    hotelRoomSummary?.total,
+    packageDetails?.flight?.currency,
+    packageDetails?.flight?.totalFare,
+    uniqueHotelRooms,
+    parsedPackagePrice.amount,
+    parsedPackagePrice.currency,
+    selectedFlight?.currency,
+    selectedFlight?.price,
+  ]);
+
+  const hotelDisplay = useMemo(() => {
+    const cached = selectedHotel?.hotelId ? hotelDetailsCache?.[selectedHotel.hotelId] : undefined;
+    return {
+      name: packageDetails?.hotel?.name || selectedHotel?.hotelName || cached?.hotelName || "Selected hotel",
+      image: packageDetails?.hotel?.imageUrl || cached?.mainImage || "/hotels/hotel-placeholder.jpg",
+      rating: packageDetails?.hotel?.starRating || cached?.hotelRating || 0,
+      reviewCount: cached?.trustYou?.reviewsCount || 0,
+      distance: cached?.address || "",
+      amenities: cached?.amenities || [],
+    };
+  }, [hotelDetailsCache, packageDetails?.hotel, selectedHotel]);
+
+  const changeFlightHref = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("type", "package");
+    if (hotelId) params.set("hotelId", hotelId);
+    if (flightResultId) params.set("flightResultId", flightResultId);
+    return `/search?${params.toString()}`;
+  }, [flightResultId, hotelId]);
 
   const handleContinue = () => {
-    // Navigate to traveler details / payment
     const params = new URLSearchParams(searchParams.toString());
-    // Pass hotel dummy data forward for traveller details page
-    params.set("hotelImage", mockHotelData.image);
-    params.set("hotelRating", String(mockHotelData.rating));
-    params.set("hotelReviewCount", String(mockHotelData.reviewCount));
-    params.set("hotelDistance", mockHotelData.distance);
-    params.set("hotelAmenities", mockHotelData.amenities.join("|"));
+    params.set("type", "package");
     router.push(`/packages/checkout?${params.toString()}`);
   };
+
+  const refNumber = vyspaFolderNumber || searchRequestId || selectedFlight?.webRef || "—";
+  const selectedCancellation = packageDetails?.cancellationPolicies?.[0];
+  const cabinLabel = formatFareLabel(selectedUpgrade?.cabinClassDisplay || selectedFareType);
+  const baggageCurrency = selectedFlight?.currency || "£";
+
+  if (!selectedFlight) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-[#3754ED]" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
 
-      {/* Main Content */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
-        {/* Step Progress */}
         <PackageStepProgress currentStep="review" />
 
-        {/* Web Ref (Mobile) - match booking page behavior */}
         <div className="mt-4">
-          <WebRefCard
-            refNumber="IN-649707636"
-            phoneNumber="020 4502 2984"
-            isMobile={true}
-          />
+          <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={true} />
         </div>
 
-        {/* Info Banner */}
         <div className="mt-6 bg-[#F5F7FF] border border-[#DFE0E4] rounded-xl p-4 flex items-start gap-3">
           <Info className="w-5 h-5 text-[#3754ED] flex-shrink-0 mt-0.5" />
           <p className="text-sm text-[#3A478A]">
-            Please remember that it is your responsibility to have in your
-            possession all the necessary travel documents with you
+            Please remember that it is your responsibility to have in your possession all the necessary travel documents.
           </p>
         </div>
 
         <div className="mt-8 flex flex-col lg:flex-row gap-8">
-          {/* Left Column - Details */}
           <div className="flex-1 space-y-6">
-            {/* Stay Details Card */}
             <div className="bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden">
-              {/* Header */}
               <div className="px-6 py-4 border-b border-[#DFE0E4] flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-[#010D50]">
-                  Stay Details
-                </h2>
-                <Link
-                  href={`/hotels?type=package`}
-                  className="text-[#3754ED] text-sm font-medium flex items-center gap-1 hover:underline"
-                >
+                <h2 className="text-xl font-semibold text-[#010D50]">Stay Details</h2>
+                <Link href="/hotels?type=package" className="text-[#3754ED] text-sm font-medium flex items-center gap-1 hover:underline">
                   <Edit2 className="w-4 h-4" />
                   Change selection
                 </Link>
               </div>
-
-              {/* Content */}
               <div className="p-6">
                 <div className="flex flex-col md:flex-row gap-6">
-                  {/* Hotel Image */}
                   <div className="w-full md:w-80 h-48 md:h-56 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
                     <img
-                      src="/hotels/hotel-placeholder.jpg"
-                      alt={decodeURIComponent(hotelName)}
+                      src={hotelDisplay.image}
+                      alt={hotelDisplay.name}
                       className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src =
+                      onError={(event) => {
+                        (event.target as HTMLImageElement).src =
                           "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&auto=format&fit=crop";
                       }}
                     />
                   </div>
 
-                  {/* Hotel Info */}
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-[#010D50] mb-1">
-                      {decodeURIComponent(hotelName)}
-                    </h3>
-                    <p className="text-sm text-[#3A478A] mb-3">
-                      {mockHotelData.distance}
-                    </p>
+                    <h3 className="text-lg font-semibold text-[#010D50] mb-1">{hotelDisplay.name}</h3>
+                    <p className="text-sm text-[#3A478A] mb-3">{hotelDisplay.distance}</p>
 
-                    {/* Rating */}
-                    <div className="flex items-center gap-2 mb-4">
-                      <span className="bg-[#3754ED] text-white text-sm font-semibold px-2.5 py-1 rounded">
-                        {mockHotelData.rating}
-                      </span>
-                      <div>
-                        <span className="text-sm font-medium text-[#010D50]">
-                          Exceptional
+                    {hotelDisplay.rating ? (
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className="bg-[#3754ED] text-white text-sm font-semibold px-2.5 py-1 rounded">
+                          {hotelDisplay.rating}
                         </span>
-                        <span className="text-xs text-[#3A478A] ml-2">
-                          {mockHotelData.reviewCount} reviews
-                        </span>
+                        <div>
+                          <span className="text-sm font-medium text-[#010D50]">
+                            {hotelDisplay.rating >= 8 ? "Exceptional" : "Very good"}
+                          </span>
+                          <span className="text-xs text-[#3A478A] ml-2">
+                            {hotelDisplay.reviewCount ? `${hotelDisplay.reviewCount} reviews` : ""}
+                          </span>
+                        </div>
                       </div>
-                    </div>
+                    ) : null}
 
-                    {/* Amenities */}
                     <div className="flex flex-wrap gap-4 text-sm text-[#3A478A]">
-                      {mockHotelData.amenities.map((amenity) => (
+                      {hotelDisplay.amenities.slice(0, 4).map((amenity) => (
                         <span key={amenity} className="flex items-center gap-1">
                           <span className="w-1.5 h-1.5 bg-[#3A478A] rounded-full" />
                           {amenity}
@@ -258,142 +338,127 @@ function PackageReviewPageInner() {
                   </div>
                 </div>
 
-                {/* Check-in/out Details */}
                 <div className="mt-6 grid grid-cols-2 gap-4 p-4 bg-[#F8F9FC] rounded-xl">
                   <div>
-                    <div className="text-sm text-[#3A478A] mb-1">Check-In:</div>
+                    <div className="text-sm text-[#3A478A] mb-1">Check-In</div>
                     <div className="text-lg font-semibold text-[#010D50]">
-                      {formatDate(checkIn) || "Wed, Jan 21, 2026"}
+                      {formatDateLabel(hotelSearch?.checkIn || packageDetails?.hotel?.rooms?.[0]?.checkIn)}
                     </div>
                   </div>
                   <div>
-                    <div className="text-sm text-[#3A478A] mb-1">Check-Out:</div>
+                    <div className="text-sm text-[#3A478A] mb-1">Check-Out</div>
                     <div className="text-lg font-semibold text-[#010D50]">
-                      {formatDate(checkOut) || "Wed, Jan 31, 2026"}
+                      {formatDateLabel(hotelSearch?.checkOut || packageDetails?.hotel?.rooms?.[0]?.checkOut || packageDetails?.hotel?.checkOutDate)}
                     </div>
                   </div>
                 </div>
-
-                {/* Stay Summary */}
                 <div className="mt-4 flex flex-wrap gap-6">
                   <div>
-                    <div className="text-sm text-[#3A478A]">
-                      Total length of the stay:
-                    </div>
-                    <div className="font-semibold text-[#010D50]">
-                      {nights} Nights
-                    </div>
+                    <div className="text-sm text-[#3A478A]">Total length of stay</div>
+                    <div className="font-semibold text-[#010D50]">{nights} Night{nights !== 1 ? "s" : ""}</div>
                   </div>
                   <div className="border-l border-[#DFE0E4] pl-6">
-                    <div className="text-sm text-[#3A478A]">You selected</div>
+                    <div className="text-sm text-[#3A478A]">Rooms selected</div>
                     <div className="font-semibold text-[#010D50]">
-                      {rooms} room{rooms > 1 ? "s" : ""} for {guests} adult
-                      {guests > 1 ? "s" : ""}
+                      {selectedHotelRoomIds.length} room{selectedHotelRoomIds.length !== 1 ? "s" : ""}
                     </div>
                   </div>
                 </div>
+                {detailLoading && (
+                  <div className="text-sm text-[#3A478A] flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Loading live package pricing...
+                  </div>
+                )}
+                {detailError && (
+                  <div className="text-sm text-red-600">{detailError}</div>
+                )}
               </div>
             </div>
 
-            {/* Flight Details Card */}
             <div className="bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden">
-              {/* Header */}
               <div className="px-6 py-4 border-b border-[#DFE0E4] flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-[#010D50]">
-                  Flight Details
-                </h2>
-                <Link
-                  href={`/search?type=package&hotelId=${hotelId}&hotelName=${hotelName}&checkIn=${checkIn}&checkOut=${checkOut}&guests=${guests}&rooms=${rooms}`}
-                  className="text-[#3754ED] text-sm font-medium flex items-center gap-1 hover:underline"
-                >
+                <h2 className="text-xl font-semibold text-[#010D50]">Flight Details</h2>
+                <Link href={changeFlightHref} className="text-[#3754ED] text-sm font-medium flex items-center gap-1 hover:underline">
                   <Edit2 className="w-4 h-4" />
                   Change selection
                 </Link>
               </div>
-
-              {/* Content - Using FlightSummaryCard like booking page */}
               <div className="p-6 flex flex-col gap-3">
-                {flightSummaryLegs.map((leg, index) => (
+                {summaryLegs.map((leg, index) => (
                   <FlightSummaryCard
                     key={`${leg.fromCode}-${leg.toCode}-${index}`}
                     leg={leg}
-                    passengers={passengerLabel}
+                    passengers={passengerLabel || "1 Adult"}
                     onViewDetails={() => setShowFlightInfo(true)}
-                    cabinLabel="Economy"
+                    cabinLabel={cabinLabel}
                   />
                 ))}
               </div>
             </div>
 
-            {/* Baggage Section - Using BaggageSection component like payment page */}
             <BaggageSection
-              additionalBaggage={additionalBaggage}
+              additionalBaggage={addOns.additionalBaggage}
               onUpdateBaggage={setAdditionalBaggage}
-              baggageDescription="Cabin bag only"
-              maxBaggageCount={guests}
-              baggagePrice={90}
-              currencySymbol="£"
+              baggageDescription={selectedFlight.baggage || "Cabin bag only"}
+              maxBaggageCount={(storeSearchParams?.passengers.adults || 1) + (storeSearchParams?.passengers.children || 0)}
+              baggagePrice={PRICING_CONFIG.baggagePrice}
+              currencySymbol={baggageCurrency}
             />
 
-            {/* Travel Protection - Using ProtectionPlanSection component like payment page (iAssure) */}
             <ProtectionPlanSection
-              selectedPlan={selectedProtectionPlan}
-              onSelectPlan={setSelectedProtectionPlan}
+              selectedPlan={addOns.protectionPlan}
+              onSelectPlan={setProtectionPlan}
               planPrices={protectionPlanPrices}
-              currency="£"
+              currency={baggageCurrency}
             />
 
-            {/* Cancellation Policy */}
             <div className="bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden">
               <div className="px-6 py-4 border-b border-[#DFE0E4]">
-                <h2 className="text-xl font-semibold text-[#010D50]">
-                  Cancellation Policy
-                </h2>
+                <h2 className="text-xl font-semibold text-[#010D50]">Cancellation Policy</h2>
               </div>
-              <div className="p-6">
-                <p className="text-sm text-[#3A478A]">
-                  Free cancellation before Jan 20
-                </p>
-                <p className="text-sm text-[#3A478A] mt-2">
-                  After Jan 20, cancellation fee of £300 applies
-                </p>
+              <div className="p-6 flex flex-col gap-2">
+                {selectedCancellation ? (
+                  <>
+                    <p className="text-sm font-medium text-[#010D50]">
+                      Effective from {formatDateLabel(selectedCancellation.effectiveDate)}
+                    </p>
+                    <p className="text-sm text-[#3A478A]">
+                      {selectedCancellation.policy}
+                    </p>
+                    {selectedCancellation.penalty != null && (
+                      <p className="text-sm text-[#3A478A]">
+                        Penalty: {formatMoney(selectedCancellation.penaltyCurrency, selectedCancellation.penalty)}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-[#3A478A]">Live cancellation details will appear here once the package detail request completes.</p>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Right Column - Price Summary */}
           <div className="w-full lg:w-96 flex-shrink-0 flex flex-col gap-4">
-            {/* Web Ref Card - Using WebRefCard component like booking page */}
-            <WebRefCard
-              refNumber="IN-649707636"
-              phoneNumber="020 4502 2984"
-              isMobile={false}
-            />
+            <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={false} />
 
-            {/* Price Summary Card */}
             <div className="bg-white border border-[#DFE0E4] rounded-xl sticky top-4">
               <div className="p-6 space-y-4">
                 <h3 className="font-semibold text-[#010D50]">Summary</h3>
 
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-[#3A478A]">
-                      Hotel ({nights} nights)
-                    </span>
-                    <span className="font-medium text-[#010D50]">
-                      £{pricing.hotelTotal.toLocaleString()}
-                    </span>
+                    <span className="text-[#3A478A]">Hotel ({nights} nights)</span>
+                    <span className="font-medium text-[#010D50]">{formatMoney(pricing.currency, pricing.hotelTotal)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#3A478A]">Flights (per person)</span>
-                    <span className="font-medium text-[#010D50]">
-                      £{pricing.flightTotal.toLocaleString()}
-                    </span>
+                    <span className="text-[#3A478A]">Flights (per booking)</span>
+                    <span className="font-medium text-[#010D50]">{formatMoney(pricing.currency, pricing.flightTotal)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[#3A478A]">Taxes & Fees</span>
                     <span className="font-medium text-[#010D50]">
-                      £{pricing.taxesAndFees.toLocaleString()}
+                      {formatMoney(pricing.currency, Math.max(0, pricing.packageTotal - pricing.hotelTotal - pricing.flightTotal))}
                     </span>
                   </div>
                 </div>
@@ -403,11 +468,9 @@ function PackageReviewPageInner() {
                     <span className="font-semibold text-[#010D50]">Total</span>
                     <div className="text-right">
                       <div className="text-2xl font-bold text-[#3754ED]">
-                        £{pricing.total.toLocaleString()}
+                        {packageDetails?.packagePrice || formatMoney(pricing.currency, pricing.packageTotal)}
                       </div>
-                      <div className="text-xs text-[#3A478A]">
-                        Incl. all taxes & fees
-                      </div>
+                      <div className="text-xs text-[#3A478A]">Incl. all taxes & fees</div>
                     </div>
                   </div>
                 </div>
@@ -421,8 +484,7 @@ function PackageReviewPageInner() {
                 </Button>
 
                 <p className="text-xs text-center text-[#3A478A]">
-                  By clicking continue, you confirm you are familiar with the
-                  terms & conditions of this booking.
+                  By clicking continue, you confirm you are familiar with the terms and conditions of this booking.
                 </p>
               </div>
             </div>
@@ -432,15 +494,12 @@ function PackageReviewPageInner() {
 
       <Footer />
 
-      {/* Flight Info Modal */}
-      {selectedFlight && (
-        <FlightInfoModal
-          flight={selectedFlight}
-          open={showFlightInfo}
-          onOpenChange={setShowFlightInfo}
-          stayOnCurrentPage={true}
-        />
-      )}
+      <FlightInfoModal
+        flight={selectedFlight}
+        open={showFlightInfo}
+        onOpenChange={setShowFlightInfo}
+        stayOnCurrentPage={true}
+      />
     </div>
   );
 }
@@ -450,7 +509,7 @@ export default function PackageReviewPage() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-white flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#3754ED]" />
+          <Loader2 className="w-8 h-8 animate-spin text-[#3754ED]" />
         </div>
       }
     >

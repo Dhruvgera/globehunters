@@ -8,6 +8,8 @@ import type {
   PackageSearchCriteria,
   PackageSearchResult,
   PackageResultsMeta,
+  PackageRoomsParams,
+  PackageRoomsResponse,
   TransformedAlternateFlight,
   HolidayHotelFilters,
   HolidayFlightFilter,
@@ -109,36 +111,17 @@ export interface PackageDetailsResponse {
 // ============================================================================
 
 export interface ChangeFlightsParams {
-  /** Flight search criteria ID from package search */
-  flightSearchCriteriaId: number;
-  /** Selected flight psw_result_id from package search */
-  selectedFlightPswResultId: number;
-  /** Hotel search criteria IDs from package search */
-  hotelSearchCriteriaIds: number;
-  /** Hotel ID (optional) */
-  hotelId?: number;
-  /** Hotel search result ID (optional) */
-  hotelResultId?: number;
-  /** Hotel search result room ID (optional) */
-  hotelResultRoomId?: number;
-  /** Maximum number of results */
-  limit?: number;
-  /** Page number */
-  page?: number;
-  /** Flight filters */
-  filter?: {
-    priceFrom?: string;
-    priceTo?: string;
-    airlines?: string[];
-    cabins?: ('M' | 'W' | 'C' | 'F')[];
-  };
+  /** Selected/default flight result ID from package search */
+  flightResultId: string;
+  /** Selected hotel result ID from package search */
+  hotelResultId: number;
 }
 
 export interface PackageDetailParams {
-  /** Priced flight result identifier (psw_result_id) */
-  pswResultId: number;
+  /** Selected/default flight result ID */
+  flightResultId: string;
   /** Selected room IDs */
-  roomIds: string[] | number[];
+  hotelResultRoomIds: string[];
 }
 
 // ============================================================================
@@ -218,9 +201,8 @@ class PackageService {
       return {
         results: data.results || [],
         meta: data.meta || {
-          flightSearchCriteriaId: 0,
-          hotelSearchCriteriaIds: 0,
-          selectedFlightPswResultId: 0,
+          requestId: 0,
+          selectedFlightResultId: '',
           completed: false,
         },
       };
@@ -236,10 +218,8 @@ class PackageService {
   async getAlternateFlights(params: ChangeFlightsParams): Promise<AlternateFlightsResponse> {
     try {
       console.log('[PackageService] Getting alternate flights:', {
-        flightSearchCriteriaId: params.flightSearchCriteriaId,
-        selectedFlightPswResultId: params.selectedFlightPswResultId,
-        hotelSearchCriteriaIds: params.hotelSearchCriteriaIds,
-        hotelId: params.hotelId,
+        flightResultId: params.flightResultId,
+        hotelResultId: params.hotelResultId,
       });
 
       const response = await fetch('/api/packages/change-flights', {
@@ -268,13 +248,42 @@ class PackageService {
   }
 
   /**
+   * Get room options for a selected package hotel
+   */
+  async getPackageRooms(params: PackageRoomsParams): Promise<PackageRoomsResponse> {
+    try {
+      const response = await fetch('/api/packages/rooms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+        console.error('[PackageService] Package rooms error:', error);
+        throw new Error(error.message || 'Failed to get package rooms');
+      }
+
+      const data = await response.json();
+      return {
+        results: data.results || [],
+      };
+    } catch (error) {
+      console.error('[PackageService] Error getting package rooms:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get full package details
    */
   async getPackageDetails(params: PackageDetailParams): Promise<PackageDetailsResponse> {
     try {
       console.log('[PackageService] Getting package details:', {
-        pswResultId: params.pswResultId,
-        roomIds: params.roomIds,
+        flightResultId: params.flightResultId,
+        hotelResultRoomIds: params.hotelResultRoomIds,
       });
 
       const response = await fetch('/api/packages/details', {
@@ -387,6 +396,8 @@ export type {
   PackageSearchCriteria,
   PackageSearchResult,
   PackageResultsMeta,
+  PackageRoomsParams,
+  PackageRoomsResponse,
   TransformedAlternateFlight,
   HolidayHotelFilters,
   HolidayFlightFilter,

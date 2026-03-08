@@ -24,7 +24,7 @@ import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
 import type { PackageSearchResult } from "@/types/holidayPackage";
 import { resolveTrustYouHotelId } from "@/lib/trustyou/hotelMapping";
 import type { TrustYouBulkResultItem } from "@/types/trustyou";
-import { parseHotelChildAges, serializeHotelChildAges } from "@/lib/hotels/childAges";
+import { normalizeHotelChildAges, parseHotelChildAges, serializeHotelChildAges } from "@/lib/hotels/childAges";
 import { getHotelProvider, parseHotelProvider, type HotelProvider } from "@/lib/hotels/provider";
 
 const DEFAULT_FILTERS: HotelFiltersState = {
@@ -73,6 +73,32 @@ const HOTEL_PROVIDER_TOGGLE_ENABLED = ["1", "true", "yes", "on"].includes(
   String(process.env.NEXT_PUBLIC_ENABLE_HOTEL_PROVIDER_TOGGLE || "").trim().toLowerCase()
 );
 const HOTEL_PROVIDER_OVERRIDE_STORAGE_KEY = "gh-hotel-provider-override";
+
+function buildPackageRoomConfigurations(
+  adults: number,
+  children: number,
+  rooms: number,
+  childAgesInput: unknown
+) {
+  const roomCount = Math.max(1, Number(rooms || 1));
+  const totalAdults = Math.max(roomCount, Number(adults || 0));
+  const totalChildren = Math.max(0, Number(children || 0));
+  const normalizedChildAges = normalizeHotelChildAges(childAgesInput, roomCount, totalChildren);
+  const baseAdults = Math.floor(totalAdults / roomCount);
+  const adultRemainder = totalAdults % roomCount;
+
+  return Array.from({ length: roomCount }, (_, roomIndex) => {
+    const roomChildren = normalizedChildAges[roomIndex] || {};
+    return {
+      adults: Math.max(1, baseAdults + (roomIndex < adultRemainder ? 1 : 0)),
+      children: Object.keys(roomChildren).length,
+      childAges: Object.entries(roomChildren)
+        .sort((a, b) => Number(a[0]) - Number(b[0]))
+        .map(([, age]) => Number(age)),
+      infants: 0,
+    };
+  });
+}
 
 function sanitizeHiddenHotelFilters(filters: HotelFiltersState): HotelFiltersState {
   return {
@@ -577,13 +603,45 @@ function HotelsPageInner() {
         try {
           const search = resolvedSearchRef.current;
           const p = new URLSearchParams(urlParamsKey);
+          const roomConfigurations = buildPackageRoomConfigurations(
+            search.adults,
+            search.children,
+            search.rooms,
+            search.child_age
+          );
           
           // Get package-specific params from URL
           const fromCode = p.get("fromCode") || "LON";
           const fromName = p.get("from") || "London";
-          const destinationHiddenValue = p.get("hidden_key") 
-            ? `${p.get("hidden_key")?.split(";")[0] || ""};${p.get("hidden_id") || ""};${search.location}`
-            : `${search.location.substring(0, 3).toUpperCase()};0;${search.location}`;
+          let destinationHiddenValue = p.get("hidden_key") || search.hidden_key || "";
+          if (!destinationHiddenValue.includes(";") && search.location) {
+            try {
+              const destinationResponse = await fetch(
+                `/api/packages/destinations?location=${encodeURIComponent(search.location)}`
+              );
+              if (destinationResponse.ok) {
+                const destinations = await destinationResponse.json() as Array<{
+                  id?: string | number;
+                  name?: string;
+                  hiddenvalue?: string;
+                }>;
+                const normalizedLocation = search.location.trim().toLowerCase();
+                const normalizedHiddenId = String(p.get("hidden_id") || search.hidden_id || "");
+                const matchedDestination =
+                  destinations.find((destination) => String(destination.id || "") === normalizedHiddenId) ||
+                  destinations.find((destination) => String(destination.name || "").trim().toLowerCase() === normalizedLocation) ||
+                  destinations[0];
+                if (matchedDestination?.hiddenvalue) {
+                  destinationHiddenValue = matchedDestination.hiddenvalue;
+                }
+              }
+            } catch (destinationError) {
+              console.warn("[Hotels Page] Failed to resolve package destination hidden value", destinationError);
+            }
+          }
+          if (!destinationHiddenValue.includes(";")) {
+            destinationHiddenValue = `${search.location.substring(0, 3).toUpperCase()};${p.get("hidden_id") || search.hidden_id || "0"};${search.location}`;
+          }
           
           // Calculate nights from check-in/check-out
           const nights = Math.max(1, Math.round(
@@ -599,8 +657,8 @@ function HotelsPageInner() {
             adults: search.adults,
             children: search.children,
           });
-          
-          const packageResponse = await packageService.searchPackages({
+
+          const packageCriteria = {
             departureCode: fromCode,
             departureName: fromName,
             destinationCode: destinationHiddenValue.split(";")[0] || "",
@@ -608,8 +666,10 @@ function HotelsPageInner() {
             destinationHiddenValue,
             checkIn: search.checkIn,
             nights,
-            rooms: [{ adults: search.adults, children: search.children, childAges: [], infants: 0 }],
-          });
+            rooms: roomConfigurations,
+          } as const;
+
+          const packageResponse = await packageService.searchPackages(packageCriteria);
           
           console.log('[Hotels Page] Package search response:', {
             resultsCount: packageResponse.results.length,
@@ -656,12 +716,37 @@ function HotelsPageInner() {
               countryName: "",
               mealPlans: [],
               refundable: undefined,
+              rawSearchResult: pkg,
             };
           });
           
-          // Store package metadata in booking store for later use
-          const setPackageResults = useBookingStore.getState().setPackageResults;
+          // Store package metadata and stay context for later steps.
+          const {
+            setPackageSearch,
+            setPackageResults,
+            setHotelSearch,
+            setSearchRequestId,
+          } = useBookingStore.getState();
+          setPackageSearch(packageCriteria);
           setPackageResults(packageResponse.results, packageResponse.meta);
+          setHotelSearch({
+            provider: "vyspa",
+            location: search.location,
+            hidden_id: search.hidden_id || "",
+            hidden_key: search.hidden_key || "",
+            checkIn: search.checkIn,
+            checkOut: search.checkOut,
+            rooms: search.rooms,
+            adults: search.adults,
+            children: search.children,
+            child_age: search.child_age,
+            branches: search.branches,
+            searchCriteriaId: packageResponse.meta.requestId,
+            arrivalPointCode: search.arrival_point_code || undefined,
+          });
+          if (packageResponse.meta.requestId) {
+            setSearchRequestId(String(packageResponse.meta.requestId));
+          }
           
           if (!cancelled && requestSeq === activeRequestSeq.current) {
             if (mappedHotels.length > 0) {

@@ -28,6 +28,7 @@ import {
   flattenHotelChildAges,
   serializeHotelChildAges,
 } from "@/lib/hotels/childAges";
+import type { HolidayDestination } from "@/types/holidayPackage";
 
 interface SearchBarProps {
   compact?: boolean;
@@ -39,6 +40,32 @@ interface SearchBarProps {
 }
 
 type Product = "flight" | "hotel" | "package";
+
+async function resolvePackageDestination(locationItem: VyspaCityHotelLookupItem | null): Promise<HolidayDestination | null> {
+  if (!locationItem?.label?.trim()) return null;
+
+  try {
+    const response = await fetch(
+      `/api/packages/destinations?location=${encodeURIComponent(locationItem.label.trim())}`
+    );
+    if (!response.ok) return null;
+
+    const destinations = (await response.json()) as HolidayDestination[];
+    if (!Array.isArray(destinations) || destinations.length === 0) return null;
+
+    const normalizedLabel = locationItem.label.trim().toLowerCase();
+    const normalizedId = locationItem.id != null ? String(locationItem.id) : "";
+
+    return (
+      destinations.find((destination) => String(destination.id) === normalizedId) ||
+      destinations.find((destination) => destination.name.trim().toLowerCase() === normalizedLabel) ||
+      destinations[0] ||
+      null
+    );
+  } catch {
+    return null;
+  }
+}
 
 function ProductTab({
   active,
@@ -229,12 +256,19 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
     );
   };
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (activeProduct === "package") {
       // Flight+Hotel packages: navigate to /hotels?type=package with query params
       const loc = hotelLocationItem?.label?.trim() || "London";
       const checkIn = hotelStartDate ? format(hotelStartDate, "yyyy-MM-dd") : "";
       const checkOut = hotelEndDate ? format(hotelEndDate, "yyyy-MM-dd") : "";
+      const packageDestination =
+        hotelLocationItem?.loc && hotelLocationItem.loc.includes(";")
+          ? null
+          : await resolvePackageDestination(hotelLocationItem);
+      const packageHiddenValue = packageDestination?.hiddenvalue || hotelLocationItem?.loc || "";
+      const packageHiddenId =
+        packageDestination?.id || (hotelLocationItem?.id != null ? String(hotelLocationItem.id) : "");
       const params = new URLSearchParams();
       params.set("type", "package");
       params.set("location", loc);
@@ -256,8 +290,8 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
       // Include flight origin if available
       if (from?.code) params.set("fromCode", from.code);
       if (from?.city) params.set("from", from.city);
-      if (hotelLocationItem?.id != null) params.set("hidden_id", String(hotelLocationItem.id));
-      if (hotelLocationItem?.loc) params.set("hidden_key", String(hotelLocationItem.loc));
+      if (packageHiddenId) params.set("hidden_id", packageHiddenId);
+      if (packageHiddenValue) params.set("hidden_key", packageHiddenValue);
       if (hotelLocationItem) setHotelLocationSelection(hotelLocationItem);
       router.push(`/hotels?${params.toString()}`);
       return;

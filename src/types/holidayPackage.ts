@@ -77,6 +77,8 @@ export interface HolidayPackageSearchRequest {
   child_ages: RoomChildAges[];
   /** Number of infants per room as string array */
   infants: string[];
+  /** Optional upstream timeout in seconds */
+  timeout?: number;
   /** Site unique identifier (specific clients only) */
   siteId?: number;
   /** Fare category: IT (Inclusive Tour), PU (Published), SS (Seat Sale), AC (Low Cost) */
@@ -117,6 +119,12 @@ export interface HolidayPackageSearchRequest {
   hotel_filters?: HolidayHotelFilters;
   /** Custom sort options */
   customsort?: HolidayCustomSort;
+  /** Retrieve an existing package search response by request ID */
+  RequestId?: number;
+  /** Retrieve results for a specific selected/default flight */
+  FlightResultId?: string;
+  /** Retrieve results for a specific selected hotel */
+  HotelResultId?: number;
 }
 
 // ============================================================================
@@ -427,26 +435,46 @@ export interface HolidaySearchCriteriaIds {
 
 /** Search criteria from response */
 export interface HolidaySearchCriteria {
-  /** IDs for subsequent API calls */
-  ids: HolidaySearchCriteriaIds;
+  /** Search request ID for package retrieval and rooms */
+  RequestId?: number;
+  /** Hotel request/search ID */
+  HotelRequestId?: number;
+  /** Hotel request/search ID for next-day hotel fallback */
+  HotelRequestIdNextDay?: number;
+  /** Flight request/search ID */
+  FlightRequestId?: number;
+  /** Default selected flight result ID */
+  FlightResultId?: string;
+  /** Hotel day option flag */
+  HotelDayOption?: number;
+  /** Whether upstream search has completed */
+  searchComplete?: boolean;
+  /** Legacy IDs shape kept for compatibility with older callers */
+  ids?: HolidaySearchCriteriaIds;
   /** Room occupancy breakdown */
   RoomOccupancy?: HolidayRoomOccupancy[];
 }
 
 /** Full package search response */
 export interface HolidayPackageSearchResponse {
+  /** Success flag */
+  success?: boolean;
+  /** Upstream status text */
+  status?: string;
   /** Hotel options flag: 1-4 based on flight arrival time */
   hotel_options?: number;
+  HotelDayOption?: number;
   /** Notes explaining hotel check-in options */
   hotel_options_remarks?: string;
+  HotelDayOptionRemarks?: string;
   /** Normalized search summary */
   search_key?: HolidaySearchKey;
-  /** Flight details (outbound/inbound) */
-  FlightDetails?: HolidayFlightDetails;
+  /** Flight details (outbound/inbound or live v2 array payload) */
+  FlightDetails?: HolidayFlightDetails | HolidayFlightDirection[];
   /** Hotel/package results */
   Packages?: HolidayPackages;
   /** Search criteria and IDs */
-  SearchCriteria?: HolidaySearchCriteria[];
+  SearchCriteria?: HolidaySearchCriteria[] | HolidaySearchCriteria;
 }
 
 // ============================================================================
@@ -467,18 +495,10 @@ export interface HolidayFlightFilter {
 
 /** Request parameters for holiday_change_flights v2 */
 export interface HolidayChangeFlightsRequest {
-  /** Flight search criteria ID from package search */
-  psc_request_id: number;
-  /** Selected flight psw_result_id from package search */
-  psw_result_id: number;
-  /** Hotel search criteria ID from package search */
-  hotel_request_id: number;
-  /** Hotel ID (optional) */
-  hotel_id?: number;
-  /** Hotel search result ID (optional) */
-  hotel_result_id?: number;
-  /** Hotel search result room ID (optional) */
-  hotel_result_room_id?: number;
+  /** Selected/default flight result ID from package search */
+  FlightResultId: string;
+  /** Selected hotel result ID from package search */
+  HotelResultId: number;
   /** Maximum number of results to return */
   limit?: number;
   /** Page number for pagination */
@@ -489,89 +509,34 @@ export interface HolidayChangeFlightsRequest {
 
 /** Alternate flight option from change flights */
 export interface HolidayAlternateFlight {
-  /** Flight psw_result_id */
-  psw_result_id: number;
+  /** Unique result ID used for change/details */
+  Result_id: string;
+  /** Flight total */
+  Total: number;
+  /** ISO currency code */
+  Currency_code?: string;
+  /** GDS source */
+  Gds?: string;
+  /** Last ticketing date */
+  Last_ticket_date?: string;
+  /** Journey type */
+  Journey_type?: number;
+  /** Fare type/category */
+  Fare_type?: string;
+  /** Validating carrier */
+  Validating_carrier?: string;
+  /** Upstream module identifier */
+  Module_id?: number;
+  /** Journey segments (usually outbound + inbound) */
+  Segments?: HolidayFlightDirection[];
+  /** Package total */
+  holiday_price?: number;
+  /** Package total per room */
+  holiday_price_per_room?: number;
   /** Package price delta vs baseline */
   holiday_diff: number;
-  /** Per-person holiday_diff */
+  /** Package price delta per passenger */
   holiday_diff_per_person?: number;
-  /** Last ticketing date */
-  last_ticket_date?: string;
-  /** GDS source */
-  gds?: string;
-  /** Fare category */
-  FareCat?: string;
-  /** ISO currency code */
-  iso_currency_code?: string;
-  /** Validating carrier */
-  validating_carrier?: string;
-  /** Designator label */
-  Designator?: string;
-  /** Module name */
-  module_name?: string;
-  /** Total fare */
-  total_fare: number;
-  /** Total net fare */
-  total_net_fare?: number;
-  /** Commission amount */
-  CommissionAmount?: number;
-  /** Total taxes */
-  tax?: number;
-  /** Internal flight ID */
-  id: number;
-  /** Cabin class code */
-  cabin_class?: string;
-  /** Marketing airline code */
-  airline_code: string;
-  /** Flight number */
-  flight_number: number;
-  /** Fare class code */
-  fare_class?: string;
-  /** Baggage allowance */
-  Baggage?: string;
-  /** Flight date code */
-  flight_date: string;
-  /** Day of week label */
-  flight_day?: string;
-  /** Departure terminal */
-  departure_terminal?: string;
-  /** Arrival terminal */
-  arrival_terminal?: string;
-  /** IATA departure airport */
-  departure_airport: string;
-  /** IATA arrival airport */
-  arrival_airport: string;
-  /** Departure date YYYY-MM-DD */
-  departure_date: string;
-  /** Arrival date YYYY-MM-DD */
-  arrival_date: string;
-  /** Departure time HHmm */
-  departure_time: number;
-  /** Arrival time HHmm */
-  arrival_time: number;
-  /** Number of stops */
-  number_stops: number;
-  /** Travel time in minutes */
-  travel_time: number;
-  /** Airline name */
-  airline_name: string;
-  /** Operating airline name */
-  operating_airline_name?: string;
-  /** Class name */
-  class_name?: string;
-  /** Available seats */
-  available_seats?: number;
-  /** Refundability text */
-  refundable_text?: string;
-  /** Airport info */
-  Airport?: {
-    depart_airport_name?: string;
-    depart_airport_city?: string;
-    depart_airport_country?: string;
-    arrive_airport_name?: string;
-    arrive_airport_city?: string;
-    arrive_airport_country?: string;
-  };
 }
 
 /** Change flights response */
@@ -586,10 +551,10 @@ export interface HolidayChangeFlightsResponse {
 
 /** Request parameters for holiday_detail */
 export interface HolidayDetailRequest {
-  /** Priced flight result identifier (psw_result_id) */
-  psw_result_id: number;
-  /** Selected room IDs as comma-separated string */
-  roomids: string;
+  /** Selected/default flight result ID */
+  FlightResultId: string;
+  /** Selected room IDs */
+  HotelResultRoomIds: string[];
 }
 
 /** Cancellation policy for a room */
@@ -650,6 +615,8 @@ export interface HolidayCancellationPolicy {
 export interface HolidayRoomDetail {
   /** Room detail ID */
   id: number;
+  /** Upstream selected-room key that links duplicated room rows to the original selected room option */
+  selection_key?: string;
   /** Room name */
   room_name?: string;
   /** Number of nights */
@@ -1033,16 +1000,26 @@ export interface TransformedFlightSegment {
 
 /** Package search result metadata */
 export interface PackageResultsMeta {
-  /** Flight search criteria ID */
-  flightSearchCriteriaId: number;
-  /** Hotel search criteria IDs */
-  hotelSearchCriteriaIds: number;
-  /** Selected flight psw_result_id */
-  selectedFlightPswResultId: number;
+  /** Package search request ID */
+  requestId: number;
+  /** Hotel request/search ID */
+  hotelRequestId?: number;
+  /** Hotel request/search ID for next-day fallback */
+  hotelRequestIdNextDay?: number;
+  /** Flight request/search ID */
+  flightRequestId?: number;
+  /** Selected/default flight result ID */
+  selectedFlightResultId: string;
   /** Pagination */
   pagination?: HolidayPagination;
+  /** Hotel day option returned by upstream */
+  hotelDayOption?: number;
   /** Search completed flag */
   completed: boolean;
+  /** Legacy fields kept optional for compatibility with older callers */
+  flightSearchCriteriaId?: number;
+  hotelSearchCriteriaIds?: number;
+  selectedFlightPswResultId?: number;
 }
 
 /** Selected package for booking */
@@ -1056,22 +1033,30 @@ export interface SelectedPackage {
     outbound: TransformedFlightLeg;
     inbound?: TransformedFlightLeg;
   };
-  /** PSW result ID for booking */
-  pswResultId: number;
+  /** Selected/default flight result ID for booking */
+  flightResultId?: string;
+  /** Legacy PSW result ID kept for compatibility with older callers */
+  pswResultId?: number;
   /** Total package price */
   totalPrice?: number;
 }
 
 /** Transformed alternate flight for frontend */
 export interface TransformedAlternateFlight {
-  /** PSW result ID */
-  pswResultId: number;
+  /** Live result ID */
+  resultId: string;
   /** Price difference from base package */
   priceDifference: number;
   /** Price difference per person */
   priceDifferencePerPerson?: number;
-  /** Total fare */
+  /** Flight total fare */
   totalFare: number;
+  /** Package total */
+  holidayPrice?: number;
+  /** Package total per room */
+  holidayPricePerRoom?: number;
+  /** Raw journey segments */
+  segments?: HolidayFlightDirection[];
   /** Airline code */
   airlineCode: string;
   /** Airline name */
@@ -1102,4 +1087,53 @@ export interface TransformedAlternateFlight {
   currency?: string;
   /** Refundable text */
   refundableText?: string;
+  /** GDS source */
+  gds?: string;
+  /** Upstream module identifier */
+  moduleId?: number;
+  /** Fare type/category */
+  fareType?: string;
+  /** Validating carrier */
+  validatingCarrier?: string;
+}
+
+export interface PackageRoomsParams {
+  requestId?: number;
+  flightResultId?: string;
+  hotelResultId: number;
+}
+
+export interface PackageRoomsResponse {
+  results: Array<{
+    id: number;
+    hotel_id: number;
+    hotel_name: string;
+    quickDescription?: string;
+    hotel_rating?: number;
+    image_name?: string;
+    geo_loc_latitude?: number;
+    geo_loc_longitude?: number;
+    address1?: string | null;
+    address2?: string | null;
+    SellCur?: string;
+    rooms?: Record<string, Array<{
+      id: string;
+      room_name?: string;
+      days_spent?: number;
+      allocated_rooms?: number;
+      allocation_status?: number;
+      allocation_status_text?: string;
+      supplier_id?: number;
+      supplier_name?: string;
+      MealPlan?: string;
+      meal_name?: string;
+      mealId?: number;
+      currency_code?: string;
+      sell_currency_code?: string;
+      cust_tot_sell_amt?: number;
+      net_price?: number;
+      nonRef?: number;
+      cancellation_policy?: string;
+    }>>;
+  }>;
 }

@@ -31,11 +31,34 @@ import { WebRefCard } from "@/components/booking/WebRefCard";
 import { PaymentForm } from "@/components/payment/PaymentForm";
 import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
 import { HotelSummaryCard } from "@/components/booking/HotelSummaryCard";
+import { packageService } from "@/services/api/packageService";
 
 import { FOLDER_STATUS_CODES } from "@/types/portal";
 import { countryCodes } from "@/lib/utils/countryCodes";
 
 const REFUNDABLE_TERMS_URL = "https://refundablebooking.com/refundable-terms";
+
+function parseMoneyString(value: string | undefined): { amount?: number; currency?: string } {
+  if (!value) return { amount: undefined, currency: undefined };
+  const normalized = value.trim();
+  const leadingCurrency = normalized.match(/^([A-Za-z£$€]{1,3})\s*([0-9]+(?:\.[0-9]+)?)$/);
+  if (leadingCurrency) {
+    return {
+      currency: leadingCurrency[1],
+      amount: Number(leadingCurrency[2]),
+    };
+  }
+
+  const trailingCurrency = normalized.match(/^([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z£$€]{1,3})$/);
+  if (trailingCurrency) {
+    return {
+      amount: Number(trailingCurrency[1]),
+      currency: trailingCurrency[2],
+    };
+  }
+
+  return { amount: undefined, currency: undefined };
+}
 
 function PaymentContent() {
   const t = useTranslations('payment');
@@ -80,6 +103,7 @@ function PaymentContent() {
 
   const { createSession, redirectToCheckout, loading: boxPayLoading, error: boxPayError } = useBoxPay();
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [packageTotalOverride, setPackageTotalOverride] = useState<{ amount?: number; currency?: string } | null>(null);
 
   // Get affiliate phone number
   const { phoneNumber: affiliatePhone } = useAffiliatePhone();
@@ -97,6 +121,45 @@ function PaymentContent() {
       router.push('/search');
     }
   }, [hasHydrated, flight, isHotelMode, router]);
+
+  const packageFlightResultId =
+    searchParams?.get("flightResultId") ||
+    searchParams?.get("flightId") ||
+    "";
+  const packageRoomIds = useMemo(() => {
+    const ids = selectedHotelRoomIds?.length
+      ? selectedHotelRoomIds
+      : [searchParams?.get("roomId") || ""];
+    return ids.map((id) => String(id || "").trim()).filter(Boolean);
+  }, [searchParams, selectedHotelRoomIds]);
+
+  useEffect(() => {
+    if (!isPackageMode || !packageFlightResultId || packageRoomIds.length === 0) return;
+
+    let cancelled = false;
+    const loadPackagePricing = async () => {
+      try {
+        const response = await packageService.getPackageDetails({
+          flightResultId: packageFlightResultId,
+          hotelResultRoomIds: packageRoomIds,
+        });
+        if (cancelled) return;
+
+        const parsed = parseMoneyString(response.details?.packagePrice);
+        setPackageTotalOverride(parsed.amount != null ? parsed : null);
+      } catch (error) {
+        if (!cancelled) {
+          console.warn("Failed to load package pricing for payment page", error);
+          setPackageTotalOverride(null);
+        }
+      }
+    };
+
+    loadPackagePricing();
+    return () => {
+      cancelled = true;
+    };
+  }, [isPackageMode, packageFlightResultId, packageRoomIds]);
 
   // Track session start for 60-min refresh expiry
   useEffect(() => {
@@ -198,7 +261,11 @@ function PaymentContent() {
   };
 
   // Price calculation - Use real pricing from selected upgrade, flight or hotel room
-  const currency = isHotelMode ? hotelRoomSummary?.currency : (selectedUpgrade ? selectedUpgrade.currency : flight?.currency);
+  const currency = isPackageMode
+    ? (packageTotalOverride?.currency || selectedUpgrade?.currency || flight?.currency || hotelRoomSummary?.currency)
+    : isHotelMode
+      ? hotelRoomSummary?.currency
+      : (selectedUpgrade ? selectedUpgrade.currency : flight?.currency);
 
   // BoxPay expects ISO currency codes (e.g. GBP), not symbols (e.g. £)
   const currencyForGateway = (() => {
@@ -209,7 +276,11 @@ function PaymentContent() {
     if (c === '€') return 'EUR';
     return c.toUpperCase();
   })();
-  const baseFare = isHotelMode ? (hotelRoomSummary?.total || 0) : (selectedUpgrade ? selectedUpgrade.totalPrice : (flight?.price || 0));
+  const baseFare = isPackageMode
+    ? (packageTotalOverride?.amount || selectedUpgrade?.totalPrice || flight?.price || 0)
+    : isHotelMode
+      ? (hotelRoomSummary?.total || 0)
+      : (selectedUpgrade ? selectedUpgrade.totalPrice : (flight?.price || 0));
 
   // Determine region (UK vs Global) and pick appropriate iAssure pricing
   const region = getRegion();

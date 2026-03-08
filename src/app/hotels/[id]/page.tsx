@@ -37,6 +37,7 @@ import Footer from "@/components/navigation/Footer";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { hotelService } from "@/services/api/hotelService";
+import { packageService } from "@/services/api/packageService";
 import { useBookingStore } from "@/store/bookingStore";
 import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
 import { resolveTrustYouHotelId } from "@/lib/trustyou/hotelMapping";
@@ -883,6 +884,9 @@ export default function HotelRoomsPage() {
   const isPackageMode = searchParams.get("type") === "package";
 
   const hotelSearch = useBookingStore((s) => s.hotelSearch);
+  const packageSearch = useBookingStore((s) => s.packageSearch);
+  const packageResults = useBookingStore((s) => s.packageResults);
+  const packageResultsMeta = useBookingStore((s) => s.packageResultsMeta);
   const hotelResultsMeta = useBookingStore((s) => s.hotelResultsMeta);
   const setSelectedHotel = useBookingStore((s) => s.setSelectedHotel);
   const setSelectedHotelRoomIds = useBookingStore((s) => s.setSelectedHotelRoomIds);
@@ -1572,6 +1576,104 @@ export default function HotelRoomsPage() {
       setRoomsError(null);
 
       try {
+        if (isPackageMode) {
+          const packageHotel = packageResults?.find((row) => String(row.id) === String(hotelId));
+          const roomResponse = await packageService.getPackageRooms({
+            hotelResultId: Number(hotelId),
+            requestId: packageResultsMeta?.requestId,
+            flightResultId: packageResultsMeta?.selectedFlightResultId || undefined,
+          });
+
+          const roomHotel =
+            roomResponse.results.find((row) => String(row.id) === String(hotelId)) ||
+            roomResponse.results[0];
+
+          if (!packageHotel || !roomHotel) {
+            throw new Error("No live package rooms were returned for the selected hotel.");
+          }
+
+          const roomGroups = Object.values(roomHotel.rooms || {}).filter(
+            (entry) => Array.isArray(entry)
+          );
+          const flattenedRooms = roomGroups.flat().map((option) => {
+            const total = Number(option.cust_tot_sell_amt ?? option.net_price ?? 0);
+            const nights = Math.max(1, Number(option.days_spent ?? packageSearch?.nights ?? 1));
+            const currencyCode = String(option.sell_currency_code || option.currency_code || roomHotel.SellCur || "GBP").toUpperCase();
+            const currency = currencyCode === "GBP" ? "£" : currencyCode;
+            return {
+              id: String(option.id || ""),
+              sourceRoomOptionId: String(option.id || ""),
+              name: String(option.room_name || "Room"),
+              bedType: String(option.meal_name || option.MealPlan || "Meal plan"),
+              reviews: { score: 0, label: "No reviews", count: 0 },
+              isRefundable: Number(option.nonRef ?? 1) === 0,
+              paymentType: "Pay now",
+              amenities: [],
+              price: {
+                currency,
+                nightly: nights > 0 ? total / nights : total,
+                total,
+              },
+              _raw: option,
+            } satisfies RoomCardData;
+          });
+
+          flattenedRooms.sort((a, b) => (a.price.total || 0) - (b.price.total || 0));
+
+          const roomCount = Math.max(1, Number(packageSearch?.rooms?.length || hotelSearch?.rooms || 1));
+          const defaultSelectedCounts = (() => {
+            const next: Record<string, number> = {};
+            if (flattenedRooms.length === 0 || roomCount > 1) return next;
+            const firstRoomId = String(flattenedRooms[0]?.id || "");
+            if (firstRoomId) next[firstRoomId] = 1;
+            return next;
+          })();
+
+          const headerImage = roomHotel.image_name || packageHotel.imageUrl || "";
+          const headerAddress = [roomHotel.address1, roomHotel.address2, packageHotel.address?.street1]
+            .filter(Boolean)
+            .join(", ");
+          const latitude = Number(roomHotel.geo_loc_latitude ?? packageHotel.address?.latitude ?? 0);
+          const longitude = Number(roomHotel.geo_loc_longitude ?? packageHotel.address?.longitude ?? 0);
+
+          if (!cancelled) {
+            setRawGetRoomsV3Response(roomResponse);
+            setRawAccommodationDetailsResponse(null);
+            setRemoteHotelHeader({
+              name: roomHotel.hotel_name || packageHotel.hotelName,
+              rating: Number(roomHotel.hotel_rating || packageHotel.starRating || 0),
+              image: headerImage || undefined,
+              address: headerAddress || undefined,
+            });
+            if (packageHotel.description || roomHotel.quickDescription) {
+              setDetailsText(packageHotel.description || roomHotel.quickDescription || "");
+            }
+            if (headerImage) setGalleryImages([headerImage]);
+            if (latitude && longitude) {
+              setCoordinates({ lat: latitude, lng: longitude });
+            }
+            setRemoteRooms(flattenedRooms);
+            setSelectedHotel({ hotelId, hotelName: roomHotel.hotel_name || packageHotel.hotelName });
+            setHotelDetailsCache(hotelId, {
+              hotelId,
+              hotelName: roomHotel.hotel_name || packageHotel.hotelName,
+              hotelRating: Number(roomHotel.hotel_rating || packageHotel.starRating || 0) || undefined,
+              mainImage: headerImage || undefined,
+              address: headerAddress || undefined,
+              galleryImages: headerImage ? [headerImage] : [],
+              rooms: flattenedRooms,
+              detailsText: packageHotel.description || roomHotel.quickDescription || "",
+              cancellationText: "",
+              amenities: [],
+              fetchedAt: Date.now(),
+            });
+            setSelectedRoomCounts(defaultSelectedCounts);
+            setActiveRoomCardId(flattenedRooms.length > 0 ? String(flattenedRooms[0].id) : null);
+          }
+
+          return;
+        }
+
         if (searchResultSeed.description) {
           setDetailsText((previous) => (previous.trim() ? previous : searchResultSeed.description));
         }
@@ -2029,7 +2131,23 @@ export default function HotelRoomsPage() {
     return () => {
       cancelled = true;
     };
-  }, [hotelId, hotelResultsMeta, hotelSearch, hotelSearch?.provider, hotelSearch?.searchCriteriaId, isPackageMode, searchParams, setHotelSearch, setSelectedHotel, urlProvider, urlSearchCriteriaId, urlSrId]);
+  }, [
+    hotelId,
+    hotelResultsMeta,
+    hotelSearch,
+    hotelSearch?.provider,
+    hotelSearch?.searchCriteriaId,
+    isPackageMode,
+    packageResults,
+    packageResultsMeta,
+    packageSearch,
+    searchParams,
+    setHotelSearch,
+    setSelectedHotel,
+    urlProvider,
+    urlSearchCriteriaId,
+    urlSrId,
+  ]);
 
   const scrollToSection = (section: string) => {
     setActiveSection(section);
@@ -2105,18 +2223,18 @@ export default function HotelRoomsPage() {
 
       {/* Package Mode: Step Progress */}
       {isPackageMode && (
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-6">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-7 pb-2">
           <PackageStepProgress currentStep="stay" />
         </div>
       )}
 
       {/* Main Content */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-3 pb-10">
         <div className="bg-white rounded-3xl overflow-hidden">
           {/* Overview Section */}
           <div ref={overviewRef}>
             {/* Hotel Header + Gallery */}
-            <div className="p-4 lg:p-6 space-y-6">
+            <div className="p-5 lg:p-8 space-y-7">
               {/* Hotel Name & Address */}
               <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                 <div className="flex-1 space-y-2">
@@ -2828,12 +2946,16 @@ export default function HotelRoomsPage() {
                     params.set("hotelId", hotelId);
                     params.set("hotelName", hotel.name);
                     params.set("roomId", String(rid));
-                    const checkIn = searchParams.get("checkIn");
-                    const checkOut = searchParams.get("checkOut");
-                    const adults = searchParams.get("adults") || "2";
-                    const children = searchParams.get("children") || "0";
+                    if (packageResultsMeta?.selectedFlightResultId) {
+                      params.set("flightResultId", packageResultsMeta.selectedFlightResultId);
+                    }
+                    const checkIn = searchParams.get("checkIn") || hotelSearch?.checkIn || packageSearch?.checkIn || "";
+                    const nights = Number(packageSearch?.nights || 0);
+                    const checkOut = searchParams.get("checkOut") || hotelSearch?.checkOut || (checkIn && nights > 0 ? shiftIsoDateByDays(checkIn, nights) : "");
+                    const adults = searchParams.get("adults") || String(hotelSearch?.adults || packageSearch?.rooms?.reduce((sum, room) => sum + room.adults, 0) || 2);
+                    const children = searchParams.get("children") || String(hotelSearch?.children || packageSearch?.rooms?.reduce((sum, room) => sum + room.children, 0) || 0);
                     const guests = String(Math.max(1, Number(adults || "0")) + Math.max(0, Number(children || "0")));
-                    const rooms = searchParams.get("rooms") || "1";
+                    const rooms = searchParams.get("rooms") || String(hotelSearch?.rooms || packageSearch?.rooms?.length || 1);
                     if (checkIn) {
                       params.set("departureDate", checkIn);
                       params.set("checkIn", checkIn);
@@ -2844,8 +2966,10 @@ export default function HotelRoomsPage() {
                     }
                     params.set("guests", guests);
                     params.set("rooms", rooms);
-                    params.set("from", "LHR");
-                    params.set("to", "HKG");
+                    if (packageSearch?.departureCode) params.set("from", packageSearch.departureCode);
+                    if (packageSearch?.destinationCode) params.set("to", packageSearch.destinationCode);
+                    if (packageSearch?.departureName) params.set("fromName", packageSearch.departureName);
+                    if (packageSearch?.destinationName) params.set("toName", packageSearch.destinationName);
                     params.set("adults", adults);
                     params.set("children", children);
                     params.set("tripType", "round-trip");
