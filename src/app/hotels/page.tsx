@@ -1822,7 +1822,7 @@ function HotelsPageInner() {
                 setProviderOverride(mode);
                 setProviderMode(mode);
               }}
-              showProviderToggle={HOTEL_PROVIDER_TOGGLE_ENABLED}
+              showProviderToggle={!isPackageMode && HOTEL_PROVIDER_TOGGLE_ENABLED}
             />
 
             {loading && hotels.length === 0 && <HotelSearchLoading />}

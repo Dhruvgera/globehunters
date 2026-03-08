@@ -9,6 +9,7 @@ import { TripTypeSelector } from "./search-bar/TripTypeSelector";
 import { PassengersSelector } from "./search-bar/PassengersSelector";
 import { AirportAutocomplete } from "./search-bar/AirportAutocomplete";
 import { HotelLocationAutocomplete } from "./search-bar/HotelLocationAutocomplete";
+import { PackageOriginAutocomplete } from "./search-bar/PackageOriginAutocomplete";
 import { SwapLocationsButton } from "./search-bar/SwapLocationsButton";
 import { DateSelector } from "./search-bar/DateSelector";
 import { SearchButton } from "./search-bar/SearchButton";
@@ -169,6 +170,18 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
 
     // Hydrate dates/guests/rooms (like flights journey) when on /hotels
     if (pathname?.startsWith("/hotels")) {
+      const fromCode = urlParams.get("fromCode") || "";
+      const fromLabel = urlParams.get("from") || "";
+      if (urlParams.get("type") === "package" && fromCode && !from) {
+        setFrom({
+          code: fromCode,
+          name: fromLabel || fromCode,
+          city: fromLabel || fromCode,
+          country: "",
+          countryCode: "",
+        });
+      }
+
       const inStr = urlParams.get("checkIn") || savedHotelSearch?.checkIn || "";
       const outStr = urlParams.get("checkOut") || savedHotelSearch?.checkOut || "";
       const adults = Number(urlParams.get("adults") || savedHotelSearch?.adults || "") || undefined;
@@ -256,8 +269,20 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
     );
   };
 
+  const isPackageSearchValid = useMemo(() => {
+    return (
+      from !== null &&
+      hotelLocationItem !== null &&
+      hotelStartDate !== undefined &&
+      hotelEndDate !== undefined
+    );
+  }, [from, hotelEndDate, hotelLocationItem, hotelStartDate]);
+
   const handleSearch = async () => {
     if (activeProduct === "package") {
+      if (!isPackageSearchValid) {
+        return;
+      }
       // Flight+Hotel packages: navigate to /hotels?type=package with query params
       const loc = hotelLocationItem?.label?.trim() || "London";
       const checkIn = hotelStartDate ? format(hotelStartDate, "yyyy-MM-dd") : "";
@@ -289,7 +314,7 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
       }
       // Include flight origin if available
       if (from?.code) params.set("fromCode", from.code);
-      if (from?.city) params.set("from", from.city);
+      if (from?.name || from?.city) params.set("from", from?.name || from?.city || "");
       if (packageHiddenId) params.set("hidden_id", packageHiddenId);
       if (packageHiddenValue) params.set("hidden_key", packageHiddenValue);
       if (hotelLocationItem) setHotelLocationSelection(hotelLocationItem);
@@ -529,6 +554,13 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
             transition={{ duration: 0.22 }}
           >
             <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
+          {activeProduct === "package" && (
+            <PackageOriginAutocomplete
+              value={from}
+              onChange={setFrom}
+              placeholder="Flying from"
+            />
+          )}
           {/* Location */}
           <HotelLocationAutocomplete
             value={hotelLocationItem}
@@ -732,6 +764,7 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
           <Button
             type="button"
             onClick={handleSearch}
+            disabled={activeProduct === "package" ? !isPackageSearchValid : false}
             className="rounded-xl px-5 py-2.5 h-auto gap-2 text-sm font-medium w-full md:w-auto bg-[#3754ED] hover:bg-[#2A3FB8] text-white"
           >
             Search

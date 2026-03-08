@@ -2,21 +2,23 @@
 
 import { ChevronRight } from "lucide-react";
 
-export type PackageStep = "stay" | "flight" | "review" | "payment" | "confirmation";
+export type PackageStep = "stay" | "flight" | "review" | "details" | "payment" | "confirmation";
 
 const STEPS: { key: PackageStep; label: string }[] = [
   { key: "stay", label: "Choose your stay" },
   { key: "flight", label: "Choose your flight" },
   { key: "review", label: "Review your package" },
+  { key: "details", label: "Passenger Details" },
   { key: "payment", label: "Payment Details" },
   { key: "confirmation", label: "Confirmation" },
 ];
 
 interface PackageStepProgressProps {
   currentStep: PackageStep;
+  labelOverrides?: Partial<Record<PackageStep, string>>;
 }
 
-export function PackageStepProgress({ currentStep }: PackageStepProgressProps) {
+export function PackageStepProgress({ currentStep, labelOverrides }: PackageStepProgressProps) {
   const currentIndex = STEPS.findIndex((s) => s.key === currentStep);
 
   return (
@@ -63,7 +65,7 @@ export function PackageStepProgress({ currentStep }: PackageStepProgressProps) {
                     isActive ? "inline text-[#010D50] font-medium" : "hidden sm:inline text-[#3A478A]",
                   ].join(" ")}
                 >
-                  {step.label}
+                  {labelOverrides?.[step.key] || step.label}
                 </span>
               </div>
 
