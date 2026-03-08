@@ -269,33 +269,33 @@ function PackageReviewPageInner() {
     <div className="min-h-screen bg-white">
       <Navbar />
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <PackageStepProgress currentStep="review" />
 
         <div className="mt-4">
           <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={true} />
         </div>
 
-        <div className="mt-6 bg-[#F5F7FF] border border-[#DFE0E4] rounded-xl p-4 flex items-start gap-3">
+        <div className="mt-4 sm:mt-6 bg-[#F5F7FF] border border-[#DFE0E4] rounded-xl p-3.5 sm:p-4 flex items-start gap-3">
           <Info className="w-5 h-5 text-[#3754ED] flex-shrink-0 mt-0.5" />
           <p className="text-sm text-[#3A478A]">
             Please remember that it is your responsibility to have in your possession all the necessary travel documents.
           </p>
         </div>
 
-        <div className="mt-8 flex flex-col lg:flex-row gap-8">
-          <div className="flex-1 space-y-6">
+        <div className="mt-6 sm:mt-8 flex flex-col lg:flex-row gap-6 lg:gap-8">
+          <div className="flex-1 space-y-5 sm:space-y-6">
             <div className="bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-[#DFE0E4] flex items-center justify-between">
+              <div className="px-4 sm:px-6 py-4 border-b border-[#DFE0E4] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <h2 className="text-xl font-semibold text-[#010D50]">Stay Details</h2>
                 <Link href="/hotels?type=package" className="text-[#3754ED] text-sm font-medium flex items-center gap-1 hover:underline">
                   <Edit2 className="w-4 h-4" />
                   Change selection
                 </Link>
               </div>
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 <div className="flex flex-col md:flex-row gap-6">
-                  <div className="w-full md:w-80 h-48 md:h-56 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+                  <div className="w-full md:w-80 h-44 sm:h-48 md:h-56 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
                     <img
                       src={hotelDisplay.image}
                       alt={hotelDisplay.name}
@@ -338,7 +338,7 @@ function PackageReviewPageInner() {
                   </div>
                 </div>
 
-                <div className="mt-6 grid grid-cols-2 gap-4 p-4 bg-[#F8F9FC] rounded-xl">
+                <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-[#F8F9FC] rounded-xl">
                   <div>
                     <div className="text-sm text-[#3A478A] mb-1">Check-In</div>
                     <div className="text-lg font-semibold text-[#010D50]">
@@ -352,12 +352,12 @@ function PackageReviewPageInner() {
                     </div>
                   </div>
                 </div>
-                <div className="mt-4 flex flex-wrap gap-6">
+                <div className="mt-4 flex flex-wrap gap-4 sm:gap-6">
                   <div>
                     <div className="text-sm text-[#3A478A]">Total length of stay</div>
                     <div className="font-semibold text-[#010D50]">{nights} Night{nights !== 1 ? "s" : ""}</div>
                   </div>
-                  <div className="border-l border-[#DFE0E4] pl-6">
+                  <div className="sm:border-l sm:border-[#DFE0E4] sm:pl-6">
                     <div className="text-sm text-[#3A478A]">Rooms selected</div>
                     <div className="font-semibold text-[#010D50]">
                       {selectedHotelRoomIds.length} room{selectedHotelRoomIds.length !== 1 ? "s" : ""}
@@ -377,14 +377,14 @@ function PackageReviewPageInner() {
             </div>
 
             <div className="bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-[#DFE0E4] flex items-center justify-between">
+              <div className="px-4 sm:px-6 py-4 border-b border-[#DFE0E4] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <h2 className="text-xl font-semibold text-[#010D50]">Flight Details</h2>
                 <Link href={changeFlightHref} className="text-[#3754ED] text-sm font-medium flex items-center gap-1 hover:underline">
                   <Edit2 className="w-4 h-4" />
                   Change selection
                 </Link>
               </div>
-              <div className="p-6 flex flex-col gap-3">
+              <div className="p-4 sm:p-6 flex flex-col gap-3">
                 {summaryLegs.map((leg, index) => (
                   <FlightSummaryCard
                     key={`${leg.fromCode}-${leg.toCode}-${index}`}
@@ -414,10 +414,10 @@ function PackageReviewPageInner() {
             />
 
             <div className="bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-[#DFE0E4]">
+              <div className="px-4 sm:px-6 py-4 border-b border-[#DFE0E4]">
                 <h2 className="text-xl font-semibold text-[#010D50]">Cancellation Policy</h2>
               </div>
-              <div className="p-6 flex flex-col gap-2">
+              <div className="p-4 sm:p-6 flex flex-col gap-2">
                 {selectedCancellation ? (
                   <>
                     <p className="text-sm font-medium text-[#010D50]">
@@ -442,8 +442,8 @@ function PackageReviewPageInner() {
           <div className="w-full lg:w-96 flex-shrink-0 flex flex-col gap-4">
             <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={false} />
 
-            <div className="bg-white border border-[#DFE0E4] rounded-xl sticky top-4">
-              <div className="p-6 space-y-4">
+            <div className="bg-white border border-[#DFE0E4] rounded-xl lg:sticky lg:top-4">
+              <div className="p-4 sm:p-6 space-y-4">
                 <h3 className="font-semibold text-[#010D50]">Summary</h3>
 
                 <div className="space-y-3 text-sm">

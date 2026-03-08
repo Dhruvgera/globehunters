@@ -376,16 +376,16 @@ function PackageTravellerDetailsInner() {
     <div className="min-h-screen bg-white">
       <Navbar />
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-5 sm:py-6">
         <PackageStepProgress currentStep="payment" />
 
         <div className="mt-4">
           <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={true} />
         </div>
 
-        <div className="mt-6 flex flex-col lg:flex-row gap-6">
+        <div className="mt-5 sm:mt-6 flex flex-col lg:flex-row gap-5 sm:gap-6">
           <div className="flex-1 flex flex-col gap-4">
-            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
+            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 sm:p-5 flex flex-col gap-4">
               <div className="text-sm font-semibold text-[#010D50]">Your hotel</div>
               <div className="flex gap-3">
                 <div className="relative w-[96px] h-[72px] rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
@@ -442,7 +442,7 @@ function PackageTravellerDetailsInner() {
 
             <PassengerFormsSection />
 
-            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
+            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 sm:p-5 flex flex-col gap-4">
               <div className="flex items-start gap-3">
                 <Checkbox
                   id="pkg-terms"
@@ -489,7 +489,7 @@ function PackageTravellerDetailsInner() {
           <div className="w-full lg:w-[482px] flex flex-col gap-4">
             <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={false} />
 
-            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4">
+            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 sm:p-5">
               <div className="text-sm font-semibold text-[#010D50]">Need help?</div>
               <div className="mt-2 text-sm text-[#3A478A]">
                 Call us 24/7:{" "}
