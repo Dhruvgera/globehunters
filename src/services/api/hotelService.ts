@@ -75,8 +75,8 @@ export class HotelService {
     );
 
     const defaultTimeoutSec = (() => {
-      const raw = Number(process.env.NEXT_PUBLIC_VYSPA_HOTELS_TIMEOUT_SEC || 5);
-      if (!Number.isFinite(raw) || raw <= 0) return 5;
+      const raw = Number(process.env.NEXT_PUBLIC_VYSPA_HOTELS_TIMEOUT_SEC || 8);
+      if (!Number.isFinite(raw) || raw <= 0) return 8;
       return Math.trunc(raw);
     })();
     const timeoutSec = (() => {

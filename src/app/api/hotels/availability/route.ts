@@ -56,6 +56,9 @@ const HB_CONTENT_TTL_MS = 1000 * 60 * 60 * 24; // 24h
 const hybridHbCacheByCriteriaId = new Map<string, { at: number; data: HotelbedsSearchSuccess }>();
 const hybridHbCacheByFingerprint = new Map<string, { at: number; data: HotelbedsSearchSuccess }>();
 const HYBRID_HB_CACHE_TTL_MS = 1000 * 60 * 20; // 20m
+const hybridVyspaCacheByCriteriaId = new Map<string, { at: number; data: Record<string, unknown> }>();
+const hybridVyspaCacheByFingerprint = new Map<string, { at: number; data: Record<string, unknown> }>();
+const HYBRID_VYSPA_CACHE_TTL_MS = 1000 * 60 * 20; // 20m
 
 function toInt(v: unknown, fallback: number): number {
   const n = typeof v === 'string' ? Number(v) : typeof v === 'number' ? v : NaN;
@@ -91,6 +94,11 @@ function normalizeSearchCriteriaId(v: unknown): string | null {
   return s;
 }
 
+function isVyspaSearchCriteriaId(v: unknown): boolean {
+  const normalized = normalizeSearchCriteriaId(v);
+  return !!normalized && /^\d+$/.test(normalized);
+}
+
 function toBooleanOrNull(v: unknown): boolean | null {
   if (typeof v === 'boolean') return v;
   if (typeof v === 'string') {
@@ -103,7 +111,10 @@ function toBooleanOrNull(v: unknown): boolean | null {
 
 function extractSearchTimeoutSec(firstCriteria: any): number {
   const requested = toOptionalPositiveInt(firstCriteria?.timeout);
-  const defaultTimeout = Math.max(5, toInt(process.env.VYSPA_HOTELS_SEARCH_TIMEOUT_SEC || '5', 5));
+  const configuredDefault = process.env.VYSPA_HOTELS_SEARCH_TIMEOUT_SEC
+    || process.env.NEXT_PUBLIC_VYSPA_HOTELS_TIMEOUT_SEC
+    || '8';
+  const defaultTimeout = Math.max(5, toInt(configuredDefault, 8));
   return Math.max(5, requested ?? defaultTimeout);
 }
 
@@ -116,7 +127,14 @@ function extractSearchTimeoutBufferSec(): number {
 function resolveVyspaAvailabilityTimeoutMs(searchTimeoutSec: number, timeoutBufferSec: number): number {
   const configured = toOptionalPositiveInt(process.env.VYSPA_HOTELS_AVAILABILITY_TIMEOUT_MS);
   if (configured) return configured;
-  return Math.max(1000, (searchTimeoutSec + timeoutBufferSec) * 1000);
+  // Keep Vyspa's payload timeout authoritative for partial search behavior.
+  // The transport timeout needs a wider window so Vyspa can return searchCriteriaId
+  // plus partial results instead of our fetch aborting first.
+  return Math.max(25000, (searchTimeoutSec + timeoutBufferSec) * 1000);
+}
+
+function getVyspaHotelsApiVersion(): string {
+  return String(process.env.VYSPA_HOTELS_API_VERSION || '1').trim() || '1';
 }
 
 function buildHybridRequestFingerprint(firstCriteria: any): string {
@@ -146,6 +164,15 @@ function cleanupHybridHbCache(now = Date.now()): void {
   }
 }
 
+function cleanupHybridVyspaCache(now = Date.now()): void {
+  for (const [key, value] of hybridVyspaCacheByCriteriaId.entries()) {
+    if (now - value.at > HYBRID_VYSPA_CACHE_TTL_MS) hybridVyspaCacheByCriteriaId.delete(key);
+  }
+  for (const [key, value] of hybridVyspaCacheByFingerprint.entries()) {
+    if (now - value.at > HYBRID_VYSPA_CACHE_TTL_MS) hybridVyspaCacheByFingerprint.delete(key);
+  }
+}
+
 function getHybridHbFromCache(input: { searchCriteriaId?: string | null; fingerprint?: string | null }): HotelbedsSearchSuccess | null {
   cleanupHybridHbCache();
   if (input.searchCriteriaId) {
@@ -171,6 +198,37 @@ function putHybridHbIntoCache(input: {
   }
   if (input.fingerprint) {
     hybridHbCacheByFingerprint.set(input.fingerprint, entry);
+  }
+}
+
+function getHybridVyspaFromCache(input: {
+  searchCriteriaId?: string | null;
+  fingerprint?: string | null;
+}): Record<string, unknown> | null {
+  cleanupHybridVyspaCache();
+  if (input.searchCriteriaId) {
+    const cached = hybridVyspaCacheByCriteriaId.get(input.searchCriteriaId);
+    if (cached) return cached.data;
+  }
+  if (input.fingerprint) {
+    const cached = hybridVyspaCacheByFingerprint.get(input.fingerprint);
+    if (cached) return cached.data;
+  }
+  return null;
+}
+
+function putHybridVyspaIntoCache(input: {
+  searchCriteriaId?: string | null;
+  fingerprint?: string | null;
+  data: Record<string, unknown>;
+}): void {
+  cleanupHybridVyspaCache();
+  const entry = { at: Date.now(), data: input.data };
+  if (input.searchCriteriaId) {
+    hybridVyspaCacheByCriteriaId.set(input.searchCriteriaId, entry);
+  }
+  if (input.fingerprint) {
+    hybridVyspaCacheByFingerprint.set(input.fingerprint, entry);
   }
 }
 
@@ -529,35 +587,69 @@ export async function POST(req: Request) {
     ? (payload[0] as Record<string, unknown>).providerOverride
     : undefined;
   const provider = getHotelProvider(requestedProvider);
-  const vyspaPayload = normalizeVyspaAvailabilityPayload(payload);
+  const vyspaPayload = normalizeVyspaAvailabilityPayload(payload).map((entry) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return entry;
+    const next = { ...(entry as Record<string, unknown>) };
+    if (!isVyspaSearchCriteriaId(next.searchCriteriaId)) {
+      delete next.searchCriteriaId;
+    }
+    return next;
+  });
   const firstCriteria = (vyspaPayload[0] as any) || {};
   const searchTimeoutSec = extractSearchTimeoutSec(firstCriteria);
   const timeoutBufferSec = extractSearchTimeoutBufferSec();
   const vyspaAvailabilityTimeoutMs = resolveVyspaAvailabilityTimeoutMs(searchTimeoutSec, timeoutBufferSec);
-  const requestedSearchCriteriaId = normalizeSearchCriteriaId(firstCriteria?.searchCriteriaId);
+  const vyspaHotelsApiVersion = getVyspaHotelsApiVersion();
+  const requestedSearchCriteriaId = isVyspaSearchCriteriaId(firstCriteria?.searchCriteriaId)
+    ? normalizeSearchCriteriaId(firstCriteria?.searchCriteriaId)
+    : null;
   const hybridRequestFingerprint = buildHybridRequestFingerprint(firstCriteria);
 
   if (provider === 'vyspa') {
     const result = await vyspaRestFetch('/rest/v4/accommodationAvailabilityV3/', vyspaPayload, {
+      headers: { 'Api-Version': vyspaHotelsApiVersion },
       timeoutMs: vyspaAvailabilityTimeoutMs,
     });
     if (!result.ok) {
-      return NextResponse.json(
-        {
-          error: 'API_ERROR',
-          message: `accommodationAvailabilityV3 failed with HTTP ${result.status}`,
-          details: typeof result.data === 'string' ? result.data.slice(0, 500) : result.data,
+      const cachedVyspa = getHybridVyspaFromCache({
+        searchCriteriaId: requestedSearchCriteriaId,
+        fingerprint: hybridRequestFingerprint,
+      });
+      if (cachedVyspa) {
+        return NextResponse.json(cachedVyspa, { status: 200 });
+      }
+      return NextResponse.json({
+        Results: [],
+        Criteria: {
+          provider: 'vyspa',
+          ...(requestedSearchCriteriaId ? { searchCriteriaId: requestedSearchCriteriaId } : {}),
+          searchComplete: false,
         },
-        { status: result.status }
-      );
+        debug: {
+          provider: 'vyspa',
+          fallback: 'pending_vyspa_search',
+          vyspaErrorStatus: result.status,
+          vyspaError: result.data,
+          timeoutSec: searchTimeoutSec,
+          timeoutBufferSec,
+          vyspaAvailabilityTimeoutMs,
+        },
+      }, { status: 200 });
     }
     const vyspaResults = Array.isArray((result.data as any)?.Results) ? (result.data as any).Results : [];
     const filteredVyspaResults = filterResultsWithImage(vyspaResults);
+    const responseCriteriaId = normalizeSearchCriteriaId((result.data as any)?.Criteria?.searchCriteriaId);
+    const cachedVyspaPayload = {
+      ...(result.data as any),
+      Results: filteredVyspaResults,
+    } as Record<string, unknown>;
+    putHybridVyspaIntoCache({
+      searchCriteriaId: responseCriteriaId || requestedSearchCriteriaId,
+      fingerprint: hybridRequestFingerprint,
+      data: cachedVyspaPayload,
+    });
     return NextResponse.json(
-      {
-        ...(result.data as any),
-        Results: filteredVyspaResults,
-      },
+      cachedVyspaPayload,
       { status: 200 }
     );
   }
@@ -594,18 +686,94 @@ export async function POST(req: Request) {
 
   const [vyspaRes, hb] = await Promise.all([
     vyspaRestFetch('/rest/v4/accommodationAvailabilityV3/', vyspaPayload, {
+      headers: { 'Api-Version': vyspaHotelsApiVersion },
       timeoutMs: vyspaAvailabilityTimeoutMs,
     }),
     hbPromise,
   ]);
   if (!vyspaRes.ok) {
+    const cachedVyspa = getHybridVyspaFromCache({
+      searchCriteriaId: requestedSearchCriteriaId,
+      fingerprint: hybridRequestFingerprint,
+    });
+    if (cachedVyspa) {
+      const cachedVyspaResultsRaw = Array.isArray((cachedVyspa as any)?.Results) ? ((cachedVyspa as any).Results as any[]) : [];
+      const cachedVyspaResults = filterResultsWithImage(cachedVyspaResultsRaw);
+      const cachedCriteria = (((cachedVyspa as any)?.Criteria || {}) as Record<string, unknown>);
+      const cachedCriteriaId = normalizeSearchCriteriaId(cachedCriteria.searchCriteriaId) || requestedSearchCriteriaId;
+      const cachedSearchComplete = toBooleanOrNull(cachedCriteria.searchComplete);
+
+      if (hb.ok) {
+        const dedupe = dedupeHybridPartialByNameAddress({
+          vyspaResults: cachedVyspaResults,
+          hotelbedsResults: hb.results,
+          includeUnmappedHotelbeds:
+            String(process.env.HYBRID_INCLUDE_UNMAPPED_HOTELBEDS ?? 'true')
+              .trim()
+              .toLowerCase() !== 'false',
+        });
+        return NextResponse.json(
+          {
+            ...(cachedVyspa as any),
+            Results: dedupe.results,
+            Criteria: {
+              ...cachedCriteria,
+              provider: 'hybrid',
+              ...(cachedCriteriaId ? { searchCriteriaId: cachedCriteriaId } : {}),
+              searchComplete: cachedSearchComplete === true ? true : false,
+            },
+            ...(debug
+              ? {
+                  debug: {
+                    provider: 'hybrid',
+                    fallback: 'cached_vyspa_partial',
+                    vyspaErrorStatus: vyspaRes.status,
+                    vyspaError: vyspaRes.data,
+                    vyspaCount: cachedVyspaResults.length,
+                    hotelbedsCount: hb.results.length,
+                    dedupe: dedupe.stats,
+                    hotelbedsDebug: hb.debugInfo,
+                  },
+                }
+              : {}),
+          },
+          { status: 200 }
+        );
+      }
+
+      return NextResponse.json(
+        {
+          ...(cachedVyspa as any),
+          Criteria: {
+            ...cachedCriteria,
+            provider: 'hybrid',
+            ...(cachedCriteriaId ? { searchCriteriaId: cachedCriteriaId } : {}),
+            searchComplete: cachedSearchComplete === true ? true : false,
+          },
+          ...(debug
+            ? {
+                debug: {
+                  provider: 'hybrid',
+                  fallback: 'cached_vyspa_only',
+                  vyspaErrorStatus: vyspaRes.status,
+                  vyspaError: vyspaRes.data,
+                  hotelbedsErrorStatus: hb.status,
+                  hotelbedsError: hb.error,
+                  vyspaCount: cachedVyspaResults.length,
+                },
+              }
+            : {}),
+        },
+        { status: 200 }
+      );
+    }
     if (hb.ok) {
       return NextResponse.json(
         {
           Results: hb.results,
           Criteria: {
             provider: 'hybrid',
-            searchCriteriaId: requestedSearchCriteriaId || hb.token,
+            ...(requestedSearchCriteriaId ? { searchCriteriaId: requestedSearchCriteriaId } : {}),
             searchComplete: false,
           },
           ...(debug
@@ -639,6 +807,14 @@ export async function POST(req: Request) {
   const vyspaCriteria = ((vyspaRes.data as any)?.Criteria || {}) as Record<string, unknown>;
   const responseSearchCriteriaId = normalizeSearchCriteriaId(vyspaCriteria.searchCriteriaId);
   const responseSearchComplete = toBooleanOrNull(vyspaCriteria.searchComplete);
+  putHybridVyspaIntoCache({
+    searchCriteriaId: responseSearchCriteriaId || requestedSearchCriteriaId,
+    fingerprint: hybridRequestFingerprint,
+    data: {
+      ...(vyspaRes.data as any),
+      Results: vyspaResults,
+    } as Record<string, unknown>,
+  });
 
   if (hb.ok) {
     putHybridHbIntoCache({

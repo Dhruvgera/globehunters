@@ -14,6 +14,19 @@ function shouldHideNoImageResults(): boolean {
   return value === 'true';
 }
 
+function getVyspaHotelsApiVersion(): string {
+  return String(process.env.VYSPA_HOTELS_API_VERSION || '1').trim() || '1';
+}
+
+function getVyspaHotelsTransportTimeoutMs(rawPayload: unknown[]): number {
+  const first = (rawPayload[0] as Record<string, unknown> | undefined) || {};
+  const timeoutCandidate = Number(first?.timeout ?? process.env.VYSPA_HOTELS_SEARCH_TIMEOUT_SEC ?? 8);
+  const searchTimeoutSec = Number.isFinite(timeoutCandidate) && timeoutCandidate > 0 ? Math.trunc(timeoutCandidate) : 8;
+  const configured = Number(process.env.VYSPA_HOTELS_AVAILABILITY_TIMEOUT_MS || '');
+  if (Number.isFinite(configured) && configured > 0) return Math.trunc(configured);
+  return Math.max(25000, (searchTimeoutSec + 5) * 1000);
+}
+
 export async function POST(req: Request) {
   const body = (await req.json().catch(() => null)) as AvailabilityBody | null;
 
@@ -34,7 +47,10 @@ export async function POST(req: Request) {
   }
 
   const vyspaPayload = normalizeVyspaAvailabilityPayload(rawPayload);
-  const result = await vyspaRestFetch('/rest/v4/accommodationAvailabilityV3/', vyspaPayload);
+  const result = await vyspaRestFetch('/rest/v4/accommodationAvailabilityV3/', vyspaPayload, {
+    headers: { 'Api-Version': getVyspaHotelsApiVersion() },
+    timeoutMs: getVyspaHotelsTransportTimeoutMs(vyspaPayload as unknown[]),
+  });
 
   // Debug logging to track Vyspa API response
   const debugRawResults = (result.data as any)?.Results || [];
@@ -69,4 +85,3 @@ export async function POST(req: Request) {
     { status: 200 }
   );
 }
-

@@ -51,8 +51,8 @@ const SHOW_HYBRID_PROVIDER_IN_RESULTS = ["1", "true", "yes", "on"].includes(
 );
 
 const VYSPA_SEARCH_TIMEOUT_SEC = (() => {
-  const raw = Number(process.env.NEXT_PUBLIC_VYSPA_HOTELS_TIMEOUT_SEC || 5);
-  if (!Number.isFinite(raw) || raw <= 0) return 5;
+  const raw = Number(process.env.NEXT_PUBLIC_VYSPA_HOTELS_TIMEOUT_SEC || 8);
+  if (!Number.isFinite(raw) || raw <= 0) return 8;
   return Math.max(5, Math.trunc(raw));
 })();
 
@@ -412,6 +412,12 @@ function HotelsPageInner() {
     if (srId) return srId;
 
     return String(fallbackIdx ?? 0);
+  }
+
+  function isVyspaSearchCriteriaId(value: unknown): value is number | string {
+    if (typeof value === "number" && Number.isFinite(value)) return true;
+    const normalized = String(value ?? "").trim();
+    return /^\d+$/.test(normalized);
   }
 
   const resolvedSearch = useMemo(() => {
@@ -1085,12 +1091,11 @@ function HotelsPageInner() {
           setHasAttemptedFetch(true);
         }
 
-        const shouldPollHybridMore =
-          parsedInitial.isHybridProviderResponse &&
-          parsedInitial.searchComplete === false &&
-          (typeof parsedInitial.criteriaId === "number" || typeof parsedInitial.criteriaId === "string");
+        const shouldPollMore =
+          (parsedInitial.criteriaProvider === "hybrid" || parsedInitial.criteriaProvider === "vyspa") &&
+          parsedInitial.searchComplete === false;
 
-        if (shouldPollHybridMore) {
+        if (shouldPollMore) {
           setLoadingMoreHotels(true);
           let latestCriteriaId: number | string | null = parsedInitial.criteriaId;
 
@@ -1098,8 +1103,6 @@ function HotelsPageInner() {
             if (cancelled || requestSeq !== activeRequestSeq.current) break;
             await new Promise((resolve) => setTimeout(resolve, HYBRID_POLL_INTERVAL_MS));
             if (cancelled || requestSeq !== activeRequestSeq.current) break;
-            if (latestCriteriaId == null || (typeof latestCriteriaId !== "number" && typeof latestCriteriaId !== "string")) break;
-
             try {
               const polledAvailability = await hotelService.searchAvailabilityV3({
                 providerOverride: providerOverride || undefined,
@@ -1114,14 +1117,14 @@ function HotelsPageInner() {
                 child_age: search.child_age,
                 branches: search.branches,
                 timeout: VYSPA_SEARCH_TIMEOUT_SEC,
-                searchCriteriaId: latestCriteriaId,
+                ...(isVyspaSearchCriteriaId(latestCriteriaId) ? { searchCriteriaId: latestCriteriaId } : {}),
               });
 
               const parsedPoll = mapAvailability(polledAvailability);
               if (cancelled || requestSeq !== activeRequestSeq.current) break;
 
               applyAvailabilityToState(parsedPoll);
-              if (typeof parsedPoll.criteriaId === "number" || typeof parsedPoll.criteriaId === "string") {
+              if (isVyspaSearchCriteriaId(parsedPoll.criteriaId)) {
                 latestCriteriaId = parsedPoll.criteriaId;
               }
               if (parsedPoll.searchComplete === true) break;
@@ -1137,10 +1140,20 @@ function HotelsPageInner() {
       } catch (e: any) {
         if (cancelled || requestSeq !== activeRequestSeq.current) return;
         setError(e?.message || "Failed to fetch hotels");
-        setHotels([]);
-        setSearchCriteriaId(null);
         setLoadingMoreHotels(false);
-        setBreakfastByHotelId({});
+        let shouldResetSearchState = false;
+        setHotels((prev) => {
+          if (prev.length > 0) {
+            console.warn("[Hotels Page] Preserving existing hotels after availability error");
+            return prev;
+          }
+          shouldResetSearchState = true;
+          return [];
+        });
+        if (shouldResetSearchState) {
+          setSearchCriteriaId(null);
+          setBreakfastByHotelId({});
+        }
       } finally {
         if (!cancelled && requestSeq === activeRequestSeq.current) {
           setLoading(false);
