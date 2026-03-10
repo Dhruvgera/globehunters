@@ -353,6 +353,34 @@ function HotelsPageInner() {
     return `HB-${(h >>> 0).toString(16).padStart(8, "0").slice(0, 8).toUpperCase()}`;
   }
 
+  function extractResultAmenities(result: any): string[] {
+    const values = new Set<string>();
+
+    if (Array.isArray(result?.amenities)) {
+      for (const amenity of result.amenities) {
+        const value = String(amenity || "").trim();
+        if (!value) continue;
+        values.add(value);
+        if (values.size >= 24) return Array.from(values);
+      }
+    }
+
+    const attributes =
+      result?.attributes && typeof result.attributes === "object" && !Array.isArray(result.attributes)
+        ? result.attributes
+        : null;
+    if (attributes) {
+      for (const value of Object.values(attributes)) {
+        const normalized = String(value || "").trim();
+        if (!normalized) continue;
+        values.add(normalized);
+        if (values.size >= 24) break;
+      }
+    }
+
+    return Array.from(values);
+  }
+
   function parsePriceFromResult(r: any): number | null {
     const candidates = [
       Array.isArray(r?.NetPrices) && r.NetPrices.length > 0 ? Math.min(...r.NetPrices.map((x: any) => Number(x) || Infinity)) : null,
@@ -879,13 +907,9 @@ function HotelsPageInner() {
             if (hasBreakfast) {
               amenitiesSet.add("Breakfast included");
             }
-            if (Array.isArray(r?.amenities)) {
-              for (const amenity of r.amenities) {
-                const value = String(amenity || "").trim();
-                if (!value) continue;
-                amenitiesSet.add(value);
-                if (amenitiesSet.size >= 24) break;
-              }
+            for (const amenity of extractResultAmenities(r)) {
+              amenitiesSet.add(amenity);
+              if (amenitiesSet.size >= 24) break;
             }
             const amenities = Array.from(amenitiesSet) as Hotel["amenities"];
 
@@ -1860,7 +1884,7 @@ function HotelsPageInner() {
               </div>
             )}
 
-            {hotels.length > 0 && (loadingMoreHotels || breakfastEnriching || contentEnriching || trustYouEnriching) && (
+            {((loadingMoreHotels && hasAttemptedFetch) || (hotels.length > 0 && (breakfastEnriching || contentEnriching || trustYouEnriching))) && (
               <div className="inline-flex items-center gap-2 text-xs text-[#3A478A]">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#3754ED] animate-pulse" />
                 {loadingMoreHotels ? "More hotels are being added…" : "Updating hotel details…"}
