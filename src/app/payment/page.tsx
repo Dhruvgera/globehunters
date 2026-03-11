@@ -97,6 +97,7 @@ function PaymentContent() {
   const contactEmail = useBookingStore((state) => state.contactEmail);
   const contactPhone = useBookingStore((state) => state.contactPhone);
   const selectedFareType = useBookingStore((state) => state.selectedFareType);
+  const packageResults = useBookingStore((state) => state.packageResults);
 
   const protectionPlan = addOns.protectionPlan;
   const additionalBaggage = addOns.additionalBaggage;
@@ -126,12 +127,32 @@ function PaymentContent() {
     searchParams?.get("flightResultId") ||
     searchParams?.get("flightId") ||
     "";
+  const packageHotelId =
+    searchParams?.get("hotelId") ||
+    selectedHotel?.hotelId ||
+    "";
   const packageRoomIds = useMemo(() => {
     const ids = selectedHotelRoomIds?.length
       ? selectedHotelRoomIds
       : [searchParams?.get("roomId") || ""];
     return ids.map((id) => String(id || "").trim()).filter(Boolean);
   }, [searchParams, selectedHotelRoomIds]);
+
+  const fallbackPackagePricing = useMemo(() => {
+    if (!isPackageMode) return null;
+    const matchedPackage = packageResults?.find((row) => String(row.id) === String(packageHotelId));
+    if (!matchedPackage?.startingPrice) return null;
+
+    const flightDelta =
+      typeof flight?.packagePriceDeltaTotal === "number"
+        ? flight.packagePriceDeltaTotal
+        : 0;
+
+    return {
+      amount: matchedPackage.startingPrice + flightDelta,
+      currency: matchedPackage.currency || flight?.currency || hotelRoomSummary?.currency || "GBP",
+    };
+  }, [flight?.currency, flight?.packagePriceDeltaTotal, hotelRoomSummary?.currency, isPackageMode, packageHotelId, packageResults]);
 
   useEffect(() => {
     if (!isPackageMode || !packageFlightResultId || packageRoomIds.length === 0) return;
@@ -262,7 +283,7 @@ function PaymentContent() {
 
   // Price calculation - Use real pricing from selected upgrade, flight or hotel room
   const currency = isPackageMode
-    ? (packageTotalOverride?.currency || selectedUpgrade?.currency || flight?.currency || hotelRoomSummary?.currency)
+    ? (packageTotalOverride?.currency || fallbackPackagePricing?.currency || selectedUpgrade?.currency || flight?.currency || hotelRoomSummary?.currency)
     : isHotelMode
       ? hotelRoomSummary?.currency
       : (selectedUpgrade ? selectedUpgrade.currency : flight?.currency);
@@ -277,7 +298,7 @@ function PaymentContent() {
     return c.toUpperCase();
   })();
   const baseFare = isPackageMode
-    ? (packageTotalOverride?.amount || selectedUpgrade?.totalPrice || flight?.price || 0)
+    ? (packageTotalOverride?.amount || fallbackPackagePricing?.amount || selectedUpgrade?.totalPrice || 0)
     : isHotelMode
       ? (hotelRoomSummary?.total || 0)
       : (selectedUpgrade ? selectedUpgrade.totalPrice : (flight?.price || 0));

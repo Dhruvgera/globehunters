@@ -22,6 +22,18 @@ import { folderService } from "@/services/api/folderService";
 import { hotelService } from "@/services/api/hotelService";
 import { packageService } from "@/services/api/packageService";
 
+function formatDateLabel(value?: string) {
+  if (!value) return "—";
+  const date = new Date(`${value.slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 function toIsoCurrency(currency: string | undefined) {
   const normalized = String(currency || "").trim().toUpperCase();
   if (normalized === "£") return "GBP";
@@ -265,6 +277,42 @@ function PackageTravellerDetailsInner() {
     };
   }, [hotelDetailsCache, packageDetails?.hotel, selectedHotel]);
 
+  const stayDetails = useMemo(() => {
+    const checkIn = hotelSearch?.checkIn || packageDetails?.hotel?.rooms?.[0]?.checkIn || packageSearch?.checkIn || "";
+    const checkOut =
+      hotelSearch?.checkOut ||
+      packageDetails?.hotel?.rooms?.[0]?.checkOut ||
+      packageDetails?.hotel?.checkOutDate ||
+      "";
+    const derivedNights =
+      checkIn && checkOut
+        ? Math.max(
+            1,
+            Math.round(
+              (new Date(`${checkOut}T12:00:00`).getTime() - new Date(`${checkIn}T12:00:00`).getTime()) /
+                (1000 * 60 * 60 * 24)
+            )
+          )
+        : undefined;
+
+    return {
+      checkIn,
+      checkOut,
+      nights: derivedNights || packageDetails?.hotel?.rooms?.[0]?.nights || packageSearch?.nights || 1,
+      rooms: Math.max(1, selectedHotelRoomIds.length || packageSearch?.rooms?.length || hotelSearch?.rooms || 1),
+    };
+  }, [
+    hotelSearch?.checkIn,
+    hotelSearch?.checkOut,
+    hotelSearch?.rooms,
+    packageDetails?.hotel?.checkOutDate,
+    packageDetails?.hotel?.rooms,
+    packageSearch?.checkIn,
+    packageSearch?.nights,
+    packageSearch?.rooms,
+    selectedHotelRoomIds.length,
+  ]);
+
   const handleContinue = async () => {
     if (!termsAccepted || !flight || !selectedHotel?.hotelId || selectedHotelRoomIds.length === 0) return;
     if (!passengersSaved) {
@@ -454,6 +502,34 @@ function PackageTravellerDetailsInner() {
                   ))}
                 </div>
               ) : null}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-[#F8F9FC] rounded-xl">
+                <div>
+                  <div className="text-sm text-[#3A478A] mb-1">Check-In</div>
+                  <div className="text-lg font-semibold text-[#010D50]">
+                    {formatDateLabel(stayDetails.checkIn)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-[#3A478A] mb-1">Check-Out</div>
+                  <div className="text-lg font-semibold text-[#010D50]">
+                    {formatDateLabel(stayDetails.checkOut)}
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-4 sm:gap-6">
+                <div>
+                  <div className="text-sm text-[#3A478A]">Total length of stay</div>
+                  <div className="font-semibold text-[#010D50]">
+                    {stayDetails.nights} Night{stayDetails.nights !== 1 ? "s" : ""}
+                  </div>
+                </div>
+                <div className="sm:border-l sm:border-[#DFE0E4] sm:pl-6">
+                  <div className="text-sm text-[#3A478A]">Rooms selected</div>
+                  <div className="font-semibold text-[#010D50]">
+                    {stayDetails.rooms} room{stayDetails.rooms !== 1 ? "s" : ""}
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="flex flex-col gap-3">

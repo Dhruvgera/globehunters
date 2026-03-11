@@ -91,6 +91,7 @@ function PackageReviewPageInner() {
   const setProtectionPlan = useBookingStore((state) => state.setProtectionPlan);
   const setAdditionalBaggage = useBookingStore((state) => state.setAdditionalBaggage);
   const storeSearchParams = useBookingStore((state) => state.searchParams);
+  const packageResults = useBookingStore((state) => state.packageResults);
   const selectedFareType = useBookingStore((state) => state.selectedFareType);
   const selectedUpgrade = useBookingStore((state) => state.selectedUpgradeOption);
   const selectedFlight = useSelectedFlight();
@@ -196,19 +197,35 @@ function PackageReviewPageInner() {
     () => getUniquePackageRooms(packageDetails?.hotel?.rooms),
     [packageDetails?.hotel?.rooms]
   );
+  const fallbackPackagePricing = useMemo(() => {
+    const matchedPackage = packageResults?.find((row) => String(row.id) === String(hotelId));
+    if (!matchedPackage?.startingPrice) return null;
+
+    const flightDelta =
+      typeof selectedFlight?.packagePriceDeltaTotal === "number"
+        ? selectedFlight.packagePriceDeltaTotal
+        : 0;
+
+    return {
+      amount: matchedPackage.startingPrice + flightDelta,
+      currency: matchedPackage.currency || selectedFlight?.currency || hotelRoomSummary?.currency || "GBP",
+    };
+  }, [hotelId, hotelRoomSummary?.currency, packageResults, selectedFlight?.currency, selectedFlight?.packagePriceDeltaTotal]);
+
   const pricing = useMemo(() => {
     const hotelTotal =
       uniqueHotelRooms.reduce((sum, room) => sum + Number(room.price || 0), 0) ||
       hotelRoomSummary?.total ||
       0;
     const flightTotal = packageDetails?.flight?.totalFare || selectedFlight?.price || 0;
-    const packageTotal = parsedPackagePrice.amount ?? hotelTotal + flightTotal;
+    const packageTotal = parsedPackagePrice.amount ?? fallbackPackagePricing?.amount ?? 0;
     return {
       hotelTotal,
       flightTotal,
       packageTotal,
       currency:
         parsedPackagePrice.currency ||
+        fallbackPackagePricing?.currency ||
         packageDetails?.flight?.currency ||
         hotelRoomSummary?.currency ||
         selectedFlight?.currency ||
@@ -217,6 +234,8 @@ function PackageReviewPageInner() {
   }, [
     hotelRoomSummary?.currency,
     hotelRoomSummary?.total,
+    fallbackPackagePricing?.amount,
+    fallbackPackagePricing?.currency,
     packageDetails?.flight?.currency,
     packageDetails?.flight?.totalFare,
     uniqueHotelRooms,
