@@ -1710,7 +1710,7 @@ export default function HotelRoomsPage() {
               setDetailsText(packageDescription);
             }
             if (extractedPackageAmenities.length > 0) {
-              setRemoteAmenities(transformAmenities(extractedPackageAmenities));
+              setRemoteAmenities(extractedPackageAmenities);
             }
             if (headerImage) setGalleryImages([headerImage]);
             if (latitude && longitude) {

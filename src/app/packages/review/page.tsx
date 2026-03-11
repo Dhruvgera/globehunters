@@ -276,9 +276,11 @@ function PackageReviewPageInner() {
   const cabinLabel = formatFareLabel(selectedUpgrade?.cabinClassDisplay || selectedFareType);
   const baggageCurrency = selectedFlight?.currency || "£";
   const journeySegments =
-    selectedFlight.segments && selectedFlight.segments.length > 0
+    selectedFlight?.segments && selectedFlight.segments.length > 0
       ? selectedFlight.segments
-      : [selectedFlight.outbound, ...(selectedFlight.inbound ? [selectedFlight.inbound] : [])];
+      : selectedFlight
+        ? [selectedFlight.outbound, ...(selectedFlight.inbound ? [selectedFlight.inbound] : [])]
+        : [];
   const baggageCost = addOns.additionalBaggage * PRICING_CONFIG.baggagePrice * journeySegments.length;
   const protectionPlanCost = addOns.protectionPlan
     ? protectionPlanPrices[addOns.protectionPlan]

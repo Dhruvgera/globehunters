@@ -40,7 +40,7 @@ interface TicketOptionsPanelProps {
   currency: string;
   priceOptions?: TransformedPriceOption[];
   isLoading?: boolean;
-  onSelectFlight?: (fareType: string) => void;
+  onSelectFlight?: (fareType: "Eco Value" | "Eco Classic" | "Eco Flex") => void;
   onViewFlightInfo?: () => void;
   rawResponse?: any;
 }
@@ -157,7 +157,7 @@ export function TicketOptionsPanel({
                       return;
                     }
                     if (onSelectFlight) {
-                      onSelectFlight(chip.label);
+                      onSelectFlight(chip.label as "Eco Value" | "Eco Classic" | "Eco Flex");
                     }
                   }}
                 >
@@ -203,4 +203,3 @@ export function TicketOptionsPanel({
     </div>
   );
 }
-

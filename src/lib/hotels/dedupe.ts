@@ -126,7 +126,7 @@ export function dedupeVyspaWithHotelbedsByLiveProperties(input: {
       unmapped += 1;
       const hbMeta = asRecord(hb?._hotelbeds);
       if (includeUnmappedHotelbeds) {
-        mergedByVyspaId.set(`hb:${hbCode}`, {
+        mergedByPrimaryId.set(`hb:${hbCode}`, {
           ...hb,
           suppliers: mergeUniqueStrings(hb?.suppliers || [], ['hotelbeds']),
           providerHotelCode: String((hb as any)?.providerHotelCode || hbCode),
