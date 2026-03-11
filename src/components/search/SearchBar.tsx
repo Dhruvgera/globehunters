@@ -2,13 +2,14 @@
 
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useSearchForm } from "@/hooks/useSearchForm";
 import { TripTypeSelector } from "./search-bar/TripTypeSelector";
 import { PassengersSelector } from "./search-bar/PassengersSelector";
 import { AirportAutocomplete } from "./search-bar/AirportAutocomplete";
 import { HotelLocationAutocomplete } from "./search-bar/HotelLocationAutocomplete";
+import { PackageDestinationAutocomplete } from "./search-bar/PackageDestinationAutocomplete";
 import { PackageOriginAutocomplete } from "./search-bar/PackageOriginAutocomplete";
 import { SwapLocationsButton } from "./search-bar/SwapLocationsButton";
 import { DateSelector } from "./search-bar/DateSelector";
@@ -42,30 +43,34 @@ interface SearchBarProps {
 
 type Product = "flight" | "hotel" | "package";
 
-async function resolvePackageDestination(locationItem: VyspaCityHotelLookupItem | null): Promise<HolidayDestination | null> {
-  if (!locationItem?.label?.trim()) return null;
+function isSamePackageDestination(
+  current: HolidayDestination | null,
+  next: HolidayDestination | null
+) {
+  if (!current && !next) return true;
+  if (!current || !next) return false;
 
-  try {
-    const response = await fetch(
-      `/api/packages/destinations?location=${encodeURIComponent(locationItem.label.trim())}`
-    );
-    if (!response.ok) return null;
+  return (
+    String(current.id) === String(next.id) &&
+    current.name === next.name &&
+    (current.hiddenvalue || "") === (next.hiddenvalue || "") &&
+    (current.airportcode || "") === (next.airportcode || "")
+  );
+}
 
-    const destinations = (await response.json()) as HolidayDestination[];
-    if (!Array.isArray(destinations) || destinations.length === 0) return null;
+function isSameHotelLocation(
+  current: VyspaCityHotelLookupItem | null,
+  next: VyspaCityHotelLookupItem | null
+) {
+  if (!current && !next) return true;
+  if (!current || !next) return false;
 
-    const normalizedLabel = locationItem.label.trim().toLowerCase();
-    const normalizedId = locationItem.id != null ? String(locationItem.id) : "";
-
-    return (
-      destinations.find((destination) => String(destination.id) === normalizedId) ||
-      destinations.find((destination) => destination.name.trim().toLowerCase() === normalizedLabel) ||
-      destinations[0] ||
-      null
-    );
-  } catch {
-    return null;
-  }
+  return (
+    Number(current.id) === Number(next.id) &&
+    current.label === next.label &&
+    String(current.loc || "") === String(next.loc || "") &&
+    (current.arrival_point_code || "") === (next.arrival_point_code || "")
+  );
 }
 
 function ProductTab({
@@ -125,6 +130,7 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
   }, [productFromUrl]);
 
   const [hotelLocationItem, setHotelLocationItem] = useState<VyspaCityHotelLookupItem | null>(null);
+  const [packageDestinationItem, setPackageDestinationItem] = useState<HolidayDestination | null>(null);
   const [hotelStartDate, setHotelStartDate] = useState<Date | undefined>(undefined);
   const [hotelEndDate, setHotelEndDate] = useState<Date | undefined>(undefined);
   const [hotelGuests, setHotelGuests] = useState(2);
@@ -138,77 +144,8 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
   const savedHotelLocation = useBookingStore((s) => s.hotelLocationSelection);
   const setHotelLocationSelection = useBookingStore((s) => s.setHotelLocationSelection);
   const savedHotelSearch = useBookingStore((s) => s.hotelSearch);
-
-  // Hydrate hotel location selection from URL (preferred) or store (like flights).
-  useEffect(() => {
-    const urlLocation = urlParams.get("location");
-    const hid = urlParams.get("hidden_id");
-    const hkey = urlParams.get("hidden_key");
-    const apc = urlParams.get("arrival_point_code");
-
-    // Prefer URL when on /hotels
-    if (pathname?.startsWith("/hotels") && urlLocation && hid && hkey) {
-      setHotelLocationItem({
-        id: Number(hid),
-        label: urlLocation,
-        loc: hkey,
-        arrival_point_code: apc || undefined,
-      } as VyspaCityHotelLookupItem);
-    } else if (!hotelLocationItem) {
-      // Otherwise hydrate from store (homepage tab switch)
-      if (savedHotelLocation) {
-        setHotelLocationItem(savedHotelLocation);
-      } else if (savedHotelSearch?.location && savedHotelSearch?.hidden_id && savedHotelSearch?.hidden_key) {
-        setHotelLocationItem({
-          id: Number(savedHotelSearch.hidden_id),
-          label: savedHotelSearch.location,
-          loc: savedHotelSearch.hidden_key,
-          arrival_point_code: savedHotelSearch.arrivalPointCode,
-        } as VyspaCityHotelLookupItem);
-      }
-    }
-
-    // Hydrate dates/guests/rooms (like flights journey) when on /hotels
-    if (pathname?.startsWith("/hotels")) {
-      const fromCode = urlParams.get("fromCode") || "";
-      const fromLabel = urlParams.get("from") || "";
-      if (urlParams.get("type") === "package" && fromCode && !from) {
-        setFrom({
-          code: fromCode,
-          name: fromLabel || fromCode,
-          city: fromLabel || fromCode,
-          country: "",
-          countryCode: "",
-        });
-      }
-
-      const inStr = urlParams.get("checkIn") || savedHotelSearch?.checkIn || "";
-      const outStr = urlParams.get("checkOut") || savedHotelSearch?.checkOut || "";
-      const adults = Number(urlParams.get("adults") || savedHotelSearch?.adults || "") || undefined;
-      const children = Number(urlParams.get("children") || savedHotelSearch?.children || "") || 0;
-      const rms = Number(urlParams.get("rooms") || savedHotelSearch?.rooms || "") || undefined;
-      const childAgeParam = urlParams.get("child_age");
-
-      if (inStr) {
-        const d = new Date(inStr);
-        if (!Number.isNaN(d.getTime())) setHotelStartDate(d);
-      }
-      if (outStr) {
-        const d = new Date(outStr);
-        if (!Number.isNaN(d.getTime())) setHotelEndDate(d);
-      }
-      if (adults) setHotelGuests(adults);
-      setHotelChildren(Math.max(0, Number(children) || 0));
-      if (rms) setHotelRooms(rms);
-      setHotelChildAges(
-        flattenHotelChildAges(
-          childAgeParam ?? savedHotelSearch?.child_age ?? [],
-          Math.max(1, Number(rms) || savedHotelSearch?.rooms || 1),
-          Math.max(0, Number(children) || 0)
-        )
-      );
-    }
-  }, [pathname, savedHotelLocation, savedHotelSearch, urlParams]);
+  const savedPackageDestination = useBookingStore((s) => s.packageDestination);
+  const setPackageDestination = useBookingStore((s) => s.setPackageDestination);
 
   useEffect(() => {
     setHotelChildAges((prev) => {
@@ -246,6 +183,120 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
     getSearchParams,
   } = useSearchForm();
 
+  const hotelLocationItemRef = useRef<VyspaCityHotelLookupItem | null>(hotelLocationItem);
+  const packageDestinationItemRef = useRef<HolidayDestination | null>(packageDestinationItem);
+  const fromRef = useRef(from);
+
+  useEffect(() => {
+    hotelLocationItemRef.current = hotelLocationItem;
+  }, [hotelLocationItem]);
+
+  useEffect(() => {
+    packageDestinationItemRef.current = packageDestinationItem;
+  }, [packageDestinationItem]);
+
+  useEffect(() => {
+    fromRef.current = from;
+  }, [from]);
+
+  // Hydrate hotel location selection from URL (preferred) or store (like flights).
+  useEffect(() => {
+    const urlLocation = urlParams.get("location");
+    const hid = urlParams.get("hidden_id");
+    const hkey = urlParams.get("hidden_key");
+    const apc = urlParams.get("arrival_point_code");
+    const isPackageHotelsPage = pathname?.startsWith("/hotels") && urlParams.get("type") === "package";
+
+    if (isPackageHotelsPage && urlLocation && hid && hkey && hkey.includes(";")) {
+      const nextPackageDestination = {
+        id: String(hid),
+        name: urlLocation,
+        country_name: "",
+        airportcode: hkey.split(";")[0] || "",
+        featured_image: "",
+        hiddenvalue: hkey,
+      } satisfies HolidayDestination;
+
+      if (!isSamePackageDestination(packageDestinationItemRef.current, nextPackageDestination)) {
+        setPackageDestinationItem(nextPackageDestination);
+      }
+    } else if (!packageDestinationItemRef.current && savedPackageDestination) {
+      setPackageDestinationItem((current) =>
+        isSamePackageDestination(current, savedPackageDestination) ? current : savedPackageDestination
+      );
+    }
+
+    if (pathname?.startsWith("/hotels") && urlLocation && hid && hkey && !hkey.includes(";")) {
+      const nextHotelLocation = {
+        id: Number(hid),
+        label: urlLocation,
+        loc: hkey,
+        arrival_point_code: apc || undefined,
+      } as VyspaCityHotelLookupItem;
+
+      if (!isSameHotelLocation(hotelLocationItemRef.current, nextHotelLocation)) {
+        setHotelLocationItem(nextHotelLocation);
+      }
+    } else if (!hotelLocationItemRef.current) {
+      if (savedHotelLocation) {
+        setHotelLocationItem((current) =>
+          isSameHotelLocation(current, savedHotelLocation) ? current : savedHotelLocation
+        );
+      } else if (savedHotelSearch?.location && savedHotelSearch?.hidden_id && savedHotelSearch?.hidden_key) {
+        const nextHotelLocation = {
+          id: Number(savedHotelSearch.hidden_id),
+          label: savedHotelSearch.location,
+          loc: savedHotelSearch.hidden_key,
+          arrival_point_code: savedHotelSearch.arrivalPointCode,
+        } as VyspaCityHotelLookupItem;
+
+        setHotelLocationItem((current) =>
+          isSameHotelLocation(current, nextHotelLocation) ? current : nextHotelLocation
+        );
+      }
+    }
+
+    if (pathname?.startsWith("/hotels")) {
+      const fromCode = urlParams.get("fromCode") || "";
+      const fromLabel = urlParams.get("from") || "";
+      if (urlParams.get("type") === "package" && fromCode && !fromRef.current) {
+        setFrom({
+          code: fromCode,
+          name: fromLabel || fromCode,
+          city: fromLabel || fromCode,
+          country: "",
+          countryCode: "",
+        });
+      }
+
+      const inStr = urlParams.get("checkIn") || savedHotelSearch?.checkIn || "";
+      const outStr = urlParams.get("checkOut") || savedHotelSearch?.checkOut || "";
+      const adults = Number(urlParams.get("adults") || savedHotelSearch?.adults || "") || undefined;
+      const children = Number(urlParams.get("children") || savedHotelSearch?.children || "") || 0;
+      const rms = Number(urlParams.get("rooms") || savedHotelSearch?.rooms || "") || undefined;
+      const childAgeParam = urlParams.get("child_age");
+
+      if (inStr) {
+        const d = new Date(inStr);
+        if (!Number.isNaN(d.getTime())) setHotelStartDate(d);
+      }
+      if (outStr) {
+        const d = new Date(outStr);
+        if (!Number.isNaN(d.getTime())) setHotelEndDate(d);
+      }
+      if (adults) setHotelGuests(adults);
+      setHotelChildren(Math.max(0, Number(children) || 0));
+      if (rms) setHotelRooms(rms);
+      setHotelChildAges(
+        flattenHotelChildAges(
+          childAgeParam ?? savedHotelSearch?.child_age ?? [],
+          Math.max(1, Number(rms) || savedHotelSearch?.rooms || 1),
+          Math.max(0, Number(children) || 0)
+        )
+      );
+    }
+  }, [pathname, savedHotelLocation, savedHotelSearch, savedPackageDestination, setFrom, urlParams]);
+
   const setProduct = (next: Product) => {
     setActiveProduct(next);
   };
@@ -272,11 +323,11 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
   const isPackageSearchValid = useMemo(() => {
     return (
       from !== null &&
-      hotelLocationItem !== null &&
+      packageDestinationItem !== null &&
       hotelStartDate !== undefined &&
       hotelEndDate !== undefined
     );
-  }, [from, hotelEndDate, hotelLocationItem, hotelStartDate]);
+  }, [from, hotelEndDate, hotelStartDate, packageDestinationItem]);
 
   const handleSearch = async () => {
     if (activeProduct === "package") {
@@ -284,16 +335,11 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
         return;
       }
       // Flight+Hotel packages: navigate to /hotels?type=package with query params
-      const loc = hotelLocationItem?.label?.trim() || "London";
+      const loc = packageDestinationItem?.name?.trim() || "London";
       const checkIn = hotelStartDate ? format(hotelStartDate, "yyyy-MM-dd") : "";
       const checkOut = hotelEndDate ? format(hotelEndDate, "yyyy-MM-dd") : "";
-      const packageDestination =
-        hotelLocationItem?.loc && hotelLocationItem.loc.includes(";")
-          ? null
-          : await resolvePackageDestination(hotelLocationItem);
-      const packageHiddenValue = packageDestination?.hiddenvalue || hotelLocationItem?.loc || "";
-      const packageHiddenId =
-        packageDestination?.id || (hotelLocationItem?.id != null ? String(hotelLocationItem.id) : "");
+      const packageHiddenValue = packageDestinationItem?.hiddenvalue || "";
+      const packageHiddenId = packageDestinationItem?.id ? String(packageDestinationItem.id) : "";
       const params = new URLSearchParams();
       params.set("type", "package");
       params.set("location", loc);
@@ -317,7 +363,7 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
       if (from?.name || from?.city) params.set("from", from?.name || from?.city || "");
       if (packageHiddenId) params.set("hidden_id", packageHiddenId);
       if (packageHiddenValue) params.set("hidden_key", packageHiddenValue);
-      if (hotelLocationItem) setHotelLocationSelection(hotelLocationItem);
+      if (packageDestinationItem) setPackageDestination(packageDestinationItem);
       router.push(`/hotels?${params.toString()}`);
       return;
     }
@@ -562,11 +608,19 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
             />
           )}
           {/* Location */}
-          <HotelLocationAutocomplete
-            value={hotelLocationItem}
-            onChange={setHotelLocationItem}
-            placeholder="Find Location"
-          />
+          {activeProduct === "package" ? (
+            <PackageDestinationAutocomplete
+              value={packageDestinationItem}
+              onChange={setPackageDestinationItem}
+              placeholder="Find Location"
+            />
+          ) : (
+            <HotelLocationAutocomplete
+              value={hotelLocationItem}
+              onChange={setHotelLocationItem}
+              placeholder="Find Location"
+            />
+          )}
 
           {/* Dates */}
           <Popover open={isHotelDatesOpen} onOpenChange={setIsHotelDatesOpen}>

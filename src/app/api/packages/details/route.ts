@@ -49,6 +49,7 @@ interface TransformedPackageDetails {
     description?: string;
     imageUrl?: string;
     starRating?: number;
+    amenities?: string[];
     checkOutDate?: string;
     visaInfo?: string;
     countryRemarks?: string[];
@@ -121,6 +122,60 @@ function asRecord(value: unknown): Record<string, any> {
   return value && typeof value === 'object' ? (value as Record<string, any>) : {};
 }
 
+function sanitizeText(value: unknown): string {
+  return String(value ?? '')
+    .replace(/<br\s*\/?\s*>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '• ')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/\r/g, '')
+    .split('\n')
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+function collectAmenityLabels(source: unknown, labels: Set<string>): void {
+  if (!Array.isArray(source)) return;
+  source.forEach((entry) => {
+    if (typeof entry === 'string') {
+      const normalized = sanitizeText(entry);
+      if (normalized) labels.add(normalized);
+      return;
+    }
+    if (!entry || typeof entry !== 'object') return;
+    const row = entry as Record<string, unknown>;
+    const normalized = sanitizeText(
+      row.label ??
+      row.name ??
+      row.description ??
+      row.title ??
+      row.Text ??
+      row.amenity ??
+      row.value
+    );
+    if (normalized) labels.add(normalized);
+  });
+}
+
+function extractPackageAmenities(...sources: unknown[]): string[] {
+  const labels = new Set<string>();
+  sources.forEach((source) => {
+    if (!source || typeof source !== 'object') return;
+    const row = source as Record<string, unknown>;
+    collectAmenityLabels(row.amenities, labels);
+    collectAmenityLabels(row.attributes, labels);
+    collectAmenityLabels(row.facilities, labels);
+    collectAmenityLabels(row.hotelAmenities, labels);
+    collectAmenityLabels(row.hotel_facilities, labels);
+    collectAmenityLabels(row.Facility, labels);
+    collectAmenityLabels(row.HotelFacility, labels);
+  });
+  return Array.from(labels).slice(0, 24);
+}
+
 function transformResponse(vyspaResponse: any): TransformedPackageDetails {
   const packageBlock = asRecord(vyspaResponse?.PackageDetails);
   const hotelBlock = asRecord(vyspaResponse?.HotelDetails);
@@ -159,6 +214,7 @@ function transformResponse(vyspaResponse: any): TransformedPackageDetails {
       description: hotelBlock.description || hotelSource.quickDescription,
       imageUrl: hotelSource.image_name,
       starRating: Number(hotelSource.hotel_rating || 0) || undefined,
+      amenities: extractPackageAmenities(hotelBlock, hotelSource, ...rawRooms),
       checkOutDate: hotelSource.checkOutDate,
       visaInfo: hotelSource.visaInfo,
       countryRemarks: hotelSource.countryRemarks,

@@ -74,6 +74,8 @@ export interface Flight {
   price: number;
   pricePerPerson: number;
   currency: string;
+  packagePriceDeltaTotal?: number;
+  packagePriceDeltaPerPerson?: number;
   originalPrice?: number;      // Price before currency conversion
   originalCurrency?: string;   // Original currency from API
   ticketOptions?: TicketOption[];
@@ -136,4 +138,3 @@ export interface FilterState {
   airlines: string[];
   extras: string[];
 }
-

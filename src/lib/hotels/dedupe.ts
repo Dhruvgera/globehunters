@@ -59,6 +59,24 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function normalizeForPartialDedupe(value: unknown): string {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function partialDedupeKey(row: any): string | null {
+  const name = normalizeForPartialDedupe(row?.hotel_name || row?.hotelName);
+  if (!name) return null;
+  const address = normalizeForPartialDedupe(
+    [row?.address1, row?.address2, row?.cityName || row?.city_name, row?.countryName || row?.country_name]
+      .filter(Boolean)
+      .join(' ')
+  );
+  return address ? `${name}|${address}` : name;
+}
+
 export function dedupeVyspaWithHotelbedsByLiveProperties(input: {
   vyspaResults: any[];
   hotelbedsResults: any[];
@@ -69,22 +87,31 @@ export function dedupeVyspaWithHotelbedsByLiveProperties(input: {
   const hotelbedsResults = Array.isArray(input.hotelbedsResults) ? input.hotelbedsResults : [];
   const includeUnmappedHotelbeds = !!input.includeUnmappedHotelbeds;
 
-  const mergedByVyspaId = new Map<string, any>();
+  const mergedByPrimaryId = new Map<string, any>();
+  const primaryIdByAlias = new Map<string, string>();
+  const vyspaIdByPartialKey = new Map<string, string>();
   for (const v of vyspaResults) {
     const keys = allVyspaKeys(v);
     if (keys.length === 0) continue;
+    const primaryKey = keys[0];
     const merged = {
       ...v,
       suppliers: mergeUniqueStrings(v?.suppliers || [], ['vyspa']),
     };
+    if (!mergedByPrimaryId.has(primaryKey)) {
+      mergedByPrimaryId.set(primaryKey, merged);
+    }
     for (const key of keys) {
-      if (!mergedByVyspaId.has(key)) {
-        mergedByVyspaId.set(key, merged);
-      }
+      if (!primaryIdByAlias.has(key)) primaryIdByAlias.set(key, primaryKey);
+    }
+    const fallbackKey = partialDedupeKey(v);
+    if (fallbackKey && !vyspaIdByPartialKey.has(fallbackKey)) {
+      vyspaIdByPartialKey.set(fallbackKey, primaryKey);
     }
   }
 
   let matched = 0;
+  let matchedByNameAddressFallback = 0;
   let unmapped = 0;
   let mappedNoVyspaResult = 0;
 
@@ -93,7 +120,9 @@ export function dedupeVyspaWithHotelbedsByLiveProperties(input: {
     if (!hbCode) continue;
 
     const mappedVyspaId = input.hotelbedsToVyspaId.get(hbCode);
-    if (!mappedVyspaId) {
+    const fallbackVyspaId = vyspaIdByPartialKey.get(partialDedupeKey(hb) || '');
+    const resolvedVyspaId = mappedVyspaId || fallbackVyspaId;
+    if (!resolvedVyspaId) {
       unmapped += 1;
       const hbMeta = asRecord(hb?._hotelbeds);
       if (includeUnmappedHotelbeds) {
@@ -113,12 +142,13 @@ export function dedupeVyspaWithHotelbedsByLiveProperties(input: {
       continue;
     }
 
-    const existing = mergedByVyspaId.get(mappedVyspaId);
+    const primaryId = primaryIdByAlias.get(resolvedVyspaId) || resolvedVyspaId;
+    const existing = mergedByPrimaryId.get(primaryId);
     if (!existing) {
       mappedNoVyspaResult += 1;
       const hbMeta = asRecord(hb?._hotelbeds);
       if (includeUnmappedHotelbeds) {
-        mergedByVyspaId.set(`hb-map:${mappedVyspaId}`, {
+        mergedByPrimaryId.set(`hb-map:${resolvedVyspaId}`, {
           ...hb,
           suppliers: mergeUniqueStrings(hb?.suppliers || [], ['hotelbeds']),
           providerHotelCode: String((hb as any)?.providerHotelCode || hbCode),
@@ -128,17 +158,22 @@ export function dedupeVyspaWithHotelbedsByLiveProperties(input: {
             providerHotelCode: String((hb as any)?.providerHotelCode || hbCode),
             hotelCode: hbCode,
           },
-          _dedupe: { matchedBy: 'liveProperties', hbCode, mappedVyspaId },
+          _dedupe: {
+            matchedBy: mappedVyspaId ? 'liveProperties' : 'partial_name_address',
+            hbCode,
+            mappedVyspaId: resolvedVyspaId,
+          },
         });
       }
       continue;
     }
 
     matched += 1;
+    if (!mappedVyspaId && fallbackVyspaId) matchedByNameAddressFallback += 1;
     const existingHb = asRecord(existing?._hotelbeds);
     const hbMeta = asRecord(hb?._hotelbeds);
     const providerHotelCode = String((hb as any)?.providerHotelCode || hbCode);
-    mergedByVyspaId.set(mappedVyspaId, {
+    mergedByPrimaryId.set(primaryId, {
       ...existing,
       image_name: existing?.image_name || hb?.image_name,
       address1: existing?.address1 || hb?.address1,
@@ -150,9 +185,9 @@ export function dedupeVyspaWithHotelbedsByLiveProperties(input: {
       MealPlans: mergeUniqueStrings(existing?.MealPlans || [], hb?.MealPlans || []),
       suppliers: mergeUniqueStrings(existing?.suppliers || [], hb?.suppliers || ['hotelbeds']),
       _dedupe: {
-        matchedBy: 'liveProperties',
+        matchedBy: mappedVyspaId ? 'liveProperties' : 'partial_name_address',
         hbCode,
-        mappedVyspaId,
+        mappedVyspaId: resolvedVyspaId,
       },
       providerHotelCode: providerHotelCode || (existing as any)?.providerHotelCode,
       hotelbedsCode: hbCode || (existing as any)?.hotelbedsCode,
@@ -165,13 +200,14 @@ export function dedupeVyspaWithHotelbedsByLiveProperties(input: {
     });
   }
 
-  const results = Array.from(new Set(mergedByVyspaId.values()));
+  const results = Array.from(mergedByPrimaryId.values());
   return {
     results,
     stats: {
       vyspaInput: vyspaResults.length,
       hotelbedsInput: hotelbedsResults.length,
       matched,
+      matchedByNameAddressFallback,
       unmappedHotelbeds: unmapped,
       mappedNoVyspaResult,
       output: results.length,

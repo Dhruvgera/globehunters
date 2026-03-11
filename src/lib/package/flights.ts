@@ -150,6 +150,11 @@ export function mapPackageAlternateFlightToFlight(
     price: Number(flight.totalFare || 0),
     pricePerPerson: Number(flight.totalFare || 0),
     currency: toCurrencySymbol(flight.currency),
+    packagePriceDeltaTotal: Number(flight.priceDifference || 0),
+    packagePriceDeltaPerPerson:
+      typeof flight.priceDifferencePerPerson === "number"
+        ? Number(flight.priceDifferencePerPerson)
+        : undefined,
     ticketOptions: [],
     webRef,
     baggage: flight.baggage,

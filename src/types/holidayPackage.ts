@@ -1016,6 +1016,8 @@ export interface PackageResultsMeta {
   hotelDayOption?: number;
   /** Search completed flag */
   completed: boolean;
+  /** Optional upstream empty-state message */
+  emptyMessage?: string;
   /** Legacy fields kept optional for compatibility with older callers */
   flightSearchCriteriaId?: number;
   hotelSearchCriteriaIds?: number;

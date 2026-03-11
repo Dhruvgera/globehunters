@@ -13,6 +13,12 @@ import { TicketOptionsPanel } from "./flight-card/TicketOptionsPanel";
 import { ShareButton } from "@/components/ui/share-button";
 import { usePriceCheck } from "@/hooks/usePriceCheck";
 
+function formatPackageDeltaLabel(amount?: number, currency?: string): string {
+  const delta = Number(amount || 0);
+  if (Math.abs(delta) < 0.01) return "Included";
+  return `${delta > 0 ? "+" : "-"}${formatPrice(Math.abs(delta), currency || "GBP")}`;
+}
+
 interface FlightCardProps {
   flight: Flight;
   showReturn?: boolean;
@@ -43,7 +49,7 @@ export default function FlightCard({
   // Uses flightKey directly with price check API (no FlightView needed)
   const { checkPrice, priceCheck, isLoading } = usePriceCheck();
   const prefetchOptions = () => {
-    if (flight.flightKey || flight.segmentResultId) {
+    if (!isPackageMode && (flight.flightKey || flight.segmentResultId)) {
       checkPrice(String(flight.segmentResultId || ''), flight.flightKey);
     }
   };
@@ -54,6 +60,14 @@ export default function FlightCard({
   const baseOption = priceCheckData?.priceOptions?.[0];
   const effectivePricePerPerson = baseOption?.pricePerPerson ?? flight.pricePerPerson;
   const effectiveCurrency = baseOption?.currency ?? flight.currency;
+  const packagePrimaryPriceLabel = isPackageMode
+    ? formatPackageDeltaLabel(
+        typeof flight.packagePriceDeltaPerPerson === "number"
+          ? flight.packagePriceDeltaPerPerson
+          : flight.packagePriceDeltaTotal,
+        flight.currency
+      )
+    : undefined;
 
   const handleSelectFlight = (
     fareType: "Eco Value" | "Eco Classic" | "Eco Flex"
@@ -140,7 +154,9 @@ export default function FlightCard({
       <FlightActions
         currency={effectiveCurrency}
         pricePerPerson={effectivePricePerPerson}
+        primaryPriceLabel={packagePrimaryPriceLabel}
         showTicketOptions={showTicketOptions}
+        showTicketOptionsToggle={!isPackageMode}
         onViewFlightInfo={() => setShowFlightInfo(!showFlightInfo)}
         onToggleTicketOptions={() => {
           // Ensure price options are loading before expanding
@@ -151,13 +167,13 @@ export default function FlightCard({
       />
 
       {/* Expandable Ticket Options */}
-      {showTicketOptions && (
+      {showTicketOptions && !isPackageMode && (
         <TicketOptionsPanel
           ticketOptions={flight.ticketOptions}
           priceOptions={priceCheckData?.priceOptions}
           currency={flight.currency}
           isLoading={isLoading}
-          onSelectFlight={handleSelectFlight as any}
+          onSelectFlight={handleSelectFlight}
           onViewFlightInfo={() => setShowFlightInfo(true)}
           rawResponse={priceCheckData?.rawResponse}
         />

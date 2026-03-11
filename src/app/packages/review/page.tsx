@@ -234,7 +234,7 @@ function PackageReviewPageInner() {
       rating: packageDetails?.hotel?.starRating || cached?.hotelRating || 0,
       reviewCount: cached?.trustYou?.reviewsCount || 0,
       distance: cached?.address || "",
-      amenities: cached?.amenities || [],
+      amenities: packageDetails?.hotel?.amenities || cached?.amenities || [],
     };
   }, [hotelDetailsCache, packageDetails?.hotel, selectedHotel]);
 
@@ -449,17 +449,11 @@ function PackageReviewPageInner() {
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
                     <span className="text-[#3A478A]">Hotel ({nights} nights)</span>
-                    <span className="font-medium text-[#010D50]">{formatMoney(pricing.currency, pricing.hotelTotal)}</span>
+                    <span className="font-medium text-[#010D50]">Included</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[#3A478A]">Flights (per booking)</span>
-                    <span className="font-medium text-[#010D50]">{formatMoney(pricing.currency, pricing.flightTotal)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#3A478A]">Taxes & Fees</span>
-                    <span className="font-medium text-[#010D50]">
-                      {formatMoney(pricing.currency, Math.max(0, pricing.packageTotal - pricing.hotelTotal - pricing.flightTotal))}
-                    </span>
+                    <span className="font-medium text-[#010D50]">Included</span>
                   </div>
                 </div>
 

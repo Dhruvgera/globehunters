@@ -43,6 +43,7 @@ export interface PackageDetailsResponse {
       description?: string;
       imageUrl?: string;
       starRating?: number;
+      amenities?: string[];
       checkOutDate?: string;
       visaInfo?: string;
       countryRemarks?: string[];

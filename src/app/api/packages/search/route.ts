@@ -20,6 +20,17 @@ import type {
   TransformedFlightSegment,
 } from '@/types/holidayPackage';
 
+function resolvePackageSearchTimeoutSec(): number {
+  const raw = Number(
+    process.env.VYSPA_PACKAGE_SEARCH_TIMEOUT_SEC
+      || process.env.VYSPA_HOTELS_SEARCH_TIMEOUT_SEC
+      || process.env.NEXT_PUBLIC_VYSPA_HOTELS_TIMEOUT_SEC
+      || 30
+  );
+  if (!Number.isFinite(raw) || raw <= 0) return 30;
+  return Math.max(5, Math.trunc(raw));
+}
+
 function buildBasicAuthHeader(): string {
   const username = VYSPA_CONFIG.credentials.username;
   const password = VYSPA_CONFIG.credentials.password;
@@ -64,7 +75,7 @@ function buildVyspaRequest(criteria: PackageSearchCriteria): HolidayPackageSearc
     child_ages: childAges,
     infants,
     minimalResponse: false,
-    timeout: 10,
+    timeout: resolvePackageSearchTimeoutSec(),
     ...(criteria.directFlightsOnly ? { direct_flight_only: 1 } : {}),
     ...(criteria.hotelFilters ? { hotel_filters: criteria.hotelFilters } : {}),
     ...(criteria.customSort ? { customsort: criteria.customSort } : {}),
@@ -111,7 +122,24 @@ function extractStartingPrice(hotel: Record<string, unknown>): number | undefine
   return Math.min(...candidates);
 }
 
-function transformResponse(
+function extractPackageEmptyMessage(rawResults: unknown): string | undefined {
+  if (!Array.isArray(rawResults) || rawResults.length < 2) return undefined;
+  const [, message] = rawResults;
+  if (typeof message !== 'string') return undefined;
+  const normalized = message.trim();
+  return normalized || undefined;
+}
+
+function isPackageHotelResultRow(value: unknown): value is Record<string, any> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const row = value as Record<string, unknown>;
+  const id = Number(row.id);
+  const hotelId = Number(row.hotel_id);
+  const hotelName = String(row.hotel_name || '').trim();
+  return Number.isFinite(id) && Number.isFinite(hotelId) && Boolean(hotelName);
+}
+
+export function transformResponse(
   vyspaResponse: HolidayPackageSearchResponse
 ): { results: PackageSearchResult[]; meta: PackageResultsMeta } {
   const criteria = Array.isArray(vyspaResponse.SearchCriteria)
@@ -125,9 +153,10 @@ function transformResponse(
   const outboundLeg = flightDirections[0] ? transformFlightLeg(flightDirections[0]) : undefined;
   const inboundLeg = flightDirections[1] ? transformFlightLeg(flightDirections[1]) : undefined;
 
-  const hotelRows = Array.isArray(vyspaResponse.Packages?.results)
+  const rawHotelRows = Array.isArray(vyspaResponse.Packages?.results)
     ? vyspaResponse.Packages.results
     : [];
+  const hotelRows = rawHotelRows.filter(isPackageHotelResultRow);
 
   const results: PackageSearchResult[] = hotelRows.map((hotel) => {
     const hotelRow = hotel as unknown as Record<string, unknown>;
@@ -163,6 +192,7 @@ function transformResponse(
     hotelDayOption: Number(criteria?.HotelDayOption ?? vyspaResponse.HotelDayOption ?? 0) || undefined,
     pagination: vyspaResponse.Packages?.pagination,
     completed: Boolean(criteria?.searchComplete),
+    emptyMessage: results.length === 0 ? extractPackageEmptyMessage(rawHotelRows) : undefined,
     flightSearchCriteriaId: Number(criteria?.FlightRequestId ?? 0) || undefined,
     hotelSearchCriteriaIds: Number(criteria?.HotelRequestId ?? 0) || undefined,
   };

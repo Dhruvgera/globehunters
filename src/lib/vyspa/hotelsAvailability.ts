@@ -68,11 +68,12 @@ export function normalizeVyspaAvailabilityCriteria(criteria: AvailabilityCriteri
   // Always request full response payload from Vyspa for stage-1 hotel search.
   normalized.minimalResponse = false;
   // Enforce Vyspa search timeout (seconds). Vyspa requires minimum 5s.
-  const defaultTimeoutSec = Math.max(5, toInt(process.env.VYSPA_HOTELS_SEARCH_TIMEOUT_SEC || '5', 5));
+  const defaultTimeoutSec = Math.max(5, toInt(process.env.VYSPA_HOTELS_SEARCH_TIMEOUT_SEC || '8', 8));
   const requestedTimeoutSec = toPositiveIntOrNull(normalized.timeout);
   normalized.timeout = Math.max(5, requestedTimeoutSec ?? defaultTimeoutSec);
   // Force Vyspa availability to Hotelbeds supplier only.
-  normalized.supplier_id = 100;
+  delete normalized.supplier_id;
+  normalized.supplierId = 100;
 
   const rawFilters =
     normalized.filters && typeof normalized.filters === 'object' && !Array.isArray(normalized.filters)

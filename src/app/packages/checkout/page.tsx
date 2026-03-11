@@ -130,6 +130,7 @@ function PackageTravellerDetailsInner() {
   const [airportNameCache, setAirportNameCache] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [packageDetails, setPackageDetails] = useState<Awaited<ReturnType<typeof packageService.getPackageDetails>>["details"] | null>(null);
 
   useEffect(() => {
     const from = packageSearch?.departureCode || storeSearchParams?.from || sp.get("from") || "";
@@ -184,6 +185,33 @@ function PackageTravellerDetailsInner() {
     load();
   }, [flight]);
 
+  useEffect(() => {
+    if (!flight || selectedHotelRoomIds.length === 0) return;
+    let cancelled = false;
+
+    const loadPackageDetails = async () => {
+      try {
+        const response = await packageService.getPackageDetails({
+          flightResultId: flight.segmentResultId || flight.id,
+          hotelResultRoomIds: selectedHotelRoomIds,
+        });
+        if (!cancelled) {
+          setPackageDetails(response.details);
+        }
+      } catch {
+        if (!cancelled) {
+          setPackageDetails(null);
+        }
+      }
+    };
+
+    loadPackageDetails();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [flight, selectedHotelRoomIds]);
+
   const getAirportName = (code: string, flightName: string, city: string) => {
     const cached = airportNameCache[code];
     if (cached && cached !== code) return shortenAirportName(cached);
@@ -228,14 +256,14 @@ function PackageTravellerDetailsInner() {
   const hotelDisplay = useMemo(() => {
     const cached = selectedHotel?.hotelId ? hotelDetailsCache?.[selectedHotel.hotelId] : undefined;
     return {
-      name: selectedHotel?.hotelName || cached?.hotelName || "Selected hotel",
-      image: cached?.mainImage || "/hotels/hotel-placeholder.jpg",
-      rating: cached?.hotelRating || 0,
+      name: packageDetails?.hotel?.name || selectedHotel?.hotelName || cached?.hotelName || "Selected hotel",
+      image: packageDetails?.hotel?.imageUrl || cached?.mainImage || "/hotels/hotel-placeholder.jpg",
+      rating: packageDetails?.hotel?.starRating || cached?.hotelRating || 0,
       reviewCount: cached?.trustYou?.reviewsCount || 0,
       distance: cached?.address || "",
-      amenities: cached?.amenities || [],
+      amenities: packageDetails?.hotel?.amenities || cached?.amenities || [],
     };
-  }, [hotelDetailsCache, selectedHotel]);
+  }, [hotelDetailsCache, packageDetails?.hotel, selectedHotel]);
 
   const handleContinue = async () => {
     if (!termsAccepted || !flight || !selectedHotel?.hotelId || selectedHotelRoomIds.length === 0) return;

@@ -114,6 +114,16 @@ interface RoomCardData {
   _raw: UnknownRecord;
 }
 
+function formatSignedPackageAmount(amount: number, currency: string): string {
+  const absolute = Math.abs(amount);
+  const formatted = absolute.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  const prefix = amount > 0 ? "+" : "-";
+  return `${prefix}${currency}${formatted}`;
+}
+
 function selectedRoomIdsFromCounts(counts: Record<string, number>): string[] {
   const out: string[] = [];
   for (const [roomId, countRaw] of Object.entries(counts)) {
@@ -1480,6 +1490,10 @@ export default function HotelRoomsPage() {
       return true;
     });
   }, [filterBoardQuery, filterRefundableOnly, remoteRooms]);
+  const packageBaseRoomTotal = useMemo(() => {
+    if (!isPackageMode || remoteRooms.length === 0) return 0;
+    return remoteRooms.reduce((lowest, room) => Math.min(lowest, Number(room.price.total || 0)), Number.POSITIVE_INFINITY);
+  }, [isPackageMode, remoteRooms]);
   const roomBoardOptions = useMemo(() => {
     const seen = new Set<string>();
     const out: string[] = [];
@@ -1600,6 +1614,7 @@ export default function HotelRoomsPage() {
             const nights = Math.max(1, Number(option.days_spent ?? packageSearch?.nights ?? 1));
             const currencyCode = String(option.sell_currency_code || option.currency_code || roomHotel.SellCur || "GBP").toUpperCase();
             const currency = currencyCode === "GBP" ? "£" : currencyCode;
+            const roomAmenities = extractAmenitiesFromGetRoomsResponse(option);
             return {
               id: String(option.id || ""),
               sourceRoomOptionId: String(option.id || ""),
@@ -1608,7 +1623,7 @@ export default function HotelRoomsPage() {
               reviews: { score: 0, label: "No reviews", count: 0 },
               isRefundable: Number(option.nonRef ?? 1) === 0,
               paymentType: "Pay now",
-              amenities: [],
+              amenities: transformAmenities(roomAmenities),
               price: {
                 currency,
                 nightly: nights > 0 ? total / nights : total,
@@ -1633,6 +1648,12 @@ export default function HotelRoomsPage() {
           const headerAddress = [roomHotel.address1, roomHotel.address2, packageHotel.address?.street1]
             .filter(Boolean)
             .join(", ");
+          const extractedPackageAmenities = Array.from(
+            new Set([
+              ...extractAmenitiesFromGetRoomsResponse(roomHotel),
+              ...flattenedRooms.flatMap((room) => room.amenities.map((amenity) => amenity.label)),
+            ])
+          ).slice(0, 24);
           const latitude = Number(roomHotel.geo_loc_latitude ?? packageHotel.address?.latitude ?? 0);
           const longitude = Number(roomHotel.geo_loc_longitude ?? packageHotel.address?.longitude ?? 0);
 
@@ -1647,6 +1668,9 @@ export default function HotelRoomsPage() {
             });
             if (packageHotel.description || roomHotel.quickDescription) {
               setDetailsText(packageHotel.description || roomHotel.quickDescription || "");
+            }
+            if (extractedPackageAmenities.length > 0) {
+              setRemoteAmenities(transformAmenities(extractedPackageAmenities));
             }
             if (headerImage) setGalleryImages([headerImage]);
             if (latitude && longitude) {
@@ -1664,7 +1688,7 @@ export default function HotelRoomsPage() {
               rooms: flattenedRooms,
               detailsText: packageHotel.description || roomHotel.quickDescription || "",
               cancellationText: "",
-              amenities: [],
+              amenities: extractedPackageAmenities,
               fetchedAt: Date.now(),
             });
             setSelectedRoomCounts(defaultSelectedCounts);
@@ -3147,12 +3171,25 @@ export default function HotelRoomsPage() {
                                 {staySummary.nights} {staySummary.nights === 1 ? "night" : "nights"} • Check-in {staySummary.checkInLabel} • Check-out {staySummary.checkOutLabel}
                               </span>
                             )}
-                            <span className="text-base text-[#010D50]">
-                              {room.price.currency}{room.price.nightly.toLocaleString()} nightly
-                            </span>
-                            <span className="text-xl font-semibold text-[#010D50]">
-                              {room.price.currency}{room.price.total.toLocaleString()} total
-                            </span>
+                            {isPackageMode ? (
+                              <span className="text-xl font-semibold text-[#010D50]">
+                                {Math.abs(Number(room.price.total || 0) - packageBaseRoomTotal) < 0.01
+                                  ? "Included"
+                                  : formatSignedPackageAmount(
+                                      Number(room.price.total || 0) - packageBaseRoomTotal,
+                                      room.price.currency
+                                    )}
+                              </span>
+                            ) : (
+                              <>
+                                <span className="text-base text-[#010D50]">
+                                  {room.price.currency}{room.price.nightly.toLocaleString()} nightly
+                                </span>
+                                <span className="text-xl font-semibold text-[#010D50]">
+                                  {room.price.currency}{room.price.total.toLocaleString()} total
+                                </span>
+                              </>
+                            )}
                             {(() => {
                               const rawForTax = room._raw as Record<string, unknown>;
                               const hbTaxes = (rawForTax.hotelBedsTaxes ?? (rawForTax._hotelbeds as any)?.taxes) as

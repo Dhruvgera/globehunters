@@ -870,9 +870,11 @@ export async function POST(req: Request) {
     );
   }
 
-  // Skip expensive liveProperties lookup while Vyspa search is still running.
-  // We'll return progressive results quickly, then do full dedupe when complete.
-  const shouldRunFinalDedupe = responseSearchComplete === true;
+  // Skip expensive liveProperties lookup on the first hybrid paint even if Vyspa
+  // is already complete. This keeps the first merged response aligned with the
+  // "return as soon as Vyspa lands" contract, and a follow-up poll can still
+  // run the stronger final dedupe once the UI is already populated.
+  const shouldRunFinalDedupe = responseSearchComplete === true && Boolean(requestedSearchCriteriaId);
   const liveProperties = shouldRunFinalDedupe
     ? await fetchVyspaLiveProperties({
         cityName: String((payload[0] as any)?.location || '').trim(),
@@ -909,7 +911,9 @@ export async function POST(req: Request) {
         ...((vyspaPayloadData as any)?.Criteria || {}),
         provider: 'hybrid',
         ...(responseSearchCriteriaId ? { searchCriteriaId: responseSearchCriteriaId } : {}),
-        ...(responseSearchComplete !== null ? { searchComplete: responseSearchComplete } : {}),
+        ...(responseSearchComplete !== null
+          ? { searchComplete: shouldRunFinalDedupe ? responseSearchComplete : false }
+          : {}),
       },
       ...(debug
         ? {

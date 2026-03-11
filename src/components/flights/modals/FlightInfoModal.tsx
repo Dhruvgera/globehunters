@@ -52,6 +52,12 @@ interface FlightInfoModalProps {
   onPackageSelect?: () => void;
 }
 
+function formatPackageDeltaLabel(amount?: number, currency?: string): string {
+  const delta = Number(amount || 0);
+  if (Math.abs(delta) < 0.01) return "Included";
+  return `${delta > 0 ? "+" : "-"}${formatPrice(Math.abs(delta), currency || "GBP")}`;
+}
+
 export default function FlightInfoModal({
   flight,
   open,
@@ -176,10 +182,10 @@ export default function FlightInfoModal({
   // Trigger price check when modal opens - run immediately, don't wait for other requests
   // V3 flow: Use flightKey for FlightView -> psw_result_id -> PriceCheck
   useEffect(() => {
-    if (open && (flight.flightKey || flight.segmentResultId)) {
+    if (open && !isPackageMode && (flight.flightKey || flight.segmentResultId)) {
       checkPrice(flight.segmentResultId || '', flight.flightKey);
     }
-  }, [open, flight.segmentResultId, flight.flightKey, checkPrice]);
+  }, [open, flight.segmentResultId, flight.flightKey, checkPrice, isPackageMode]);
 
   useEffect(() => {
     if (!open) return;
@@ -841,7 +847,7 @@ export default function FlightInfoModal({
 
           {/* Fare Details Section (Dynamic from Price Check or Flight data fallback) */}
           {/* Show either when we have upgrade options OR when price check has loaded (even with fallback data) */}
-          {((priceCheck && priceCheck.priceOptions.length > 0 && selectedUpgradeOption) || (!isLoading && priceCheck)) && (
+          {!isPackageMode && ((priceCheck && priceCheck.priceOptions.length > 0 && selectedUpgradeOption) || (!isLoading && priceCheck)) && (
             <div className="flex flex-col gap-5 sm:gap-6">
               {/* Only show fare option chips if there are multiple options */}
               {priceCheck && priceCheck.priceOptions.length > 1 && (
@@ -1322,14 +1328,23 @@ export default function FlightInfoModal({
             <div className="sticky bottom-0 z-20 bg-white rounded-xl px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-3 border border-[#EEF0F7] shadow-[0_-8px_24px_-12px_rgba(2,6,23,0.35)]">
               <div className="flex flex-col gap-1">
                 <span className="text-sm sm:text-lg font-medium text-[#3754ED] whitespace-nowrap">
-                  {selectedUpgradeOption
-                    ? formatPrice(selectedUpgradeOption.totalPrice, selectedUpgradeOption.currency)
-                    : formatPrice(flight.price, flight.currency)}
+                  {isPackageMode
+                    ? formatPackageDeltaLabel(
+                        typeof flight.packagePriceDeltaPerPerson === "number"
+                          ? flight.packagePriceDeltaPerPerson
+                          : flight.packagePriceDeltaTotal,
+                        flight.currency
+                      )
+                    : selectedUpgradeOption
+                      ? formatPrice(selectedUpgradeOption.totalPrice, selectedUpgradeOption.currency)
+                      : formatPrice(flight.price, flight.currency)}
                 </span>
                 <span className="text-xs text-[#3A478A]">
-                  {selectedUpgradeOption
-                    ? `${formatPrice(selectedUpgradeOption.pricePerPerson, selectedUpgradeOption.currency)} per person`
-                    : `${formatPrice(flight.pricePerPerson, flight.currency)} per person`}
+                  {isPackageMode
+                    ? "Included in package total"
+                    : selectedUpgradeOption
+                      ? `${formatPrice(selectedUpgradeOption.pricePerPerson, selectedUpgradeOption.currency)} per person`
+                      : `${formatPrice(flight.pricePerPerson, flight.currency)} per person`}
                 </span>
               </div>
               <Button
@@ -1425,4 +1440,3 @@ export default function FlightInfoModal({
     </>
   );
 }
-

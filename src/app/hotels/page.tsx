@@ -283,6 +283,7 @@ function HotelsPageInner() {
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [noResultsMessage, setNoResultsMessage] = useState<string | null>(null);
   const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
   const [displayedHotelsCount, setDisplayedHotelsCount] = useState(12);
   const activeRequestSeq = useRef(0);
@@ -622,6 +623,7 @@ function HotelsPageInner() {
       setLoading(true);
       setLoadingMoreHotels(false);
       setError(null);
+      setNoResultsMessage(null);
       // Clear stale results immediately on a new search (match flights UX).
       setHotels([]);
       setSelectedHotelKey("");
@@ -663,8 +665,7 @@ function HotelsPageInner() {
                 const normalizedHiddenId = String(p.get("hidden_id") || search.hidden_id || "");
                 const matchedDestination =
                   destinations.find((destination) => String(destination.id || "") === normalizedHiddenId) ||
-                  destinations.find((destination) => String(destination.name || "").trim().toLowerCase() === normalizedLocation) ||
-                  destinations[0];
+                  destinations.find((destination) => String(destination.name || "").trim().toLowerCase() === normalizedLocation);
                 if (matchedDestination?.hiddenvalue) {
                   destinationHiddenValue = matchedDestination.hiddenvalue;
                 }
@@ -674,7 +675,7 @@ function HotelsPageInner() {
             }
           }
           if (!destinationHiddenValue.includes(";")) {
-            destinationHiddenValue = `${search.location.substring(0, 3).toUpperCase()};${p.get("hidden_id") || search.hidden_id || "0"};${search.location}`;
+            throw new Error("No matching package destination found.");
           }
           
           // Calculate nights from check-in/check-out
@@ -786,9 +787,11 @@ function HotelsPageInner() {
             if (mappedHotels.length > 0) {
               setHotels(mappedHotels);
               setSelectedHotelKey(mappedHotels.length > 0 ? `${mappedHotels[0]?.id}-0` : "");
+              setNoResultsMessage(null);
             } else {
               setHotels([]);
               setSelectedHotelKey("");
+              setNoResultsMessage(packageResponse.meta.emptyMessage || "No results found");
             }
             setLoading(false);
             setLoadingMoreHotels(false);
@@ -797,9 +800,10 @@ function HotelsPageInner() {
         } catch (err) {
           console.error('[Hotels Page] Package search error:', err);
           if (!cancelled && requestSeq === activeRequestSeq.current) {
-            setError(err instanceof Error ? err.message : "Failed to fetch package hotels");
+            setError(null);
             setHotels([]);
             setSelectedHotelKey("");
+            setNoResultsMessage("No results found");
             setLoading(false);
             setLoadingMoreHotels(false);
             setHasAttemptedFetch(true);
@@ -1026,7 +1030,10 @@ function HotelsPageInner() {
 
           const { mapped, meta, results, criteriaId, criteriaProvider } = parsed;
 
-          setProviderMode(criteriaProvider);
+          // Respect the user's explicit provider tab selection. The response
+          // provider is informative, but it should not flip the active toggle
+          // away from the requested mode while searches are refreshing.
+          setProviderMode(providerOverride || criteriaProvider);
 
           setHotels(mapped);
           setBreakfastByHotelId((prev) => {
@@ -1125,7 +1132,8 @@ function HotelsPageInner() {
 
           for (let attempt = 0; attempt < HYBRID_MAX_POLLS; attempt += 1) {
             if (cancelled || requestSeq !== activeRequestSeq.current) break;
-            await new Promise((resolve) => setTimeout(resolve, HYBRID_POLL_INTERVAL_MS));
+            const pollDelayMs = isVyspaSearchCriteriaId(latestCriteriaId) ? HYBRID_POLL_INTERVAL_MS : 750;
+            await new Promise((resolve) => setTimeout(resolve, pollDelayMs));
             if (cancelled || requestSeq !== activeRequestSeq.current) break;
             try {
               const polledAvailability = await hotelService.searchAvailabilityV3({
@@ -1604,7 +1612,11 @@ function HotelsPageInner() {
   // HotelBeds content enrichment: fill images/address/city for *visible* (filtered) results (lazy, client-side).
   useEffect(() => {
     if (!hasHydrated) return;
-    if (savedHotelSearch?.provider !== "hotelbeds") return;
+    const activeProvider = providerOverride || providerMode;
+    if (activeProvider !== "hotelbeds") {
+      setContentEnriching(false);
+      return;
+    }
     if (filteredHotels.length === 0) return;
 
     const target = filteredHotels.slice(0, Math.min(filteredHotels.length, displayedHotelsCount + 24));
@@ -1724,7 +1736,7 @@ function HotelsPageInner() {
     return () => {
       cancelled = true;
     };
-  }, [displayedHotelsCount, filteredHotels, hasHydrated, savedHotelSearch?.provider]);
+  }, [displayedHotelsCount, filteredHotels, hasHydrated, providerMode, providerOverride]);
 
   // Calculate available meal plans from all hotels
   const availableMealPlans = useMemo(() => {
@@ -1863,18 +1875,24 @@ function HotelsPageInner() {
             />
 
             {loading && hotels.length === 0 && <HotelSearchLoading />}
-            {error && (
+            {error && !isPackageMode && (
               <div className="text-sm text-red-600">{error}</div>
             )}
 
             {/* No Results State */}
-            {hasAttemptedFetch && !loading && !error && hotels.length === 0 && (
+            {hasAttemptedFetch && !loading && hotels.length === 0 && (!error || isPackageMode) && (
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
                 <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">No Hotels Found</h3>
-                <p className="text-gray-600 mb-4">We couldn&apos;t find any hotels for your search. Try adjusting your dates or destination.</p>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  {isPackageMode ? "No results found" : "No Hotels Found"}
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  {isPackageMode
+                    ? (noResultsMessage || "No results found")
+                    : "We couldn&apos;t find any hotels for your search. Try adjusting your dates or destination."}
+                </p>
                 <button
                   onClick={() => window.location.href = '/'}
                   className="px-6 py-2 bg-[#3754ED] text-white rounded-lg hover:bg-[#2a45d6] transition-colors"
