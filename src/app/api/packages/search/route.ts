@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { VYSPA_CONFIG } from '@/config/vyspa';
+import { fixStubaImageUrl } from '@/lib/hotels/imageUrl';
 import type {
   HolidayFlightDirection,
   HolidayFlightSegment,
@@ -165,7 +166,7 @@ export function transformResponse(
       hotelId: Number(hotel.hotel_id),
       hotelName: hotel.hotel_name,
       description: hotel.quickDescription,
-      imageUrl: hotel.image_name,
+      imageUrl: fixStubaImageUrl(hotel.image_name),
       starRating: Number(hotelRow.hotel_rating ?? hotel.HotelInfo?.hotel_rating ?? 0) || undefined,
       address: {
         street1: typeof hotelRow.address1 === 'string' ? hotelRow.address1 : undefined,

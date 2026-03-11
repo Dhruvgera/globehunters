@@ -26,6 +26,7 @@ import { resolveTrustYouHotelId } from "@/lib/trustyou/hotelMapping";
 import type { TrustYouBulkResultItem } from "@/types/trustyou";
 import { normalizeHotelChildAges, parseHotelChildAges, serializeHotelChildAges } from "@/lib/hotels/childAges";
 import { getHotelProvider, parseHotelProvider, type HotelProvider } from "@/lib/hotels/provider";
+import { fixStubaImageUrl } from "@/lib/hotels/imageUrl";
 
 const DEFAULT_FILTERS: HotelFiltersState = {
   propertyQuery: "",
@@ -570,7 +571,7 @@ function HotelsPageInner() {
               srId: raw?.id ? String(raw.id) : undefined,
               vyspaHotelId: toPositiveNumericId(raw?.hotel_id ?? raw?.hotelId) || undefined,
               vMapId: toPositiveNumericId(raw?.VmapId ?? raw?.vMapId) || undefined,
-              imageName: typeof raw?.image_name === "string" ? raw.image_name : undefined,
+              imageName: typeof raw?.image_name === "string" ? fixStubaImageUrl(raw.image_name) : undefined,
               address1: typeof raw?.address1 === "string" ? raw.address1 : undefined,
               address2: typeof raw?.address2 === "string" ? raw.address2 : undefined,
               hotelRating: Number.isFinite(Number(raw?.hotel_rating)) ? Number(raw.hotel_rating) : undefined,
@@ -967,7 +968,7 @@ function HotelsPageInner() {
                 nights,
                 rooms: search.rooms,
               },
-              imageSrc: r?.image_name || "/hotel-placeholder.jpg",
+              imageSrc: fixStubaImageUrl(r?.image_name) || "/hotel-placeholder.jpg",
               description: quickDesc,
               cityName,
               countryName,
@@ -999,7 +1000,7 @@ function HotelsPageInner() {
               srId: r?.id ? String(r.id) : undefined,
               vyspaHotelId: toPositiveNumericId(r?.hotel_id ?? r?.hotelId) || undefined,
               vMapId: toPositiveNumericId(r?.VmapId ?? r?.vMapId) || undefined,
-              imageName: typeof r?.image_name === "string" ? r.image_name : undefined,
+              imageName: typeof r?.image_name === "string" ? fixStubaImageUrl(r.image_name) : undefined,
               address1: typeof r?.address1 === "string" ? r.address1 : undefined,
               address2: typeof r?.address2 === "string" ? r.address2 : undefined,
               hotelRating: Number.isFinite(Number(r?.hotel_rating)) ? Number(r.hotel_rating) : undefined,
@@ -1871,7 +1872,7 @@ function HotelsPageInner() {
                 setProviderOverride(mode);
                 setProviderMode(mode);
               }}
-              showProviderToggle={!isPackageMode && HOTEL_PROVIDER_TOGGLE_ENABLED}
+              showProviderToggle={!isPackageMode && HOTEL_PROVIDER_TOGGLE_ENABLED && providerOverrideReady}
             />
 
             {loading && hotels.length === 0 && <HotelSearchLoading />}

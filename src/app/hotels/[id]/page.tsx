@@ -47,6 +47,7 @@ import {
   flattenHotelChildAges,
   serializeHotelChildAges,
 } from "@/lib/hotels/childAges";
+import { fixStubaImageUrl } from "@/lib/hotels/imageUrl";
 
 function LoadingBlock({ className }: { className: string }) {
   return <div className={`animate-pulse bg-gray-200/70 rounded-xl ${className}`} />;
@@ -240,9 +241,33 @@ function getAmenityIcon(iconName: string) {
   return Icon ? <Icon className="w-[18px] h-[18px] text-[#010D50]" /> : null;
 }
 
+function normalizeAmenityLabel(value: unknown): string {
+  if (typeof value === "string" || typeof value === "number") {
+    return String(value).trim();
+  }
+
+  if (!value || typeof value !== "object") return "";
+
+  const entry = value as Record<string, unknown>;
+  const candidate =
+    entry.label ??
+    entry.name ??
+    entry.description ??
+    entry.title ??
+    entry.Text ??
+    entry.text ??
+    entry.amenity ??
+    entry.value;
+
+  return typeof candidate === "string" || typeof candidate === "number" ? String(candidate).trim() : "";
+}
+
 // Map raw amenity text from API to { label, icon } format
-function mapAmenityTextToIcon(text: string): string {
-  const lowered = text.toLowerCase();
+function mapAmenityTextToIcon(text: unknown): string {
+  const label = normalizeAmenityLabel(text);
+  if (!label) return "";
+
+  const lowered = label.toLowerCase();
   if (lowered.includes("wi-fi") || lowered.includes("wifi") || lowered.includes("internet")) return "wifi";
   if (lowered.includes("pool") || lowered.includes("swim")) return "pool";
   if (lowered.includes("gym") || lowered.includes("fitness")) return "gym";
@@ -262,11 +287,17 @@ function mapAmenityTextToIcon(text: string): string {
   return ""; // No icon match
 }
 
-function transformAmenities(rawAmenities: string[]): { label: string; icon: string }[] {
-  return rawAmenities.map((text) => ({
-    label: text,
-    icon: mapAmenityTextToIcon(text),
-  }));
+function transformAmenities(rawAmenities: unknown[]): { label: string; icon: string }[] {
+  return rawAmenities
+    .map((amenity) => {
+      const label = normalizeAmenityLabel(amenity);
+      if (!label) return null;
+      return {
+        label,
+        icon: mapAmenityTextToIcon(label),
+      };
+    })
+    .filter((amenity): amenity is { label: string; icon: string } => Boolean(amenity));
 }
 
 function sanitizeHotelText(value: unknown): string {
@@ -301,6 +332,13 @@ function sanitizeRoomDisplayText(value: unknown): string {
     .replace(/\bAnd\b/g, "and")
     .replace(/\bOr\b/g, "or")
     .replace(/\bOf\b/g, "of");
+}
+
+function splitHotelTextIntoParagraphs(value: unknown): string[] {
+  return sanitizeHotelText(value)
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.replace(/\n+/g, " ").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
 }
 
 function extractAmenitiesFromDescription(description: string): string[] {
@@ -1118,7 +1156,7 @@ export default function HotelRoomsPage() {
         srId: srId || nextMeta[String(hotelId)]?.srId,
         vyspaHotelId: toPositiveNumericId(hitRow.hotel_id ?? hitRow.hotelId) || nextMeta[String(hotelId)]?.vyspaHotelId,
         vMapId: toPositiveNumericId(hitRow.VmapId ?? hitRow.vMapId) || nextMeta[String(hotelId)]?.vMapId,
-        imageName: typeof hitRow.image_name === "string" ? hitRow.image_name : nextMeta[String(hotelId)]?.imageName,
+        imageName: typeof hitRow.image_name === "string" ? fixStubaImageUrl(hitRow.image_name) : nextMeta[String(hotelId)]?.imageName,
         address1: typeof hitRow.address1 === "string" ? hitRow.address1 : nextMeta[String(hotelId)]?.address1,
         address2: typeof hitRow.address2 === "string" ? hitRow.address2 : nextMeta[String(hotelId)]?.address2,
         hotelRating:
@@ -1425,7 +1463,7 @@ export default function HotelRoomsPage() {
       galleryImages: galleryImages.length > 0 ? galleryImages : (remoteHotelHeader?.image ? [remoteHotelHeader.image] : []),
       address: remoteHotelHeader?.address || "",
       about: {
-        description: detailsText || "",
+        description: sanitizeHotelText(detailsText || ""),
       },
       amenities: transformAmenities(remoteAmenities || []),
       reviews: {
@@ -1466,6 +1504,7 @@ export default function HotelRoomsPage() {
   const hasImportantInfo = hotel.importantInfo.trim().length > 0;
   const hasAccessibilitySection = hasImportantInfo;
   const hasAboutProperty = hotel.about.description.trim().length > 0;
+  const aboutParagraphs = useMemo(() => splitHotelTextIntoParagraphs(hotel.about.description), [hotel.about.description]);
   const hasAmenitiesSection = hotel.amenities.length > 0;
   const hasAboutSection = hasAboutProperty || hasAmenitiesSection;
   const navSections = useMemo(
@@ -1644,7 +1683,7 @@ export default function HotelRoomsPage() {
             return next;
           })();
 
-          const headerImage = roomHotel.image_name || packageHotel.imageUrl || "";
+          const headerImage = fixStubaImageUrl(roomHotel.image_name) || packageHotel.imageUrl || "";
           const headerAddress = [roomHotel.address1, roomHotel.address2, packageHotel.address?.street1]
             .filter(Boolean)
             .join(", ");
@@ -1666,8 +1705,9 @@ export default function HotelRoomsPage() {
               image: headerImage || undefined,
               address: headerAddress || undefined,
             });
-            if (packageHotel.description || roomHotel.quickDescription) {
-              setDetailsText(packageHotel.description || roomHotel.quickDescription || "");
+            const packageDescription = sanitizeHotelText(packageHotel.description || roomHotel.quickDescription || "");
+            if (packageDescription) {
+              setDetailsText(packageDescription);
             }
             if (extractedPackageAmenities.length > 0) {
               setRemoteAmenities(transformAmenities(extractedPackageAmenities));
@@ -1686,7 +1726,7 @@ export default function HotelRoomsPage() {
               address: headerAddress || undefined,
               galleryImages: headerImage ? [headerImage] : [],
               rooms: flattenedRooms,
-              detailsText: packageHotel.description || roomHotel.quickDescription || "",
+              detailsText: packageDescription,
               cancellationText: "",
               amenities: extractedPackageAmenities,
               fetchedAt: Date.now(),
@@ -1823,7 +1863,7 @@ export default function HotelRoomsPage() {
         const respAny: any = respRoot as any;
         const headerName = respAny?.hotel_name || meta?.hotelName || remoteHotelHeader?.name || "";
         const headerRating = Number(respAny?.hotel_rating || meta?.hotelRating || remoteHotelHeader?.rating || 0) || 0;
-        const headerImage = String(respAny?.image_name || meta?.imageName || "").trim();
+        const headerImage = fixStubaImageUrl(respAny?.image_name || meta?.imageName || "");
         const headerAddress =
           respAny?.address1 || respAny?.address2
             ? [respAny?.address1, respAny?.address2].filter(Boolean).join(", ")
@@ -2476,8 +2516,12 @@ export default function HotelRoomsPage() {
                       <h2 className="text-xl lg:text-2xl font-semibold text-[#010D50]">
                         About this property
                       </h2>
-                      <div className="text-sm text-[#3A478A] leading-relaxed whitespace-pre-line">
-                        {hotel.about.description}
+                      <div className="space-y-4 text-[15px] leading-7 text-[#3A478A]">
+                        {aboutParagraphs.map((paragraph, index) => (
+                          <p key={`${paragraph.slice(0, 32)}-${index}`} className="max-w-[78ch]">
+                            {paragraph}
+                          </p>
+                        ))}
                       </div>
                     </div>
                   )}

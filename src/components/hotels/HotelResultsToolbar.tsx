@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { BarChart3, Grid3X3, Map, SlidersHorizontal } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,14 @@ export function HotelResultsToolbar({
   onProviderModeChange?: (mode: HotelProvider) => void;
   showProviderToggle?: boolean;
 }) {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const shouldHighlightGrid = viewMode === "grid" || (isMounted && viewMode === "list" && window.innerWidth < 640);
+
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -118,7 +127,7 @@ export function HotelResultsToolbar({
             onClick={() => onViewModeChange("grid")}
             className={[
               "h-9 rounded-xl px-3 text-sm",
-              viewMode === "grid" || (viewMode === "list" && typeof window !== "undefined" && window.innerWidth < 640)
+              shouldHighlightGrid
                 ? "bg-[#E0E7FF] text-[#010D50] hover:bg-[#D7E0FF]"
                 : "bg-white text-[#3754ED] border border-[#3754ED] hover:bg-[#F5F7FF]",
             ].join(" ")}

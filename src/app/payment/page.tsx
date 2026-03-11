@@ -357,9 +357,11 @@ function PaymentContent() {
       : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
   }, [flight]);
 
-  const normalizedProtectionPlan = isHotelMode
-    ? (protectionPlan ? "basic" : undefined)
-    : protectionPlan;
+  const normalizedProtectionPlan = isPackageMode
+    ? undefined
+    : isHotelMode
+      ? (protectionPlan ? "basic" : undefined)
+      : protectionPlan;
   const protectionPlanCost = normalizedProtectionPlan
     ? protectionPlanPrices[normalizedProtectionPlan]
     : 0;
@@ -648,13 +650,18 @@ function PaymentContent() {
                 price={protectionPlanPrices.basic}
                 currency={currency || "GBP"}
               />
-            ) : (
+            ) : !isPackageMode ? (
               <ProtectionPlanSection
                 selectedPlan={normalizedProtectionPlan}
                 onSelectPlan={setProtectionPlan}
                 planPrices={protectionPlanPrices}
                 currency={currency || 'GBP'}
               />
+            ) : (
+              <>
+                {/* Package hotel booking: iAssure temporarily disabled. */}
+                {/* Restore the ProtectionPlanSection block above for package mode when ready. */}
+              </>
             )}
 
             {isHotelMode && (
@@ -701,13 +708,17 @@ function PaymentContent() {
 
                   // Add protection plan if selected
                   if (normalizedProtectionPlan && protectionPlanPrices[normalizedProtectionPlan]) {
-                    extras.push({
-                      type: 'insurance',
-                      planType: normalizedProtectionPlan,
-                      price: protectionPlanPrices[normalizedProtectionPlan],
-                      productName: isHotelMode ? 'Refund Shield' : 'iAssure Insurance',
-                      vendorMode: isHotelMode ? 'refund-shield' : 'iassure',
-                    });
+                    if (!isPackageMode) {
+                      extras.push({
+                        type: 'insurance',
+                        planType: normalizedProtectionPlan,
+                        price: protectionPlanPrices[normalizedProtectionPlan],
+                        productName: isHotelMode ? 'Refund Shield' : 'iAssure Insurance',
+                        vendorMode: isHotelMode ? 'refund-shield' : 'iassure',
+                      });
+                    }
+                    // Package hotel booking: iAssure temporarily disabled.
+                    // Restore the extras.push block above for package mode when ready.
                   }
 
                   // Add baggage if selected

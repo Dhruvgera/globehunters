@@ -8,17 +8,19 @@ import { useTranslations } from "next-intl";
 interface SearchHeaderProps {
   onFilterClick: () => void;
   resultCount: number;
+  showSearchBar?: boolean;
 }
 
-export function SearchHeader({ onFilterClick, resultCount }: SearchHeaderProps) {
+export function SearchHeader({ onFilterClick, resultCount, showSearchBar = true }: SearchHeaderProps) {
   const t = useTranslations('search.button');
   
   return (
     <>
-      {/* Search Bar Section */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
-        <SearchBar compact />
-      </div>
+      {showSearchBar && (
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
+          <SearchBar compact />
+        </div>
+      )}
 
       {/* Mobile Filter Button */}
       <div className="lg:hidden mx-auto max-w-7xl px-4 sm:px-6 mb-4">

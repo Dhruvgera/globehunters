@@ -8,6 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { VYSPA_CONFIG } from '@/config/vyspa';
+import { fixStubaImageUrl } from '@/lib/hotels/imageUrl';
 import type { HolidayDetailRequest } from '@/types/holidayPackage';
 
 function buildBasicAuthHeader(): string {
@@ -212,7 +213,7 @@ function transformResponse(vyspaResponse: any): TransformedPackageDetails {
       hotelId: Number(hotelSource.hotel_id || 0),
       name: String(hotelSource.hotel_name || 'Selected hotel'),
       description: hotelBlock.description || hotelSource.quickDescription,
-      imageUrl: hotelSource.image_name,
+      imageUrl: fixStubaImageUrl(hotelSource.image_name),
       starRating: Number(hotelSource.hotel_rating || 0) || undefined,
       amenities: extractPackageAmenities(hotelBlock, hotelSource, ...rawRooms),
       checkOutDate: hotelSource.checkOutDate,

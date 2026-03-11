@@ -1048,6 +1048,7 @@ function SearchPageContent() {
       <SearchHeader
         onFilterClick={() => setIsFilterSheetOpen(true)}
         resultCount={filteredFlights.length}
+        showSearchBar={!isPackageMode}
       />
 
       {/* Package Mode: Step Progress */}
@@ -1216,11 +1217,13 @@ function SearchPageContent() {
             <div className="flex-1 flex flex-col gap-3 order-2 lg:order-2 min-w-0 overflow-hidden">
               {filteredFlights.length > 0 ? (
                 <>
-                  <FlightSortTabs
-                    flights={filteredFlights}
-                    activeTab={sortBy}
-                    onTabChange={setSortBy}
-                  />
+                  {!isPackageMode && (
+                    <FlightSortTabs
+                      flights={filteredFlights}
+                      activeTab={sortBy}
+                      onTabChange={setSortBy}
+                    />
+                  )}
                   <FlightsList
                     flights={filteredFlights}
                     displayCount={displayedFlightsCount}

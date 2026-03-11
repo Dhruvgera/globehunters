@@ -256,6 +256,15 @@ function PackageReviewPageInner() {
   const selectedCancellation = packageDetails?.cancellationPolicies?.[0];
   const cabinLabel = formatFareLabel(selectedUpgrade?.cabinClassDisplay || selectedFareType);
   const baggageCurrency = selectedFlight?.currency || "£";
+  const journeySegments =
+    selectedFlight.segments && selectedFlight.segments.length > 0
+      ? selectedFlight.segments
+      : [selectedFlight.outbound, ...(selectedFlight.inbound ? [selectedFlight.inbound] : [])];
+  const baggageCost = addOns.additionalBaggage * PRICING_CONFIG.baggagePrice * journeySegments.length;
+  const protectionPlanCost = addOns.protectionPlan
+    ? protectionPlanPrices[addOns.protectionPlan]
+    : 0;
+  const totalPrice = pricing.packageTotal + baggageCost + protectionPlanCost;
 
   if (!selectedFlight) {
     return (
@@ -455,6 +464,22 @@ function PackageReviewPageInner() {
                     <span className="text-[#3A478A]">Flights (per booking)</span>
                     <span className="font-medium text-[#010D50]">Included</span>
                   </div>
+                  {addOns.additionalBaggage > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-[#3A478A]">
+                        Checked baggage ({addOns.additionalBaggage} bag{addOns.additionalBaggage !== 1 ? "s" : ""})
+                      </span>
+                      <span className="font-medium text-[#010D50]">{formatMoney(pricing.currency, baggageCost)}</span>
+                    </div>
+                  )}
+                  {addOns.protectionPlan && (
+                    <div className="flex justify-between">
+                      <span className="text-[#3A478A]">Protection plan</span>
+                      <span className="font-medium text-[#010D50]">
+                        {formatMoney(pricing.currency, protectionPlanCost)}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-t border-[#DFE0E4] pt-4">
@@ -462,7 +487,7 @@ function PackageReviewPageInner() {
                     <span className="font-semibold text-[#010D50]">Total</span>
                     <div className="text-right">
                       <div className="text-2xl font-bold text-[#3754ED]">
-                        {packageDetails?.packagePrice || formatMoney(pricing.currency, pricing.packageTotal)}
+                        {formatMoney(pricing.currency, totalPrice)}
                       </div>
                       <div className="text-xs text-[#3A478A]">Incl. all taxes & fees</div>
                     </div>

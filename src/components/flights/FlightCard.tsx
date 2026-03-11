@@ -12,6 +12,7 @@ import { FlightActions } from "./flight-card/FlightActions";
 import { TicketOptionsPanel } from "./flight-card/TicketOptionsPanel";
 import { ShareButton } from "@/components/ui/share-button";
 import { usePriceCheck } from "@/hooks/usePriceCheck";
+import { formatPrice } from "@/lib/currency";
 
 function formatPackageDeltaLabel(amount?: number, currency?: string): string {
   const delta = Number(amount || 0);
