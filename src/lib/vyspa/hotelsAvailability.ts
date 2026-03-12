@@ -73,7 +73,7 @@ export function normalizeVyspaAvailabilityCriteria(criteria: AvailabilityCriteri
   normalized.timeout = Math.max(5, requestedTimeoutSec ?? defaultTimeoutSec);
   // Force Vyspa availability to Hotelbeds supplier only.
   delete normalized.supplier_id;
-  normalized.supplierId = 100;
+  // normalized.supplierId = 100;
 
   const rawFilters =
     normalized.filters && typeof normalized.filters === 'object' && !Array.isArray(normalized.filters)
