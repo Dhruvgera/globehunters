@@ -774,7 +774,7 @@ function HotelsPageInner() {
             timeout: VYSPA_SEARCH_TIMEOUT_SEC,
           };
 
-          const mapPackageHotels = (response: { results: PackageSearchResult[]; meta: { emptyMessage?: string } }) =>
+          const mapPackageHotels = (response: { results: PackageSearchResult[] }) =>
             response.results.map((pkg: PackageSearchResult): Hotel => {
               const total = pkg.startingPrice || 0;
               const nightly = nights > 0 ? total / nights : total;
@@ -825,7 +825,7 @@ function HotelsPageInner() {
               };
             });
 
-          const applyPackageResponse = (packageResponse: { results: PackageSearchResult[]; meta: { requestId: number; completed: boolean; emptyMessage?: string } }) => {
+          const applyPackageResponse = (packageResponse: { results: PackageSearchResult[]; meta: import("@/types/holidayPackage").PackageResultsMeta }) => {
             const mappedHotels = mapPackageHotels(packageResponse);
             const {
               setPackageSearch,
