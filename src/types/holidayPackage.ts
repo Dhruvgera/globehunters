@@ -279,6 +279,7 @@ export interface HolidayHotelAddress {
   street2?: string;
   postalcode?: string;
   city?: string;
+  country?: string;
   /** Latitude in decimal degrees */
   latitude?: number;
   /** Longitude in decimal degrees */
@@ -911,6 +912,10 @@ export interface PackageSearchCriteria {
   hotelFilters?: HolidayHotelFilters;
   /** Custom sort */
   customSort?: HolidayCustomSort;
+  /** Optional upstream timeout in seconds */
+  timeout?: number;
+  /** Optional request ID for package search retrieval / rerun */
+  requestId?: number;
 }
 
 /** Room configuration */
@@ -947,6 +952,16 @@ export interface PackageSearchResult {
   startingPrice?: number;
   /** Currency code */
   currency?: string;
+  /** Hotel amenities / attributes */
+  amenities?: string[];
+  /** Meal plans available */
+  mealPlans?: string[];
+  /** City name from upstream hotel row */
+  cityName?: string;
+  /** Country name from upstream hotel row */
+  countryName?: string;
+  /** Keep the upstream hotel row so package mode can reuse richer hotel data */
+  rawSearchResult?: unknown;
   /** Flight details for this package */
   flight?: {
     outbound: TransformedFlightLeg;

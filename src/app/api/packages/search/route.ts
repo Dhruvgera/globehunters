@@ -21,7 +21,12 @@ import type {
   TransformedFlightSegment,
 } from '@/types/holidayPackage';
 
-function resolvePackageSearchTimeoutSec(): number {
+function resolvePackageSearchTimeoutSec(criteria?: PackageSearchCriteria): number {
+  const requested = Number(criteria?.timeout);
+  if (Number.isFinite(requested) && requested > 0) {
+    return Math.max(3, Math.trunc(requested));
+  }
+
   const raw = Number(
     process.env.VYSPA_PACKAGE_SEARCH_TIMEOUT_SEC
       || process.env.VYSPA_HOTELS_SEARCH_TIMEOUT_SEC
@@ -29,7 +34,22 @@ function resolvePackageSearchTimeoutSec(): number {
       || 30
   );
   if (!Number.isFinite(raw) || raw <= 0) return 30;
-  return Math.max(5, Math.trunc(raw));
+  return Math.max(3, Math.trunc(raw));
+}
+
+function resolvePackageSearchTimeoutBufferSec(): number {
+  const raw = Number(process.env.VYSPA_PACKAGE_SEARCH_TIMEOUT_BUFFER_SEC || 5);
+  if (!Number.isFinite(raw) || raw <= 0) return 5;
+  return Math.min(15, Math.max(3, Math.trunc(raw)));
+}
+
+function resolvePackageTransportTimeoutMs(criteria?: PackageSearchCriteria): number {
+  const configured = Number(process.env.VYSPA_PACKAGE_TRANSPORT_TIMEOUT_MS || 0);
+  if (Number.isFinite(configured) && configured > 0) return Math.trunc(configured);
+
+  const timeoutSec = resolvePackageSearchTimeoutSec(criteria);
+  const bufferSec = resolvePackageSearchTimeoutBufferSec();
+  return Math.max(15000, (timeoutSec + bufferSec) * 1000);
 }
 
 function buildBasicAuthHeader(): string {
@@ -76,11 +96,36 @@ function buildVyspaRequest(criteria: PackageSearchCriteria): HolidayPackageSearc
     child_ages: childAges,
     infants,
     minimalResponse: false,
-    timeout: resolvePackageSearchTimeoutSec(),
+    timeout: resolvePackageSearchTimeoutSec(criteria),
+    ...(criteria.requestId ? { RequestId: criteria.requestId } : {}),
     ...(criteria.directFlightsOnly ? { direct_flight_only: 1 } : {}),
     ...(criteria.hotelFilters ? { hotel_filters: criteria.hotelFilters } : {}),
     ...(criteria.customSort ? { customsort: criteria.customSort } : {}),
   };
+}
+
+function extractPackageAmenities(hotel: Record<string, unknown>): string[] {
+  const attributes = hotel.attributes;
+  if (!attributes || typeof attributes !== 'object' || Array.isArray(attributes)) return [];
+  return Array.from(
+    new Set(
+      Object.values(attributes as Record<string, unknown>)
+        .map((value) => String(value || '').trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function extractMealPlans(hotel: Record<string, unknown>): string[] {
+  const mealPlans = hotel.MealPlans;
+  if (!Array.isArray(mealPlans)) return [];
+  return Array.from(
+    new Set(
+      mealPlans
+        .map((value) => String(value || '').trim())
+        .filter(Boolean)
+    )
+  );
 }
 
 function transformFlightLeg(direction: HolidayFlightDirection): TransformedFlightLeg {
@@ -171,6 +216,8 @@ export function transformResponse(
       address: {
         street1: typeof hotelRow.address1 === 'string' ? hotelRow.address1 : undefined,
         street2: typeof hotelRow.address2 === 'string' ? hotelRow.address2 : undefined,
+        city: typeof hotelRow.cityName === 'string' ? hotelRow.cityName : undefined,
+        country: typeof hotelRow.countryName === 'string' ? hotelRow.countryName : undefined,
         latitude: Number(hotelRow.geo_loc_latitude ?? 0) || undefined,
         longitude: Number(hotelRow.geo_loc_longitude ?? 0) || undefined,
       },
@@ -180,6 +227,11 @@ export function transformResponse(
         typeof hotelRow.SellCur === 'string'
           ? hotelRow.SellCur
           : undefined,
+      amenities: extractPackageAmenities(hotelRow),
+      mealPlans: extractMealPlans(hotelRow),
+      cityName: typeof hotelRow.cityName === 'string' ? hotelRow.cityName : undefined,
+      countryName: typeof hotelRow.countryName === 'string' ? hotelRow.countryName : undefined,
+      rawSearchResult: hotelRow,
       flight: outboundLeg ? { outbound: outboundLeg, inbound: inboundLeg } : undefined,
     };
   });
@@ -222,7 +274,7 @@ export async function POST(request: NextRequest) {
     const url = `${getVyspaBaseUrl()}/rest/v4/holiday_package_search/`;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), VYSPA_CONFIG.defaults.timeout * 2);
+    const timeoutId = setTimeout(() => controller.abort(), resolvePackageTransportTimeoutMs(criteria));
 
     const response = await fetch(url, {
       method: 'POST',

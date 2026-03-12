@@ -194,6 +194,74 @@ function includesBreakfast(mealPlans: string[]): boolean {
   return mealPlans.some((p) => normalizeMealPlanLabel(p).toLowerCase().includes("breakfast"));
 }
 
+function mealPlanFieldCandidates(rawMealPlan: string): string[] {
+  const key = mealPlanKey(rawMealPlan);
+  switch (key) {
+    case "room only":
+    case "ro":
+      return ["MinRO"];
+    case "bed and breakfast":
+    case "bb":
+    case "breakfast":
+      return ["MinBB"];
+    case "half board":
+    case "hb":
+      return ["MinHB"];
+    case "full board":
+    case "fb":
+      return ["MinFB"];
+    case "all inclusive":
+    case "ai":
+      return ["MinAI"];
+    case "self catering":
+    case "sc":
+      return ["MinSC"];
+    default:
+      return [];
+  }
+}
+
+function parsePositivePriceCandidate(value: unknown): number | null {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
+function resolveMealPlanAdjustedTotal(hotel: Hotel, selectedMealPlans: string[]): number | null {
+  if (!selectedMealPlans.length) return null;
+  const raw =
+    hotel.rawSearchResult && typeof hotel.rawSearchResult === "object" && !Array.isArray(hotel.rawSearchResult)
+      ? (hotel.rawSearchResult as Record<string, unknown>)
+      : null;
+  if (!raw) return null;
+
+  const candidates: number[] = [];
+  for (const selectedMealPlan of selectedMealPlans) {
+    for (const field of mealPlanFieldCandidates(selectedMealPlan)) {
+      const candidate = parsePositivePriceCandidate(raw[field]);
+      if (candidate != null) candidates.push(candidate);
+    }
+  }
+
+  if (candidates.length === 0) return null;
+  return Math.min(...candidates);
+}
+
+function applySelectedMealPlanPrice(hotel: Hotel, selectedMealPlans: string[]): Hotel {
+  const adjustedTotal = resolveMealPlanAdjustedTotal(hotel, selectedMealPlans);
+  if (adjustedTotal == null) return hotel;
+  const nights = hotel.price.nights > 0 ? hotel.price.nights : 1;
+  const adjustedNightly = Math.round((adjustedTotal / nights) * 100) / 100;
+  return {
+    ...hotel,
+    price: {
+      ...hotel.price,
+      total: adjustedTotal,
+      nightly: adjustedNightly,
+    },
+  };
+}
+
 type BreakfastStatus = "unknown" | "yes" | "no";
 
 function hasBreakfastInRoomsResponse(resp: any): boolean {
@@ -703,98 +771,156 @@ function HotelsPageInner() {
             checkIn: search.checkIn,
             nights,
             rooms: roomConfigurations,
-          } as const;
+            timeout: VYSPA_SEARCH_TIMEOUT_SEC,
+          };
+
+          const mapPackageHotels = (response: { results: PackageSearchResult[]; meta: { emptyMessage?: string } }) =>
+            response.results.map((pkg: PackageSearchResult): Hotel => {
+              const total = pkg.startingPrice || 0;
+              const nightly = nights > 0 ? total / nights : total;
+              const starRatingClamped = Math.min(5, Math.max(1, pkg.starRating || 3)) as 1 | 2 | 3 | 4 | 5;
+              const location = [pkg.address?.street1, pkg.address?.city, pkg.address?.country].filter(Boolean).join(", ");
+              const tyId = resolveTrustYouHotelId({
+                hotelName: pkg.hotelName,
+                location,
+              });
+
+              return {
+                id: String(pkg.id),
+                tyId: tyId || undefined,
+                name: pkg.hotelName,
+                distanceLabel: pkg.address?.street1 || pkg.address?.city || search.location,
+                neighborhood:
+                  pkg.address?.city && pkg.address?.country
+                    ? `${pkg.address.city}, ${pkg.address.country}`
+                    : pkg.address?.city || pkg.cityName || undefined,
+                starRating: starRatingClamped,
+                amenities: (pkg.amenities || []).slice(0, 24) as Hotel["amenities"],
+                room: {
+                  name:
+                    pkg.mealPlans && pkg.mealPlans.length > 0
+                      ? `Meal plans: ${pkg.mealPlans.slice(0, 2).join(", ")}${pkg.mealPlans.length > 2 ? " +" : ""}`
+                      : "Room options available",
+                  highlights: pkg.flight ? ["Includes flights"] : [],
+                },
+                reviews: {
+                  score: 0,
+                  label: "No guest rating yet",
+                  count: 0,
+                },
+                price: {
+                  currency: currencySymbol(pkg.currency || "GBP"),
+                  nightly,
+                  total,
+                  nights,
+                  rooms: search.rooms,
+                },
+                imageSrc: pkg.imageUrl || "/hotel-placeholder.jpg",
+                description: pkg.description || "",
+                cityName: pkg.address?.city || pkg.cityName || "",
+                countryName: pkg.address?.country || pkg.countryName || "",
+                mealPlans: pkg.mealPlans || [],
+                refundable: undefined,
+                rawSearchResult: pkg.rawSearchResult ?? pkg,
+              };
+            });
+
+          const applyPackageResponse = (packageResponse: { results: PackageSearchResult[]; meta: { requestId: number; completed: boolean; emptyMessage?: string } }) => {
+            const mappedHotels = mapPackageHotels(packageResponse);
+            const {
+              setPackageSearch,
+              setPackageResults,
+              setHotelSearch,
+              setSearchRequestId,
+            } = useBookingStore.getState();
+
+            setPackageSearch({
+              ...packageCriteria,
+              requestId: packageResponse.meta.requestId || undefined,
+            });
+            setPackageResults(packageResponse.results, packageResponse.meta);
+            setHotelSearch({
+              provider: "vyspa",
+              location: search.location,
+              hidden_id: search.hidden_id || "",
+              hidden_key: search.hidden_key || "",
+              checkIn: search.checkIn,
+              checkOut: search.checkOut,
+              rooms: search.rooms,
+              adults: search.adults,
+              children: search.children,
+              child_age: search.child_age,
+              branches: search.branches,
+              searchCriteriaId: packageResponse.meta.requestId,
+              arrivalPointCode: search.arrival_point_code || undefined,
+            });
+            if (packageResponse.meta.requestId) {
+              setSearchRequestId(String(packageResponse.meta.requestId));
+            }
+
+            if (!cancelled && requestSeq === activeRequestSeq.current) {
+              if (mappedHotels.length > 0) {
+                setHotels(mappedHotels);
+                setSelectedHotelKey(mappedHotels.length > 0 ? `${mappedHotels[0]?.id}-0` : "");
+                setNoResultsMessage(null);
+              } else {
+                setHotels([]);
+                setSelectedHotelKey("");
+                setNoResultsMessage(packageResponse.meta.emptyMessage || "No results found");
+              }
+            }
+
+            return mappedHotels;
+          };
 
           const packageResponse = await packageService.searchPackages(packageCriteria);
-          
+
           console.log('[Hotels Page] Package search response:', {
             resultsCount: packageResponse.results.length,
             meta: packageResponse.meta,
           });
-          
-          // Transform package results to Hotel format for display
-          const mappedHotels: Hotel[] = packageResponse.results.map((pkg: PackageSearchResult): Hotel => {
-            const total = pkg.startingPrice || 0;
-            const nightly = nights > 0 ? total / nights : total;
-            const starRatingClamped = Math.min(5, Math.max(1, pkg.starRating || 3)) as 1 | 2 | 3 | 4 | 5;
-            const tyId = resolveTrustYouHotelId({
-              hotelName: pkg.hotelName,
-              location: [pkg.address?.street1, pkg.address?.city].filter(Boolean).join(", "),
-            });
-            
-            return {
-              id: String(pkg.id),
-              tyId: tyId || undefined,
-              name: pkg.hotelName,
-              distanceLabel: pkg.address?.street1 || pkg.address?.city || search.location,
-              neighborhood: pkg.address?.city || undefined,
-              starRating: starRatingClamped,
-              amenities: [],
-              room: {
-                name: "Room options available",
-                highlights: pkg.flight ? ["Includes flights"] : [],
-              },
-              reviews: {
-                score: 8.0,
-                label: "Very Good",
-                count: 0,
-              },
-              price: {
-                currency: currencySymbol(pkg.currency || "GBP"),
-                nightly,
-                total,
-                nights,
-                rooms: search.rooms,
-              },
-              imageSrc: pkg.imageUrl || "/hotel-placeholder.jpg",
-              description: pkg.description || "",
-              cityName: pkg.address?.city || "",
-              countryName: "",
-              mealPlans: [],
-              refundable: undefined,
-              rawSearchResult: pkg,
-            };
-          });
-          
-          // Store package metadata and stay context for later steps.
-          const {
-            setPackageSearch,
-            setPackageResults,
-            setHotelSearch,
-            setSearchRequestId,
-          } = useBookingStore.getState();
-          setPackageSearch(packageCriteria);
-          setPackageResults(packageResponse.results, packageResponse.meta);
-          setHotelSearch({
-            provider: "vyspa",
-            location: search.location,
-            hidden_id: search.hidden_id || "",
-            hidden_key: search.hidden_key || "",
-            checkIn: search.checkIn,
-            checkOut: search.checkOut,
-            rooms: search.rooms,
-            adults: search.adults,
-            children: search.children,
-            child_age: search.child_age,
-            branches: search.branches,
-            searchCriteriaId: packageResponse.meta.requestId,
-            arrivalPointCode: search.arrival_point_code || undefined,
-          });
-          if (packageResponse.meta.requestId) {
-            setSearchRequestId(String(packageResponse.meta.requestId));
-          }
-          
+
+          applyPackageResponse(packageResponse);
+
           if (!cancelled && requestSeq === activeRequestSeq.current) {
-            if (mappedHotels.length > 0) {
-              setHotels(mappedHotels);
-              setSelectedHotelKey(mappedHotels.length > 0 ? `${mappedHotels[0]?.id}-0` : "");
-              setNoResultsMessage(null);
-            } else {
-              setHotels([]);
-              setSelectedHotelKey("");
-              setNoResultsMessage(packageResponse.meta.emptyMessage || "No results found");
-            }
             setLoading(false);
+            setHasAttemptedFetch(true);
+          }
+
+          if (packageResponse.meta.completed === false && packageResponse.meta.requestId) {
+            setLoadingMoreHotels(true);
+            let latestRequestId = packageResponse.meta.requestId;
+
+            for (let attempt = 0; attempt < HYBRID_MAX_POLLS; attempt += 1) {
+              if (cancelled || requestSeq !== activeRequestSeq.current) break;
+              await new Promise((resolve) => setTimeout(resolve, HYBRID_POLL_INTERVAL_MS));
+              if (cancelled || requestSeq !== activeRequestSeq.current) break;
+
+              try {
+                const polledPackageResponse = await packageService.searchPackages({
+                  ...packageCriteria,
+                  requestId: latestRequestId,
+                });
+
+                console.log('[Hotels Page] Package poll response:', {
+                  requestId: polledPackageResponse.meta.requestId,
+                  completed: polledPackageResponse.meta.completed,
+                  resultsCount: polledPackageResponse.results.length,
+                });
+
+                applyPackageResponse(polledPackageResponse);
+                if (polledPackageResponse.meta.requestId) {
+                  latestRequestId = polledPackageResponse.meta.requestId;
+                }
+                if (polledPackageResponse.meta.completed) break;
+              } catch (pollError) {
+                console.warn("[Hotels Page] Package poll request failed", pollError);
+                break;
+              }
+            }
+          }
+
+          if (!cancelled && requestSeq === activeRequestSeq.current) {
             setLoadingMoreHotels(false);
             setHasAttemptedFetch(true);
           }
@@ -1298,6 +1424,11 @@ function HotelsPageInner() {
 
   const currency = useMemo(() => hotels[0]?.price.currency || "$", [hotels]);
 
+  const hotelsWithSelectedMealPricing = useMemo(
+    () => hotels.map((hotel) => applySelectedMealPlanPrice(hotel, filters.mealPlans)),
+    [filters.mealPlans, hotels]
+  );
+
   const hotelsForPriceBounds = useMemo(() => {
     // Apply all filters except priceRange, so slider bounds reflect the "current result set"
     // when other filters (e.g. breakfast) are toggled.
@@ -1307,7 +1438,7 @@ function HotelsPageInner() {
         .map((n) => normalizeNeighborhoodValue(n, { searchLocation: resolvedSearch.location }).key)
         .filter(Boolean)
     );
-    return hotels.filter((h) => {
+    return hotelsWithSelectedMealPricing.filter((h) => {
       if (q && !h.name.toLowerCase().includes(q)) return false;
       if (filters.starRatings.length > 0 && !filters.starRatings.includes(h.starRating)) return false;
       if (selectedNeighborhoodKeys.size > 0) {
@@ -1340,7 +1471,7 @@ function HotelsPageInner() {
     filters.propertyQuery,
     resolvedSearch.location,
     filters.starRatings,
-    hotels,
+    hotelsWithSelectedMealPricing,
   ]);
 
   const priceBounds = useMemo((): { min: number; max: number } => {
@@ -1410,7 +1541,7 @@ function HotelsPageInner() {
         .filter(Boolean)
     );
 
-    const base = hotels.filter((h) => {
+    const base = hotelsWithSelectedMealPricing.filter((h) => {
       if (q && !h.name.toLowerCase().includes(q)) return false;
 
       if (filters.starRatings.length > 0 && !filters.starRatings.includes(h.starRating)) return false;
@@ -1465,7 +1596,7 @@ function HotelsPageInner() {
     } // recommended: keep API order
 
     return sorted;
-  }, [filters, hotels, resolvedSearch.location, sortMode]);
+  }, [filters, hotelsWithSelectedMealPricing, resolvedSearch.location, sortMode]);
 
   const displayedHotels = useMemo(() => {
     return filteredHotels.slice(0, displayedHotelsCount);
@@ -1742,7 +1873,7 @@ function HotelsPageInner() {
   // Calculate available meal plans from all hotels
   const availableMealPlans = useMemo(() => {
     const planByKey = new Map<string, string>();
-    for (const h of hotels) {
+    for (const h of hotelsWithSelectedMealPricing) {
       for (const p of h.mealPlans || []) {
         const label = normalizeMealPlanLabel(String(p));
         const key = mealPlanKey(label);
@@ -1751,11 +1882,11 @@ function HotelsPageInner() {
       }
     }
     return Array.from(planByKey.values()).sort((a, b) => a.localeCompare(b));
-  }, [hotels]);
+  }, [hotelsWithSelectedMealPricing]);
 
   const availableAmenities = useMemo<HotelAmenityOption[]>(() => {
     const countByAmenity = new Map<string, { label: string; count: number }>();
-    for (const h of hotels) {
+    for (const h of hotelsWithSelectedMealPricing) {
       for (const amenity of h.amenities || []) {
         const label = String(amenity || "").trim();
         if (!label) continue;
@@ -1774,11 +1905,11 @@ function HotelsPageInner() {
         return a.label.localeCompare(b.label);
       })
       .slice(0, 24);
-  }, [hotels]);
+  }, [hotelsWithSelectedMealPricing]);
 
   const availableNeighborhoods = useMemo(() => {
     const byKey = new Map<string, string>();
-    for (const h of hotels) {
+    for (const h of hotelsWithSelectedMealPricing) {
       const { key, label } = normalizeNeighborhoodValue(h.neighborhood || "", {
         city: h.cityName,
         country: h.countryName,
@@ -1791,17 +1922,17 @@ function HotelsPageInner() {
       }
     }
     return Array.from(byKey.values()).sort((a, b) => a.localeCompare(b));
-  }, [hotels, resolvedSearch.location]);
+  }, [hotelsWithSelectedMealPricing, resolvedSearch.location]);
 
   const refundableFilterEnabled = useMemo(
-    () => hotels.some((h) => h.refundable === true || h.refundable === false),
-    [hotels]
+    () => hotelsWithSelectedMealPricing.some((h) => h.refundable === true || h.refundable === false),
+    [hotelsWithSelectedMealPricing]
   );
 
   // Calculate min price per star rating
   const minPriceByStarRating = useMemo(() => {
     const minByRating: Record<number, number> = {};
-    for (const h of hotels) {
+    for (const h of hotelsWithSelectedMealPricing) {
       const rating = h.starRating;
       // Sidebar label is "per night" so always compute using nightly pricing.
       const price = h.price.nightly;
@@ -1810,7 +1941,7 @@ function HotelsPageInner() {
       }
     }
     return minByRating;
-  }, [hotels]);
+  }, [hotelsWithSelectedMealPricing]);
 
   return (
     <div className="min-h-screen bg-white">
