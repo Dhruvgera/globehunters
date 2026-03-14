@@ -658,10 +658,18 @@ function imageDedupKey(value: unknown): string {
 
   try {
     const parsed = new URL(raw);
-    const pathname = parsed.pathname.replace(/\/+$/, "");
+    const pathname = parsed.pathname
+      .replace(/\/+$/, "")
+      // Hotelbeds often returns the same photo under size variants like
+      // `/giata/bigger/...` and `/giata/original/...`; treat them as one image.
+      .replace(/\/giata\/(?:bigger|xl|original)\//i, "/giata/");
     return `${parsed.protocol.toLowerCase()}//${parsed.host.toLowerCase()}${pathname.toLowerCase()}`;
   } catch {
-    return raw.replace(/[?#].*$/, "").replace(/\/+$/, "").toLowerCase();
+    return raw
+      .replace(/[?#].*$/, "")
+      .replace(/\/+$/, "")
+      .replace(/\/giata\/(?:bigger|xl|original)\//i, "/giata/")
+      .toLowerCase();
   }
 }
 
