@@ -53,9 +53,33 @@ const DEFAULT_SEARCH_PARAMS: SearchParams = {
 
 function safeDateTime(value: unknown): number | null {
   if (value == null) return null;
-  const d = value instanceof Date ? value : new Date(value as any);
+  let d: Date;
+  if (value instanceof Date) {
+    d = value;
+  } else if (typeof value === "string" || typeof value === "number") {
+    d = new Date(value);
+  } else {
+    return null;
+  }
   const t = d.getTime();
   return Number.isFinite(t) ? t : null;
+}
+
+function getQueryParamCaseInsensitive(
+  searchParams: { get: (name: string) => string | null; entries: () => IterableIterator<[string, string]> },
+  key: string
+): string | null {
+  const direct = searchParams.get(key);
+  if (direct !== null) return direct;
+
+  const target = key.toLowerCase();
+  for (const [entryKey, entryValue] of searchParams.entries()) {
+    if (entryKey.toLowerCase() === target) {
+      return entryValue;
+    }
+  }
+
+  return null;
 }
 
 function SearchPageContent() {
@@ -64,10 +88,10 @@ function SearchPageContent() {
   const router = useRouter();
   
   // Detect if we're in package (Flight+Hotel) mode
-  const isPackageMode = urlParams.get("type") === "package";
-  const packageHotelId = urlParams.get("hotelId");
-  const packageHotelName = urlParams.get("hotelName");
-  const packageFlightResultId = urlParams.get("flightResultId");
+  const isPackageMode = getQueryParamCaseInsensitive(urlParams, "type") === "package";
+  const packageHotelId = getQueryParamCaseInsensitive(urlParams, "hotelId");
+  const packageHotelName = getQueryParamCaseInsensitive(urlParams, "hotelName");
+  const packageFlightResultId = getQueryParamCaseInsensitive(urlParams, "flightResultId");
   
   const setStoreSearchParams = useBookingStore((state) => state.setSearchParams);
   const storeSearchParams = useBookingStore((state) => state.searchParams);
@@ -91,7 +115,7 @@ function SearchPageContent() {
 
   // Handle flight deeplink parameter - redirect directly to booking
   useEffect(() => {
-    const flightKey = urlParams.get('flight');
+    const flightKey = getQueryParamCaseInsensitive(urlParams, 'flight');
 
     if (flightKey) {
       // This is a deeplink with a pre-selected flight - redirect to booking
@@ -101,11 +125,11 @@ function SearchPageContent() {
       setIsFromDeeplink(true);
 
       // Extract tracking data
-      const affCode = urlParams.get('aff');
-      const utmSource = urlParams.get('utm_source');
-      const utmMedium = urlParams.get('utm_medium');
-      const utmCampaign = urlParams.get('utm_campaign');
-      const cnc = urlParams.get('cnc');
+      const affCode = getQueryParamCaseInsensitive(urlParams, 'aff');
+      const utmSource = getQueryParamCaseInsensitive(urlParams, 'utm_source');
+      const utmMedium = getQueryParamCaseInsensitive(urlParams, 'utm_medium');
+      const utmCampaign = getQueryParamCaseInsensitive(urlParams, 'utm_campaign');
+      const cnc = getQueryParamCaseInsensitive(urlParams, 'cnc');
 
       // Store affiliate/tracking data
       const affiliateCode = affCode || utmSource;
@@ -186,10 +210,10 @@ function SearchPageContent() {
   // Handle affiliate code and UTM params from URL
   useEffect(() => {
     // Skip if this is a deeplink flow (handled above)
-    if (urlParams.get('flight')) return;
+    if (getQueryParamCaseInsensitive(urlParams, 'flight')) return;
 
-    const affCode = urlParams.get('aff');
-    const utmSource = urlParams.get('utm_source');
+    const affCode = getQueryParamCaseInsensitive(urlParams, 'aff');
+    const utmSource = getQueryParamCaseInsensitive(urlParams, 'utm_source');
 
     // Prioritize aff code, fall back to utm_source
     const affiliateCode = affCode || utmSource;
@@ -201,8 +225,8 @@ function SearchPageContent() {
     // Store UTM params in sessionStorage for persistence
     if (typeof window !== 'undefined') {
       if (utmSource) sessionStorage.setItem('utm_source', utmSource);
-      const utmMedium = urlParams.get('utm_medium');
-      const utmCampaign = urlParams.get('utm_campaign');
+      const utmMedium = getQueryParamCaseInsensitive(urlParams, 'utm_medium');
+      const utmCampaign = getQueryParamCaseInsensitive(urlParams, 'utm_campaign');
       if (utmMedium) sessionStorage.setItem('utm_medium', utmMedium);
       if (utmCampaign) sessionStorage.setItem('utm_campaign', utmCampaign);
     }
@@ -225,23 +249,23 @@ function SearchPageContent() {
 
   // Parse URL parameters and set in store on mount
   useEffect(() => {
-    const from = urlParams.get('from');
-    const to = urlParams.get('to');
-    const departureDate = urlParams.get('departureDate');
-    const returnDate = urlParams.get('returnDate');
-    const adults = urlParams.get('adults');
-    const children = urlParams.get('children');
-    const infants = urlParams.get('infants');
-    const travelClass = urlParams.get('class');
-    const tripType = urlParams.get('tripType') as SearchParams['tripType'] | null;
+    const from = getQueryParamCaseInsensitive(urlParams, 'from');
+    const to = getQueryParamCaseInsensitive(urlParams, 'to');
+    const departureDate = getQueryParamCaseInsensitive(urlParams, 'departureDate');
+    const returnDate = getQueryParamCaseInsensitive(urlParams, 'returnDate');
+    const adults = getQueryParamCaseInsensitive(urlParams, 'adults');
+    const children = getQueryParamCaseInsensitive(urlParams, 'children');
+    const infants = getQueryParamCaseInsensitive(urlParams, 'infants');
+    const travelClass = getQueryParamCaseInsensitive(urlParams, 'class');
+    const tripType = getQueryParamCaseInsensitive(urlParams, 'tripType') as SearchParams['tripType'] | null;
 
     if (tripType === 'multi-city') {
       const segments: SearchParams['segments'] = [];
 
       // Support both from/to/departureDate and from1/to1/departureDate1 for first leg
-      const firstFrom = urlParams.get('from1') || from;
-      const firstTo = urlParams.get('to1') || to;
-      const firstDeparture = urlParams.get('departureDate1') || departureDate;
+      const firstFrom = getQueryParamCaseInsensitive(urlParams, 'from1') || from;
+      const firstTo = getQueryParamCaseInsensitive(urlParams, 'to1') || to;
+      const firstDeparture = getQueryParamCaseInsensitive(urlParams, 'departureDate1') || departureDate;
 
       if (firstFrom && firstTo && firstDeparture) {
         segments.push({
@@ -253,9 +277,9 @@ function SearchPageContent() {
 
       // Parse additional legs up to 6
       for (let i = 2; i <= 6; i++) {
-        const segFrom = urlParams.get(`from${i}`);
-        const segTo = urlParams.get(`to${i}`);
-        const segDate = urlParams.get(`departureDate${i}`);
+        const segFrom = getQueryParamCaseInsensitive(urlParams, `from${i}`);
+        const segTo = getQueryParamCaseInsensitive(urlParams, `to${i}`);
+        const segDate = getQueryParamCaseInsensitive(urlParams, `departureDate${i}`);
         if (segFrom && segTo && segDate) {
           segments.push({
             from: segFrom,
