@@ -7,12 +7,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { boxpayService } from '@/services/api/boxpayService';
+import { convertLocalTaxesToCurrency, type LocalPayableTaxItem, normalizeCurrencyCode } from '@/lib/currency/serverFx';
 
 interface CreateSessionRequestBody {
   orderId: string;
   amount: number;
   currency: string;
   flow?: 'flight' | 'package' | 'hotel';
+  localPayableTaxes?: LocalPayableTaxItem[];
   shopper: {
     firstName: string;
     lastName: string;
@@ -58,11 +60,15 @@ export async function POST(request: NextRequest) {
     const returnUrl = `${origin}/payment-complete?orderId=${encodeURIComponent(body.orderId)}${qp}`;
     const backUrl = `${origin}/payment${flow !== 'flight' ? `?type=${flow}` : ''}`;
 
+    const gatewayCurrency = normalizeCurrencyCode(body.currency) || 'GBP';
+    const localTaxesConverted = await convertLocalTaxesToCurrency(body.localPayableTaxes, gatewayCurrency);
+    const finalAmount = Number(body.amount || 0) + localTaxesConverted;
+
     // Build and send the session request
     const sessionRequest = boxpayService.buildSessionRequest({
       orderId: body.orderId,
-      amount: body.amount,
-      currency: body.currency,
+      amount: finalAmount,
+      currency: gatewayCurrency,
       shopper: body.shopper,
       returnUrl,
       backUrl,
@@ -74,6 +80,9 @@ export async function POST(request: NextRequest) {
       success: true,
       token: sessionResponse.token,
       checkoutUrl: sessionResponse.url,
+      finalAmount: Number(finalAmount.toFixed(2)),
+      localTaxesAdded: Number(localTaxesConverted.toFixed(2)),
+      currency: gatewayCurrency,
     });
   } catch (error) {
     console.error('BoxPay session creation error:', error);
@@ -86,8 +95,6 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
-
 
 
 

@@ -1,10 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useBookingStore } from "@/store/bookingStore";
 import type { HotelTaxBreakdown, HotelBedsTaxItem } from "@/types/hotel";
+import { convertHotelLocalTaxRows, convertHotelLocalTaxTotal, formatMoneyFromCode } from "@/lib/currency/localTaxDisplay";
 
 function formatMoney(currency: string | undefined, amount: number | undefined) {
   const c = currency || "";
@@ -24,6 +25,8 @@ interface HotelSummaryCardProps {
 
 export function HotelSummaryCard(props: HotelSummaryCardProps) {
   const isHotelDatesDebugMode = process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES === "true";
+  const [convertedLocalTaxTotal, setConvertedLocalTaxTotal] = useState<string | null>(null);
+  const [convertedLocalTaxRows, setConvertedLocalTaxRows] = useState<Array<{ label: string; amount: number; currencyCode: string }>>([]);
   const storeHotelSearch = useBookingStore((s) => s.hotelSearch);
   const storeSelectedHotel = useBookingStore((s) => s.selectedHotel);
   const storeSelectedRoomIds = useBookingStore((s) => s.selectedHotelRoomIds);
@@ -65,6 +68,21 @@ export function HotelSummaryCard(props: HotelSummaryCardProps) {
     const localTaxCurrency = localTaxes[0]?.clientCurrency || localTaxes[0]?.currency || currency;
     return { name, address, img, roomName, mealName, isRefundable, currency, total, nightly, localTaxes, localTaxTotal, localTaxCurrency };
   }, [cached, roomSummary, selectedHotel, selectedRoomIds]);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      convertHotelLocalTaxRows(display.localTaxes, display.currency),
+      convertHotelLocalTaxTotal(display.localTaxes, display.currency),
+    ]).then(([rows, converted]) => {
+      if (cancelled) return;
+      setConvertedLocalTaxRows(rows);
+      setConvertedLocalTaxTotal(converted ? formatMoneyFromCode(converted.currencyCode, converted.amount) : null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [display.currency, display.localTaxes]);
 
   return (
     <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
@@ -115,7 +133,13 @@ export function HotelSummaryCard(props: HotelSummaryCardProps) {
             Nightly: {formatMoney(display.currency, display.nightly)}
           </div>
           <div className="text-base font-semibold text-[#010D50]">
-            Total: {formatMoney(display.currency, display.total)}
+            Total: {formatMoney(
+              display.currency,
+              (display.total || 0) +
+                (convertedLocalTaxRows.length > 0
+                  ? convertedLocalTaxRows.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+                  : 0)
+            )}
           </div>
         </div>
       </div>
@@ -123,33 +147,31 @@ export function HotelSummaryCard(props: HotelSummaryCardProps) {
       {display.localTaxes.length > 0 && (
         <div className="bg-[#FFF8F0] border border-[#F5D9B3] rounded-lg p-3 flex flex-col gap-1.5">
           <span className="text-xs font-semibold text-[#8B5E20]">
-            Local taxes payable at hotel
+            Local taxes included
           </span>
-          {display.localTaxes.map((tax, i) => (
+          {(convertedLocalTaxRows.length > 0 ? convertedLocalTaxRows : display.localTaxes.map((tax) => ({
+            label: tax.subType || tax.type || "Taxes & fees",
+            amount: Number(tax.clientAmount || tax.amount || 0),
+            currencyCode: tax.clientCurrency || tax.currency || display.localTaxCurrency,
+          })) ).map((tax, i) => (
             <div key={i} className="flex items-center justify-between text-xs text-[#8B5E20]">
-              <span>{tax.subType || tax.type || "Taxes & fees"}</span>
+              <span>{tax.label}</span>
               <span>
-                {formatMoney(
-                  tax.clientCurrency || tax.currency || display.localTaxCurrency,
-                  Number(tax.clientAmount || tax.amount || 0)
-                )}
+                {formatMoneyFromCode(tax.currencyCode, Number(tax.amount || 0))}
               </span>
             </div>
           ))}
-          {display.localTaxes.length > 1 && (
+          {(convertedLocalTaxRows.length > 1 || display.localTaxes.length > 1) && (
             <div className="flex items-center justify-between text-xs font-semibold text-[#8B5E20] border-t border-[#F5D9B3] pt-1">
               <span>Total</span>
-              <span>{formatMoney(display.localTaxCurrency, display.localTaxTotal)}</span>
+              <span>{convertedLocalTaxTotal || formatMoney(display.localTaxCurrency, display.localTaxTotal)}</span>
             </div>
           )}
-          <span className="text-[10px] text-[#B07930]">
-            Not included in the price above. Payable directly at the property.
-          </span>
+          {convertedLocalTaxTotal && (
+            <span className="text-[10px] text-[#B07930]">Converted into your billing currency and included in the total above.</span>
+          )}
         </div>
       )}
     </div>
   );
 }
-
-
-

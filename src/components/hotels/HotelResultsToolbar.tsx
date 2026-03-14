@@ -16,6 +16,7 @@ import type { HotelProvider } from "@/lib/hotels/provider";
 export type HotelViewMode = "list" | "grid" | "map";
 
 export type HotelSortMode = "recommended" | "price_low" | "review_score";
+export type HybridSupplierFilterMode = "all" | "vyspa" | "hotelbeds";
 
 export function HotelResultsToolbar({
   resultCount,
@@ -27,6 +28,9 @@ export function HotelResultsToolbar({
   providerMode,
   onProviderModeChange,
   showProviderToggle = false,
+  hybridSupplierFilter = "all",
+  onHybridSupplierFilterChange,
+  showHybridSupplierFilter = false,
 }: {
   resultCount: number;
   viewMode: HotelViewMode;
@@ -37,6 +41,9 @@ export function HotelResultsToolbar({
   providerMode?: HotelProvider;
   onProviderModeChange?: (mode: HotelProvider) => void;
   showProviderToggle?: boolean;
+  hybridSupplierFilter?: HybridSupplierFilterMode;
+  onHybridSupplierFilterChange?: (mode: HybridSupplierFilterMode) => void;
+  showHybridSupplierFilter?: boolean;
 }) {
   const [isMounted, setIsMounted] = useState(false);
 
@@ -61,6 +68,24 @@ export function HotelResultsToolbar({
             </SelectContent>
           </Select>
         </div>
+
+        {showHybridSupplierFilter && onHybridSupplierFilterChange && (
+          <div className="w-full sm:w-[220px]">
+            <Select
+              value={hybridSupplierFilter}
+              onValueChange={(v) => onHybridSupplierFilterChange(v as HybridSupplierFilterMode)}
+            >
+              <SelectTrigger className="h-9 min-h-9 rounded-xl border border-[#DFE0E4] bg-white px-3 text-sm">
+                <SelectValue placeholder="All suppliers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All hybrid results</SelectItem>
+                <SelectItem value="vyspa">Vyspa results</SelectItem>
+                <SelectItem value="hotelbeds">Hotelbeds results</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         {showProviderToggle && providerMode && onProviderModeChange && (
           <div className="flex items-center rounded-xl border border-[#DFE0E4] bg-white p-1">

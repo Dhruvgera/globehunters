@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getHotelProvider } from '@/lib/hotels/provider';
 import { VYSPA_PORTAL_CONFIG } from '@/config/vyspaPortal';
+import { convertLocalTaxesToCurrency, type LocalPayableTaxItem, normalizeCurrencyCode } from '@/lib/currency/serverFx';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -42,6 +43,7 @@ type SubmitBody =
         rateKey?: string;
         boardName?: string;
         refundable?: boolean;
+        localPayableTaxes?: LocalPayableTaxItem[];
       };
     };
 
@@ -184,6 +186,13 @@ export async function POST(req: Request) {
       : []),
   ].filter(Boolean) as string[];
 
+  const normalizedCurrency = normalizeCurrencyCode(body.currency) || 'GBP';
+  const localTaxesConverted = await convertLocalTaxesToCurrency(
+    body.selection?.localPayableTaxes,
+    normalizedCurrency
+  );
+  const finalSelectionTotal = Number(body.selection.total || 0) + localTaxesConverted;
+
   const manualItem = {
     Segment: {
       fi_type: 'OTH',
@@ -199,10 +208,10 @@ export async function POST(req: Request) {
     },
     FolderPricings: [
       {
-        tot_net_amt: String(Number(body.selection.total || 0).toFixed(2)),
-        tot_sell_amt: String(Number(body.selection.total || 0).toFixed(2)),
+        tot_net_amt: String(Number(finalSelectionTotal || 0).toFixed(2)),
+        tot_sell_amt: String(Number(finalSelectionTotal || 0).toFixed(2)),
         desc: 'Hotel (HotelBeds)',
-        cu_curr_code: body.currency,
+        cu_curr_code: normalizedCurrency || body.currency,
       },
     ],
   };
@@ -318,6 +327,12 @@ export async function POST(req: Request) {
       {
         success: true,
         result: parsed,
+        pricing: {
+          baseSelectionTotal: Number(body.selection.total || 0),
+          localTaxesAdded: Number(localTaxesConverted.toFixed(2)),
+          finalSelectionTotal: Number(finalSelectionTotal.toFixed(2)),
+          currency: normalizedCurrency || body.currency,
+        },
         folderDetails: verifiedFolderDetails,
         verification: {
           beforeCount,

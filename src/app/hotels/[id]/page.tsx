@@ -48,6 +48,7 @@ import {
   serializeHotelChildAges,
 } from "@/lib/hotels/childAges";
 import { fixStubaImageUrl } from "@/lib/hotels/imageUrl";
+import { convertHotelLocalTaxTotal, formatMoneyFromCode } from "@/lib/currency/localTaxDisplay";
 
 function LoadingBlock({ className }: { className: string }) {
   return <div className={`animate-pulse bg-gray-200/70 rounded-xl ${className}`} />;
@@ -964,6 +965,7 @@ export default function HotelRoomsPage() {
   const [importantInfoText, setImportantInfoText] = useState<string>("");
   const [remoteAmenities, setRemoteAmenities] = useState<string[]>([]);
   const [remoteRooms, setRemoteRooms] = useState<RoomCardData[]>([]);
+  const [convertedLocalTaxByRoomId, setConvertedLocalTaxByRoomId] = useState<Record<string, string>>({});
   const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [roomsLoading, setRoomsLoading] = useState(false);
   const [roomsError, setRoomsError] = useState<string | null>(null);
@@ -1010,6 +1012,33 @@ export default function HotelRoomsPage() {
       return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
     });
   }, [stayChildren]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      const entries = await Promise.all(
+        remoteRooms.map(async (room) => {
+          const rawForTax = room._raw as Record<string, unknown>;
+          const hbTaxes = (rawForTax.hotelBedsTaxes ?? (rawForTax._hotelbeds as any)?.taxes) as
+            import("@/types/hotel").HotelTaxBreakdown | null | undefined;
+          const converted = await convertHotelLocalTaxTotal(hbTaxes?.taxes, room.price.currency);
+          return [
+            room.id,
+            converted ? `+ ${formatMoneyFromCode(converted.currencyCode, converted.amount)} local taxes included` : "",
+          ] as const;
+        })
+      );
+
+      if (cancelled) return;
+      setConvertedLocalTaxByRoomId(Object.fromEntries(entries));
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [remoteRooms]);
 
   function shortWebRefFromToken(token: string): string {
     let h = 2166136261;
@@ -1768,15 +1797,32 @@ export default function HotelRoomsPage() {
           hybridHotelbedsCode.length > 0 &&
           /^\d+$/.test(hybridHotelbedsCode) &&
           isPackageMode === false;
+        const hybridSuppliers = Array.isArray(rawResult.suppliers)
+          ? rawResult.suppliers.map((supplier) => String(supplier || "").trim().toLowerCase())
+          : [];
+        const shouldPreferHotelbedsRooms =
+          canFallbackToHotelbeds &&
+          effectiveProvider !== "hotelbeds" &&
+          hybridSuppliers.includes("hotelbeds");
 
         let resp: any;
-        try {
-          resp = await hotelService.getRoomsV3(effectiveSearchCriteriaId, hotelId, srId);
-        } catch (initialError) {
-          if (!canFallbackToHotelbeds) throw initialError;
-          resp = await hotelService.getRoomsV3(hybridHotelbedsToken, hybridHotelbedsCode);
-          effectiveProvider = "hotelbeds";
-          effectiveSearchCriteriaId = hybridHotelbedsToken;
+        if (shouldPreferHotelbedsRooms) {
+          try {
+            resp = await hotelService.getRoomsV3(hybridHotelbedsToken, hybridHotelbedsCode);
+            effectiveProvider = "hotelbeds";
+            effectiveSearchCriteriaId = hybridHotelbedsToken;
+          } catch {
+            resp = await hotelService.getRoomsV3(effectiveSearchCriteriaId, hotelId, srId);
+          }
+        } else {
+          try {
+            resp = await hotelService.getRoomsV3(effectiveSearchCriteriaId, hotelId, srId);
+          } catch (initialError) {
+            if (!canFallbackToHotelbeds) throw initialError;
+            resp = await hotelService.getRoomsV3(hybridHotelbedsToken, hybridHotelbedsCode);
+            effectiveProvider = "hotelbeds";
+            effectiveSearchCriteriaId = hybridHotelbedsToken;
+          }
         }
         const initialResp = resp;
         let respRoot: any = Array.isArray(resp) ? resp[0] : resp;
@@ -3239,20 +3285,15 @@ export default function HotelRoomsPage() {
                               const hbTaxes = (rawForTax.hotelBedsTaxes ?? (rawForTax._hotelbeds as any)?.taxes) as
                                 import('@/types/hotel').HotelTaxBreakdown | null | undefined;
                               const notIncluded = hbTaxes?.taxes?.filter(t => !t.included) ?? [];
-                              if (notIncluded.length > 0) {
-                                const localTotal = notIncluded.reduce((s, t) => s + Number(t.clientAmount || t.amount || 0), 0);
-                                const localCur = notIncluded[0]?.clientCurrency || notIncluded[0]?.currency || room.price.currency;
+                              const convertedLabel = convertedLocalTaxByRoomId[room.id];
+                              if (notIncluded.length > 0 && convertedLabel) {
                                 return (
                                   <span className="text-xs text-[#B07930] bg-[#FFF8F0] border border-[#F5D9B3] rounded px-2 py-0.5">
-                                    + {localCur} {localTotal.toFixed(2)} local taxes at hotel
+                                    {convertedLabel}
                                   </span>
                                 );
                               }
-                              return (
-                                <span className="text-xs text-[#3A478A]">
-                                  * Locally payable taxes
-                                </span>
-                              );
+                              return null;
                             })()}
                           </div>
 

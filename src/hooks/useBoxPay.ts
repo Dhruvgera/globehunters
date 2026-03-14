@@ -11,6 +11,7 @@ interface BoxPaySessionParams {
   currency: string;
   /** Optional flow discriminator so return/back URLs can be routed correctly */
   flow?: "flight" | "package" | "hotel";
+  localPayableTaxes?: Array<{ amount: number; currency: string; label?: string }>;
   shopper: {
     firstName: string;
     lastName: string;
@@ -31,6 +32,9 @@ interface CreateSessionResponse {
   success: boolean;
   token?: string;
   checkoutUrl?: string;
+  finalAmount?: number;
+  localTaxesAdded?: number;
+  currency?: string;
   error?: string;
 }
 
@@ -82,6 +86,9 @@ export function useBoxPay(): UseBoxPayReturn {
         success: true,
         token: data.token,
         checkoutUrl: data.checkoutUrl,
+        finalAmount: typeof data.finalAmount === 'number' ? data.finalAmount : undefined,
+        localTaxesAdded: typeof data.localTaxesAdded === 'number' ? data.localTaxesAdded : undefined,
+        currency: typeof data.currency === 'string' ? data.currency : undefined,
       };
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Failed to create payment session';
@@ -153,7 +160,6 @@ export function useBoxPay(): UseBoxPayReturn {
     clearError,
   };
 }
-
 
 
 

@@ -262,7 +262,14 @@ export class HotelService {
       telephone?: string;
     }>;
     comments?: string[];
-    selection: { total: number; nightly?: number; rateKey?: string; boardName?: string; refundable?: boolean };
+    selection: {
+      total: number;
+      nightly?: number;
+      rateKey?: string;
+      boardName?: string;
+      refundable?: boolean;
+      localPayableTaxes?: Array<{ amount: number; currency: string; label?: string }>;
+    };
   }): Promise<{ success: boolean; result?: unknown; message?: string }> {
     return jsonFetch<{ success: boolean; result?: unknown; message?: string }>('/api/hotels/submit', {
       method: 'POST',

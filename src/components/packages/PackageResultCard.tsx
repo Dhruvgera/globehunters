@@ -224,10 +224,6 @@ export function PackageResultCard({
                   {currency}
                   {totalPrice.toLocaleString()} total
                 </div>
-                <div className="flex items-center gap-1 text-xs text-[#3A478A]">
-                  <span>*</span>
-                  <span>Locally payable taxes</span>
-                </div>
               </div>
 
               {/* CTA Button */}
@@ -333,7 +329,6 @@ export function PackageResultCard({
               {currency}
               {totalPrice.toLocaleString()} total
             </div>
-            <div className="text-xs text-[#3A478A]">* Locally payable taxes</div>
           </div>
 
           {/* CTA Button */}

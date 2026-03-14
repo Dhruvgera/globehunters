@@ -35,6 +35,7 @@ import { packageService } from "@/services/api/packageService";
 
 import { FOLDER_STATUS_CODES } from "@/types/portal";
 import { countryCodes } from "@/lib/utils/countryCodes";
+import { convertHotelLocalTaxRows, convertHotelLocalTaxTotal } from "@/lib/currency/localTaxDisplay";
 
 const REFUNDABLE_TERMS_URL = "https://refundablebooking.com/refundable-terms";
 
@@ -72,6 +73,8 @@ function PaymentContent() {
   const [sessionExpiredOpen, setSessionExpiredOpen] = useState(false);
   const [paymentErrorOpen, setPaymentErrorOpen] = useState(false);
   const [paymentErrorMessage, setPaymentErrorMessage] = useState<string>('');
+  const [convertedLocalTaxTotalForDisplay, setConvertedLocalTaxTotalForDisplay] = useState(0);
+  const [convertedLocalTaxRowsForBilling, setConvertedLocalTaxRowsForBilling] = useState<Array<{ amount: number; currency: string; label?: string }>>([]);
 
   // Check if store has been hydrated from sessionStorage
   const hasHydrated = useStoreHydration();
@@ -395,6 +398,38 @@ function PaymentContent() {
   const subtotal = baseFare + protectionPlanCost + baggageCost;
   const discountAmount = subtotal * discountPercent;
   const tripTotal = subtotal - discountAmount;
+  const localPayableTaxesForBilling = convertedLocalTaxRowsForBilling;
+  const tripTotalForDisplay = tripTotal + convertedLocalTaxTotalForDisplay;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!(isHotelMode || isPackageMode)) {
+      setConvertedLocalTaxRowsForBilling([]);
+      setConvertedLocalTaxTotalForDisplay(0);
+      return;
+    }
+
+    const rows = hotelRoomSummary?.hotelBedsTaxes?.taxes || [];
+    Promise.all([
+      convertHotelLocalTaxRows(rows, currencyForGateway),
+      convertHotelLocalTaxTotal(rows, currencyForGateway),
+    ]).then(([convertedRows, convertedTotal]) => {
+      if (cancelled) return;
+      setConvertedLocalTaxRowsForBilling(
+        convertedRows.map((row) => ({
+          amount: row.amount,
+          currency: row.currencyCode,
+          label: row.label,
+        }))
+      );
+      setConvertedLocalTaxTotalForDisplay(convertedTotal?.amount || 0);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currencyForGateway, hotelRoomSummary?.hotelBedsTaxes?.taxes, isHotelMode, isPackageMode]);
 
   const protectionPlanName =
     isHotelMode
@@ -865,6 +900,7 @@ function PaymentContent() {
                   amount: tripTotal,
                   currency: currencyForGateway,
                   flow: isHotelMode ? "hotel" : (isPackageMode ? "package" : "flight"),
+                  localPayableTaxes: localPayableTaxesForBilling,
                   shopper: {
                     firstName,
                     lastName,
@@ -883,10 +919,16 @@ function PaymentContent() {
                 });
 
                 if (result.success && result.checkoutUrl) {
+                  const chargedTripTotal =
+                    typeof result.finalAmount === "number" && Number.isFinite(result.finalAmount)
+                      ? result.finalAmount
+                      : tripTotal;
+                  const chargedCurrency = result.currency || currencyForGateway;
+
                   // Store order info before redirect
                   sessionStorage.setItem('pendingOrderId', orderId);
-                  sessionStorage.setItem('pendingOrderAmount', tripTotal.toString());
-                  sessionStorage.setItem('pendingOrderCurrency', currencyForGateway);
+                  sessionStorage.setItem('pendingOrderAmount', chargedTripTotal.toString());
+                  sessionStorage.setItem('pendingOrderCurrency', chargedCurrency);
 
                   // Persist a per-order snapshot so the confirmation page/email can't pick up stale store data
                   // (e.g. multi-tab or navigating around during payment redirects).
@@ -939,8 +981,9 @@ function PaymentContent() {
                         baseFare,
                         protectionPlanCost,
                         baggageCost,
-                        tripTotal,
-                        currency,
+                        tripTotal: chargedTripTotal,
+                        currency: chargedCurrency,
+                        localTaxesAdded: Number(result.localTaxesAdded || 0),
                       },
                     };
                     sessionStorage.setItem(
@@ -1039,7 +1082,7 @@ function PaymentContent() {
               baggageCount={additionalBaggage}
               discountPercent={discountPercent}
               discountAmount={discountAmount}
-              tripTotal={tripTotal}
+              tripTotal={tripTotalForDisplay}
               isSticky={true}
               currency={currency || 'GBP'}
             />

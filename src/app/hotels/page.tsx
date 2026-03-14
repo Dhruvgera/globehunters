@@ -11,6 +11,7 @@ import { HotelFiltersSidebar, HotelFiltersState, type HotelAmenityOption } from 
 import { HotelSearchLoading } from "@/components/hotels/HotelSearchLoading";
 import {
   HotelResultsToolbar,
+  HybridSupplierFilterMode,
   HotelSortMode,
   HotelViewMode,
 } from "@/components/hotels/HotelResultsToolbar";
@@ -73,6 +74,9 @@ const ENABLE_TRUSTYOU_ENRICHMENT = false;
 const HOTEL_PROVIDER_TOGGLE_ENABLED = ["1", "true", "yes", "on"].includes(
   String(process.env.NEXT_PUBLIC_ENABLE_HOTEL_PROVIDER_TOGGLE || "").trim().toLowerCase()
 );
+const HYBRID_SUPPLIER_FILTER_ENABLED =
+  SHOW_HYBRID_PROVIDER_IN_RESULTS ||
+  ["1", "true", "yes", "on"].includes(String(process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES || "").trim().toLowerCase());
 const HOTEL_PROVIDER_OVERRIDE_STORAGE_KEY = "gh-hotel-provider-override";
 
 function buildPackageRoomConfigurations(
@@ -348,6 +352,7 @@ function HotelsPageInner() {
   const [providerOverride, setProviderOverride] = useState<HotelProvider | null>(null);
   const [providerMode, setProviderMode] = useState<HotelProvider>(getHotelProvider());
   const [providerOverrideReady, setProviderOverrideReady] = useState(!HOTEL_PROVIDER_TOGGLE_ENABLED);
+  const [hybridSupplierFilter, setHybridSupplierFilter] = useState<HybridSupplierFilterMode>("all");
 
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(false);
@@ -395,6 +400,12 @@ function HotelsPageInner() {
   useEffect(() => {
     hotelResultsCacheRef.current = hotelResultsCache;
   }, [hotelResultsCache]);
+
+  useEffect(() => {
+    if (providerMode !== "hybrid" && hybridSupplierFilter !== "all") {
+      setHybridSupplierFilter("all");
+    }
+  }, [hybridSupplierFilter, providerMode]);
 
   function currencySymbol(code?: string) {
     const c = (code || "").toUpperCase();
@@ -1545,6 +1556,14 @@ function HotelsPageInner() {
     );
 
     const base = hotelsWithSelectedMealPricing.filter((h) => {
+      if (providerMode === "hybrid" && hybridSupplierFilter !== "all") {
+        const raw = h.rawSearchResult && typeof h.rawSearchResult === "object"
+          ? (h.rawSearchResult as Record<string, unknown>)
+          : null;
+        const rowProvider = String(raw?.provider || "").trim().toLowerCase();
+        if (rowProvider !== hybridSupplierFilter) return false;
+      }
+
       if (q && !h.name.toLowerCase().includes(q)) return false;
 
       if (filters.starRatings.length > 0 && !filters.starRatings.includes(h.starRating)) return false;
@@ -1599,7 +1618,7 @@ function HotelsPageInner() {
     } // recommended: keep API order
 
     return sorted;
-  }, [filters, hotelsWithSelectedMealPricing, resolvedSearch.location, sortMode]);
+  }, [filters, hotelsWithSelectedMealPricing, hybridSupplierFilter, providerMode, resolvedSearch.location, sortMode]);
 
   const displayedHotels = useMemo(() => {
     return filteredHotels.slice(0, displayedHotelsCount);
@@ -2001,12 +2020,15 @@ function HotelsPageInner() {
               onViewModeChange={setViewMode}
               sortMode={sortMode}
               onSortModeChange={setSortMode}
+              hybridSupplierFilter={hybridSupplierFilter}
+              onHybridSupplierFilterChange={setHybridSupplierFilter}
               providerMode={providerMode}
               onProviderModeChange={(mode) => {
                 setProviderOverride(mode);
                 setProviderMode(mode);
               }}
               showProviderToggle={!isPackageMode && HOTEL_PROVIDER_TOGGLE_ENABLED && providerOverrideReady}
+              showHybridSupplierFilter={!isPackageMode && HYBRID_SUPPLIER_FILTER_ENABLED && providerMode === "hybrid"}
             />
 
             {loading && hotels.length === 0 && <HotelSearchLoading />}

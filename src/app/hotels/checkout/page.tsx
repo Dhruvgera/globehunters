@@ -598,6 +598,15 @@ export default function HotelCheckoutPage() {
       ].filter(Boolean);
 
       if (isHotelbedsMode) {
+        const localPayableTaxes = (selectedHotelRoomSummary?.hotelBedsTaxes?.taxes || [])
+          .filter((tax) => !tax?.included)
+          .map((tax) => ({
+            amount: Number(tax?.clientAmount || tax?.amount || 0),
+            currency: String(tax?.clientCurrency || tax?.currency || selectedHotelRoomSummary?.currency || "GBP"),
+            label: String(tax?.subType || tax?.type || "Local tax"),
+          }))
+          .filter((tax) => Number.isFinite(tax.amount) && tax.amount > 0 && Boolean(tax.currency));
+
         const submitResp = await hotelService.submitHotelbedsToFolder({
           provider: "hotelbeds",
           folderNumber: Number(folderNo),
@@ -617,6 +626,7 @@ export default function HotelCheckoutPage() {
             rateKey: selectedHotelRoomSummary?.hotelbedsRateKey,
             boardName: selectedHotelRoomSummary?.mealName,
             refundable: selectedHotelRoomSummary?.isRefundable,
+            localPayableTaxes,
           },
           comments: folderComments,
         });
