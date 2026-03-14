@@ -1251,7 +1251,10 @@ function HotelsPageInner() {
 
         const shouldPollMore =
           (parsedInitial.criteriaProvider === "hybrid" || parsedInitial.criteriaProvider === "vyspa") &&
-          parsedInitial.searchComplete === false;
+          (
+            parsedInitial.searchComplete === false ||
+            (parsedInitial.searchComplete === null && parsedInitial.mapped.length === 0)
+          );
 
         if (shouldPollMore) {
           setLoadingMoreHotels(true);
