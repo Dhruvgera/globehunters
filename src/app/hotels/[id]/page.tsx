@@ -116,16 +116,6 @@ interface RoomCardData {
   _raw: UnknownRecord;
 }
 
-function formatSignedPackageAmount(amount: number, currency: string): string {
-  const absolute = Math.abs(amount);
-  const formatted = absolute.toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-  const prefix = amount > 0 ? "+" : "-";
-  return `${prefix}${currency}${formatted}`;
-}
-
 function selectedRoomIdsFromCounts(counts: Record<string, number>): string[] {
   const out: string[] = [];
   for (const [roomId, countRaw] of Object.entries(counts)) {
@@ -1566,10 +1556,6 @@ export default function HotelRoomsPage() {
       return true;
     });
   }, [filterBoardQuery, filterRefundableOnly, remoteRooms]);
-  const packageBaseRoomTotal = useMemo(() => {
-    if (!isPackageMode || remoteRooms.length === 0) return 0;
-    return remoteRooms.reduce((lowest, room) => Math.min(lowest, Number(room.price.total || 0)), Number.POSITIVE_INFINITY);
-  }, [isPackageMode, remoteRooms]);
   const roomBoardOptions = useMemo(() => {
     const seen = new Set<string>();
     const out: string[] = [];
@@ -3271,12 +3257,7 @@ export default function HotelRoomsPage() {
                             )}
                             {isPackageMode ? (
                               <span className="text-xl font-semibold text-[#010D50]">
-                                {Math.abs(Number(room.price.total || 0) - packageBaseRoomTotal) < 0.01
-                                  ? "Included"
-                                  : formatSignedPackageAmount(
-                                      Number(room.price.total || 0) - packageBaseRoomTotal,
-                                      room.price.currency
-                                    )}
+                                {room.price.currency}{room.price.total.toLocaleString()} total
                               </span>
                             ) : (
                               <>

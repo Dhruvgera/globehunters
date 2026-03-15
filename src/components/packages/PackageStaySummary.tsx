@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Building2, Calendar, Users, Moon, CheckCircle2 } from "lucide-react";
+import { Building2, Calendar, Users, Moon, CheckCircle2, ReceiptText } from "lucide-react";
 
 interface PackageStaySummaryProps {
   hotelName: string;
@@ -9,6 +9,8 @@ interface PackageStaySummaryProps {
   checkOut: string;
   guests: number;
   rooms: number;
+  price?: number;
+  currency?: string;
   hotelImage?: string;
   rating?: number;
   reviewCount?: number;
@@ -20,6 +22,8 @@ export function PackageStaySummary({
   checkOut,
   guests,
   rooms,
+  price,
+  currency,
   hotelImage,
   rating,
   reviewCount,
@@ -44,6 +48,21 @@ export function PackageStaySummary({
       year: "numeric",
     });
   };
+
+  const formattedPrice = useMemo(() => {
+    if (price == null || Number.isNaN(price)) return "";
+    const normalizedCurrency = String(currency || "").trim();
+    const formattedAmount = price.toLocaleString("en-GB", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
+
+    if (normalizedCurrency === "£" || normalizedCurrency === "$" || normalizedCurrency === "€") {
+      return `${normalizedCurrency}${formattedAmount}`;
+    }
+
+    return normalizedCurrency ? `${formattedAmount} ${normalizedCurrency}` : formattedAmount;
+  }, [currency, price]);
 
   return (
     <div className="mt-5 bg-[#F5F7FF] rounded-2xl p-6 lg:p-7 border border-[#E5E8F5]">
@@ -86,7 +105,7 @@ export function PackageStaySummary({
               )}
 
               {/* Stay Details Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+              <div className={`grid grid-cols-2 ${formattedPrice ? "sm:grid-cols-5" : "sm:grid-cols-4"} gap-4 mt-4`}>
                 {/* Check-in */}
                 <div className="flex flex-col">
                   <div className="flex items-center gap-1.5 text-xs text-[#3A478A] mb-0.5">
@@ -131,6 +150,18 @@ export function PackageStaySummary({
                     {rooms === 1 ? "Room" : "Rooms"}
                   </span>
                 </div>
+
+                {formattedPrice && (
+                  <div className="flex flex-col">
+                    <div className="flex items-center gap-1.5 text-xs text-[#3A478A] mb-0.5">
+                      <ReceiptText className="w-3.5 h-3.5" />
+                      <span>Price</span>
+                    </div>
+                    <span className="text-sm font-semibold text-[#010D50]">
+                      {formattedPrice}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 

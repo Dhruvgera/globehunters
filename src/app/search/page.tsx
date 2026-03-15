@@ -98,6 +98,7 @@ function SearchPageContent() {
   const setSearchRequestId = useBookingStore((state) => state.setSearchRequestId);
   const searchRequestId = useBookingStore((state) => state.searchRequestId);
   const setSelectedFlight = useBookingStore((state) => state.setSelectedFlight);
+  const selectedHotelRoomSummary = useBookingStore((state) => state.selectedHotelRoomSummary);
   const packageResultsMeta = useBookingStore((state) => state.packageResultsMeta);
   const setAffiliateData = useBookingStore((state) => state.setAffiliateData);
   const setIsFromDeeplink = useBookingStore((state) => state.setIsFromDeeplink);
@@ -1087,6 +1088,8 @@ function SearchPageContent() {
               checkOut={urlParams.get("checkOut") || urlParams.get("returnDate") || ""}
               guests={parseInt(urlParams.get("guests") || urlParams.get("adults") || "2")}
               rooms={parseInt(urlParams.get("rooms") || "1")}
+              price={selectedHotelRoomSummary?.total}
+              currency={selectedHotelRoomSummary?.currency}
             />
           )}
         </div>

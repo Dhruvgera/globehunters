@@ -34,6 +34,30 @@ function formatDateLabel(value?: string) {
   });
 }
 
+function parseMoneyString(value?: string | null) {
+  const raw = String(value || "").trim();
+  const match = raw.match(/^([A-Z]{3}|Â£|\$|â‚¬)?\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Z]{3}|Â£|\$|â‚¬)?$/i);
+  if (!match) return { amount: undefined, currency: undefined as string | undefined };
+  const leading = match[1];
+  const trailing = match[3];
+  return {
+    amount: Number(match[2]),
+    currency: String(leading || trailing || "").trim() || undefined,
+  };
+}
+
+function formatMoney(currency: string | undefined, amount: number | undefined) {
+  if (amount == null || Number.isNaN(amount)) return "â€”";
+  const normalized = String(currency || "").trim();
+  if (normalized === "Â£" || normalized === "$" || normalized === "â‚¬") {
+    return `${normalized}${amount.toFixed(2)}`;
+  }
+  if (/^[A-Z]{3}$/.test(normalized)) {
+    return `${amount.toFixed(2)} ${normalized}`;
+  }
+  return amount.toFixed(2);
+}
+
 function toIsoCurrency(currency: string | undefined) {
   const normalized = String(currency || "").trim().toUpperCase();
   if (normalized === "£") return "GBP";
@@ -265,6 +289,29 @@ function PackageTravellerDetailsInner() {
   const cabinLabel = formatFareLabel(selectedUpgrade?.cabinClassDisplay || selectedFareType);
   const refNumber = vyspaFolderNumber || useBookingStore.getState().searchRequestId || flight?.webRef || "—";
 
+  const parsedPackagePrice = useMemo(() => parseMoneyString(packageDetails?.packagePrice), [packageDetails?.packagePrice]);
+  const packageTotalLabel = useMemo(() => {
+    const amount =
+      parsedPackagePrice.amount ??
+      ((packageDetails?.flight?.totalFare || 0) +
+        Number(packageDetails?.hotel?.rooms?.reduce((sum, room) => sum + Number(room.price || 0), 0) || 0));
+    const currency =
+      parsedPackagePrice.currency ||
+      packageDetails?.flight?.currency ||
+      selectedUpgrade?.currency ||
+      flight?.currency ||
+      "GBP";
+    return formatMoney(currency, amount);
+  }, [
+    flight?.currency,
+    packageDetails?.flight?.currency,
+    packageDetails?.flight?.totalFare,
+    packageDetails?.hotel?.rooms,
+    parsedPackagePrice.amount,
+    parsedPackagePrice.currency,
+    selectedUpgrade?.currency,
+  ]);
+
   const hotelDisplay = useMemo(() => {
     const cached = selectedHotel?.hotelId ? hotelDetailsCache?.[selectedHotel.hotelId] : undefined;
     return {
@@ -457,6 +504,10 @@ function PackageTravellerDetailsInner() {
 
         <div className="mt-4">
           <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={true} />
+          <div className="mt-4 lg:hidden bg-white border border-[#DFE0E4] rounded-xl p-4">
+            <div className="text-xs uppercase tracking-[0.12em] text-[#3A478A]">Total package price</div>
+            <div className="mt-1 text-2xl font-semibold text-[#010D50]">{packageTotalLabel}</div>
+          </div>
         </div>
 
         <div className="mt-5 sm:mt-6 flex flex-col lg:flex-row gap-5 sm:gap-6">
@@ -592,6 +643,11 @@ function PackageTravellerDetailsInner() {
 
           <div className="w-full lg:w-[482px] flex flex-col gap-4">
             <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={false} />
+
+            <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 sm:p-5">
+              <div className="text-xs uppercase tracking-[0.12em] text-[#3A478A]">Total package price</div>
+              <div className="mt-1 text-2xl font-semibold text-[#010D50]">{packageTotalLabel}</div>
+            </div>
 
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 sm:p-5">
               <div className="text-sm font-semibold text-[#010D50]">Need help?</div>
