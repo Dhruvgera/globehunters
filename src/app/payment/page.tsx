@@ -32,6 +32,7 @@ import { PaymentForm } from "@/components/payment/PaymentForm";
 import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
 import { HotelSummaryCard } from "@/components/booking/HotelSummaryCard";
 import { packageService } from "@/services/api/packageService";
+import { resolvePackagePricing } from "@/lib/package/pricing";
 
 import { FOLDER_STATUS_CODES } from "@/types/portal";
 import { countryCodes } from "@/lib/utils/countryCodes";
@@ -144,18 +145,28 @@ function PaymentContent() {
   const fallbackPackagePricing = useMemo(() => {
     if (!isPackageMode) return null;
     const matchedPackage = packageResults?.find((row) => String(row.id) === String(packageHotelId));
-    if (!matchedPackage?.startingPrice) return null;
-
     const flightDelta =
       typeof flight?.packagePriceDeltaTotal === "number"
         ? flight.packagePriceDeltaTotal
         : 0;
-
-    return {
-      amount: matchedPackage.startingPrice + flightDelta,
-      currency: matchedPackage.currency || flight?.currency || hotelRoomSummary?.currency || "GBP",
-    };
-  }, [flight?.currency, flight?.packagePriceDeltaTotal, hotelRoomSummary?.currency, isPackageMode, packageHotelId, packageResults]);
+    const resolved = resolvePackagePricing({
+      selectedRoomPackageTotal: hotelRoomSummary?.total,
+      selectedRoomCurrency: hotelRoomSummary?.currency,
+      selectedFlightDelta: flightDelta,
+      fallbackStartingPrice: matchedPackage?.startingPrice,
+      fallbackCurrency: matchedPackage?.currency,
+      selectedFlightCurrency: flight?.currency,
+    });
+    return resolved.amount != null ? resolved : null;
+  }, [
+    flight?.currency,
+    flight?.packagePriceDeltaTotal,
+    hotelRoomSummary?.currency,
+    hotelRoomSummary?.total,
+    isPackageMode,
+    packageHotelId,
+    packageResults,
+  ]);
 
   useEffect(() => {
     if (!isPackageMode || !packageFlightResultId || packageRoomIds.length === 0) return;
@@ -170,7 +181,23 @@ function PaymentContent() {
         if (cancelled) return;
 
         const parsed = parseMoneyString(response.details?.packagePrice);
-        setPackageTotalOverride(parsed.amount != null ? parsed : null);
+        const resolved = resolvePackagePricing({
+          packagePriceAmount: parsed.amount,
+          packagePriceCurrency: parsed.currency,
+          hotelRoomTotals: response.details?.hotel?.rooms?.map((room) => Number(room.price || 0) || undefined),
+          flightTotal: response.details?.flight?.totalFare,
+          flightCurrency: response.details?.flight?.currency,
+          selectedRoomPackageTotal: hotelRoomSummary?.total,
+          selectedRoomCurrency: hotelRoomSummary?.currency,
+          selectedFlightDelta:
+            typeof flight?.packagePriceDeltaTotal === "number"
+              ? flight.packagePriceDeltaTotal
+              : 0,
+          fallbackStartingPrice: fallbackPackagePricing?.amount,
+          fallbackCurrency: fallbackPackagePricing?.currency,
+          selectedFlightCurrency: selectedUpgrade?.currency || flight?.currency,
+        });
+        setPackageTotalOverride(resolved.amount != null ? resolved : null);
       } catch (error) {
         if (!cancelled) {
           console.warn("Failed to load package pricing for payment page", error);
@@ -183,7 +210,18 @@ function PaymentContent() {
     return () => {
       cancelled = true;
     };
-  }, [isPackageMode, packageFlightResultId, packageRoomIds]);
+  }, [
+    fallbackPackagePricing?.amount,
+    fallbackPackagePricing?.currency,
+    flight?.currency,
+    flight?.packagePriceDeltaTotal,
+    hotelRoomSummary?.currency,
+    hotelRoomSummary?.total,
+    isPackageMode,
+    packageFlightResultId,
+    packageRoomIds,
+    selectedUpgrade?.currency,
+  ]);
 
   // Track session start for 60-min refresh expiry
   useEffect(() => {

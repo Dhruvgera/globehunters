@@ -16,6 +16,7 @@ export function WebRefCard({
 }: WebRefCardProps) {
   const t = useTranslations('booking.webRef');
   const tNav = useTranslations('common.navigation.phone');
+  const phoneHref = `tel:${phoneNumber.replace(/[^\d+]/g, "")}`;
   if (isMobile) {
     return (
       <div className="lg:hidden bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
@@ -27,9 +28,12 @@ export function WebRefCard({
             <Phone className="w-5 h-5 text-white" />
           </div>
           <div className="flex flex-col">
-            <span className="text-[#010D50] text-sm font-bold">
+            <a
+              className="text-[#010D50] text-sm font-bold hover:underline"
+              href={phoneHref}
+            >
               {phoneNumber}
-            </span>
+            </a>
           </div>
         </div>
       </div>
@@ -52,7 +56,12 @@ export function WebRefCard({
           <span className="text-[#010D50] text-[8px] font-medium leading-tight">
             {tNav('label')}
           </span>
-          <span className="text-[#010D50] text-sm font-bold">{phoneNumber}</span>
+          <a
+            className="text-[#010D50] text-sm font-bold hover:underline"
+            href={phoneHref}
+          >
+            {phoneNumber}
+          </a>
         </div>
       </div>
     </div>

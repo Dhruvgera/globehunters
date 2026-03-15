@@ -20,6 +20,7 @@ import { packageService } from "@/services/api/packageService";
 import { PRICING_CONFIG, IASSURE_PRICING } from "@/config/constants";
 import { getRegion } from "@/lib/utils/domainMapping";
 import { formatFareLabel } from "@/lib/utils";
+import { resolvePackagePricing } from "@/lib/package/pricing";
 
 function formatDateLabel(value?: string) {
   if (!value) return "—";
@@ -197,52 +198,78 @@ function PackageReviewPageInner() {
     () => getUniquePackageRooms(packageDetails?.hotel?.rooms),
     [packageDetails?.hotel?.rooms]
   );
+  const selectedFlightDelta =
+    typeof selectedFlight?.packagePriceDeltaTotal === "number"
+      ? selectedFlight.packagePriceDeltaTotal
+      : 0;
   const fallbackPackagePricing = useMemo(() => {
     const matchedPackage = packageResults?.find((row) => String(row.id) === String(hotelId));
-    if (!matchedPackage?.startingPrice) return null;
+    const resolved = resolvePackagePricing({
+      selectedRoomPackageTotal: hotelRoomSummary?.total,
+      selectedRoomCurrency: hotelRoomSummary?.currency,
+      selectedFlightDelta,
+      fallbackStartingPrice: matchedPackage?.startingPrice,
+      fallbackCurrency: matchedPackage?.currency,
+      selectedFlightCurrency: selectedFlight?.currency,
+    });
+    return resolved.amount != null ? resolved : null;
+  }, [
+    hotelId,
+    hotelRoomSummary?.currency,
+    hotelRoomSummary?.total,
+    packageResults,
+    selectedFlight?.currency,
+    selectedFlightDelta,
+  ]);
 
-    const flightDelta =
-      typeof selectedFlight?.packagePriceDeltaTotal === "number"
-        ? selectedFlight.packagePriceDeltaTotal
-        : 0;
-
-    return {
-      amount: matchedPackage.startingPrice + flightDelta,
-      currency: matchedPackage.currency || selectedFlight?.currency || hotelRoomSummary?.currency || "GBP",
-    };
-  }, [hotelId, hotelRoomSummary?.currency, packageResults, selectedFlight?.currency, selectedFlight?.packagePriceDeltaTotal]);
+  const resolvedPackagePricing = useMemo(
+    () =>
+      resolvePackagePricing({
+        packagePriceAmount: parsedPackagePrice.amount,
+        packagePriceCurrency: parsedPackagePrice.currency,
+        hotelRoomTotals: uniqueHotelRooms.map((room) => Number(room.price || 0) || undefined),
+        flightTotal: packageDetails?.flight?.totalFare,
+        flightCurrency: packageDetails?.flight?.currency,
+        selectedRoomPackageTotal: hotelRoomSummary?.total,
+        selectedRoomCurrency: hotelRoomSummary?.currency,
+        selectedFlightDelta,
+        fallbackStartingPrice: fallbackPackagePricing?.amount,
+        fallbackCurrency: fallbackPackagePricing?.currency,
+        selectedFlightCurrency: selectedFlight?.currency,
+      }),
+    [
+      fallbackPackagePricing?.amount,
+      fallbackPackagePricing?.currency,
+      hotelRoomSummary?.currency,
+      hotelRoomSummary?.total,
+      packageDetails?.flight?.currency,
+      packageDetails?.flight?.totalFare,
+      parsedPackagePrice.amount,
+      parsedPackagePrice.currency,
+      selectedFlight?.currency,
+      selectedFlightDelta,
+      uniqueHotelRooms,
+    ]
+  );
 
   const pricing = useMemo(() => {
     const hotelTotal =
-      uniqueHotelRooms.reduce((sum, room) => sum + Number(room.price || 0), 0) ||
-      hotelRoomSummary?.total ||
-      0;
+      uniqueHotelRooms.reduce((sum, room) => sum + Number(room.price || 0), 0) || 0;
     const flightTotal = packageDetails?.flight?.totalFare || selectedFlight?.price || 0;
-    const packageTotal = parsedPackagePrice.amount ?? fallbackPackagePricing?.amount ?? 0;
+    const packageTotal = resolvedPackagePricing.amount ?? 0;
     return {
       hotelTotal,
       flightTotal,
       packageTotal,
       currency:
-        parsedPackagePrice.currency ||
-        fallbackPackagePricing?.currency ||
-        packageDetails?.flight?.currency ||
-        hotelRoomSummary?.currency ||
-        selectedFlight?.currency ||
-        "GBP",
+        resolvedPackagePricing.currency || "GBP",
     };
   }, [
-    hotelRoomSummary?.currency,
-    hotelRoomSummary?.total,
-    fallbackPackagePricing?.amount,
-    fallbackPackagePricing?.currency,
-    packageDetails?.flight?.currency,
     packageDetails?.flight?.totalFare,
-    uniqueHotelRooms,
-    parsedPackagePrice.amount,
-    parsedPackagePrice.currency,
-    selectedFlight?.currency,
+    resolvedPackagePricing.amount,
+    resolvedPackagePricing.currency,
     selectedFlight?.price,
+    uniqueHotelRooms,
   ]);
 
   const hotelDisplay = useMemo(() => {

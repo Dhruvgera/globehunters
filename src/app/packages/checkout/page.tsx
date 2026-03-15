@@ -21,6 +21,7 @@ import { formatFareLabel } from "@/lib/utils";
 import { folderService } from "@/services/api/folderService";
 import { hotelService } from "@/services/api/hotelService";
 import { packageService } from "@/services/api/packageService";
+import { resolvePackagePricing } from "@/lib/package/pricing";
 
 function formatDateLabel(value?: string) {
   if (!value) return "—";
@@ -152,6 +153,7 @@ function PackageTravellerDetailsInner() {
   const selectedHotel = useBookingStore((s) => s.selectedHotel);
   const hotelDetailsCache = useBookingStore((s) => s.hotelDetailsCache);
   const selectedHotelRoomIds = useBookingStore((s) => s.selectedHotelRoomIds);
+  const selectedHotelRoomSummary = useBookingStore((s) => s.selectedHotelRoomSummary);
   const passengersSaved = useBookingStore((s) => s.passengersSaved);
   const passengers = useBookingStore((s) => s.passengers);
   const vyspaFolderNumber = useBookingStore((s) => s.vyspaFolderNumber);
@@ -291,24 +293,32 @@ function PackageTravellerDetailsInner() {
 
   const parsedPackagePrice = useMemo(() => parseMoneyString(packageDetails?.packagePrice), [packageDetails?.packagePrice]);
   const packageTotalLabel = useMemo(() => {
-    const amount =
-      parsedPackagePrice.amount ??
-      ((packageDetails?.flight?.totalFare || 0) +
-        Number(packageDetails?.hotel?.rooms?.reduce((sum, room) => sum + Number(room.price || 0), 0) || 0));
-    const currency =
-      parsedPackagePrice.currency ||
-      packageDetails?.flight?.currency ||
-      selectedUpgrade?.currency ||
-      flight?.currency ||
-      "GBP";
-    return formatMoney(currency, amount);
+    const selectedFlightDelta =
+      typeof flight?.packagePriceDeltaTotal === "number"
+        ? flight.packagePriceDeltaTotal
+        : 0;
+    const resolved = resolvePackagePricing({
+      packagePriceAmount: parsedPackagePrice.amount,
+      packagePriceCurrency: parsedPackagePrice.currency,
+      hotelRoomTotals: packageDetails?.hotel?.rooms?.map((room) => Number(room.price || 0) || undefined),
+      flightTotal: packageDetails?.flight?.totalFare,
+      flightCurrency: packageDetails?.flight?.currency,
+      selectedRoomPackageTotal: selectedHotelRoomSummary?.total,
+      selectedRoomCurrency: selectedHotelRoomSummary?.currency,
+      selectedFlightDelta,
+      selectedFlightCurrency: selectedUpgrade?.currency || flight?.currency,
+    });
+    return formatMoney(resolved.currency, resolved.amount);
   }, [
     flight?.currency,
+    flight?.packagePriceDeltaTotal,
     packageDetails?.flight?.currency,
     packageDetails?.flight?.totalFare,
     packageDetails?.hotel?.rooms,
     parsedPackagePrice.amount,
     parsedPackagePrice.currency,
+    selectedHotelRoomSummary?.currency,
+    selectedHotelRoomSummary?.total,
     selectedUpgrade?.currency,
   ]);
 
