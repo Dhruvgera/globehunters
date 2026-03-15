@@ -1758,6 +1758,75 @@ export default function HotelRoomsPage() {
             setActiveRoomCardId(flattenedRooms.length > 0 ? String(flattenedRooms[0].id) : null);
           }
 
+          const packageHotelDetailsId = Number(roomHotel.hotel_id ?? packageHotel.hotelId);
+          if (packageHotelDetailsId > 0) {
+            hotelService
+              .hotelSearchDetails([String(packageHotelDetailsId)])
+              .then((detailsResponse: any) => {
+                if (cancelled) return;
+
+                const detailsData = extractVyspaGetHotelDetailsData(detailsResponse);
+                const vyspaMedia = parseVyspaHotelDetailsMedia(detailsResponse);
+                const nextGallery = mergeUniqueImages(
+                  detailsData.galleryImages || [],
+                  vyspaMedia.hotelImages || [],
+                  flattenRoomImages(vyspaMedia.roomImages),
+                  headerImage ? [headerImage] : []
+                ).slice(0, 24);
+
+                if (detailsData.description) {
+                  setDetailsText((previous) =>
+                    previous.trim() ? mergeTextContent(previous, detailsData.description) : detailsData.description || previous
+                  );
+                }
+
+                if (detailsData.amenities.length > 0) {
+                  setRemoteAmenities((previous) =>
+                    Array.from(new Set([...(previous || []), ...detailsData.amenities]))
+                  );
+                }
+
+                if (detailsData.policies) {
+                  setCancellationText((previous) => mergeTextContent(previous, detailsData.policies));
+                }
+
+                if (detailsData.importantInfo) {
+                  setImportantInfoText((previous) => mergeTextContent(previous, detailsData.importantInfo, "\n"));
+                }
+
+                if (detailsData.coordinates && !coordinates) {
+                  setCoordinates(detailsData.coordinates);
+                }
+
+                if (nextGallery.length > 0) {
+                  setGalleryImages(nextGallery);
+                  setRemoteHotelHeader((prev) =>
+                    prev ? { ...prev, image: prev.image || nextGallery[0] } : prev
+                  );
+                }
+
+                setHotelDetailsCache(hotelId, {
+                  hotelId,
+                  hotelName: roomHotel.hotel_name || packageHotel.hotelName,
+                  hotelRating: Number(roomHotel.hotel_rating || packageHotel.starRating || 0) || undefined,
+                  mainImage: nextGallery[0] || headerImage || undefined,
+                  address: headerAddress || undefined,
+                  galleryImages: nextGallery.length > 0 ? nextGallery : (headerImage ? [headerImage] : []),
+                  rooms: flattenedRooms,
+                  detailsText: detailsData.description || packageDescription,
+                  cancellationText: detailsData.policies || "",
+                  amenities:
+                    detailsData.amenities.length > 0
+                      ? Array.from(new Set([...extractedPackageAmenities, ...detailsData.amenities]))
+                      : extractedPackageAmenities,
+                  fetchedAt: Date.now(),
+                });
+              })
+              .catch(() => {
+                // Keep the base package room response if detail enrichment fails.
+              });
+          }
+
           return;
         }
 
