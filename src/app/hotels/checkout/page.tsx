@@ -351,8 +351,8 @@ export default function HotelCheckoutPage() {
       traveller?.dateOfBirth ||
       (traveller?.email?.trim() && traveller.email.trim() !== email.trim()) ||
       (traveller?.phone?.trim() && traveller.phone.trim() !== phone.trim()) ||
-      ((traveller?.countryCode || "+44") !== (countryCode || "+44")) ||
-      ((traveller?.nationality || "") !== (passport || ""))
+      (traveller?.phone?.trim() && ((traveller?.countryCode || "+44") !== (countryCode || "+44"))) ||
+      (traveller?.nationality?.trim() && ((traveller?.nationality || "") !== (passport || "")))
     );
 
   const hasCompleteTravellerDetails = (traveller: Passenger | undefined) =>
@@ -376,19 +376,19 @@ export default function HotelCheckoutPage() {
     for (let i = 0; i < otherTravellers.length; i += 1) {
       const traveller = otherTravellers[i];
       if (!hasCustomizedTravellerDetails(traveller)) continue;
-      if (!traveller?.firstName?.trim()) errors[`traveller_${i}_firstName`] = "First name is required";
-      if (!traveller?.lastName?.trim()) errors[`traveller_${i}_lastName`] = "Last name is required";
-      if (!traveller?.dateOfBirth) {
-        errors[`traveller_${i}_dateOfBirth`] = "Date of birth is required";
-      } else {
+      const hasFirstName = Boolean(traveller?.firstName?.trim());
+      const hasLastName = Boolean(traveller?.lastName?.trim());
+
+      if (hasFirstName && !hasLastName) errors[`traveller_${i}_lastName`] = "Last name is required";
+      if (hasLastName && !hasFirstName) errors[`traveller_${i}_firstName`] = "First name is required";
+
+      if (traveller?.dateOfBirth) {
         const dobCheck = validateDateOfBirthForType(traveller.dateOfBirth, traveller.type === "child" ? "child" : "adult");
         if (!dobCheck.valid) errors[`traveller_${i}_dateOfBirth`] = dobCheck.error || "Invalid date of birth";
       }
-      if (!traveller?.email?.trim()) errors[`traveller_${i}_email`] = "Email is required";
       if (traveller?.email?.trim() && !validateEmail(traveller.email.trim())) {
         errors[`traveller_${i}_email`] = "Please enter a valid email";
       }
-      if (!traveller?.phone?.trim()) errors[`traveller_${i}_phone`] = "Phone number is required";
       if (traveller?.phone?.trim() && !validatePhone(traveller.phone.trim())) {
         errors[`traveller_${i}_phone`] = "Please enter a valid phone number";
       }

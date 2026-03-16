@@ -48,7 +48,7 @@ import {
   serializeHotelChildAges,
 } from "@/lib/hotels/childAges";
 import { fixStubaImageUrl } from "@/lib/hotels/imageUrl";
-import { convertHotelLocalTaxTotal, formatMoneyFromCode } from "@/lib/currency/localTaxDisplay";
+import { convertHotelLocalTaxTotal, formatMoneyFromCode, normalizeCurrencyCode } from "@/lib/currency/localTaxDisplay";
 
 function LoadingBlock({ className }: { className: string }) {
   return <div className={`animate-pulse bg-gray-200/70 rounded-xl ${className}`} />;
@@ -1020,10 +1020,25 @@ export default function HotelRoomsPage() {
           const rawForTax = room._raw as Record<string, unknown>;
           const hbTaxes = (rawForTax.hotelBedsTaxes ?? (rawForTax._hotelbeds as any)?.taxes) as
             import("@/types/hotel").HotelTaxBreakdown | null | undefined;
+          const localTaxes = hbTaxes?.taxes?.filter((tax) => !tax?.included) ?? [];
           const converted = await convertHotelLocalTaxTotal(hbTaxes?.taxes, room.price.currency);
+          const localTotal = localTaxes.reduce((sum, tax) => sum + Number(tax?.clientAmount || tax?.amount || 0), 0);
+          const localCurrency = normalizeCurrencyCode(localTaxes[0]?.clientCurrency || localTaxes[0]?.currency);
+          const localLabel =
+            localTotal > 0 && localCurrency
+              ? formatMoneyFromCode(localCurrency, localTotal)
+              : "";
+          const convertedLabel =
+            converted && converted.currencyCode !== localCurrency
+              ? `${formatMoneyFromCode(converted.currencyCode, converted.amount)}`
+              : "";
           return [
             room.id,
-            converted ? `+ ${formatMoneyFromCode(converted.currencyCode, converted.amount)} local taxes included` : "",
+            localLabel
+              ? `+ ${localLabel}${convertedLabel ? ` (${convertedLabel})` : ""} local taxes included`
+              : converted
+                ? `+ ${formatMoneyFromCode(converted.currencyCode, converted.amount)} local taxes included`
+                : "",
           ] as const;
         })
       );

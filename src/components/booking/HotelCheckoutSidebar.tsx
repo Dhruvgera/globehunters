@@ -8,7 +8,12 @@ import { useBookingStore } from "@/store/bookingStore";
 import type { HotelTaxBreakdown, HotelBedsTaxItem } from "@/types/hotel";
 import { resolveTrustYouHotelId } from "@/lib/trustyou/hotelMapping";
 import type { TrustYouHotelReviewSummary } from "@/types/trustyou";
-import { convertHotelLocalTaxRows, convertHotelLocalTaxTotal, formatMoneyFromCode } from "@/lib/currency/localTaxDisplay";
+import {
+  convertHotelLocalTaxRows,
+  convertHotelLocalTaxTotal,
+  formatMoneyFromCode,
+  type ConvertedHotelLocalTaxRow,
+} from "@/lib/currency/localTaxDisplay";
 
 function formatMoney(currency: string | undefined, amount: number | undefined) {
   const c = currency || "$";
@@ -87,7 +92,7 @@ export function HotelCheckoutSidebar({
   const cached = hotelId ? hotelDetailsCache?.[hotelId] : undefined;
   const [trustYouReview, setTrustYouReview] = useState<TrustYouHotelReviewSummary | null>(cached?.trustYou || null);
   const [convertedLocalTaxTotal, setConvertedLocalTaxTotal] = useState<string | null>(null);
-  const [convertedLocalTaxRows, setConvertedLocalTaxRows] = useState<Array<{ label: string; amount: number; currencyCode: string }>>([]);
+  const [convertedLocalTaxRows, setConvertedLocalTaxRows] = useState<ConvertedHotelLocalTaxRow[]>([]);
 
   useEffect(() => {
     setTrustYouReview(cached?.trustYou || null);
@@ -479,12 +484,19 @@ export function HotelCheckoutSidebar({
                 label: tax.subType || tax.type || "Taxes & fees",
                 amount: Number(tax.clientAmount || tax.amount || 0),
                 currencyCode: tax.clientCurrency || tax.currency || display.localTaxCurrency,
+                localAmount: Number(tax.clientAmount || tax.amount || 0),
+                localCurrencyCode: tax.clientCurrency || tax.currency || display.localTaxCurrency,
               })) ).map((tax, i) => (
                 <div key={i} className="flex items-center justify-between text-xs text-[#8B5E20]">
                   <span>{tax.label}</span>
-                  <span>
-                    {formatMoneyFromCode(tax.currencyCode, Number(tax.amount || 0))}
-                  </span>
+                  <div className="text-right">
+                    <div>{formatMoneyFromCode(tax.localCurrencyCode, Number(tax.localAmount || 0))}</div>
+                    {tax.currencyCode !== tax.localCurrencyCode && (
+                      <div className="text-[10px] text-[#B07930]">
+                        {formatMoneyFromCode(tax.currencyCode, Number(tax.amount || 0))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
               {(convertedLocalTaxRows.length > 1 || display.localTaxes.length > 1) && (

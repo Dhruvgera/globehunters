@@ -23,10 +23,18 @@ export function formatMoneyFromCode(currencyCode: string, amount: number): strin
   return `${normalized} ${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+export type ConvertedHotelLocalTaxRow = {
+  label: string;
+  amount: number;
+  currencyCode: string;
+  localAmount: number;
+  localCurrencyCode: string;
+};
+
 export async function convertHotelLocalTaxRows(
   taxes: HotelBedsTaxItem[] | undefined,
   targetCurrencyInput: string | undefined | null
-): Promise<Array<{ label: string; amount: number; currencyCode: string }>> {
+): Promise<ConvertedHotelLocalTaxRow[]> {
   const rows = Array.isArray(taxes) ? taxes.filter((tax) => !tax?.included) : [];
   if (rows.length === 0) return [];
 
@@ -43,11 +51,13 @@ export async function convertHotelLocalTaxRows(
         label: String(tax?.subType || tax?.type || "Taxes & fees"),
         amount: convertedAmount,
         currencyCode: targetCurrency,
+        localAmount: amount,
+        localCurrencyCode: sourceCurrency,
       };
     })
   );
 
-  return convertedRows.filter((row): row is { label: string; amount: number; currencyCode: string } => !!row);
+  return convertedRows.filter((row): row is ConvertedHotelLocalTaxRow => !!row);
 }
 
 export async function convertHotelLocalTaxTotal(
