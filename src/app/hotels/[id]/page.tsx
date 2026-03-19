@@ -1725,6 +1725,7 @@ export default function HotelRoomsPage() {
           const headerAddress = [roomHotel.address1, roomHotel.address2, packageHotel.address?.street1]
             .filter(Boolean)
             .join(", ");
+          const packageDescription = sanitizeHotelText(packageHotel.description || roomHotel.quickDescription || "");
           const extractedPackageAmenities = Array.from(
             new Set([
               ...extractAmenitiesFromGetRoomsResponse(roomHotel),
@@ -1743,7 +1744,6 @@ export default function HotelRoomsPage() {
               image: headerImage || undefined,
               address: headerAddress || undefined,
             });
-            const packageDescription = sanitizeHotelText(packageHotel.description || roomHotel.quickDescription || "");
             if (packageDescription) {
               setDetailsText(packageDescription);
             }
