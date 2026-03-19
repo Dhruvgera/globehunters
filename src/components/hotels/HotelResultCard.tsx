@@ -71,7 +71,6 @@ export function HotelResultCard({
 }) {
   const isGrid = view === "grid";
   const showNightlyPrice = !isPackageMode;
-  const showTotalPrice = isPackageMode;
   const hotelSearch = useBookingStore((state) => state.hotelSearch);
   const raw = (hotel.rawSearchResult ?? null) as Record<string, unknown> | null;
   const detailParams = new URLSearchParams();
@@ -204,11 +203,9 @@ export function HotelResultCard({
                     {hotel.price.currency}{hotel.price.nightly.toLocaleString()} nightly
                   </div>
                 )}
-                {showTotalPrice && (
-                  <div className="text-2xl font-bold text-[#010D50]">
-                    {hotel.price.currency}{hotel.price.total.toLocaleString()}
-                  </div>
-                )}
+                <div className="text-2xl font-bold text-[#010D50]">
+                  {hotel.price.currency}{hotel.price.total.toLocaleString()}
+                </div>
               </div>
             </div>
 
@@ -307,12 +304,10 @@ export function HotelResultCard({
                     {hotel.price.nightly.toLocaleString()} nightly
                   </div>
                 )}
-                {showTotalPrice && (
-                  <div className="text-lg font-semibold text-[#010D50]">
-                    {hotel.price.currency}
-                    {hotel.price.total.toLocaleString()}
-                  </div>
-                )}
+                <div className="text-lg font-semibold text-[#010D50]">
+                  {hotel.price.currency}
+                  {hotel.price.total.toLocaleString()}
+                </div>
               </div>
 
               <div className="mt-auto w-full flex justify-end">

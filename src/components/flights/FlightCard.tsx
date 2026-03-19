@@ -14,10 +14,11 @@ import { ShareButton } from "@/components/ui/share-button";
 import { usePriceCheck } from "@/hooks/usePriceCheck";
 import { formatPrice } from "@/lib/currency";
 
-function formatPackageDeltaLabel(amount?: number, currency?: string): string {
+function formatPackageDeltaLabel(amount?: number, currency?: string, perPerson = false): string {
   const delta = Number(amount || 0);
   if (Math.abs(delta) < 0.01) return "Included";
-  return `${delta > 0 ? "+" : "-"}${formatPrice(Math.abs(delta), currency || "GBP")}`;
+  const prefix = `${delta > 0 ? "+" : "-"}${formatPrice(Math.abs(delta), currency || "GBP")}`;
+  return perPerson ? `${prefix} per person` : prefix;
 }
 
 interface FlightCardProps {
@@ -61,12 +62,12 @@ export default function FlightCard({
   const baseOption = priceCheckData?.priceOptions?.[0];
   const effectivePricePerPerson = baseOption?.pricePerPerson ?? flight.pricePerPerson;
   const effectiveCurrency = baseOption?.currency ?? flight.currency;
+  const isPackagePerPersonDelta = typeof flight.packagePriceDeltaPerPerson === "number";
   const packagePrimaryPriceLabel = isPackageMode
     ? formatPackageDeltaLabel(
-        typeof flight.packagePriceDeltaPerPerson === "number"
-          ? flight.packagePriceDeltaPerPerson
-          : flight.packagePriceDeltaTotal,
-        flight.currency
+        isPackagePerPersonDelta ? flight.packagePriceDeltaPerPerson : flight.packagePriceDeltaTotal,
+        flight.currency,
+        isPackagePerPersonDelta
       )
     : undefined;
 
