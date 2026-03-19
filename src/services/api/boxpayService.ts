@@ -80,6 +80,20 @@ function toIso2CountryCode(input: string | undefined | null): string | undefined
   return undefined;
 }
 
+export function normalizeBoxPayPhoneNumber(input: string): string {
+  const raw = String(input || '').trim();
+  if (!raw) return '';
+
+  const hasPlusPrefix = raw.startsWith('+');
+  const digits = String(input || '').replace(/\D/g, '');
+  if (!digits) return '';
+
+  if (hasPlusPrefix) return `+${digits}`;
+  if (digits.length > 10) return `+${digits}`;
+
+  return digits.length === 10 ? digits : '';
+}
+
 class BoxPayService {
   private endpoints = getBoxPayEndpoints();
   
@@ -100,7 +114,13 @@ class BoxPayService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error('BoxPay session creation failed:', errorData);
+        console.error(
+          `[BoxPay] session creation failed ${JSON.stringify({
+            errorData,
+            requestPayload: request,
+            normalizedPhoneNumber: request.shopper?.phoneNumber,
+          })}`
+        );
         throw new Error(errorData.message || `BoxPay API error: ${response.status}`);
       }
 
@@ -179,7 +199,7 @@ class BoxPayService {
         firstName: params.shopper.firstName,
         lastName: params.shopper.lastName,
         email: params.shopper.email,
-        phoneNumber: params.shopper.phone.replace(/[^0-9]/g, ''),
+        phoneNumber: normalizeBoxPayPhoneNumber(params.shopper.phone),
         uniqueReference: params.orderId,
         deliveryAddress: params.shopper.address
           ? (() => {

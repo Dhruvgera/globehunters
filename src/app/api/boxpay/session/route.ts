@@ -74,6 +74,15 @@ export async function POST(request: NextRequest) {
       backUrl,
     });
 
+    console.log(
+      `[BoxPay] Session request payload ${JSON.stringify({
+        orderId: body.orderId,
+        incomingShopperPhone: body.shopper.phone,
+        normalizedShopperPhone: sessionRequest.shopper.phoneNumber,
+        payload: sessionRequest,
+      })}`
+    );
+
     const sessionResponse = await boxpayService.createSession(sessionRequest);
 
     return NextResponse.json({

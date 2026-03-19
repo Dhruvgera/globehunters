@@ -353,20 +353,17 @@ function PaymentContent() {
     const fallback = (fallbackDialCode || "").trim();
     if (!input && !fallback) return "";
 
-    // Already international
-    if (input.startsWith("+")) return `+${input.slice(1).replace(/[^\d]/g, "")}`;
-    if (input.startsWith("00")) return `+${input.slice(2).replace(/[^\d]/g, "")}`;
-
     const digits = input.replace(/[^\d]/g, "");
     const dialDigits = fallback.replace(/[^\d]/g, "");
-    if (!digits) return dialDigits ? `+${dialDigits}` : "";
+    const strippedLocal = digits.length > 10 ? digits.slice(-10) : digits;
 
-    // If user already included dial code without '+'
-    if (dialDigits && digits.startsWith(dialDigits)) return `+${digits}`;
-
-    // Strip trunk zeros
-    const national = digits.replace(/^0+/, "");
-    return dialDigits ? `+${dialDigits}${national}` : `+${national}`;
+    if (input.startsWith("+") && digits.length > 10) return `+${digits}`;
+    if (digits.length > 10) return `+${digits}`;
+    if (strippedLocal.length === 10) return strippedLocal;
+    if (dialDigits) {
+      return `+${dialDigits}${strippedLocal.replace(/^0+/, "")}`;
+    }
+    return "";
   };
 
   const dialFromBillingCountry = (country: string) => {
@@ -611,7 +608,7 @@ function PaymentContent() {
           <div className="flex-1 flex flex-col gap-4">
             {(isPackageMode || isHotelMode) && (
               <div className="flex flex-col gap-3">
-                <HotelSummaryCard />
+                <HotelSummaryCard isPackageMode={isPackageMode} />
 
                 {/* Stay Details - hotel mode only */}
                 {isHotelMode && hotelDisplay && (
@@ -930,7 +927,35 @@ function PaymentContent() {
                   contactPhone ||
                   (leadPassenger?.countryCode ? `${leadPassenger.countryCode}${leadPassenger.phone}` : leadPassenger?.phone) ||
                   "";
-                const shopperPhone = normalizePhoneForBoxPay(rawPhone, fallbackDial) || (isUK ? "+442089444555" : "+12089444555");
+                const shopperPhone = normalizePhoneForBoxPay(rawPhone, fallbackDial) || "2089444555";
+
+                console.log('[BoxPay] Client session payload', {
+                  orderId,
+                  rawPhone,
+                  fallbackDial,
+                  shopperPhone,
+                  payload: {
+                    orderId,
+                    amount: tripTotal,
+                    currency: currencyForGateway,
+                    flow: isHotelMode ? "hotel" : (isPackageMode ? "package" : "flight"),
+                    localPayableTaxes: localPayableTaxesForBilling,
+                    shopper: {
+                      firstName,
+                      lastName,
+                      email: contactEmail || 'customer@globehunters.com',
+                      phone: shopperPhone,
+                      address: {
+                        address1: billingAddress.addressLine1,
+                        address2: billingAddress.addressLine2,
+                        city: billingAddress.city,
+                        state: billingAddress.state || billingAddress.city,
+                        countryCode: billingAddress.country || 'GB',
+                        postalCode: billingAddress.postalCode,
+                      },
+                    },
+                  },
+                });
 
                 // Create BoxPay session
                 const result = await createSession({

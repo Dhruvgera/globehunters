@@ -26,6 +26,7 @@ interface HotelSummaryCardProps {
   selectedRoomIds?: string[];
   roomSummary?: any;
   detailsCache?: any;
+  isPackageMode?: boolean;
 }
 
 export function HotelSummaryCard(props: HotelSummaryCardProps) {
@@ -43,6 +44,7 @@ export function HotelSummaryCard(props: HotelSummaryCardProps) {
   const selectedRoomIds = props.selectedRoomIds || storeSelectedRoomIds;
   const roomSummary = props.roomSummary || storeRoomSummary;
   const detailsCache = props.detailsCache || storeDetailsCache;
+  const isPackageMode = props.isPackageMode ?? false;
 
   const hotelId = selectedHotel?.hotelId;
   const cached = hotelId ? detailsCache?.[hotelId] : undefined;
@@ -134,9 +136,11 @@ export function HotelSummaryCard(props: HotelSummaryCardProps) {
       <div className="flex items-end justify-between">
         <div className="text-xs text-[#3A478A]">Price</div>
         <div className="text-right">
-          <div className="text-xs text-[#3A478A]">
-            Nightly: {formatMoney(display.currency, display.nightly)}
-          </div>
+          {!isPackageMode && (
+            <div className="text-xs text-[#3A478A]">
+              Nightly: {formatMoney(display.currency, display.nightly)}
+            </div>
+          )}
           <div className="text-base font-semibold text-[#010D50]">
             Total: {formatMoney(
               display.currency,

@@ -1349,6 +1349,7 @@ function PaymentCompleteContent() {
                   selectedRoomIds={ctx?.selectedHotelRoomIds}
                   roomSummary={ctx?.hotelRoomSummary}
                   detailsCache={hotelDetailsCacheForDisplay}
+                  isPackageMode={isPackageMode}
                 />
 
                 {/* Stay Details - hotel mode only */}
