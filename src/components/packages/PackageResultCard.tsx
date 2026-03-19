@@ -82,8 +82,7 @@ export function PackageResultCard({
   onSelect,
   onContinue,
 }: PackageResultCardProps) {
-  const { hotel, outboundFlight, totalPrice, nightlyPrice, currency, nights, rooms } =
-    pkg;
+  const { hotel, outboundFlight, totalPrice, currency } = pkg;
 
   const rootClass = [
     "bg-white border rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden w-full cursor-pointer",
@@ -213,16 +212,9 @@ export function PackageResultCard({
 
               {/* Price section */}
               <div className="flex flex-col items-end gap-1 text-right">
-                <div className="text-sm text-[#3A478A]">
-                  for {nights} nights, {rooms} room
-                </div>
-                <div className="text-sm text-[#3A478A]">
-                  {currency}
-                  {nightlyPrice.toLocaleString()} nightly
-                </div>
                 <div className="text-2xl font-bold text-[#010D50]">
                   {currency}
-                  {totalPrice.toLocaleString()} total
+                  {totalPrice.toLocaleString()}
                 </div>
               </div>
 
@@ -321,13 +313,9 @@ export function PackageResultCard({
 
           {/* Price section */}
           <div className="flex flex-col items-end gap-1 mt-auto">
-            <div className="text-sm text-[#3A478A]">
-              {currency}
-              {nightlyPrice.toLocaleString()} nightly
-            </div>
             <div className="text-2xl font-bold text-[#010D50]">
               {currency}
-              {totalPrice.toLocaleString()} total
+              {totalPrice.toLocaleString()}
             </div>
           </div>
 
