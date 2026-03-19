@@ -46,6 +46,7 @@ This list is derived from scanning `process.env.*` usage in `src/`.
 - `VYSPA_PASSWORD`
 - `VYSPA_TOKEN`
 - `VYSPA_FLIGHTVIEW_URL` (optional override for FlightView endpoint)
+- `VYSPA_DEFAULT_CHILD_AGE` (optional; default child age for hotel search occupancy)
 
 ### Vyspa Portal
 
@@ -69,6 +70,25 @@ This list is derived from scanning `process.env.*` usage in `src/`.
 - `SMTP_USER`
 - `SMTP_PASSWORD`
 - `SMTP_FROM_EMAIL`
+
+### Hotelbeds
+
+- `HOTELBEDS_API_KEY`
+- `HOTELBEDS_SECRET`
+- `HOTELBEDS_BOOKING_BASE_URL` (default: `https://api.hotelbeds.com/hotel-api/1.0`)
+- `HOTELBEDS_CONTENT_BASE_URL` (default: `https://api.hotelbeds.com/hotel-content-api/1.0`)
+- `HOTELBEDS_SEARCH_RADIUS_KM` (optional; proximity search radius)
+- `HOTELBEDS_ENRICH_LIMIT` (optional; max hotels to enrich with content)
+- `HOTELBEDS_ENRICH_TIMEOUT_MS` (optional; content enrichment timeout)
+- `HOTELBEDS_DEFAULT_ADULT_AGE` (optional; default adult age for occupancy)
+- `HOTELBEDS_DEFAULT_CHILD_AGE` (optional; default child age for occupancy)
+- `HOTELBEDS_HIDE_NO_IMAGE` / `VYSPA_HIDE_NO_IMAGE` (optional; hide hotels without images)
+
+### TrustYou
+
+- `TRUSTYOU_API_KEY`
+- `TRUSTYOU_PARTNER_ID` (single partner ID)
+- `TRUSTYOU_PARTNER_IDS` (comma-separated list of partner IDs)
 
 ### Reviews (Yotpo)
 

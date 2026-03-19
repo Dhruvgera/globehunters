@@ -37,6 +37,28 @@
 - Verify portal credentials:
   - `VYSPA_PORTAL_URL`, `VYSPA_PORTAL_USERNAME`, `VYSPA_PORTAL_PASSWORD`, `VYSPA_PORTAL_TOKEN`
 
+## Hotel search issues
+
+- **Empty results**:
+  - Verify Vyspa hotel credentials (`VYSPA_API_URL`, `VYSPA_USERNAME`, etc.)
+  - Check Hotelbeds credentials (`HOTELBEDS_API_KEY`, `HOTELBEDS_SECRET`)
+  - `HOTELBEDS_HIDE_NO_IMAGE` / `VYSPA_HIDE_NO_IMAGE` may filter out results without images
+- **TrustYou scores not showing**:
+  - Check `TRUSTYOU_API_KEY`, `TRUSTYOU_PARTNER_ID` / `TRUSTYOU_PARTNER_IDS`
+  - Use `/dev/trustyou-preview` to test widget rendering
+  - Bulk endpoint may time out for large result sets
+- **Deduplication issues** (Vyspa vs Hotelbeds):
+  - See `src/lib/hotels/dedupe.ts` for matching logic
+  - See `docs/integrations/hotelbeds-vyspa-deduplication.md` for details
+
+## Package issues
+
+- **No package results**:
+  - Packages require both a valid hotel and flight search; confirm both providers are responding
+  - Check `/api/packages/search` response for errors
+- **Alternate flights not loading**:
+  - `/api/packages/change-flights` calls Vyspa; confirm search credentials
+
 ## Reviews not loading
 
 - `/api/reviews` requires Yotpo credentials:

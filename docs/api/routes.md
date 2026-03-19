@@ -6,32 +6,85 @@ These are **Next.js Route Handlers** (Node runtime) that encapsulate secrets and
 
 ## Summary table
 
+### Flight routes
+
 | Route | Method | Purpose | Used by |
-|------|--------|---------|---------|
+|-------|--------|---------|---------|
 | `/api/airports` | GET | Airport lookup (cached; supports `?q=`) | airport search UI/hooks |
-| `/api/affiliates` | GET | (Legacy/Unused) Affiliate data now static in `src/data/affiliates.ts` | `AffiliateContext` |
-| `/api/reviews` | GET | Fetch + filter reviews from Yotpo (OAuth token + reviews) | booking UI (`useReviews`) |
 | `/api/flight-view` | POST | Resolve deeplink flight key → flight + params | `/`, `/search`, `/checkout` deeplink flows |
 | `/api/price-check` | POST | Price verification + upgrade options (V1+V3 flows) | `/booking` (prefetch) + upgrade modal |
 | `/api/search-flights-batch` | POST | Batch min-price (date tiles / prefetch) | `useDatePrices` / search UI |
+
+### Hotel routes
+
+| Route | Method | Purpose | Used by |
+|-------|--------|---------|---------|
+| `/api/hotels/cities` | POST | City/hotel location search (Vyspa `get_cities`) | `useHotelLocationSearch` |
+| `/api/hotels/availability` | POST | Hotel availability search | `/hotels` page |
+| `/api/hotels/details` | POST | Hotel details (name, images, amenities) | `/hotels/[id]` page |
+| `/api/hotels/rooms` | POST | Room options with pricing | `/hotels/[id]` page |
+| `/api/hotels/content` | POST | Hotel content (descriptions, facilities) | `/hotels/[id]` page |
+| `/api/hotels/accommodation-details` | POST | Accommodation-level details | hotel detail views |
+| `/api/hotels/create-folder` | POST | Create hotel booking folder (Vyspa) | hotel checkout flow |
+| `/api/hotels/submit` | POST | Submit hotel booking | hotel checkout |
+| `/api/hotels/trustyou` | POST | TrustYou review score for a single hotel | `/hotels/[id]` page |
+| `/api/hotels/trustyou/bulk` | POST | TrustYou scores for multiple hotels (batch) | `/hotels` search results |
+
+### Package routes
+
+| Route | Method | Purpose | Used by |
+|-------|--------|---------|---------|
+| `/api/packages/search` | POST | Holiday package search (flight + hotel) | `usePackageSearch` |
+| `/api/packages/details` | POST | Package detail (rooms, pricing) | package detail views |
+| `/api/packages/destinations` | GET | Destination search/autocomplete | package search UI |
+| `/api/packages/rooms` | POST | Room options for a package | package room selection |
+| `/api/packages/change-flights` | POST | Alternate flights for a package | `/packages/review` |
+
+### Payment routes
+
+| Route | Method | Purpose | Used by |
+|-------|--------|---------|---------|
 | `/api/boxpay/session` | POST | Create BoxPay checkout session + return URLs | `/payment` |
 | `/api/boxpay/inquiry` | POST | Inquire transaction status using `redirectionResult` | `/payment-complete` |
+
+### Vyspa Portal routes
+
+| Route | Method | Purpose | Used by |
+|-------|--------|---------|---------|
 | `/api/vyspa/init-folder` | POST | Create folder / customer details in Portal | `/payment` (before BoxPay) |
 | `/api/vyspa/add-to-folder` | POST | Add items (flight etc.) to a folder (Vyspa REST v4) | folder services / booking flow |
 | `/api/vyspa/add-extras` | POST | Add insurance/baggage extras (Portal) | `/payment` |
-| `/api/vyspa/save-payment` | POST | Record payment transaction + update folder status (Portal) | `/payment-complete` |
+| `/api/vyspa/save-payment` | POST | Record payment transaction + update folder status | `/payment-complete` |
 | `/api/vyspa/update-status` | POST | Explicitly update folder status (e.g. failure) | `/payment`, `/payment-complete` |
+| `/api/vyspa/confirm-itinerary` | POST | Confirm itinerary (hotel/package post-payment) | hotel/package checkout |
 | `/api/vyspa/portal` | POST | Generic Portal method wrapper (form-encoded) | internal/debug/utility use |
+
+### Vyspa Hotel routes
+
+| Route | Method | Purpose | Used by |
+|-------|--------|---------|---------|
+| `/api/vyspa/hotels/cities` | POST | Vyspa hotel city lookup | hotel search |
+| `/api/vyspa/hotels/availability` | POST | Vyspa hotel availability | hotel search |
+| `/api/vyspa/hotels/details` | POST | Vyspa hotel details | hotel detail page |
+| `/api/vyspa/hotels/rooms` | POST | Vyspa hotel room options | hotel room selection |
+| `/api/vyspa/hotels/create-folder` | POST | Vyspa hotel folder creation | hotel checkout |
+
+### Other routes
+
+| Route | Method | Purpose | Used by |
+|-------|--------|---------|---------|
+| `/api/reviews` | GET | Fetch + filter reviews from Yotpo (OAuth token + reviews) | booking UI (`useReviews`) |
+| `/api/affiliates` | GET | (Legacy) Affiliate data; now static in `src/data/affiliates.ts` | `AffiliateContext` |
 | `/api/send-confirmation-email` | POST | Send confirmation email (nodemailer) | `/payment-complete` |
 | `/api/test-email` | POST | Test email sending | dev tooling |
 
 ## External dependencies called by API routes
 
-- **Yotpo** (reviews): `src/app/api/reviews/route.ts` uses `YOTPO_APP_KEY` + `YOTPO_SECRET_KEY`
-- **TravCart CMS API** (affiliates): `src/app/api/affiliates/route.ts` calls a remote API (POST)
-- **Vyspa** (search + flight view + price check + add to folder): multiple routes and server actions
-- **Vyspa Portal** (folder init/extras/payment recording): `src/app/api/vyspa/*`
+- **Vyspa** (search, flight view, price check, hotels, packages, portal): multiple routes and server actions
+- **Hotelbeds**: hotel availability, details, content (via `src/lib/hotelbeds/*`)
+- **TrustYou**: hotel review scores (via `src/lib/trustyou/*`)
 - **BoxPay** (payments): `src/app/api/boxpay/*`
+- **Yotpo** (reviews): `src/app/api/reviews/route.ts` uses `YOTPO_APP_KEY` + `YOTPO_SECRET_KEY`
 
 ## Route deep-links (implementation pointers)
 
@@ -67,5 +120,11 @@ These are **Next.js Route Handlers** (Node runtime) that encapsulate secrets and
   - `/api/vyspa/init-folder`
   - `/api/vyspa/add-extras`
   - `/api/vyspa/save-payment`
+  - `/api/vyspa/confirm-itinerary`
 
+### Hotel routes
 
+- Vyspa hotel config shares the same portal/search credentials
+- Hotelbeds client: `src/lib/hotelbeds/client.ts`
+- Hotel deduplication: `src/lib/hotels/dedupe.ts`
+- TrustYou client: `src/lib/trustyou/client.ts`
