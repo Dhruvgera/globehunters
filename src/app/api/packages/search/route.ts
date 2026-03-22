@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { VYSPA_CONFIG } from '@/config/vyspa';
 import { fixStubaImageUrl } from '@/lib/hotels/imageUrl';
+import { parsePackageHotelContent } from '@/lib/package/hotelContent';
 import type {
   HolidayFlightDirection,
   HolidayFlightSegment,
@@ -105,15 +106,19 @@ function buildVyspaRequest(criteria: PackageSearchCriteria): HolidayPackageSearc
 }
 
 function extractPackageAmenities(hotel: Record<string, unknown>): string[] {
+  const labels = new Set<string>();
   const attributes = hotel.attributes;
-  if (!attributes || typeof attributes !== 'object' || Array.isArray(attributes)) return [];
-  return Array.from(
-    new Set(
-      Object.values(attributes as Record<string, unknown>)
-        .map((value) => String(value || '').trim())
-        .filter(Boolean)
-    )
-  );
+  if (attributes && typeof attributes === 'object' && !Array.isArray(attributes)) {
+    Object.values(attributes as Record<string, unknown>)
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+      .forEach((label) => labels.add(label));
+  }
+
+  const parsed = parsePackageHotelContent(hotel.quickDescription ?? hotel.description ?? '');
+  parsed.amenities.forEach((label) => labels.add(label));
+
+  return Array.from(labels).slice(0, 24);
 }
 
 function extractMealPlans(hotel: Record<string, unknown>): string[] {

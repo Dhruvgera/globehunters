@@ -30,6 +30,7 @@ import {
   X,
   ChevronLeft,
   Loader2,
+  MapPin,
 } from "lucide-react";
 
 import Navbar from "@/components/navigation/Navbar";
@@ -49,6 +50,7 @@ import {
 } from "@/lib/hotels/childAges";
 import { fixStubaImageUrl } from "@/lib/hotels/imageUrl";
 import { convertHotelLocalTaxTotal, formatMoneyFromCode, normalizeCurrencyCode } from "@/lib/currency/localTaxDisplay";
+import { parsePackageHotelContent, type PackageHotelNearbyPlace } from "@/lib/package/hotelContent";
 
 function LoadingBlock({ className }: { className: string }) {
   return <div className={`animate-pulse bg-gray-200/70 rounded-xl ${className}`} />;
@@ -962,6 +964,7 @@ export default function HotelRoomsPage() {
   const [cancellationText, setCancellationText] = useState<string>("");
   const [importantInfoText, setImportantInfoText] = useState<string>("");
   const [remoteAmenities, setRemoteAmenities] = useState<string[]>([]);
+  const [nearbyPlaces, setNearbyPlaces] = useState<PackageHotelNearbyPlace[]>([]);
   const [remoteRooms, setRemoteRooms] = useState<RoomCardData[]>([]);
   const [convertedLocalTaxByRoomId, setConvertedLocalTaxByRoomId] = useState<Record<string, string>>({});
   const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
@@ -1373,7 +1376,10 @@ export default function HotelRoomsPage() {
   // Hydrate from cache to avoid mock-first / flicker.
   useEffect(() => {
     const cached = hotelId ? hotelDetailsCache[hotelId] : undefined;
-    if (!cached) return;
+    if (!cached) {
+      setNearbyPlaces([]);
+      return;
+    }
 
     if (cached.hotelName || cached.mainImage || cached.hotelRating) {
       setRemoteHotelHeader({
@@ -1385,6 +1391,8 @@ export default function HotelRoomsPage() {
     }
     if (Array.isArray(cached.galleryImages)) setGalleryImages(cached.galleryImages);
     if (Array.isArray(cached.amenities)) setRemoteAmenities(cached.amenities);
+    if (Array.isArray(cached.nearbyPlaces)) setNearbyPlaces(cached.nearbyPlaces);
+    else setNearbyPlaces([]);
     if (Array.isArray(cached.rooms)) setRemoteRooms(cached.rooms);
     if (typeof cached.detailsText === "string") setDetailsText(cached.detailsText);
     if (typeof cached.cancellationText === "string") setCancellationText(cached.cancellationText);
@@ -1515,6 +1523,7 @@ export default function HotelRoomsPage() {
         breakdown: trustYouBreakdown,
       },
       policies: cancellationText || "",
+      nearby: nearbyPlaces,
       mapUrl: coordinates
         ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}&hl=en`
         : "#",
@@ -1528,6 +1537,7 @@ export default function HotelRoomsPage() {
     detailsText,
     galleryImages,
     importantInfoText,
+    nearbyPlaces,
     remoteAmenities,
     remoteHotelHeader,
     trustYouReview,
@@ -1547,8 +1557,9 @@ export default function HotelRoomsPage() {
   const hasAccessibilitySection = hasImportantInfo;
   const hasAboutProperty = hotel.about.description.trim().length > 0;
   const aboutParagraphs = useMemo(() => splitHotelTextIntoParagraphs(hotel.about.description), [hotel.about.description]);
+  const hasNearbySection = hotel.nearby.length > 0;
   const hasAmenitiesSection = hotel.amenities.length > 0;
-  const hasAboutSection = hasAboutProperty || hasAmenitiesSection;
+  const hasAboutSection = hasAboutProperty || hasNearbySection || hasAmenitiesSection;
   const navSections = useMemo(
     () => [
       "Overview",
@@ -1729,9 +1740,13 @@ export default function HotelRoomsPage() {
           const headerAddress = [roomHotel.address1, roomHotel.address2, packageHotel.address?.street1]
             .filter(Boolean)
             .join(", ");
-          const packageDescription = sanitizeHotelText(packageHotel.description || roomHotel.quickDescription || "");
+          const parsedPackageContent = parsePackageHotelContent(packageHotel.description || roomHotel.quickDescription || "");
+          const packageDescription = sanitizeHotelText(
+            parsedPackageContent.description || packageHotel.description || roomHotel.quickDescription || ""
+          );
           const extractedPackageAmenities = Array.from(
             new Set([
+              ...parsedPackageContent.amenities,
               ...extractAmenitiesFromGetRoomsResponse(roomHotel),
               ...flattenedRooms.flatMap((room) => room.amenities.map((amenity) => amenity.label)),
             ])
@@ -1751,8 +1766,12 @@ export default function HotelRoomsPage() {
             if (packageDescription) {
               setDetailsText(packageDescription);
             }
+            setNearbyPlaces(parsedPackageContent.nearby);
             if (extractedPackageAmenities.length > 0) {
               setRemoteAmenities(extractedPackageAmenities);
+            }
+            if (parsedPackageContent.policyText) {
+              setCancellationText(parsedPackageContent.policyText);
             }
             if (headerImage) setGalleryImages([headerImage]);
             if (latitude && longitude) {
@@ -1769,8 +1788,9 @@ export default function HotelRoomsPage() {
               galleryImages: headerImage ? [headerImage] : [],
               rooms: flattenedRooms,
               detailsText: packageDescription,
-              cancellationText: "",
+              cancellationText: parsedPackageContent.policyText || "",
               amenities: extractedPackageAmenities,
+              nearbyPlaces: parsedPackageContent.nearby,
               fetchedAt: Date.now(),
             });
             setSelectedRoomCounts(defaultSelectedCounts);
@@ -1833,11 +1853,12 @@ export default function HotelRoomsPage() {
                   galleryImages: nextGallery.length > 0 ? nextGallery : (headerImage ? [headerImage] : []),
                   rooms: flattenedRooms,
                   detailsText: detailsData.description || packageDescription,
-                  cancellationText: detailsData.policies || "",
+                  cancellationText: detailsData.policies || parsedPackageContent.policyText || "",
                   amenities:
                     detailsData.amenities.length > 0
                       ? Array.from(new Set([...extractedPackageAmenities, ...detailsData.amenities]))
                       : extractedPackageAmenities,
+                  nearbyPlaces: parsedPackageContent.nearby,
                   fetchedAt: Date.now(),
                 });
               })
@@ -2649,6 +2670,41 @@ export default function HotelRoomsPage() {
                           <p key={`${paragraph.slice(0, 32)}-${index}`} className="max-w-[78ch]">
                             {paragraph}
                           </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {hasNearbySection && (
+                    <div className={`space-y-4 ${hasAmenitiesSection ? "pb-6 border-b border-[#DFE0E4]" : ""}`}>
+                      <h2 className="text-xl lg:text-2xl font-semibold text-[#010D50]">
+                        Nearby
+                      </h2>
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        {hotel.nearby.slice(0, 12).map((place) => (
+                          <div
+                            key={`${place.kind}-${place.name}`}
+                            className="rounded-2xl border border-[#DFE0E4] px-4 py-3 bg-white"
+                          >
+                            <div className="flex items-start gap-3">
+                              <MapPin className="w-4 h-4 mt-0.5 text-[#3754ED] flex-shrink-0" />
+                              <div className="min-w-0">
+                                <div className="text-sm font-medium text-[#010D50]">
+                                  {place.name}
+                                </div>
+                                <div className="text-xs text-[#3A478A] mt-1">
+                                  {typeof place.distanceKm === "number" && typeof place.distanceMi === "number"
+                                    ? `${place.distanceKm} km / ${place.distanceMi} mi`
+                                    : typeof place.distanceKm === "number"
+                                      ? `${place.distanceKm} km`
+                                      : typeof place.distanceMi === "number"
+                                        ? `${place.distanceMi} mi`
+                                        : ""}
+                                  {place.kind === "airport" ? " • Airport" : ""}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         ))}
                       </div>
                     </div>

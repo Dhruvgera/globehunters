@@ -16,7 +16,7 @@ Globehunters Affiliate.csv
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
-
+__tests__
 # testing
 /coverage
 

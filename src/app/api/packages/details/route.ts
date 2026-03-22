@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { VYSPA_CONFIG } from '@/config/vyspa';
 import { fixStubaImageUrl } from '@/lib/hotels/imageUrl';
+import { parsePackageHotelContent, sanitizePackageHotelText } from '@/lib/package/hotelContent';
 import type { HolidayDetailRequest } from '@/types/holidayPackage';
 
 function buildBasicAuthHeader(): string {
@@ -51,6 +52,13 @@ interface TransformedPackageDetails {
     imageUrl?: string;
     starRating?: number;
     amenities?: string[];
+    nearby?: Array<{
+      name: string;
+      distanceKm?: number;
+      distanceMi?: number;
+      kind: 'landmark' | 'airport';
+    }>;
+    policyHighlights?: string[];
     checkOutDate?: string;
     visaInfo?: string;
     countryRemarks?: string[];
@@ -124,6 +132,7 @@ function asRecord(value: unknown): Record<string, any> {
 }
 
 function sanitizeText(value: unknown): string {
+  return sanitizePackageHotelText(value);
   return String(value ?? '')
     .replace(/<br\s*\/?\s*>/gi, '\n')
     .replace(/<\/p>/gi, '\n')
@@ -202,6 +211,7 @@ function transformResponse(vyspaResponse: any): TransformedPackageDetails {
   };
 
   if (Object.keys(hotelSource).length > 0) {
+    const parsedContent = parsePackageHotelContent(hotelBlock.description || hotelSource.quickDescription);
     const rawRooms = Array.isArray(hotelBlock.rooms)
       ? hotelBlock.rooms
       : Array.isArray(hotelSource.rooms)
@@ -212,10 +222,20 @@ function transformResponse(vyspaResponse: any): TransformedPackageDetails {
       id: Number(hotelSource.id || 0),
       hotelId: Number(hotelSource.hotel_id || 0),
       name: String(hotelSource.hotel_name || 'Selected hotel'),
-      description: hotelBlock.description || hotelSource.quickDescription,
+      description:
+        parsedContent.description ||
+        sanitizeText(hotelBlock.description || hotelSource.quickDescription) ||
+        undefined,
       imageUrl: fixStubaImageUrl(hotelSource.image_name),
       starRating: Number(hotelSource.hotel_rating || 0) || undefined,
-      amenities: extractPackageAmenities(hotelBlock, hotelSource, ...rawRooms),
+      amenities: Array.from(
+        new Set([
+          ...extractPackageAmenities(hotelBlock, hotelSource, ...rawRooms),
+          ...parsedContent.amenities,
+        ])
+      ).slice(0, 24),
+      nearby: parsedContent.nearby,
+      policyHighlights: parsedContent.policies,
       checkOutDate: hotelSource.checkOutDate,
       visaInfo: hotelSource.visaInfo,
       countryRemarks: hotelSource.countryRemarks,
@@ -256,13 +276,13 @@ function transformResponse(vyspaResponse: any): TransformedPackageDetails {
       const policy = asRecord(entry?.SearchResultCancellation || entry);
       return {
         id: Number(policy.id || 0),
-        roomName: policy.roomName,
+        roomName: sanitizeText(policy.roomName) || undefined,
         effectiveDate: policy.effectiveDate,
         endEffectiveDate: policy.endEffectiveDate,
-        policy: policy.cancellationPolicy,
-        chargeType: policy.chargeType,
+        policy: sanitizeText(policy.cancellationPolicy) || undefined,
+        chargeType: sanitizeText(policy.chargeType) || undefined,
         penalty: Number(policy.finalRate || policy.remoteRate || 0) || undefined,
-        penaltyCurrency: policy.finalCurrency || policy.remoteCurrency,
+        penaltyCurrency: sanitizeText(policy.finalCurrency || policy.remoteCurrency) || undefined,
       };
     });
   }

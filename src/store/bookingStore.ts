@@ -266,6 +266,12 @@ interface BookingState {
       detailsText?: string;
       cancellationText?: string;
       amenities?: string[];
+      nearbyPlaces?: Array<{
+        name: string;
+        distanceKm?: number;
+        distanceMi?: number;
+        kind: 'landmark' | 'airport';
+      }>;
       trustYou?: TrustYouHotelReviewSummary;
       fetchedAt: number;
     }
