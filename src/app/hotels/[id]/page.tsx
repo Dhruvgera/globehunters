@@ -1571,6 +1571,10 @@ export default function HotelRoomsPage() {
       return true;
     });
   }, [filterBoardQuery, filterRefundableOnly, remoteRooms]);
+  const minRoomPrice = useMemo(
+    () => (rooms.length > 0 ? Math.min(...rooms.map((r) => r.price.total)) : 0),
+    [rooms]
+  );
   const roomBoardOptions = useMemo(() => {
     const seen = new Set<string>();
     const out: string[] = [];
@@ -3075,9 +3079,11 @@ export default function HotelRoomsPage() {
                   const roomSelectionCount = Math.max(0, Number(selectedRoomCounts[room.id] || 0));
                   const roomIsSelected = roomSelectionCount > 0;
                   const isMultiRoomSelectionMode = !isPackageMode && requiredRoomCount > 1;
-                  const isActiveRoomCard = isMultiRoomSelectionMode
+                  const isActiveRoomCard = isPackageMode
                     ? String(activeRoomCardId || "") === String(room.id)
-                    : roomIsSelected;
+                    : isMultiRoomSelectionMode
+                      ? String(activeRoomCardId || "") === String(room.id)
+                      : roomIsSelected;
                   const roomRaw = room._raw as Record<string, unknown>;
                   const hbRaw = roomRaw._hotelbeds && typeof roomRaw._hotelbeds === "object"
                     ? (roomRaw._hotelbeds as Record<string, unknown>)
@@ -3115,6 +3121,7 @@ export default function HotelRoomsPage() {
                     (Array.isArray(room?.amenities) && room.amenities.length > 0);
                   const expanded = !!expandedRoomInfoById[room.id];
                   const handlePackageRoomContinue = () => {
+                    setActiveRoomCardId(String(room.id));
                     const chosenRoom = room;
                     const rid = chosenRoom.id;
                     const chosenRaw = chosenRoom._raw as Record<string, unknown>;
@@ -3189,6 +3196,7 @@ export default function HotelRoomsPage() {
                       ].join(" ")}
                       role={isPackageMode || isMultiRoomSelectionMode || isSingleRoomSelectionMode ? "button" : undefined}
                       tabIndex={isPackageMode || isMultiRoomSelectionMode || isSingleRoomSelectionMode ? 0 : undefined}
+                      onMouseEnter={isPackageMode ? () => setActiveRoomCardId(String(room.id)) : undefined}
                       onClick={
                         isPackageMode
                           ? handlePackageRoomContinue
@@ -3339,10 +3347,27 @@ export default function HotelRoomsPage() {
                                 {staySummary.nights} {staySummary.nights === 1 ? "night" : "nights"} • Check-in {staySummary.checkInLabel} • Check-out {staySummary.checkOutLabel}
                               </span>
                             )}
-                            {isPackageMode ? (
-                              <span className="text-xl font-semibold text-[#010D50]">
-                                {room.price.currency}{room.price.total.toLocaleString()} total
+                            {isPackageMode && (
+                              <span className="text-xs font-medium text-[#008234]">
+                                ✓ Return Flights Included
                               </span>
+                            )}
+                            {isPackageMode ? (
+                              (() => {
+                                const delta = room.price.total - minRoomPrice;
+                                if (Math.abs(delta) < 0.01) {
+                                  return (
+                                    <span className="text-xl font-semibold text-[#008234]">
+                                      Included
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <span className="text-xl font-semibold text-[#010D50]">
+                                    +{room.price.currency}{delta.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                );
+                              })()
                             ) : (
                               <>
                                 <span className="text-base text-[#010D50]">
