@@ -43,6 +43,7 @@ import { useBookingStore } from "@/store/bookingStore";
 import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
 import { resolveTrustYouHotelId } from "@/lib/trustyou/hotelMapping";
 import type { TrustYouHotelReviewSummary } from "@/types/trustyou";
+import { resolvePackagePricing } from "@/lib/package/pricing";
 import {
   buildHotelChildAgesFromFlat,
   flattenHotelChildAges,
@@ -88,6 +89,28 @@ function shiftIsoDateByDays(isoDate: string, days: number): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${dd}`;
+}
+
+function formatDisplayPrice(currency: string | undefined, amount: number | undefined): string {
+  if (typeof amount !== "number" || !Number.isFinite(amount)) return "";
+  const normalizedCurrency = String(currency || "").trim().toUpperCase();
+  if (/^[A-Z]{3}$/.test(normalizedCurrency)) {
+    try {
+      return new Intl.NumberFormat("en-GB", {
+        style: "currency",
+        currency: normalizedCurrency,
+        maximumFractionDigits: 2,
+      }).format(amount);
+    } catch {
+      // Fall back to prefix formatting below.
+    }
+  }
+
+  const prefix = String(currency || "").trim() || "£";
+  return `${prefix}${amount.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -936,6 +959,7 @@ export default function HotelRoomsPage() {
   const packageSearch = useBookingStore((s) => s.packageSearch);
   const packageResults = useBookingStore((s) => s.packageResults);
   const packageResultsMeta = useBookingStore((s) => s.packageResultsMeta);
+  const selectedPackage = useBookingStore((s) => s.selectedPackage);
   const hotelResultsMeta = useBookingStore((s) => s.hotelResultsMeta);
   const setSelectedHotel = useBookingStore((s) => s.setSelectedHotel);
   const setSelectedHotelRoomIds = useBookingStore((s) => s.setSelectedHotelRoomIds);
@@ -1603,6 +1627,52 @@ export default function HotelRoomsPage() {
   const selectedRoomIds = useMemo(() => selectedRoomIdsFromCounts(selectedRoomCounts), [selectedRoomCounts]);
   const selectedRoomCount = useMemo(() => countSelectedRooms(selectedRoomCounts), [selectedRoomCounts]);
   const canProceedWithRooms = selectedRoomCount === requiredRoomCount && selectedRoomCount > 0;
+  const matchedPackageResult = useMemo(
+    () => packageResults?.find((row) => String(row.id) === String(hotelId)),
+    [hotelId, packageResults]
+  );
+  const activePackageRoom = useMemo(
+    () =>
+      isPackageMode
+        ? remoteRooms.find((room) => String(room.id) === String(activeRoomCardId || ""))
+        : undefined,
+    [activeRoomCardId, isPackageMode, remoteRooms]
+  );
+  const resolvedPackagePrice = useMemo(() => {
+    if (!isPackageMode) return null;
+
+    if (activePackageRoom?.price?.total) {
+      return {
+        amount: activePackageRoom.price.total,
+        currency: activePackageRoom.price.currency,
+      };
+    }
+
+    const fallback = resolvePackagePricing({
+      packagePriceAmount: selectedPackage?.totalPrice,
+      packagePriceCurrency: selectedPackage?.hotel?.currency,
+      fallbackStartingPrice: matchedPackageResult?.startingPrice,
+      fallbackCurrency: matchedPackageResult?.currency,
+    });
+
+    return fallback.amount != null
+      ? {
+          amount: fallback.amount,
+          currency: fallback.currency,
+        }
+      : null;
+  }, [
+    activePackageRoom?.price?.currency,
+    activePackageRoom?.price?.total,
+    isPackageMode,
+    matchedPackageResult?.currency,
+    matchedPackageResult?.startingPrice,
+    selectedPackage?.hotel?.currency,
+    selectedPackage?.totalPrice,
+  ]);
+  const packagePriceLabel = resolvedPackagePrice
+    ? formatDisplayPrice(resolvedPackagePrice.currency, resolvedPackagePrice.amount)
+    : "";
   const reviews: Array<{
     id: string;
     author: string;
@@ -2860,6 +2930,17 @@ export default function HotelRoomsPage() {
                   </span>
                 </button>
 
+                {isPackageMode && packagePriceLabel && (
+                  <div className="flex flex-col justify-center px-4 py-3 border border-[#DFE0E4] rounded-2xl min-w-[200px] bg-[#F8FAFF]">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#3A478A]">
+                      Total Package Price
+                    </span>
+                    <span className="text-lg font-semibold text-[#010D50]">
+                      {packagePriceLabel}
+                    </span>
+                  </div>
+                )}
+
                 {/* Filters Button */}
                 <Button
                   variant="default"
@@ -3176,6 +3257,9 @@ export default function HotelRoomsPage() {
                     hbPromotions.length > 0 ||
                     (Array.isArray(room?.amenities) && room.amenities.length > 0);
                   const expanded = !!expandedRoomInfoById[room.id];
+                  const handlePackageRoomActivate = () => {
+                    setActiveRoomCardId(String(room.id));
+                  };
                   const handlePackageRoomContinue = () => {
                     setActiveRoomCardId(String(room.id));
                     const chosenRoom = room;
@@ -3252,10 +3336,9 @@ export default function HotelRoomsPage() {
                       ].join(" ")}
                       role={isPackageMode || isMultiRoomSelectionMode || isSingleRoomSelectionMode ? "button" : undefined}
                       tabIndex={isPackageMode || isMultiRoomSelectionMode || isSingleRoomSelectionMode ? 0 : undefined}
-                      onMouseEnter={isPackageMode ? () => setActiveRoomCardId(String(room.id)) : undefined}
                       onClick={
                         isPackageMode
-                          ? handlePackageRoomContinue
+                          ? handlePackageRoomActivate
                           : isMultiRoomSelectionMode
                             ? handleMultiRoomCardSelect
                             : isSingleRoomSelectionMode
@@ -3267,7 +3350,7 @@ export default function HotelRoomsPage() {
                           ? (e) => {
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault();
-                              if (isPackageMode) handlePackageRoomContinue();
+                              if (isPackageMode) handlePackageRoomActivate();
                               else if (isMultiRoomSelectionMode) handleMultiRoomCardSelect();
                               else handleSingleRoomCardSelect();
                             }
