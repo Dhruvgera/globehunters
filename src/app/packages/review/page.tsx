@@ -21,6 +21,7 @@ import { PRICING_CONFIG, IASSURE_PRICING } from "@/config/constants";
 import { getRegion } from "@/lib/utils/domainMapping";
 import { formatFareLabel } from "@/lib/utils";
 import { resolvePackagePricing } from "@/lib/package/pricing";
+import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
 
 function formatDateLabel(value?: string) {
   if (!value) return "—";
@@ -92,6 +93,7 @@ function PackageReviewPageInner() {
   const setProtectionPlan = useBookingStore((state) => state.setProtectionPlan);
   const setAdditionalBaggage = useBookingStore((state) => state.setAdditionalBaggage);
   const storeSearchParams = useBookingStore((state) => state.searchParams);
+  const packageSearch = useBookingStore((state) => state.packageSearch);
   const packageResults = useBookingStore((state) => state.packageResults);
   const selectedFareType = useBookingStore((state) => state.selectedFareType);
   const selectedUpgrade = useBookingStore((state) => state.selectedUpgradeOption);
@@ -313,6 +315,7 @@ function PackageReviewPageInner() {
     ? protectionPlanPrices[addOns.protectionPlan]
     : 0;
   const totalPrice = pricing.packageTotal + baggageCost + protectionPlanCost;
+  const totalPerPersonPrice = calculatePackagePerPersonPrice(totalPrice, packageSearch?.rooms);
 
   if (!selectedFlight) {
     return (
@@ -536,6 +539,9 @@ function PackageReviewPageInner() {
                     <div className="text-right">
                       <div className="text-2xl font-bold text-[#3754ED]">
                         {formatMoney(pricing.currency, totalPrice)}
+                      </div>
+                      <div className="text-xs text-[#3A478A]">
+                        {formatMoney(pricing.currency, totalPerPersonPrice)} per person
                       </div>
                       <div className="text-xs text-[#3A478A]">Incl. all taxes & fees</div>
                     </div>

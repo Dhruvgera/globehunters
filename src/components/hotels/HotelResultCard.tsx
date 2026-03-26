@@ -91,6 +91,7 @@ export function HotelResultCard({
     : `/hotels/${hotel.id}`;
   const isHotelDatesDebugMode = process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES === "true";
   const hasReviewRating = hotel.reviews.score > 0;
+  const packagePerPersonPrice = isPackageMode ? hotel.price.perPerson : undefined;
 
   const rootClass = [
     "bg-white border rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden w-full max-w-full cursor-pointer",
@@ -203,9 +204,20 @@ export function HotelResultCard({
                     {hotel.price.currency}{hotel.price.nightly.toLocaleString()} nightly
                   </div>
                 )}
-                <div className="text-2xl font-bold text-[#010D50]">
-                  {hotel.price.currency}{hotel.price.total.toLocaleString()}
-                </div>
+                {packagePerPersonPrice != null ? (
+                  <>
+                    <div className="text-2xl font-bold text-[#010D50]">
+                      {hotel.price.currency}{packagePerPersonPrice.toLocaleString()}
+                    </div>
+                    <div className="text-xs font-medium uppercase tracking-[0.08em] text-[#3A478A]">
+                      Per Person
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-2xl font-bold text-[#010D50]">
+                    {hotel.price.currency}{hotel.price.total.toLocaleString()}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -304,10 +316,22 @@ export function HotelResultCard({
                     {hotel.price.nightly.toLocaleString()} nightly
                   </div>
                 )}
-                <div className="text-lg font-semibold text-[#010D50]">
-                  {hotel.price.currency}
-                  {hotel.price.total.toLocaleString()}
-                </div>
+                {packagePerPersonPrice != null ? (
+                  <>
+                    <div className="text-lg font-semibold text-[#010D50]">
+                      {hotel.price.currency}
+                      {packagePerPersonPrice.toLocaleString()}
+                    </div>
+                    <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#3A478A]">
+                      Per Person
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-lg font-semibold text-[#010D50]">
+                    {hotel.price.currency}
+                    {hotel.price.total.toLocaleString()}
+                  </div>
+                )}
               </div>
 
               <div className="mt-auto w-full flex justify-end">

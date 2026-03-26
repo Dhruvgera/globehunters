@@ -2,12 +2,16 @@
 
 import { useMemo } from "react";
 import { Building2, Calendar, Users, Moon, CheckCircle2, ReceiptText } from "lucide-react";
+import { getChargeablePassengerCount } from "@/lib/package/passengers";
 
 interface PackageStaySummaryProps {
   hotelName: string;
   checkIn: string;
   checkOut: string;
   guests: number;
+  adults?: number;
+  children?: number;
+  infants?: number;
   rooms: number;
   price?: number;
   currency?: string;
@@ -21,6 +25,9 @@ export function PackageStaySummary({
   checkIn,
   checkOut,
   guests,
+  adults,
+  children,
+  infants,
   rooms,
   price,
   currency,
@@ -63,6 +70,30 @@ export function PackageStaySummary({
 
     return normalizedCurrency ? `${formattedAmount} ${normalizedCurrency}` : formattedAmount;
   }, [currency, price]);
+
+  const formattedPerPersonPrice = useMemo(() => {
+    if (price == null || Number.isNaN(price)) return "";
+
+    const chargeableGuests = getChargeablePassengerCount([
+      {
+        adults: Math.max(0, Number(adults ?? guests ?? 0)),
+        children: Math.max(0, Number(children || 0)),
+        infants: Math.max(0, Number(infants || 0)),
+      },
+    ]);
+    const perPersonPrice = Math.round((price / chargeableGuests) * 100) / 100;
+    const normalizedCurrency = String(currency || "").trim();
+    const formattedAmount = perPersonPrice.toLocaleString("en-GB", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
+
+    if (normalizedCurrency === "Â£" || normalizedCurrency === "$" || normalizedCurrency === "â‚¬") {
+      return `${normalizedCurrency}${formattedAmount}`;
+    }
+
+    return normalizedCurrency ? `${formattedAmount} ${normalizedCurrency}` : formattedAmount;
+  }, [adults, children, currency, guests, infants, price]);
 
   return (
     <div className="mt-5 bg-[#F5F7FF] rounded-2xl p-6 lg:p-7 border border-[#E5E8F5]">
@@ -160,6 +191,11 @@ export function PackageStaySummary({
                     <span className="text-sm font-semibold text-[#010D50]">
                       {formattedPrice}
                     </span>
+                    {formattedPerPersonPrice && (
+                      <span className="text-xs text-[#3A478A]">
+                        {formattedPerPersonPrice} per person
+                      </span>
+                    )}
                   </div>
                 )}
               </div>

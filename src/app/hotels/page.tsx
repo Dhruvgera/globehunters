@@ -28,6 +28,7 @@ import type { TrustYouBulkResultItem } from "@/types/trustyou";
 import { normalizeHotelChildAges, parseHotelChildAges, serializeHotelChildAges } from "@/lib/hotels/childAges";
 import { getHotelProvider, parseHotelProvider, type HotelProvider } from "@/lib/hotels/provider";
 import { fixStubaImageUrl } from "@/lib/hotels/imageUrl";
+import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
 
 const DEFAULT_FILTERS: HotelFiltersState = {
   propertyQuery: "",
@@ -788,6 +789,7 @@ function HotelsPageInner() {
           const mapPackageHotels = (response: { results: PackageSearchResult[] }) =>
             response.results.map((pkg: PackageSearchResult): Hotel => {
               const total = pkg.startingPrice || 0;
+              const perPerson = calculatePackagePerPersonPrice(total, roomConfigurations);
               const nightly = nights > 0 ? total / nights : total;
               const starRatingClamped = Math.min(5, Math.max(1, pkg.starRating || 3)) as 1 | 2 | 3 | 4 | 5;
               const location = [pkg.address?.street1, pkg.address?.city, pkg.address?.country].filter(Boolean).join(", ");
@@ -823,6 +825,7 @@ function HotelsPageInner() {
                   currency: currencySymbol(pkg.currency || "GBP"),
                   nightly,
                   total,
+                  perPerson,
                   nights,
                   rooms: search.rooms,
                 },

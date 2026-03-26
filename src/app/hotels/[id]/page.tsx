@@ -44,6 +44,7 @@ import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
 import { resolveTrustYouHotelId } from "@/lib/trustyou/hotelMapping";
 import type { TrustYouHotelReviewSummary } from "@/types/trustyou";
 import { resolvePackagePricing } from "@/lib/package/pricing";
+import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
 import {
   buildHotelChildAgesFromFlat,
   flattenHotelChildAges,
@@ -1673,6 +1674,13 @@ export default function HotelRoomsPage() {
   const packagePriceLabel = resolvedPackagePrice
     ? formatDisplayPrice(resolvedPackagePrice.currency, resolvedPackagePrice.amount)
     : "";
+  const packagePerPersonLabel =
+    resolvedPackagePrice?.amount != null
+      ? formatDisplayPrice(
+          resolvedPackagePrice.currency,
+          calculatePackagePerPersonPrice(resolvedPackagePrice.amount, packageSearch?.rooms)
+        )
+      : "";
   const reviews: Array<{
     id: string;
     author: string;
@@ -2931,13 +2939,18 @@ export default function HotelRoomsPage() {
                 </button>
 
                 {isPackageMode && packagePriceLabel && (
-                  <div className="flex flex-col justify-center px-4 py-3 border border-[#DFE0E4] rounded-2xl min-w-[200px] bg-[#F8FAFF]">
+                  <div className="flex flex-col justify-center px-4 py-3 border border-[#DFE0E4] rounded-2xl min-w-[220px] bg-[#F8FAFF]">
                     <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#3A478A]">
                       Total Package Price
                     </span>
                     <span className="text-lg font-semibold text-[#010D50]">
                       {packagePriceLabel}
                     </span>
+                    {packagePerPersonLabel && (
+                      <span className="text-xs font-medium text-[#3A478A]">
+                        {packagePerPersonLabel} per person
+                      </span>
+                    )}
                   </div>
                 )}
 

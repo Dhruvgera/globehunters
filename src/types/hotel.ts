@@ -35,6 +35,7 @@ export interface HotelPriceSummary {
   currency: string; // e.g. "$"
   nightly: number;
   total: number;
+  perPerson?: number;
   nights: number;
   rooms: number;
 }

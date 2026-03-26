@@ -22,6 +22,8 @@ import { folderService } from "@/services/api/folderService";
 import { hotelService } from "@/services/api/hotelService";
 import { packageService } from "@/services/api/packageService";
 import { resolvePackagePricing } from "@/lib/package/pricing";
+import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
+import { hasErrors, validatePassenger } from "@/utils/validation";
 
 function formatDateLabel(value?: string) {
   if (!value) return "—";
@@ -76,6 +78,31 @@ function mapPassengerType(type?: string) {
 function mapPassengerGender(title?: string) {
   const normalized = String(title || "").toLowerCase();
   return normalized === "mr" || normalized === "mstr" ? "M" as const : "F" as const;
+}
+
+function formatPassengerValidationMessage(
+  passengerIndex: number,
+  errors: ReturnType<typeof validatePassenger>
+) {
+  const labels: Record<string, string> = {
+    firstName: "first name",
+    lastName: "last name",
+    dateOfBirth: "date of birth",
+    email: "email",
+    phone: "phone number",
+    passportNumber: "passport number",
+    passportExpiry: "passport expiry",
+  };
+
+  const invalidFields = Object.entries(errors)
+    .filter(([, value]) => Boolean(value))
+    .map(([key]) => labels[key] || key);
+
+  if (invalidFields.length === 0) {
+    return `Please complete Passenger ${passengerIndex + 1} details before continuing.`;
+  }
+
+  return `Please check Passenger ${passengerIndex + 1}: ${invalidFields.join(", ")}.`;
 }
 
 function buildPackageRoomPassengers(
@@ -321,6 +348,39 @@ function PackageTravellerDetailsInner() {
     selectedHotelRoomSummary?.total,
     selectedUpgrade?.currency,
   ]);
+  const packagePerPersonLabel = useMemo(() => {
+    const selectedFlightDelta =
+      typeof flight?.packagePriceDeltaTotal === "number"
+        ? flight.packagePriceDeltaTotal
+        : 0;
+    const resolved = resolvePackagePricing({
+      packagePriceAmount: parsedPackagePrice.amount,
+      packagePriceCurrency: parsedPackagePrice.currency,
+      hotelRoomTotals: packageDetails?.hotel?.rooms?.map((room) => Number(room.price || 0) || undefined),
+      flightTotal: packageDetails?.flight?.totalFare,
+      flightCurrency: packageDetails?.flight?.currency,
+      selectedRoomPackageTotal: selectedHotelRoomSummary?.total,
+      selectedRoomCurrency: selectedHotelRoomSummary?.currency,
+      selectedFlightDelta,
+      selectedFlightCurrency: selectedUpgrade?.currency || flight?.currency,
+    });
+    return formatMoney(
+      resolved.currency,
+      calculatePackagePerPersonPrice(resolved.amount, packageSearch?.rooms)
+    );
+  }, [
+    flight?.currency,
+    flight?.packagePriceDeltaTotal,
+    packageDetails?.flight?.currency,
+    packageDetails?.flight?.totalFare,
+    packageDetails?.hotel?.rooms,
+    packageSearch?.rooms,
+    parsedPackagePrice.amount,
+    parsedPackagePrice.currency,
+    selectedHotelRoomSummary?.currency,
+    selectedHotelRoomSummary?.total,
+    selectedUpgrade?.currency,
+  ]);
 
   const hotelDisplay = useMemo(() => {
     const cached = selectedHotel?.hotelId ? hotelDetailsCache?.[selectedHotel.hotelId] : undefined;
@@ -372,17 +432,19 @@ function PackageTravellerDetailsInner() {
 
   const handleContinue = async () => {
     if (!termsAccepted || !flight || !selectedHotel?.hotelId || selectedHotelRoomIds.length === 0) return;
-    if (!passengersSaved) {
-      alert("Please complete all traveller details before continuing.");
-      return;
-    }
 
     const counts = storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 };
     const required = (counts.adults || 0) + (counts.children || 0) + (counts.infants || 0);
     for (let i = 0; i < required; i += 1) {
       const passenger = passengers[i];
-      if (!passenger?.firstName || !passenger?.lastName || !passenger?.dateOfBirth || !passenger?.email || !passenger?.phone) {
-        alert("Please complete all traveller details before continuing.");
+      if (!passenger) {
+        alert(`Please complete Passenger ${i + 1} details before continuing.`);
+        return;
+      }
+
+      const validationErrors = validatePassenger(passenger, passenger.type);
+      if (hasErrors(validationErrors)) {
+        alert(formatPassengerValidationMessage(i, validationErrors));
         return;
       }
     }
@@ -517,6 +579,7 @@ function PackageTravellerDetailsInner() {
           <div className="mt-4 lg:hidden bg-white border border-[#DFE0E4] rounded-xl p-4">
             <div className="text-xs uppercase tracking-[0.12em] text-[#3A478A]">Total package price</div>
             <div className="mt-1 text-2xl font-semibold text-[#010D50]">{packageTotalLabel}</div>
+            <div className="mt-1 text-sm text-[#3A478A]">{packagePerPersonLabel} per person</div>
           </div>
         </div>
 
@@ -657,6 +720,7 @@ function PackageTravellerDetailsInner() {
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 sm:p-5">
               <div className="text-xs uppercase tracking-[0.12em] text-[#3A478A]">Total package price</div>
               <div className="mt-1 text-2xl font-semibold text-[#010D50]">{packageTotalLabel}</div>
+              <div className="mt-1 text-sm text-[#3A478A]">{packagePerPersonLabel} per person</div>
             </div>
 
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 sm:p-5">

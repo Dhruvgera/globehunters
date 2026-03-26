@@ -33,6 +33,8 @@ import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
 import { HotelSummaryCard } from "@/components/booking/HotelSummaryCard";
 import { packageService } from "@/services/api/packageService";
 import { resolvePackagePricing } from "@/lib/package/pricing";
+import { formatPrice } from "@/lib/currency";
+import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
 
 import { FOLDER_STATUS_CODES } from "@/types/portal";
 import { countryCodes } from "@/lib/utils/countryCodes";
@@ -102,6 +104,7 @@ function PaymentContent() {
   const contactPhone = useBookingStore((state) => state.contactPhone);
   const selectedFareType = useBookingStore((state) => state.selectedFareType);
   const packageResults = useBookingStore((state) => state.packageResults);
+  const packageSearch = useBookingStore((state) => state.packageSearch);
 
   const protectionPlan = addOns.protectionPlan;
   const additionalBaggage = addOns.additionalBaggage;
@@ -476,6 +479,59 @@ function PaymentContent() {
         : normalizedProtectionPlan === "all"
           ? "All Included"
           : "None";
+
+  const paymentSummaryRows = useMemo(() => {
+    if (!isPackageMode) return undefined;
+
+    const rows: Array<{ label: string; value: string; valueClassName?: string }> = [
+      {
+        label: `Hotel (${hotelSearch?.checkIn && hotelSearch?.checkOut
+          ? Math.max(
+              1,
+              Math.round(
+                (new Date(hotelSearch.checkOut).getTime() - new Date(hotelSearch.checkIn).getTime()) /
+                  (1000 * 60 * 60 * 24)
+              )
+            )
+          : packageSearch?.nights || 0} nights)`,
+        value: "Included",
+      },
+      {
+        label: "Flights (per booking)",
+        value: "Included",
+      },
+    ];
+
+    if (baggageCost > 0) {
+      rows.push({
+        label: `Checked baggage (${additionalBaggage} bag${additionalBaggage !== 1 ? "s" : ""})`,
+        value: formatPrice(baggageCost, currency || "GBP"),
+      });
+    }
+
+    if (protectionPlanCost > 0) {
+      rows.push({
+        label: "Protection plan",
+        value: formatPrice(protectionPlanCost, currency || "GBP"),
+      });
+    }
+
+    return rows;
+  }, [
+    additionalBaggage,
+    baggageCost,
+    currency,
+    hotelSearch?.checkIn,
+    hotelSearch?.checkOut,
+    isPackageMode,
+    packageSearch?.nights,
+    protectionPlanCost,
+  ]);
+  const paymentTotalSubtext = useMemo(() => {
+    if (!isPackageMode) return undefined;
+    const perPerson = calculatePackagePerPersonPrice(tripTotalForDisplay, packageSearch?.rooms);
+    return perPerson != null ? `${formatPrice(perPerson, currency || "GBP")} per person` : undefined;
+  }, [currency, isPackageMode, packageSearch?.rooms, tripTotalForDisplay]);
 
   const paymentTermsText = isHotelMode
     ? "By checking this box, I acknowledge that guest information matches the passport or official ID for travel, and that name changes are not allowed. I confirm that I have reviewed the hotel details and agree to the Refund & Cancellation Policy. I understand bookings are non-transferable and non-changeable unless stated otherwise. I accept full responsibility for valid travel documentation and understand Globehunters cannot be held responsible for denied boarding due to passport or visa validity."
@@ -1148,6 +1204,8 @@ function PaymentContent() {
               tripTotal={tripTotalForDisplay}
               isSticky={true}
               currency={currency || 'GBP'}
+              totalSubtext={paymentTotalSubtext}
+              rows={paymentSummaryRows}
             />
           </div>
         </div>
