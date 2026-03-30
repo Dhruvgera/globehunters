@@ -2890,9 +2890,27 @@ export default function HotelRoomsPage() {
           <div ref={roomsRef} className="border border-[#DFE0E4] rounded-3xl mx-4 lg:mx-6 mb-6">
             {/* Search Bar */}
             <div className="p-6 lg:p-8 border-b border-[#DFE0E4] space-y-6">
-              <h2 className="text-xl lg:text-2xl font-semibold text-[#010D50]">
-                Availability
-              </h2>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <h2 className="text-xl lg:text-2xl font-semibold text-[#010D50]">
+                  Availability
+                </h2>
+
+                {isPackageMode && packagePriceLabel && (
+                  <div className="flex flex-col justify-center px-4 py-3 border border-[#DFE0E4] rounded-2xl min-w-[220px] bg-[#F8FAFF] sm:ml-auto">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#3A478A]">
+                      Total Package Price
+                    </span>
+                    <span className="text-lg font-semibold text-[#010D50]">
+                      {packagePriceLabel}
+                    </span>
+                    {packagePerPersonLabel && (
+                      <span className="text-xs font-medium text-[#3A478A]">
+                        {packagePerPersonLabel} per person
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <div className="flex flex-wrap items-center gap-4">
                 {/* Hotel Name Input */}
@@ -2937,22 +2955,6 @@ export default function HotelRoomsPage() {
                     , {stayRooms} Room{stayRooms === 1 ? "" : "s"}
                   </span>
                 </button>
-
-                {isPackageMode && packagePriceLabel && (
-                  <div className="flex flex-col justify-center px-4 py-3 border border-[#DFE0E4] rounded-2xl min-w-[220px] bg-[#F8FAFF]">
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#3A478A]">
-                      Total Package Price
-                    </span>
-                    <span className="text-lg font-semibold text-[#010D50]">
-                      {packagePriceLabel}
-                    </span>
-                    {packagePerPersonLabel && (
-                      <span className="text-xs font-medium text-[#3A478A]">
-                        {packagePerPersonLabel} per person
-                      </span>
-                    )}
-                  </div>
-                )}
 
                 {/* Filters Button */}
                 <Button
