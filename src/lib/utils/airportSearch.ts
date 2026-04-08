@@ -16,6 +16,7 @@ function calculateMatchScore(airport: Airport, query: string): {
   if (!q) return { score: 0, matchedFields: [] };
 
   const code = airport.code.toLowerCase();
+  const name = (airport.name || '').toLowerCase();
   const city = airport.city.toLowerCase();
   const country = airport.country.toLowerCase();
 
@@ -58,6 +59,20 @@ function calculateMatchScore(airport: Airport, query: string): {
   if (country.includes(q)) {
     score += 40;
     matchedFields.push('country');
+  }
+
+  // Name match (important for places like "Bali (Ngurah Rai)")
+  if (name === q) {
+    score += 85;
+    matchedFields.push('name');
+  }
+  else if (name.startsWith(q)) {
+    score += 80;
+    matchedFields.push('name');
+  }
+  else if (name.includes(q)) {
+    score += 65;
+    matchedFields.push('name');
   }
 
   return { score, matchedFields };

@@ -13,15 +13,22 @@ interface PackageOriginAutocompleteProps {
   placeholder?: string;
 }
 
+function getAirportDisplayLabel(airport: Airport | null): string {
+  if (!airport) return "";
+  const code = (airport.code || "").trim();
+  const primary = shortenAirportName(airport.name || airport.city || code).trim();
+  if (!code) return primary;
+  if (!primary) return code;
+  return `${primary} (${code})`;
+}
+
 export function PackageOriginAutocomplete({
   value,
   onChange,
   placeholder = "Flying from",
 }: PackageOriginAutocompleteProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [inputValue, setInputValue] = useState(
-    value ? `${value.city || value.name || value.code} (${value.code})` : ""
-  );
+  const [inputValue, setInputValue] = useState(getAirportDisplayLabel(value));
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -43,7 +50,7 @@ export function PackageOriginAutocomplete({
   };
 
   useEffect(() => {
-    setInputValue(value ? `${value.city || value.name || value.code} (${value.code})` : "");
+    setInputValue(getAirportDisplayLabel(value));
   }, [value]);
 
   useEffect(() => {
@@ -67,7 +74,7 @@ export function PackageOriginAutocomplete({
   };
 
   const handleSelect = (airport: Airport) => {
-    setInputValue(`${airport.city || airport.name || airport.code} (${airport.code})`);
+    setInputValue(getAirportDisplayLabel(airport));
     onChange(airport);
     setIsOpen(false);
     setSelectedIndex(-1);
@@ -147,10 +154,10 @@ export function PackageOriginAutocomplete({
                   >
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-semibold text-gray-900 truncate">
-                        {airport.city || airport.name || airport.code} ({airport.code})
+                        {getAirportDisplayLabel(airport)}
                       </div>
                       <div className="text-xs text-gray-500 truncate">
-                        {shortenAirportName(airport.name || airport.city)}, {airport.country}
+                        {airport.city}, {airport.country}
                       </div>
                     </div>
                   </button>
