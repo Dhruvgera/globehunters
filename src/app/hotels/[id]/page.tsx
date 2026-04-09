@@ -2176,7 +2176,7 @@ export default function HotelRoomsPage() {
             .catch(() => {});
         }
 
-        // Real schema (seen in stage): rooms.room1options[] with {id, room_name, meal_name, net_price, nonRef, ...}
+        // Real schema (seen in stage): rooms.room1options[] with {id, room_name, meal_name, cust_tot_sell_amt, net_price, nonRef, ...}
         const roomsObj: any = respAny?.rooms;
         const room1options: any[] = Array.isArray(roomsObj?.room1options)
           ? roomsObj.room1options
@@ -2227,7 +2227,7 @@ export default function HotelRoomsPage() {
                   const d = row?.SearchResultRoomDetail || row;
                   const id = String(d?.id ?? d?.search_result_detail_id ?? "").trim();
                   if (!id) return null;
-                  const total = Number(d?.net_price ?? d?.room_price ?? 0);
+                  const total = Number(d?.cust_tot_sell_amt ?? d?.net_price ?? d?.room_price ?? 0);
                   const days = Number(d?.days_spent ?? 0);
                   const sellCur = String(d?.branch_currency || d?.currency_code || "GBP").toUpperCase();
                   return {
@@ -2271,8 +2271,11 @@ export default function HotelRoomsPage() {
             amenities: [],
             price: {
               currency: opt?.sell_currency_code === "GBP" ? "£" : opt?.sell_currency_code || "£",
-              nightly: Number(opt?.days_spent) > 0 ? Number(opt?.net_price || 0) / Number(opt?.days_spent) : Number(opt?.net_price || 0),
-              total: Number(opt?.net_price || 0),
+              nightly:
+                Number(opt?.days_spent) > 0
+                  ? Number(opt?.cust_tot_sell_amt ?? opt?.net_price ?? 0) / Number(opt?.days_spent)
+                  : Number(opt?.cust_tot_sell_amt ?? opt?.net_price ?? 0),
+              total: Number(opt?.cust_tot_sell_amt ?? opt?.net_price ?? 0),
             },
             _raw: {
               ...opt,
