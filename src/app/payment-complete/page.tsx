@@ -15,10 +15,6 @@ import { useAffiliatePhone } from "@/lib/AffiliateContext";
 import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
 import { PaymentHeader } from "@/components/payment/PaymentHeader";
 import { HotelSummaryCard } from "@/components/booking/HotelSummaryCard";
-import {
-  mockBookingConfirmation,
-  airportNames,
-} from "@/data/mockBookingConfirmation";
 import { transformBookingToEmailData, transformHotelBookingToEmailData, sendBookingConfirmationEmail } from "@/lib/emailHelper";
 import { shortenAirportName } from "@/lib/vyspa/utils";
 import { airportCache } from "@/lib/cache/airportCache";
@@ -48,8 +44,6 @@ import Image from "next/image";
 import { useMemo } from "react";
 import { FOLDER_STATUS_CODES } from "@/types/portal";
 
-// Check if mock mode is enabled
-const isMockMode = process.env.NEXT_PUBLIC_MOCK_BOOKING_CONFIRMATION === "true";
 const REFUNDABLE_TERMS_URL = "https://refundablebooking.com/refundable-terms";
 const REFUNDABLE_CLAIMS_URL = "https://form.refundablebooking.com";
 
@@ -301,14 +295,12 @@ function StopoverBadge({
   airportCode: string;
   duration: string;
 }) {
-  const airportInfo = airportNames[airportCode] || {
-    city: airportCode,
-    name: shortenAirportName(airportCode),
-  };
+  const cached = airportCache.getAirportByCode(airportCode);
+  const city = cached?.city || airportCode;
   return (
     <div className="flex items-center gap-2 py-2">
       <span className="text-sm text-[#6B7280]">
-        Stopover at {shortenAirportName(airportInfo.city)} ({airportCode}) for
+        Stopover at {shortenAirportName(city)} ({airportCode}) for
       </span>
       <div className="flex items-center gap-1 text-sm font-medium text-[#010D50]">
         <Clock className="w-4 h-4" />
@@ -338,11 +330,7 @@ interface FlightCardConfirmationProps {
 
 // Helper to get city name from airport code using cache or fallback
 function getCityName(airportCode: string): string {
-  // First check static lookup
-  if (airportNames[airportCode]?.city) {
-    return airportNames[airportCode].city;
-  }
-  // Then try airport cache
+  // Try airport cache first
   const cached = airportCache.getAirportByCode(airportCode);
   if (cached?.city) {
     return cached.city;
@@ -614,7 +602,7 @@ function PaymentCompleteContent() {
   const [error, setError] = useState<string | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
 
-  // Get flight and booking info from store (or mock data)
+  // Get flight and booking info from store
   const storeSelectedFlight = useSelectedFlight();
   const storeVyspaFolderNumber = useBookingStore(
     (state) => state.vyspaFolderNumber
@@ -770,20 +758,9 @@ function PaymentCompleteContent() {
   // Get email from store or vyspa - use vyspaEmailAddress as fallback
   const effectiveContactEmail = storeContactEmail || storeVyspaEmailAddress;
 
-  // Use mock data if enabled, otherwise use store data
-  const flight = isMockMode ? mockBookingConfirmation.flight : storeSelectedFlight;
-  const passengers = isMockMode
-    ? mockBookingConfirmation.passengers
-    : storePassengers;
-  const vyspaFolderNumber = isMockMode
-    ? mockBookingConfirmation.vyspaFolderNumber
-    : storeVyspaFolderNumber;
-  const contactEmail = isMockMode
-    ? mockBookingConfirmation.contactEmail
-    : storeContactEmail;
-  const contactPhone = isMockMode
-    ? mockBookingConfirmation.contactPhone
-    : storeContactPhone;
+  const flight = storeSelectedFlight;
+  const passengers = storePassengers;
+  const vyspaFolderNumber = storeVyspaFolderNumber;
 
   // Get orderId and redirectionResult from URL
   const orderId = searchParams?.get("orderId") || "";
@@ -792,20 +769,6 @@ function PaymentCompleteContent() {
   // Inquire payment status on mount
   useEffect(() => {
     const checkPaymentStatus = async () => {
-      // If mock mode, use mock payment info
-      if (isMockMode) {
-        setPaymentInfo({
-          status: mockBookingConfirmation.paymentInfo.status,
-          orderId: mockBookingConfirmation.paymentInfo.orderId,
-          amount: mockBookingConfirmation.paymentInfo.amount.toString(),
-          currency: mockBookingConfirmation.paymentInfo.currency,
-          transactionId: mockBookingConfirmation.paymentInfo.transactionId,
-          timestamp: mockBookingConfirmation.paymentInfo.timestamp,
-        });
-        setShowConfetti(true);
-        return;
-      }
-
       // If we have a redirectionResult token, use it to check status
       if (redirectionResult) {
         const result = await inquirePayment(redirectionResult);
@@ -929,7 +892,6 @@ function PaymentCompleteContent() {
 
   // When we know the payment order id, load the correct snapshot for this order to avoid stale data
   useEffect(() => {
-    if (isMockMode) return;
     const id =
       paymentInfo?.orderId ||
       sessionStorage.getItem("pendingOrderId") ||
@@ -939,7 +901,7 @@ function PaymentCompleteContent() {
     if (!id) return;
     const ctx = loadBookingContext(id);
     if (ctx) setBookingContext(ctx);
-  }, [isMockMode, paymentInfo?.orderId, storeVyspaFolderNumber, orderId, loadBookingContext]);
+  }, [paymentInfo?.orderId, storeVyspaFolderNumber, orderId, loadBookingContext]);
 
   // Hide confetti after animation
   useEffect(() => {
@@ -1142,9 +1104,9 @@ function PaymentCompleteContent() {
   const isPending = paymentInfo?.status === "pending";
   const isCancelled = paymentInfo?.status === "cancelled";
 
-  const displayEmail = (isMockMode ? contactEmail : (ctx?.contactEmail || effectiveContactEmail)) || "—";
+  const displayEmail = (ctx?.contactEmail || effectiveContactEmail) || "—";
   const displayPhone =
-    (isMockMode ? contactPhone : (ctx?.contactPhone || storeContactPhone || passengers?.[0]?.phone)) || "—";
+    (ctx?.contactPhone || storeContactPhone || passengers?.[0]?.phone) || "—";
   const displayPassengers = (ctx?.passengers || passengers) || [];
   const chargedCurrency = paymentInfo?.currency || ctx?.pricing?.currency || (typeof window !== 'undefined' ? sessionStorage.getItem("pendingOrderCurrency") : null) || "GBP";
   const chargedAmount = (() => {
@@ -1178,7 +1140,7 @@ function PaymentCompleteContent() {
           </div>
         )}
         {/* Loading State */}
-        {inquiryLoading && !paymentInfo && !isMockMode && (
+        {inquiryLoading && !paymentInfo && (
           <div className="flex flex-col items-center justify-center py-20">
             <Loader2 className="w-12 h-12 text-[#3754ED] animate-spin mb-4" />
             <p className="text-lg text-[#3A478A]">
@@ -1188,7 +1150,7 @@ function PaymentCompleteContent() {
         )}
 
         {/* Error State */}
-        {error && !paymentInfo && !isMockMode && (
+        {error && !paymentInfo && (
           <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
             <div className="w-20 h-20 mx-auto mb-6 bg-red-100 rounded-full flex items-center justify-center">
               <AlertCircle className="w-10 h-10 text-red-500" />
@@ -1217,7 +1179,7 @@ function PaymentCompleteContent() {
         )}
 
         {/* Success State - New Figma Design */}
-        {(paymentInfo || isMockMode) && isSuccess && (
+        {paymentInfo && isSuccess && (
           <div className="space-y-6">
             {/* Header Card */}
             <div className="bg-white rounded-2xl shadow-sm border border-[#E5E7EB] p-8 text-center">

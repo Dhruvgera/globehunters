@@ -13,7 +13,6 @@ import { airportCache } from "@/lib/cache/airportCache";
 import { shortenAirportName } from "@/lib/vyspa/utils";
 import { normalizeCabinClass } from "@/lib/utils";
 import { FilterState, Flight, SearchParams } from "@/types/flight";
-import { mockFlights, mockDatePrices, mockAirlines, mockAirports } from "@/data/mockFlights";
 import { useFilterExpansion } from "@/hooks/useFilterExpansion";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -506,8 +505,8 @@ function SearchPageContent() {
     }
     // If we have real data, use it
     if (flights.length > 0) return flights;
-    // If error and no data, show mock data as fallback
-    if (error) return mockFlights;
+    // If error and no data, show empty state
+    if (error) return [];
     // Otherwise empty
     return [];
   }, [flights, loading, error, isPackageMode, packageFlights]);
@@ -526,11 +525,11 @@ function SearchPageContent() {
 
     // Always return filters (even empty during loading)
     const baseFilters = apiFilters || {
-      airlines: loading ? [] : mockAirlines,
-      departureAirports: loading ? [] : mockAirports.departure,
-      arrivalAirports: loading ? [] : mockAirports.arrival,
-      minPrice: 400,
-      maxPrice: 1200,
+      airlines: [],
+      departureAirports: [],
+      arrivalAirports: [],
+      minPrice: 0,
+      maxPrice: 0,
     };
 
     // Enrich airport names from cache (the cache is loaded asynchronously)
@@ -553,7 +552,7 @@ function SearchPageContent() {
   }, [apiFilters, isPackageMode, loading, packageFlights, resolvedAirportNames]);
 
   // Initialize/adjust price range when real API filters arrive or bounds change
-  // For package mode, use a wide price range to show all mock flights
+  // For package mode, use a wide price range to show all flights
   useEffect(() => {
     if (isPackageMode) {
       setFilterState((prev) => ({
@@ -1115,7 +1114,7 @@ function SearchPageContent() {
         </div>
       )}
 
-      {/* Loading State - Show during bootstrap, first fetch, and any date change (skip for package mode with mock data) */}
+      {/* Loading state during bootstrap, first fetch, and date changes */}
       {!isPackageMode && (!isInitialized || activeLoading || isDateChanging || (isInitialized && !activeLoading && flights.length === 0 && !hasAttemptedFetch)) && (
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
           <div className="flex flex-col items-center justify-center gap-4">

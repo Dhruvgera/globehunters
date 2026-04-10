@@ -3,11 +3,10 @@
  * Handles all flight-related API calls
  */
 
+import { Flight, SearchParams } from '@/types/flight';
 import { apiClient } from './client';
 import { API_CONFIG } from '@/config/api';
-import { Flight, SearchParams } from '@/types/flight';
 import { ApiResponse } from '@/types/api';
-import { mockFlights, mockDatePrices, mockAirlines, mockAirports } from '@/data/mockFlights';
 import { searchFlights as searchFlightsAction } from '@/actions/flights';
 import type { FlightSearchRequest } from '@/types/vyspa';
 
@@ -238,11 +237,9 @@ class FlightService {
         tripType: params.tripType || flight.tripType,
       }));
 
-      // Add mock date prices for now (Vyspa doesn't provide this)
       const result: FlightSearchResponse = {
         ...response,
         flights: flightsWithTripType,
-        datePrices: mockDatePrices,
       };
       // 2) Save to cache
       this.saveToCache(params, result, requestId, affiliateCode);
@@ -278,25 +275,13 @@ class FlightService {
 
   /**
    * Get flight details by ID
-   * TODO: Replace mock data with actual API call
    */
   async getFlightDetails(flightId: string): Promise<Flight> {
     try {
-      // TODO: Uncomment when API is ready
-      // const response = await apiClient.get<ApiResponse<Flight>>(
-      //   `${API_CONFIG.endpoints.flights.details}/${flightId}`
-      // );
-      // return response.data;
-
-      // Mock implementation - simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      const flight = mockFlights.find(f => f.id === flightId);
-      if (!flight) {
-        throw new Error(`Flight with ID ${flightId} not found`);
-      }
-
-      return flight;
+      const response = await apiClient.get<ApiResponse<Flight>>(
+        `${API_CONFIG.endpoints.flights.details}/${flightId}`
+      );
+      return response.data;
     } catch (error) {
       console.error('Error fetching flight details:', error);
       throw error;
@@ -305,66 +290,20 @@ class FlightService {
 
   /**
    * Get flight pricing details
-   * TODO: Replace mock data with actual API call
    */
   async getFlightPricing(flightId: string, fareType?: string): Promise<FlightPricing> {
     try {
-      // TODO: Uncomment when API is ready
-      // const response = await apiClient.post<ApiResponse<FlightPricing>>(
-      //   API_CONFIG.endpoints.flights.pricing,
-      //   { flightId, fareType }
-      // );
-      // return response.data;
-
-      // Mock implementation
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      const flight = mockFlights.find(f => f.id === flightId);
-      if (!flight) {
-        throw new Error(`Flight with ID ${flightId} not found`);
-      }
-
-      return {
-        flightId: flight.id,
-        baseFare: flight.price * 0.75,
-        taxes: flight.price * 0.20,
-        fees: flight.price * 0.05,
-        total: flight.price,
-        currency: flight.currency,
-        fareOptions: flight.ticketOptions?.map(opt => ({
-          type: opt.type,
-          price: opt.price,
-          available: true,
-        })) || [],
-      };
+      const response = await apiClient.post<ApiResponse<FlightPricing>>(
+        API_CONFIG.endpoints.flights.pricing,
+        { flightId, fareType }
+      );
+      return response.data;
     } catch (error) {
       console.error('Error fetching flight pricing:', error);
       throw error;
     }
   }
 
-  /**
-   * Get date-based pricing for flexible date search
-   * TODO: Replace mock data with actual API call
-   */
-  async getDatePricing(from: string, to: string, month: string): Promise<DatePrice[]> {
-    try {
-      // TODO: Uncomment when API is ready
-      // const response = await apiClient.post<ApiResponse<DatePrice[]>>(
-      //   API_CONFIG.endpoints.flights.datePrice,
-      //   { from, to, month }
-      // );
-      // return response.data;
-
-      // Mock implementation
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      return mockDatePrices;
-    } catch (error) {
-      console.error('Error fetching date pricing:', error);
-      throw error;
-    }
-  }
 }
 
 // Export singleton instance

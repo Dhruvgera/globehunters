@@ -1398,7 +1398,7 @@ export default function HotelRoomsPage() {
   const accessibilitiesRef = useRef<HTMLDivElement>(null);
   const policiesRef = useRef<HTMLDivElement>(null);
 
-  // Hydrate from cache to avoid mock-first / flicker.
+  // Hydrate from cache to avoid first-render flicker.
   useEffect(() => {
     const cached = hotelId ? hotelDetailsCache[hotelId] : undefined;
     if (!cached) {
@@ -2460,7 +2460,7 @@ export default function HotelRoomsPage() {
     <div className="min-h-screen bg-white">
       <Navbar />
 
-      {/* Hard loader: avoid showing mock-first UI */}
+      {/* Hard loader: avoid showing incomplete first-render UI */}
       {!remoteHotelHeader && roomsLoading && (
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
           <div className="space-y-6">

@@ -309,7 +309,7 @@ function matchesPopular(hotel: Hotel, filters: HotelFiltersState) {
   if (wantsShuttle && !hotel.amenities.includes("Airport shuttle included")) return false;
   if (wantsNoCard && !hotel.amenities.includes("Reserve without a credit card")) return false;
 
-  // Mock dataset doesn't include an explicit "pay later" flag; treat as no-op for now.
+  // Current dataset doesn't include an explicit "pay later" flag; treat as no-op for now.
   return true;
 }
 

@@ -252,7 +252,7 @@ interface BookingState {
   selectedHotelRoomIds: string[];
   setSelectedHotelRoomIds: (roomIds: string[]) => void;
 
-  // Cached hotel details (so back navigation doesn't flash mock content)
+  // Cached hotel details (so back navigation doesn't flash placeholder content)
   hotelDetailsCache: Record<
     string,
     {

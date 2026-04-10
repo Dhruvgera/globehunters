@@ -1,5 +1,3 @@
-// Mock data for hotel details page
-
 export const mockHotelDetails = {
   id: "h-2",
   name: "Regala Skycity Hotel by Regal Hotels",

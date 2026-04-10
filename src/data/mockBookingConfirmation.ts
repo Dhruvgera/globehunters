@@ -1,8 +1,3 @@
-/**
- * Mock data for booking confirmation page testing
- * Enable by setting NEXT_PUBLIC_MOCK_BOOKING_CONFIRMATION=true
- */
-
 import { Flight, FlightSegment } from "@/types/flight";
 import { Passenger } from "@/types/booking";
 
@@ -207,11 +202,3 @@ export const mockBookingConfirmation: MockBookingConfirmation = {
     timestamp: new Date().toISOString(),
   },
 };
-
-// Airport code to full name mapping for display
-export const airportNames: Record<string, { name: string; city: string }> = {
-  LGW: { name: "London Gatwick", city: "London" },
-  CMN: { name: "Mohammed V Intl", city: "Casablanca" },
-  LOS: { name: "Murtala Muhammed Intl", city: "Lagos" },
-};
-
