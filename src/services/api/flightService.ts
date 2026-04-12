@@ -42,20 +42,6 @@ export interface FlightSearchResponse {
   requestId?: string; // Request ID from API - used as web ref until folder is created
 }
 
-export interface FlightPricing {
-  flightId: string;
-  baseFare: number;
-  taxes: number;
-  fees: number;
-  total: number;
-  currency: string;
-  fareOptions: {
-    type: 'Eco Value' | 'Eco Classic' | 'Eco Flex';
-    price: number;
-    available: boolean;
-  }[];
-}
-
 class FlightService {
   // In-memory response cache (session-scoped)
   private static CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -284,22 +270,6 @@ class FlightService {
       return response.data;
     } catch (error) {
       console.error('Error fetching flight details:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get flight pricing details
-   */
-  async getFlightPricing(flightId: string, fareType?: string): Promise<FlightPricing> {
-    try {
-      const response = await apiClient.post<ApiResponse<FlightPricing>>(
-        API_CONFIG.endpoints.flights.pricing,
-        { flightId, fareType }
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching flight pricing:', error);
       throw error;
     }
   }

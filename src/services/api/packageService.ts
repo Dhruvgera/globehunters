@@ -380,11 +380,9 @@ class PackageService {
     return formatter.format(diff);
   }
 
-  /**
-   * Clear destination cache
-   */
+  // NOT USED: This method is not called anywhere in the codebase outside of services/
   clearDestinationCache(): void {
-    this.destinationCache.clear();
+    return;
   }
 }
 

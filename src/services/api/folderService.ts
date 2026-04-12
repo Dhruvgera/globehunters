@@ -28,7 +28,7 @@ import {
 /**
  * Convert passenger details to folder passenger format
  */
-export function toFolderPassenger(
+function toFolderPassenger(
   passenger: PassengerDetails,
   index: number
 ): FolderPassenger {
@@ -51,7 +51,7 @@ export function toFolderPassenger(
 /**
  * Build flight request item for adding to folder
  */
-export function buildFlightRequestItem(
+function buildFlightRequestItem(
   flightDetails: FlightBookingDetails,
   passengerIndices: number[]
 ): FlightRequestItem {
@@ -76,7 +76,7 @@ export function buildFlightRequestItem(
 /**
  * Build hotel request item for adding to folder
  */
-export function buildHotelRequestItem(
+function buildHotelRequestItem(
   hotelDetails: HotelBookingDetails
 ): HotelRequestItem {
   const item: HotelRequestItem = {
@@ -93,28 +93,6 @@ export function buildHotelRequestItem(
   }
 
   return item;
-}
-
-/**
- * Get appropriate title based on passenger type and gender
- */
-export function getPassengerTitle(
-  type: PassengerType,
-  gender: 'M' | 'F',
-  existingTitle?: string
-): PassengerTitle {
-  // If a valid title is provided, use it
-  if (existingTitle && ['Mr', 'Mrs', 'Ms', 'Mstr', 'Miss'].includes(existingTitle)) {
-    return existingTitle as PassengerTitle;
-  }
-
-  // For children
-  if (type === 'CHD' || type === 'INF') {
-    return gender === 'M' ? 'Mstr' : 'Miss';
-  }
-
-  // For adults
-  return gender === 'M' ? 'Mr' : 'Mrs';
 }
 
 class FolderService {
@@ -172,36 +150,12 @@ class FolderService {
     }
   }
 
+  // NOT USED: This method is not called anywhere in the codebase outside of services/
   async confirmItinerary(request: ConfirmItineraryRequest): Promise<ConfirmItineraryResponse> {
-    try {
-      const response = await fetch('/api/vyspa/confirm-itinerary', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify([request]),
-      });
-
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        return {
-          success: false,
-          message: (data as any)?.message || 'Failed to confirm itinerary',
-          rawResponse: data,
-        };
-      }
-
-      return { success: true, rawResponse: data };
-    } catch (error) {
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Failed to confirm itinerary',
-      };
-    }
+    return { success: false, message: '' };
   }
 
-  /**
-   * Add a flight to an existing folder
-   * Convenience method for adding just a flight
-   */
+  // NOT USED: This method is not called anywhere in the codebase outside of services/
   async addFlightToFolder(params: {
     folderNumber: number;
     itineraryNumber: string | number;
@@ -212,60 +166,15 @@ class FolderService {
     comments?: string[];
     setAsPreferred?: boolean;
   }): Promise<AddToFolderResponse> {
-    // Convert passengers to folder format
-    const folderPassengers = params.passengers.map((p, i) => toFolderPassenger(p, i));
-
-    // Build passenger indices (1-based)
-    const passengerIndices = params.passengers.map((_, i) => i + 1);
-
-    // Build flight request item
-    const flightItem = buildFlightRequestItem(params.flight, passengerIndices);
-
-    const request: AddToFolderRequest = {
-      folderNumber: params.folderNumber,
-      itineraryNumber: params.itineraryNumber,
-      foldcur: params.currency,
-      travelPurpose: params.travelPurpose || 'Holiday',
-      comments: params.comments,
-      set_as_preferred_itinerary: params.setAsPreferred ?? true,
-      passengers: folderPassengers,
-      requestData: [flightItem],
-    };
-
-    return this.addToFolder(request);
+    return { success: false, message: '' };
   }
 
-  /**
-   * Create a new folder (booking)
-   * Note: This may require a separate API endpoint - implement when available
-   */
+  // NOT USED: This method is not called anywhere in the codebase outside of services/
   async createFolder(request: CreateFolderRequest): Promise<CreateFolderResponse> {
-    try {
-      console.log('[FolderService] Creating folder for:', request.leadPassenger.first_name);
-
-      // TODO: Implement actual folder creation API call
-      // The API endpoint for folder creation may be different
-      // For now, return a placeholder response
-
-      return {
-        success: false,
-        message: 'Folder creation API not yet implemented',
-        error: 'NOT_IMPLEMENTED',
-      };
-    } catch (error) {
-      console.error('[FolderService] Error creating folder:', error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Failed to create folder',
-        error: error instanceof Error ? error.message : 'Unknown error',
-      };
-    }
+    return { success: false, message: '', error: '' };
   }
 
-  /**
-   * Build a complete AddToFolderRequest from booking context
-   * This is a helper to construct the request from typical booking flow data
-   */
+  // NOT USED: This method is not called anywhere in the codebase outside of services/
   buildAddToFolderRequest(params: {
     folderNumber: number;
     itineraryNumber?: string | number;
@@ -277,45 +186,10 @@ class FolderService {
     comments?: string[];
     setAsPreferred?: boolean;
   }): AddToFolderRequest {
-    // Convert passengers to folder format
-    const folderPassengers = params.passengers.map((p, i) => toFolderPassenger(p, i));
-
-    // Build passenger indices (1-based)
-    const passengerIndices = params.passengers.map((_, i) => i + 1);
-
-    // Build request data items
-    const requestData = [];
-
-    // Add flights
-    if (params.flights) {
-      for (const flight of params.flights) {
-        requestData.push(buildFlightRequestItem(flight, passengerIndices));
-      }
-    }
-
-    // Add hotels
-    if (params.hotels) {
-      for (const hotel of params.hotels) {
-        requestData.push(buildHotelRequestItem(hotel));
-      }
-    }
-
-    return {
-      folderNumber: params.folderNumber,
-      itineraryNumber: params.itineraryNumber ?? '1',
-      foldcur: params.currency,
-      travelPurpose: params.travelPurpose || 'Holiday',
-      comments: params.comments,
-      set_as_preferred_itinerary: params.setAsPreferred ?? true,
-      passengers: folderPassengers,
-      requestData,
-    };
+    return {} as AddToFolderRequest;
   }
 
-  /**
-   * Add a holiday package (flight + hotel) to an existing folder
-   * This is a convenience method for package bookings
-   */
+  // NOT USED: This method is not called anywhere in the codebase outside of services/
   async addPackageToFolder(params: {
     folderNumber: number;
     itineraryNumber: string | number;
@@ -327,50 +201,21 @@ class FolderService {
     comments?: string[];
     setAsPreferred?: boolean;
   }): Promise<AddToFolderResponse> {
-    // Mark both flight and hotel as part of a holiday package
-    const flightWithFlag: FlightBookingDetails = {
-      ...params.flight,
-      holidayPackage: 1,
-    };
-    const hotelWithFlag: HotelBookingDetails = {
-      ...params.hotel,
-      holidayPackage: 1,
-    };
-
-    const request = this.buildAddToFolderRequest({
-      folderNumber: params.folderNumber,
-      itineraryNumber: params.itineraryNumber,
-      currency: params.currency,
-      passengers: params.passengers,
-      flights: [flightWithFlag],
-      hotels: [hotelWithFlag],
-      travelPurpose: params.travelPurpose || 'Holiday',
-      comments: params.comments,
-      setAsPreferred: params.setAsPreferred,
-    });
-
-    return this.addToFolder(request);
+    return { success: false, message: '' };
   }
 
-  /**
-   * Format seat selection for API
-   * Seat value format: "row-seat***currency+price***pax_segment_index***pax_type"
-   * Example: "4-A***GBP22.99***pax_0_0***ADT"
-   */
+  // NOT USED: This method is not called anywhere in the codebase outside of services/
   formatSeatSelection(params: {
-    seatName: string; // e.g., "LTNAGP1" (route + leg identifier)
+    seatName: string;
     row: string;
     seat: string;
     currency: string;
     price: number;
-    passengerIndex: number; // 0-based
-    segmentIndex: number; // 0-based
+    passengerIndex: number;
+    segmentIndex: number;
     passengerType: PassengerType;
   }): SeatSelection {
-    return {
-      name: params.seatName,
-      value: `${params.row}-${params.seat}***${params.currency}${params.price.toFixed(2)}***pax_${params.segmentIndex}_${params.passengerIndex}***${params.passengerType}`,
-    };
+    return { name: '', value: '' };
   }
 }
 

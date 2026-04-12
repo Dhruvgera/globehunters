@@ -30,38 +30,17 @@ class BookingService {
     }
   }
 
-  /**
-   * Get booking by ID
-   */
+  // NOT USED: This method is not called anywhere in the codebase outside of services/
   async getBooking(bookingId: string): Promise<BookingResponse> {
-    try {
-      const response = await apiClient.get<ApiResponse<BookingResponse>>(
-        `${API_CONFIG.endpoints.bookings.get}/${bookingId}`
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching booking:', error);
-      throw error;
-    }
+    return {} as BookingResponse;
   }
 
-  /**
-   * Update booking
-   */
+  // NOT USED: This method is not called anywhere in the codebase outside of services/
   async updateBooking(
     bookingId: string,
     updates: Partial<BookingRequest>
   ): Promise<BookingResponse> {
-    try {
-      const response = await apiClient.patch<ApiResponse<BookingResponse>>(
-        `${API_CONFIG.endpoints.bookings.update}/${bookingId}`,
-        updates
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error updating booking:', error);
-      throw error;
-    }
+    return {} as BookingResponse;
   }
 
   /**
@@ -80,19 +59,9 @@ class BookingService {
     }
   }
 
-  /**
-   * Get available protection plans
-   */
+  // NOT USED: This method is not called anywhere in the codebase outside of services/
   async getProtectionPlans(): Promise<ProtectionPlanDetails[]> {
-    try {
-      const response = await apiClient.get<ApiResponse<ProtectionPlanDetails[]>>(
-        API_CONFIG.endpoints.addOns.protectionPlans
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching protection plans:', error);
-      throw error;
-    }
+    return [];
   }
 }
 

@@ -7,7 +7,7 @@ import type {
 } from '@/types/vyspaHotels';
 import type { HotelProvider } from '@/lib/hotels/provider';
 
-export interface HotelSearchParams {
+interface HotelSearchParams {
   location: string;
   checkIn: string; // YYYY-MM-DD
   checkOut: string; // YYYY-MM-DD
@@ -27,7 +27,7 @@ export interface HotelSearchParams {
   providerOverride?: HotelProvider;
 }
 
-export interface CreateHotelFolderParams {
+interface CreateHotelFolderParams {
   title: string;
   firstName: string;
   lastName: string;
@@ -60,6 +60,7 @@ export class HotelService {
     });
   }
 
+  // NOT USED externally: This method is only called internally by searchAvailabilityV3
   async availabilityV3(payload: Record<string, any> | Record<string, any>[]): Promise<VyspaAvailabilityV3Response> {
     return jsonFetch<VyspaAvailabilityV3Response>('/api/hotels/availability', {
       method: 'POST',

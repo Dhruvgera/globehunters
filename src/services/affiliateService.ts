@@ -30,18 +30,3 @@ export async function getAffiliateByCode(code: string): Promise<Affiliate | null
     (aff) => aff.Aff_TrackingCode.toLowerCase() === code.toLowerCase()
   ) || null;
 }
-
-/**
- * Get affiliate phone number by tracking code
- * Returns default phone if no affiliate found
- */
-export async function getAffiliatePhone(code: string | null): Promise<string> {
-  const DEFAULT_PHONE = '020 4502 2984';
-  
-  if (!code) {
-    return DEFAULT_PHONE;
-  }
-
-  const affiliate = await getAffiliateByCode(code);
-  return affiliate?.Aff_TelNo || DEFAULT_PHONE;
-}

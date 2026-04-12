@@ -131,9 +131,7 @@ class ApiClient {
   }
 }
 
-/**
- * Custom API Error class
- */
+// NOT USED externally: ApiClientError is only referenced within client.ts
 export class ApiClientError extends Error {
   constructor(
     message: string,
@@ -146,5 +144,5 @@ export class ApiClientError extends Error {
   }
 }
 
-// Export singleton instance
+// NOT USED externally: apiClient is only imported within services/ itself
 export const apiClient = new ApiClient();

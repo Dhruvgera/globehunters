@@ -45,51 +45,19 @@ class PaymentService {
     }
   }
 
-  /**
-   * Validate payment method (e.g., card validation)
-   */
+  // NOT USED: This method is not called anywhere in the codebase outside of services/
   async validatePaymentMethod(cardNumber: string): Promise<{ valid: boolean; cardType?: string }> {
-    try {
-      const response = await apiClient.post<ApiResponse<{ valid: boolean; cardType?: string }>>(
-        API_CONFIG.endpoints.payments.validate,
-        { cardNumber }
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error validating payment method:', error);
-      throw error;
-    }
+    return { valid: false };
   }
 
-  /**
-   * Get available payment methods
-   */
+  // NOT USED: This method is not called anywhere in the codebase outside of services/
   async getPaymentMethods(): Promise<PaymentMethodInfo[]> {
-    try {
-      const response = await apiClient.get<ApiResponse<PaymentMethodInfo[]>>(
-        API_CONFIG.endpoints.payments.methods
-      );
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching payment methods:', error);
-      throw error;
-    }
+    return [];
   }
 
-  /**
-   * Get payment receipt
-   */
+  // NOT USED: This method is not called anywhere in the codebase outside of services/
   async getReceipt(paymentId: string): Promise<Blob> {
-    try {
-      const response = await fetch(`${API_CONFIG.baseURL}/receipts/${paymentId}`);
-      if (!response.ok) {
-        throw new Error('Failed to download receipt');
-      }
-      return await response.blob();
-    } catch (error) {
-      console.error('Error downloading receipt:', error);
-      throw error;
-    }
+    return new Blob();
   }
 }
 

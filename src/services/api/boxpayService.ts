@@ -80,7 +80,7 @@ function toIso2CountryCode(input: string | undefined | null): string | undefined
   return undefined;
 }
 
-export function normalizeBoxPayPhoneNumber(input: string): string {
+function normalizeBoxPayPhoneNumber(input: string): string {
   const raw = String(input || '').trim();
   if (!raw) return '';
 
@@ -235,9 +235,7 @@ class BoxPayService {
     };
   }
 
-  /**
-   * Map BoxPay status to a simplified completion status
-   */
+  // NOT USED externally: This method is only called internally by parseCompletionInfo
   mapToCompletionStatus(status: BoxPayOperationStatus): PaymentCompletionStatus {
     switch (status) {
       case 'Approved':

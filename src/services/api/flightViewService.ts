@@ -16,7 +16,7 @@ import { getAircraftName } from '@/lib/vyspa/aircraftTypes';
  * Individual flight within a segment from FlightView API
  * Note: API may return properties in either snake_case or CamelCase format
  */
-export interface FlightViewFlight {
+interface FlightViewFlight {
   airline_code: string;
   flight_number: number | string;
   fare_class: string;
@@ -59,7 +59,7 @@ export interface FlightViewFlight {
  * Segment from FlightView API
  * Note: API returns snake_case properties (Flying_time, Segment_number) but may also return CamelCase
  */
-export interface FlightViewSegment {
+interface FlightViewSegment {
   SegmentNo?: number;
   Segment_number?: number | string; // API returns this in snake_case
   Route: string; // e.g., "LHREWR"
@@ -74,7 +74,7 @@ export interface FlightViewSegment {
 /**
  * Passenger breakdown from FlightView API (legacy format)
  */
-export interface FlightViewBreakdown {
+interface FlightViewBreakdown {
   pax_type: string; // "ADT", "CHD", "INF"
   total_pax: number;
   fare: number;
@@ -86,7 +86,7 @@ export interface FlightViewBreakdown {
 /**
  * Passenger breakdown from FlightView API (newer format with Pax_breakdown)
  */
-export interface FlightViewPaxBreakdown {
+interface FlightViewPaxBreakdown {
   pax_type: string; // "ADT", "CHD", "INF"
   pax_count: number;
   base_fare: string | number;

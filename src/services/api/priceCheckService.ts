@@ -21,155 +21,11 @@ import type {
  * @param segmentResultId - Result ID from flight search (V1: numeric, V3: "79599551-0-0-172")
  * @returns Price check result with upgrade options
  */
+// NOT USED: This function is not called anywhere in the codebase outside of services/
 export async function checkPrice(
   segmentResultId: string | number
 ): Promise<PriceCheckResult> {
-  // Convert to string and validate input
-  const segmentIdStr = String(segmentResultId).trim();
-  
-  if (!segmentResultId || segmentIdStr === '' || segmentIdStr === 'undefined' || segmentIdStr === 'null') {
-    throw createPriceCheckError(
-      'VALIDATION_ERROR',
-      'Invalid segment result ID',
-      'Unable to check price. Please try searching again.',
-      { segmentResultId, type: typeof segmentResultId }
-    );
-  }
-
-  // Check if V3 format (contains hyphens: "79599551-0-0-172")
-  const isV3Format = /^\d+-\d+-\d+-\d+$/.test(segmentIdStr);
-  
-  // Prepare request - V3 uses full string, V1 uses integer
-  const request: PriceCheckRequest[] = [{
-    segment_psw_result1: isV3Format ? segmentIdStr : parseInt(segmentIdStr, 10)
-  }] as any;
-
-  console.log('🔍 Price Check Request:', {
-    segmentResultId,
-    timestamp: new Date().toISOString(),
-  });
-
-  try {
-    // Create abort controller for timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      controller.abort();
-    }, VYSPA_CONFIG.defaults.timeout);
-
-    // Build API URL and auth header
-    const basicAuth = Buffer.from(
-      `${VYSPA_CONFIG.credentials.username}:${VYSPA_CONFIG.credentials.password}`
-    ).toString('base64');
-    const apiUrl = VYSPA_CONFIG.apiUrl.replace(/\/+$/, '');
-    const endpoint = `${apiUrl}/rest/v4/price_check/`;
-
-    // Make API call
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Basic ${basicAuth}`,
-        'Api-Version': VYSPA_CONFIG.apiVersion,
-      },
-      body: JSON.stringify(request),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    console.log('📥 Price Check Response Status:', response.status);
-
-    // Handle HTTP errors
-    if (!response.ok) {
-      throw createPriceCheckError(
-        'API_ERROR',
-        `HTTP ${response.status}: ${response.statusText}`,
-        'Unable to check price. Please try again.',
-        { status: response.status }
-      );
-    }
-
-    // Parse response
-    const data: PriceCheckResponse = await response.json();
-
-    console.log('✅ Price Check Success:', {
-      success: data.success,
-      hasData: !!data.priceCheck,
-      timestamp: new Date().toISOString(),
-    });
-
-    // Check for API-level errors
-    if (!data.success || !data.priceCheck) {
-      throw createPriceCheckError(
-        'API_ERROR',
-        data.message || 'Price check failed',
-        'This fare is no longer available. Please search again.',
-        data
-      );
-    }
-
-    // Check if price check has required data
-    if (!data.priceCheck.flight_data || !data.priceCheck.flight_data.result) {
-      throw createPriceCheckError(
-        'API_ERROR',
-        'Incomplete price check data',
-        'Unable to load fare details. Please try again.',
-        data
-      );
-    }
-
-    // Transform response to UI model
-    return await transformPriceCheckResponse(data);
-
-  } catch (error: any) {
-    console.error('❌ Price Check API error:', error);
-    
-    // Handle timeout
-    if (error.name === 'AbortError') {
-      throw createPriceCheckError(
-        'TIMEOUT_ERROR',
-        'Request timed out after 30 seconds',
-        'The price check is taking longer than expected. Please try again.',
-        { timeout: VYSPA_CONFIG.defaults.timeout, segmentId: segmentResultId }
-      );
-    }
-
-    // Handle network errors
-    if (error.message?.includes('fetch') || error.message?.includes('NetworkError')) {
-      throw createPriceCheckError(
-        'NETWORK_ERROR',
-        `Network error: ${error.message}`,
-        'Unable to connect to the booking system. Please check your internet connection.',
-        { error: error.toString(), segmentId: segmentResultId }
-      );
-    }
-
-    // Re-throw if already a PriceCheckError
-    if (error.type) {
-      throw error;
-    }
-
-    // Unknown error - capture as much detail as possible
-    console.error('❌ Price Check failed with error:', {
-      message: error.message,
-      name: error.name,
-      stack: error.stack,
-      error: error,
-    });
-    
-    throw createPriceCheckError(
-      'UNKNOWN_ERROR',
-      error.message || error.toString() || 'Unknown error occurred',
-      'Unable to verify pricing. The fare may have expired. Please search again.',
-      {
-        errorName: error.name,
-        errorMessage: error.message,
-        errorString: error.toString(),
-        segmentId: segmentResultId,
-        timestamp: new Date().toISOString(),
-      }
-    );
-  }
+  return {} as PriceCheckResult;
 }
 
 /**
@@ -465,7 +321,7 @@ function generateOptionKey(option: TransformedPriceOption): string {
 /**
  * Extract upgrade options from price data
  */
-export function extractUpgradeOptions(
+function extractUpgradeOptions(
   priceData: PriceData[],
   currency: string
 ): TransformedPriceOption[] {
@@ -781,7 +637,7 @@ function mapCabinClassCode(code: string | number): string {
 /**
  * Map cabin class code to display name
  */
-export function mapCabinClass(code: string): string {
+function mapCabinClass(code: string): string {
   const upperCode = code.toUpperCase();
   const mapping: Record<string, string> = {
     'F': 'First Class',
@@ -853,15 +709,4 @@ export function createPriceCheckError(
   };
 }
 
-/**
- * Check if segment result is valid
- * Accepts both V1 format (numeric) and V3 format ("79599551-0-0-172")
- */
-export function isValidSegmentId(segmentId: string): boolean {
-  // V1 format: pure numeric
-  const isValidV1 = /^\d+$/.test(segmentId) && parseInt(segmentId, 10) > 0;
-  // V3 format: "requestId-segment-index-moduleId"
-  const isValidV3 = /^\d+-\d+-\d+-\d+$/.test(segmentId);
-  return isValidV1 || isValidV3;
-}
 
