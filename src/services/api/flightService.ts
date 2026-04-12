@@ -9,6 +9,7 @@ import { API_CONFIG } from '@/config/api';
 import { ApiResponse } from '@/types/api';
 import { searchFlights as searchFlightsAction } from '@/actions/flights';
 import type { FlightSearchRequest } from '@/types/vyspa';
+import { cabinClassToVyspaNumeric } from '@/lib/utils/cabinClass';
 
 export interface DatePrice {
   date: string;
@@ -198,7 +199,7 @@ class FlightService {
           inf1: String(params.passengers.infants || 0),
           ow,
           dir: '0', // TODO: Add direct flights filter to UI
-          cl: this.mapCabinClass(params.class),
+          cl: cabinClassToVyspaNumeric(params.class),
           ...(aff ? { aff } : {}),
           ...multiCityExtras,
         };
@@ -244,19 +245,6 @@ class FlightService {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
-  }
-
-  /**
-   * Map cabin class to Vyspa format
-   */
-  private mapCabinClass(cabinClass: string): string {
-    const classMap: Record<string, string> = {
-      'Economy': '1',
-      'Premium Economy': '2',
-      'Business': '3',
-      'First': '4',
-    };
-    return classMap[cabinClass] || '1';
   }
 
   /**

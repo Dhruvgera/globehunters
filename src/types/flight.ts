@@ -4,16 +4,28 @@ export interface Airport {
   city: string;
 }
 
+export interface Layover {
+  viaAirport: string;
+  duration: string;
+  airport?: string;
+  viaAirportName?: string;
+  airportName?: string;
+}
+
 export interface IndividualFlight {
   departureAirport: string;
   arrivalAirport: string;
+  departureCity?: string;
+  arrivalCity?: string;
   departureTime: string;
   arrivalTime: string;
   duration: string;
   flightNumber?: string;
   carrierCode?: string;
-  departureDate?: string; // Raw API date for debugging
-  arrivalDate?: string;   // Raw API date for debugging
+  airline?: string;
+  operatedBy?: string;
+  departureDate?: string;
+  arrivalDate?: string;
 }
 
 export interface FlightSegment {
@@ -36,11 +48,8 @@ export interface FlightSegment {
   distance?: string | number;
   departureTerminal?: string;
   arrivalTerminal?: string;
-  layovers?: Array<{
-    viaAirport: string;
-    duration: string; // e.g., "2h 15m"
-  }>;
-  individualFlights?: IndividualFlight[]; // Individual flight legs with their durations
+  layovers?: Layover[];
+  individualFlights?: IndividualFlight[];
   segmentBaggage?: string;
   segmentBaggageQuantity?: string;
   segmentBaggageUnit?: string;

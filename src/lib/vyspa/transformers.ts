@@ -14,6 +14,7 @@ import {
 } from './utils';
 import { getAircraftName } from './aircraftTypes';
 import { airportCache } from '@/lib/cache/airportCache';
+import { buildFlightFilters } from '@/lib/utils/filterBuilder';
 import type {
   VyspaApiResponse,
   VyspaResult,
@@ -23,8 +24,6 @@ import type {
 import type { Flight, FlightSegment, Airport, Airline } from '@/types/flight';
 import type {
   FlightSearchResponse,
-  AirlineFilter,
-  AirportFilter
 } from '@/services/api/flightService';
 
 /**
@@ -52,44 +51,32 @@ export function transformVyspaResponse(
   }
 
   const flights: Flight[] = [];
-  const airlinesMap = new Map<string, AirlineFilter>();
-  const departureAirportsMap = new Map<string, AirportFilter>();
-  const arrivalAirportsMap = new Map<string, AirportFilter>();
-  let minPrice = Infinity;
-  let maxPrice = -Infinity;
 
   for (const result of vyspaData.Results) {
     try {
       const flight = transformResult(result);
       if (flight) {
         flights.push(flight);
-
-        // Update price range
-        if (flight.price < minPrice) minPrice = flight.price;
-        if (flight.price > maxPrice) maxPrice = flight.price;
-
-        // Collect filter data
-        collectFilterData(
-          flight,
-          airlinesMap,
-          departureAirportsMap,
-          arrivalAirportsMap
-        );
       }
     } catch (error) {
       console.error('Error transforming result:', error);
-      // Continue processing other results
     }
   }
+
+  const filterResult = buildFlightFilters(
+    flights,
+    (f) => f.price,
+    (_code, name) => shortenAirportName(name)
+  );
 
   return {
     flights,
     filters: {
-      airlines: Array.from(airlinesMap.values()),
-      departureAirports: Array.from(departureAirportsMap.values()),
-      arrivalAirports: Array.from(arrivalAirportsMap.values()),
-      minPrice: minPrice === Infinity ? 0 : Math.floor(minPrice),
-      maxPrice: maxPrice === -Infinity ? 0 : Math.ceil(maxPrice),
+      airlines: Array.from(filterResult.airlines.values()),
+      departureAirports: Array.from(filterResult.departureAirports.values()),
+      arrivalAirports: Array.from(filterResult.arrivalAirports.values()),
+      minPrice: filterResult.priceRange.min,
+      maxPrice: filterResult.priceRange.max,
     },
     requestId,
   };
@@ -552,81 +539,4 @@ function formatDate(dateStr: string): string {
   }
 }
 
-/**
- * Get currency symbol from currency code
- */
-function getCurrencySymbol(code: string): string {
-  if (!code) return '';
-  const upperCode = String(code).toUpperCase();
-  const symbols: Record<string, string> = {
-    'USD': '$',
-    'GBP': '£',
-    'EUR': '€',
-    'INR': '₹',
-    'AED': 'د.إ',
-    'CAD': 'C$',
-    'AUD': 'A$',
-  };
 
-  return symbols[upperCode] || code;
-}
-
-/**
- * Collect filter data from flight
- */
-function collectFilterData(
-  flight: Flight,
-  airlinesMap: Map<string, AirlineFilter>,
-  departureAirportsMap: Map<string, AirportFilter>,
-  arrivalAirportsMap: Map<string, AirportFilter>
-): void {
-  const airlineCode = flight.airline.code;
-  const airlineName = flight.airline.name;
-  const price = flight.price;
-
-  // Update airline filter
-  if (airlinesMap.has(airlineCode)) {
-    const airline = airlinesMap.get(airlineCode)!;
-    airline.count++;
-    airline.minPrice = Math.min(airline.minPrice, price);
-  } else {
-    airlinesMap.set(airlineCode, {
-      name: airlineName,
-      code: airlineCode,
-      count: 1,
-      minPrice: price,
-    });
-  }
-
-  // Update departure airport filter
-  const depCode = flight.outbound.departureAirport.code;
-  const depName = shortenAirportName(flight.outbound.departureAirport.name || depCode);
-  if (departureAirportsMap.has(depCode)) {
-    const airport = departureAirportsMap.get(depCode)!;
-    airport.count++;
-    airport.minPrice = Math.min(airport.minPrice, price);
-  } else {
-    departureAirportsMap.set(depCode, {
-      code: depCode,
-      name: depName,
-      count: 1,
-      minPrice: price,
-    });
-  }
-
-  // Update arrival airport filter (from outbound)
-  const arrCode = flight.outbound.arrivalAirport.code;
-  const arrName = shortenAirportName(flight.outbound.arrivalAirport.name || arrCode);
-  if (arrivalAirportsMap.has(arrCode)) {
-    const airport = arrivalAirportsMap.get(arrCode)!;
-    airport.count++;
-    airport.minPrice = Math.min(airport.minPrice, price);
-  } else {
-    arrivalAirportsMap.set(arrCode, {
-      code: arrCode,
-      name: arrName,
-      count: 1,
-      minPrice: price,
-    });
-  }
-}

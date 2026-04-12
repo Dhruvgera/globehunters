@@ -6,19 +6,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { SearchParams } from '@/types/flight';
 import { flightService, DatePrice } from '@/services/api/flightService';
 import { flightCache } from '@/lib/cache/flightCache';
-// Switch batch fetching to API route (parallel on server)
+import { getTimestamp } from '@/lib/utils/date';
 
-// Staggering strategy for background date fetching
 const DATE_SLIDER_STAGGER_MS = Number(process.env.NEXT_PUBLIC_DATE_SLIDER_STAGGER_MS || 500);
 const DATE_SLIDER_CHUNK_SIZE = Number(process.env.NEXT_PUBLIC_DATE_SLIDER_CHUNK_SIZE || 2);
-
-// Helper to safely get timestamp from a date that might be a string or Date
-function getTimestamp(date: Date | string | undefined | null): number | undefined {
-  if (!date) return undefined;
-  if (date instanceof Date) return date.getTime();
-  const parsed = new Date(date);
-  return isNaN(parsed.getTime()) ? undefined : parsed.getTime();
-}
 
 // Normalize date to midnight for safe comparisons
 function normalizeDate(date: Date): Date {

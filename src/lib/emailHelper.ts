@@ -3,30 +3,13 @@
  * Transforms booking data into email format
  */
 
-import { Flight } from '@/types/flight';
+import { Flight, FlightSegment, IndividualFlight, Layover } from '@/types/flight';
 import { Passenger } from '@/types/booking';
 import { BookingConfirmationEmailData, JourneyEmail, FlightSegmentEmail, StopoverEmail } from '@/types/email';
 import { format, parseISO } from 'date-fns';
+import { getCurrencySymbol } from '@/lib/currency/converter';
 
-/**
- * Get currency symbol from currency code
- */
-function getCurrencySymbol(currency: string): string {
-  const symbols: Record<string, string> = {
-    'GBP': '£',
-    'USD': '$',
-    'EUR': '€',
-    'AUD': 'A$',
-    'INR': '₹',
-    'CAD': 'C$',
-  };
-  return symbols[currency] || currency;
-}
 
-/**
- * Safely format a date string for display in email
- * Handles various date formats including ISO and display formats
- */
 function formatEmailDate(dateString: string): string {
   if (!dateString) return '';
 
@@ -95,12 +78,11 @@ function getPassengerFullName(passenger: Passenger): string {
 /**
  * Transform a flight segment to email format
  */
-function transformSegmentToEmail(segment: any, cabinClass: string, mainAirlineName?: string, mainAirlineCode?: string): FlightSegmentEmail[] {
+function transformSegmentToEmail(segment: FlightSegment, cabinClass: string, mainAirlineName?: string, mainAirlineCode?: string): FlightSegmentEmail[] {
   const segments: FlightSegmentEmail[] = [];
 
-  // Check if segment has individual flights (multi-leg)
   if (segment.individualFlights && segment.individualFlights.length > 0) {
-    segment.individualFlights.forEach((flight: any) => {
+    segment.individualFlights.forEach((flight: IndividualFlight) => {
       segments.push({
         from: flight.departureCity || flight.departureAirport,
         fromCode: flight.departureAirport,
@@ -111,14 +93,13 @@ function transformSegmentToEmail(segment: any, cabinClass: string, mainAirlineNa
         arrivalTime: flight.arrivalTime,
         duration: flight.duration,
         flightNumber: flight.flightNumber || segment.flightNumber || '',
-        airline: flight.airline || segment.airline?.name || mainAirlineName || 'Airline',
+        airline: flight.airline || segment.carrierName || mainAirlineName || 'Airline',
         airlineCode: flight.carrierCode || segment.carrierCode || mainAirlineCode || '',
         cabinClass: cabinClass || 'Economy',
         operatedBy: flight.operatedBy,
       });
     });
   } else {
-    // Simple segment
     segments.push({
       from: segment.departureAirport?.name || segment.departureAirport?.city || segment.departureAirport?.code || '',
       fromCode: segment.departureAirport?.code || '',
@@ -129,7 +110,7 @@ function transformSegmentToEmail(segment: any, cabinClass: string, mainAirlineNa
       arrivalTime: segment.arrivalTime,
       duration: segment.totalJourneyTime || segment.duration || '',
       flightNumber: segment.flightNumber || '',
-      airline: segment.airline?.name || mainAirlineName || 'Airline',
+      airline: segment.carrierName || mainAirlineName || 'Airline',
       airlineCode: segment.carrierCode || mainAirlineCode || '',
       cabinClass: cabinClass || 'Economy',
     });
@@ -141,12 +122,12 @@ function transformSegmentToEmail(segment: any, cabinClass: string, mainAirlineNa
 /**
  * Transform layovers to email format
  */
-function transformLayoversToEmail(segment: any): StopoverEmail[] {
+function transformLayoversToEmail(segment: FlightSegment): StopoverEmail[] {
   if (!segment.layovers || segment.layovers.length === 0) {
     return [];
   }
 
-  return segment.layovers.map((layover: any) => ({
+  return segment.layovers.map((layover: Layover) => ({
     airportCode: layover.viaAirport || layover.airport || '',
     airportName: layover.viaAirportName || layover.airportName || layover.viaAirport || '',
     duration: layover.duration || '',

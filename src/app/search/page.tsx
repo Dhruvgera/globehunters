@@ -13,6 +13,7 @@ import { airportCache } from "@/lib/cache/airportCache";
 import { shortenAirportName } from "@/lib/vyspa/utils";
 import { normalizeCabinClass } from "@/lib/utils";
 import { FilterState, Flight, SearchParams } from "@/types/flight";
+import { DEFAULT_FILTER_STATE } from "@/config/constants";
 import { useFilterExpansion } from "@/hooks/useFilterExpansion";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -604,21 +605,7 @@ function SearchPageContent() {
     if (departureDateChanged || returnDateChanged) {
       console.log('[Search] Date changed via slider, resetting filters');
       // Reset filter state to defaults - new bounds will be set by apiFilters effect
-      setFilterState({
-        stops: [],
-        priceRange: [0, 2000], // Placeholder, will be updated by apiFilters effect
-        departureTimeOutbound: [0, 24],
-        departureTimeInbound: [0, 24],
-        arrivalTimeOutbound: [0, 24],
-        arrivalTimeInbound: [0, 24],
-        timeFilterMode: 'takeoff',
-        journeyTimeOutbound: [0, 35], // Will be updated by journeyTimeBounds effect
-        journeyTimeInbound: [0, 35],
-        departureAirports: [],
-        arrivalAirports: [],
-        airlines: [],
-        extras: [],
-      });
+      setFilterState({ ...DEFAULT_FILTER_STATE });
       // Reset the displayed flights count as well
       setDisplayedFlightsCount(5);
     }
@@ -695,21 +682,7 @@ function SearchPageContent() {
   };
 
   // Filter state
-  const [filterState, setFilterState] = useState<FilterState>({
-    stops: [],
-    priceRange: [0, 2000],
-    departureTimeOutbound: [0, 24],
-    departureTimeInbound: [0, 24],
-    arrivalTimeOutbound: [0, 24],
-    arrivalTimeInbound: [0, 24],
-    timeFilterMode: 'takeoff',
-    journeyTimeOutbound: [0, 35],
-    journeyTimeInbound: [0, 35],
-    departureAirports: [],
-    arrivalAirports: [],
-    airlines: [],
-    extras: [],
-  });
+  const [filterState, setFilterState] = useState<FilterState>({ ...DEFAULT_FILTER_STATE });
 
   const [sortBy, setSortBy] = useState<'best' | 'cheapest' | 'fastest'>('cheapest');
 
@@ -905,21 +878,7 @@ function SearchPageContent() {
       // New search detected - clear stale booking data (folder ID, passengers, etc.)
       clearForNewSearch();
       // Reset filters
-      setFilterState({
-        stops: [],
-        priceRange: [0, 2000],
-        departureTimeOutbound: [0, 24],
-        departureTimeInbound: [0, 24],
-        arrivalTimeOutbound: [0, 24],
-        arrivalTimeInbound: [0, 24],
-        timeFilterMode: 'takeoff',
-        journeyTimeOutbound: [0, 35],
-        journeyTimeInbound: [0, 35],
-        departureAirports: [],
-        arrivalAirports: [],
-        airlines: [],
-        extras: [],
-      });
+      setFilterState({ ...DEFAULT_FILTER_STATE });
       setDisplayedFlightsCount(5);
     }
 

@@ -6,6 +6,7 @@
 import type { FlightSearchRequest } from '@/types/vyspa';
 import type { FlightSearchResponse } from '@/services/api/flightService';
 import type { Flight } from '@/types/flight';
+import { buildFlightFilters } from '@/lib/utils/filterBuilder';
 // COMMENTED OUT: Using API-returned currency directly (FlightsUK returns GBP, FlightsUS returns USD)
 // import { convertCurrency as convertCurrencyAmount, getTargetCurrency } from '@/lib/currency/converter';
 
@@ -51,11 +52,17 @@ export async function applyBusinessRules(
   // - Airline priorities (if configured)
 
   // 6. Update filters based on filtered results
-  const updatedFilters = updateFiltersForFlights(flights);
+  const filterResult = buildFlightFilters(flights, (f) => f.price);
 
   return {
     flights,
-    filters: updatedFilters,
+    filters: {
+      airlines: Array.from(filterResult.airlines.values()),
+      departureAirports: Array.from(filterResult.departureAirports.values()),
+      arrivalAirports: Array.from(filterResult.arrivalAirports.values()),
+      minPrice: filterResult.priceRange.min,
+      maxPrice: filterResult.priceRange.max,
+    },
   };
 }
 
@@ -176,85 +183,6 @@ function sortFlightsByPrice(flights: Flight[]): Flight[] {
   return [...flights].sort((a, b) => a.price - b.price);
 }
 
-/**
- * Update filters based on filtered flight results
- */
-function updateFiltersForFlights(flights: Flight[]) {
-  const airlinesMap = new Map<string, { name: string; code: string; count: number; minPrice: number }>();
-  const departureAirportsMap = new Map<string, { code: string; name: string; count: number; minPrice: number }>();
-  const arrivalAirportsMap = new Map<string, { code: string; name: string; count: number; minPrice: number }>();
-  let minPrice = Infinity;
-  let maxPrice = -Infinity;
-
-  for (const flight of flights) {
-    const price = flight.price;
-
-    // Update price range
-    if (price < minPrice) minPrice = price;
-    if (price > maxPrice) maxPrice = price;
-
-    // Update airlines
-    const airlineCode = flight.airline.code;
-    if (airlinesMap.has(airlineCode)) {
-      const airline = airlinesMap.get(airlineCode)!;
-      airline.count++;
-      airline.minPrice = Math.min(airline.minPrice, price);
-    } else {
-      airlinesMap.set(airlineCode, {
-        name: flight.airline.name,
-        code: airlineCode,
-        count: 1,
-        minPrice: price,
-      });
-    }
-
-    // Update departure airports
-    const depCode = flight.outbound.departureAirport.code;
-    if (departureAirportsMap.has(depCode)) {
-      const airport = departureAirportsMap.get(depCode)!;
-      airport.count++;
-      airport.minPrice = Math.min(airport.minPrice, price);
-    } else {
-      departureAirportsMap.set(depCode, {
-        code: depCode,
-        name: flight.outbound.departureAirport.name,
-        count: 1,
-        minPrice: price,
-      });
-    }
-
-    // Update arrival airports
-    const arrCode = flight.outbound.arrivalAirport.code;
-    if (arrivalAirportsMap.has(arrCode)) {
-      const airport = arrivalAirportsMap.get(arrCode)!;
-      airport.count++;
-      airport.minPrice = Math.min(airport.minPrice, price);
-    } else {
-      arrivalAirportsMap.set(arrCode, {
-        code: arrCode,
-        name: flight.outbound.arrivalAirport.name,
-        count: 1,
-        minPrice: price,
-      });
-    }
-  }
-
-  return {
-    airlines: Array.from(airlinesMap.values()),
-    departureAirports: Array.from(departureAirportsMap.values()),
-    arrivalAirports: Array.from(arrivalAirportsMap.values()),
-    minPrice: minPrice === Infinity ? 0 : Math.floor(minPrice),
-    maxPrice: maxPrice === -Infinity ? 0 : Math.ceil(maxPrice),
-  };
-}
-
-/**
- * Apply currency conversion (optional - implement if needed)
- * @param amount Amount to convert
- * @param fromCurrency Source currency code
- * @param toCurrency Target currency code
- * @returns Converted amount
- */
 export function convertCurrency(
   amount: number,
   fromCurrency: string,

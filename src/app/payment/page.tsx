@@ -16,9 +16,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ErrorMessage } from "@/components/ui/error-message";
 import { useBoxPay } from "@/hooks/useBoxPay";
 import { getRegion } from "@/lib/utils/domainMapping";
-import { airportCache } from "@/lib/cache/airportCache";
-import { shortenAirportName } from "@/lib/vyspa/utils";
 import { formatFareLabel } from "@/lib/utils";
+import { useAirportNames } from "@/hooks/useAirportNames";
+import { getJourneySegments } from "@/lib/flight/segments";
 
 // Import new modular components
 import { PaymentHeader } from "@/components/payment/PaymentHeader";
@@ -39,6 +39,7 @@ import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
 import { FOLDER_STATUS_CODES } from "@/types/portal";
 import { countryCodes } from "@/lib/utils/countryCodes";
 import { convertHotelLocalTaxRows, convertHotelLocalTaxTotal } from "@/lib/currency/localTaxDisplay";
+import { calculateNights } from "@/lib/hotels/nights";
 
 const REFUNDABLE_TERMS_URL = "https://refundablebooking.com/refundable-terms";
 
@@ -282,48 +283,7 @@ function PaymentContent() {
     }
   }, [searchParams, vyspaFolderNumber, searchRequestId]);
 
-  // State for resolved airport names from cache
-  const [airportNameCache, setAirportNameCache] = useState<Record<string, string>>({});
-
-  // Load airport names from cache on mount
-  useEffect(() => {
-    const loadAirportNames = async () => {
-      await airportCache.getAirports();
-      // Get all unique airport codes from the flight
-      if (flight) {
-        const codes = new Set<string>();
-        const segments = flight.segments && flight.segments.length > 0
-          ? flight.segments
-          : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
-
-        segments.forEach((seg) => {
-          codes.add(seg.departureAirport.code);
-          codes.add(seg.arrivalAirport.code);
-        });
-
-        const nameMap: Record<string, string> = {};
-        codes.forEach((code) => {
-          nameMap[code] = airportCache.getAirportName(code);
-        });
-        setAirportNameCache(nameMap);
-      }
-    };
-
-    loadAirportNames();
-  }, [flight]);
-
-
-  // Helper to get airport name - prefer cache, then flight data, then code
-  const getAirportName = (code: string, flightName: string, city: string) => {
-    // Check cache first
-    const cached = airportNameCache[code];
-    if (cached && cached !== code) return shortenAirportName(cached);
-    // Fall back to flight data
-    if (flightName && flightName !== code) return shortenAirportName(flightName);
-    // Fall back to city
-    if (city && city !== code) return shortenAirportName(city);
-    return code;
-  };
+  const { getAirportName } = useAirportNames(flight);
 
   // Price calculation - Use real pricing from selected upgrade, flight or hotel room
   const currency = isPackageMode
@@ -414,9 +374,7 @@ function PaymentContent() {
   // Flight data for summary cards - Use real flight data (supports multi-city)
   const journeySegments = useMemo(() => {
     if (!flight) return [];
-    return flight.segments && flight.segments.length > 0
-      ? flight.segments
-      : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
+    return getJourneySegments(flight);
   }, [flight]);
 
   const normalizedProtectionPlan = isPackageMode
@@ -486,13 +444,7 @@ function PaymentContent() {
     const rows: Array<{ label: string; value: string; valueClassName?: string }> = [
       {
         label: `Hotel (${hotelSearch?.checkIn && hotelSearch?.checkOut
-          ? Math.max(
-              1,
-              Math.round(
-                (new Date(hotelSearch.checkOut).getTime() - new Date(hotelSearch.checkIn).getTime()) /
-                  (1000 * 60 * 60 * 24)
-              )
-            )
+          ? calculateNights(hotelSearch.checkIn, hotelSearch.checkOut)
           : packageSearch?.nights || 0} nights)`,
         value: "Included",
       },
@@ -582,7 +534,7 @@ function PaymentContent() {
     const isRefundable = hotelRoomSummary?.isRefundable;
     const roomName = hotelRoomSummary?.roomName || "Selected Room";
     const nightsCount = hotelSearch
-      ? Math.max(1, Math.round((new Date(hotelSearch.checkOut).getTime() - new Date(hotelSearch.checkIn).getTime()) / (1000 * 60 * 60 * 24)))
+      ? calculateNights(hotelSearch.checkIn, hotelSearch.checkOut)
       : 0;
     const rooms = hotelSearch?.rooms || 1;
     const adults = hotelSearch?.adults || 1;
@@ -1053,13 +1005,7 @@ function PaymentContent() {
                   // (e.g. multi-tab or navigating around during payment redirects).
                   try {
                     const hotelNights = hotelSearch
-                      ? Math.max(
-                        1,
-                        Math.round(
-                          (new Date(hotelSearch.checkOut).getTime() - new Date(hotelSearch.checkIn).getTime()) /
-                          (1000 * 60 * 60 * 24)
-                        )
-                      )
+                      ? calculateNights(hotelSearch.checkIn, hotelSearch.checkOut)
                       : undefined;
                     const hotelCacheEntry = selectedHotel?.hotelId
                       ? hotelDetailsCache?.[selectedHotel.hotelId]

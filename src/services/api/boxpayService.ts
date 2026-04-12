@@ -13,7 +13,7 @@ import {
   PaymentCompletionStatus,
   BoxPayOperationStatus,
 } from '@/types/boxpay';
-import airports from '@/data/airports.json';
+import { normalizeCountryCode as toIso2CountryCode } from '@/lib/utils/countryUtils';
 
 function normalizeKey(value: string): string {
   return value
@@ -22,62 +22,6 @@ function normalizeKey(value: string): string {
     .replace(/[().,]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-}
-
-const COUNTRY_NAME_TO_ISO2: Map<string, string> = (() => {
-  const map = new Map<string, string>();
-  for (const a of airports as any[]) {
-    const name = typeof a?.country === 'string' ? a.country : undefined;
-    const code = typeof a?.countryCode === 'string' ? a.countryCode : undefined;
-    if (!name || !code) continue;
-    const iso2 = code.trim().toUpperCase();
-    if (!/^[A-Z]{2}$/.test(iso2)) continue;
-    map.set(normalizeKey(name), iso2);
-  }
-
-  // Common aliases (more reliable than substring hacks)
-  map.set('uk', 'GB');
-  map.set('u k', 'GB');
-  map.set('united kingdom', 'GB');
-  map.set('great britain', 'GB');
-  map.set('britain', 'GB');
-  map.set('england', 'GB');
-
-  map.set('us', 'US');
-  map.set('u s', 'US');
-  map.set('usa', 'US');
-  map.set('u s a', 'US');
-  map.set('united states', 'US');
-  map.set('united states of america', 'US');
-
-  map.set('uae', 'AE');
-  map.set('u a e', 'AE');
-  map.set('united arab emirates', 'AE');
-
-  return map;
-})();
-
-function toIso2CountryCode(input: string | undefined | null): string | undefined {
-  if (!input) return undefined;
-
-  const raw = String(input).trim();
-  if (/^[A-Za-z]{2}$/.test(raw)) {
-    const iso2 = raw.toUpperCase();
-    return iso2 === 'UN' ? undefined : iso2;
-  }
-
-  const normalized = normalizeKey(raw);
-  const fromMap = COUNTRY_NAME_TO_ISO2.get(normalized);
-  if (fromMap && fromMap !== 'UN') return fromMap;
-
-  // Try splitting on commas (e.g., "London, United Kingdom")
-  const firstPart = normalized.split(',')[0]?.trim();
-  if (firstPart) {
-    const fromFirst = COUNTRY_NAME_TO_ISO2.get(firstPart);
-    if (fromFirst && fromFirst !== 'UN') return fromFirst;
-  }
-
-  return undefined;
 }
 
 function normalizeBoxPayPhoneNumber(input: string): string {

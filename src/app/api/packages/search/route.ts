@@ -63,10 +63,7 @@ function getVyspaBaseUrl(): string {
   return VYSPA_CONFIG.apiUrl.replace(/\/anon\.php\/?$/, '').replace(/\/+$/, '');
 }
 
-function formatDateForVyspa(isoDate: string): string {
-  const [year, month, day] = isoDate.split('-');
-  return `${day}/${month}/${year}`;
-}
+import { formatDateToPortal } from '@/lib/utils/dateFormat';
 
 function buildVyspaRequest(criteria: PackageSearchCriteria): HolidayPackageSearchRequest {
   const adults: string[] = [];
@@ -89,7 +86,7 @@ function buildVyspaRequest(criteria: PackageSearchCriteria): HolidayPackageSearc
   return {
     DestinationFrom: criteria.departureCode,
     Destination: criteria.destinationHiddenValue,
-    departure_date: formatDateForVyspa(criteria.checkIn),
+    departure_date: formatDateToPortal(criteria.checkIn),
     nights: String(criteria.nights),
     rooms: String(criteria.rooms.length),
     adults,

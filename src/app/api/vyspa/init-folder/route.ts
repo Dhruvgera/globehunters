@@ -110,23 +110,7 @@ function normaliseDepartureDateForVyspa(input: string): string {
   return input;
 }
 
-// Convert YYYY-MM-DD to DD/MM/YYYY format for Portal API
-function formatDateForPortal(dateStr: string): string {
-  if (!dateStr) return '';
-  const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    return `${parts[2]}/${parts[1]}/${parts[0]}`;
-  }
-  // Try parsing as date
-  const parsed = new Date(dateStr);
-  if (!isNaN(parsed.getTime())) {
-    const day = String(parsed.getDate()).padStart(2, '0');
-    const month = String(parsed.getMonth() + 1).padStart(2, '0');
-    const year = parsed.getFullYear();
-    return `${day}/${month}/${year}`;
-  }
-  return dateStr;
-}
+import { formatDateToPortal } from '@/lib/utils/dateFormat';
 
 // Parse duration string like "9h 35m" or "575" to minutes
 function parseDurationToMinutes(duration: string): string {
@@ -246,7 +230,7 @@ export async function POST(req: Request) {
 
     const lead = passengers[0];
     const vyspaDepartureDate = normaliseDepartureDateForVyspa(departureDate);
-    const portalDateFormat = formatDateForPortal(vyspaDepartureDate);
+    const portalDateFormat = formatDateToPortal(vyspaDepartureDate);
     
     // Determine region from request host
     const host = req.headers.get('host') || 'globehunters.co.uk';
@@ -315,8 +299,8 @@ export async function POST(req: Request) {
     // Add AIR segments if provided
     if (flightSegments && flightSegments.length > 0) {
       for (const seg of flightSegments) {
-        const segDepDate = formatDateForPortal(normaliseDepartureDateForVyspa(seg.departureDate));
-        const segArrDate = formatDateForPortal(normaliseDepartureDateForVyspa(seg.arrivalDate || seg.departureDate));
+        const segDepDate = formatDateToPortal(normaliseDepartureDateForVyspa(seg.departureDate));
+        const segArrDate = formatDateToPortal(normaliseDepartureDateForVyspa(seg.arrivalDate || seg.departureDate));
 
         manualItems.push({
           Segment: {
@@ -357,8 +341,8 @@ export async function POST(req: Request) {
     // Get first and last segment info for TKT
     const firstSeg = flightSegments?.[0];
     const lastSeg = flightSegments?.[flightSegments.length - 1];
-    const tktStartDate = formatDateForPortal(normaliseDepartureDateForVyspa(firstSeg?.departureDate || departureDate));
-    const tktEndDate = lastSeg ? formatDateForPortal(normaliseDepartureDateForVyspa(lastSeg.arrivalDate || lastSeg.departureDate)) : tktStartDate;
+    const tktStartDate = formatDateToPortal(normaliseDepartureDateForVyspa(firstSeg?.departureDate || departureDate));
+    const tktEndDate = lastSeg ? formatDateToPortal(normaliseDepartureDateForVyspa(lastSeg.arrivalDate || lastSeg.departureDate)) : tktStartDate;
 
     // Add TKT segments - one per passenger with individual pricing
     // If passengerPricing is provided, create separate TKT for each passenger.

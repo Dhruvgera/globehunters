@@ -25,12 +25,7 @@ interface BatchSearchResult {
 	response?: FlightSearchResponse;
 }
 
-function formatDate(date: Date): string {
-	const day = String(date.getDate()).padStart(2, '0');
-	const month = String(date.getMonth() + 1).padStart(2, '0');
-	const year = date.getFullYear();
-	return `${day}/${month}/${year}`;
-}
+import { formatDateToDDMMYYYY } from '@/lib/utils/dateFormat';
 
 function coerceDate(value: any): Date {
 	if (value instanceof Date) return value;
@@ -95,8 +90,8 @@ function toVyspaRequest(params: SearchParams): FlightSearchRequest {
 	return {
 		origin1: params.from,
 		destinationid: params.to,
-		fr: formatDate(params.departureDate),
-		to: params.returnDate ? formatDate(params.returnDate) : undefined,
+		fr: formatDateToDDMMYYYY(params.departureDate),
+		to: params.returnDate ? formatDateToDDMMYYYY(params.returnDate) : undefined,
 		adt1: String(params.passengers.adults),
 		chd1: String(params.passengers.children),
 		inf1: String(params.passengers.infants || 0),

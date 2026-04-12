@@ -4,6 +4,8 @@
  */
 
 import { VYSPA_CONFIG } from '@/config/vyspa';
+import { cabinCodeToDisplayName } from '@/lib/utils/cabinClass';
+import { decodeHtmlEntities } from '@/lib/utils/html';
 // COMMENTED OUT: Currency conversion imports - using API-returned currency directly
 // import { convertCurrency, getTargetCurrency } from '@/lib/currency';
 import type {
@@ -379,20 +381,6 @@ function parseChargeableStatus(chargeable?: string): 'included' | 'chargeable' |
 }
 
 /**
- * Decode HTML entities in a string
- */
-function decodeHtmlEntities(text: string): string {
-  if (!text) return '';
-  return text
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ');
-}
-
-/**
  * Extract OptionalService items by tag from the OptionalService array
  * Filters out items where Chargeable is "Not offered" (as per email instructions)
  * 
@@ -502,7 +490,7 @@ function transformPriceOption(
   // Use brand name (e.g., "ECONOMY LIGHT") for display, fallback to cabin name
   const cabinClassDisplay = brandName || 
     option.BrandInfo?.[0]?.CabinName || 
-    mapCabinClassCode(cabinClassCode);
+    cabinCodeToDisplayName(cabinClassCode);
   
   // Get booking code - prefer explicit fields, do NOT override with brand name
   const bookingCode =
@@ -561,7 +549,7 @@ function transformPriceOption(
   };
 
   // Extract CabinName from BrandInfo (e.g., "Economy", "Premium Economy", "Business")
-  const cabinName = option.BrandInfo?.[0]?.CabinName || mapCabinClassCode(cabinClassCode);
+  const cabinName = option.BrandInfo?.[0]?.CabinName || cabinCodeToDisplayName(cabinClassCode);
 
   // --- Extract OptionalService items by tag ---
   // These provide detailed baggage, flexibility, and meal information
@@ -617,39 +605,6 @@ function transformPriceOption(
     refundableStatus: optionRefundableStatus,
     refundableText: optionRefundableText,
   };
-}
-
-/**
- * Map cabin class code (numeric or letter) to display name
- */
-function mapCabinClassCode(code: string | number): string {
-  const codeStr = String(code);
-  
-  // Numeric codes
-  if (codeStr === '2') return 'Business';
-  if (codeStr === '3') return 'Premium Economy';
-  if (codeStr === '4') return 'Economy';
-  
-  // Letter codes
-  return mapCabinClass(codeStr);
-}
-
-/**
- * Map cabin class code to display name
- */
-function mapCabinClass(code: string): string {
-  const upperCode = code.toUpperCase();
-  const mapping: Record<string, string> = {
-    'F': 'First Class',
-    'C': 'Business',
-    'J': 'Business', // Alternative business code
-    'W': 'Premium Economy',
-    'Y': 'Economy',
-    'M': 'Economy',
-    'S': 'Economy',
-    'H': 'Economy',
-  };
-  return mapping[upperCode] || 'Economy';
 }
 
 /**

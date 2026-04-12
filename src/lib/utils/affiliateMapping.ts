@@ -1,6 +1,6 @@
 import { getRegion } from './domainMapping';
+import { CABIN_CLASS_MAP } from './cabinClass';
 
-// Type definitions for mapping keys
 export type RegionCode = 'AU' | 'NZ' | 'US' | 'CA' | 'MX' | 'IE' | 'ZA' | 'UK' | 'ROW';
 export type CabinClass = 'Economy' | 'Premium Economy' | 'Business' | 'First';
 export type AffiliateName = 'Skyscanner' | 'Kayak' | 'Momondo' | 'CheapFlight' | 'GH' | 'Jetcost' | 'Default';
@@ -10,30 +10,11 @@ export interface MarketSourceInfo {
   subSourceId: string;
 }
 
-// Normalized input types
 interface AffiliateMappingInput {
   affiliateCode?: string | null;
   region?: string;
   cabinClass?: string;
 }
-
-// Map cabin class strings to standardized keys
-const CABIN_CLASS_MAP: Record<string, CabinClass> = {
-  'economy': 'Economy',
-  'premium': 'Premium Economy',
-  'premium economy': 'Premium Economy',
-  'business': 'Business',
-  'first': 'First',
-  // Short codes
-  'y': 'Economy',
-  'm': 'Economy',
-  'w': 'Premium Economy',
-  's': 'Premium Economy',
-  'c': 'Business',
-  'j': 'Business',
-  'f': 'First',
-  'a': 'First'
-};
 
 // Default mapping (CheapFlight AU Eco)
 const DEFAULT_MAPPING: MarketSourceInfo = {

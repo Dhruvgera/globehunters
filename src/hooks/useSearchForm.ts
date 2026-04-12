@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import type { Airport } from "@/types/airport";
 import { useBookingStore } from "@/store/bookingStore";
 import { airportCache } from "@/lib/cache/airportCache";
+import { getTimestamp } from "@/lib/utils/date";
 
 type TripType = "round-trip" | "one-way" | "multi-city";
 
@@ -21,15 +22,6 @@ export function useSearchForm() {
   const searchParamsFromStore = useBookingStore((state) => state.searchParams);
   const hasInitializedRef = useRef(false);
   const lastStoreVersionRef = useRef<string>('');
-
-  // Helper to safely get timestamp from a date that might be a string or Date
-  const getTimestamp = (date: Date | string | undefined | null): number | undefined => {
-    if (!date) return undefined;
-    if (date instanceof Date) return date.getTime();
-    // If it's a string, parse it
-    const parsed = new Date(date);
-    return isNaN(parsed.getTime()) ? undefined : parsed.getTime();
-  };
 
   // Helper to ensure a date value is a Date object
   const ensureDate = (date: Date | string | undefined | null): Date | undefined => {

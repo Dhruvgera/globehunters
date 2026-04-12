@@ -99,3 +99,21 @@ export const PAGINATION = {
   defaultPageSize: 5,
   incrementSize: 5,
 };
+
+import type { FilterState } from '@/types/flight';
+
+export const DEFAULT_FILTER_STATE: FilterState = {
+  stops: [],
+  priceRange: [0, 2000],
+  departureTimeOutbound: [0, 24],
+  departureTimeInbound: [0, 24],
+  arrivalTimeOutbound: [0, 24],
+  arrivalTimeInbound: [0, 24],
+  timeFilterMode: 'takeoff',
+  journeyTimeOutbound: [0, 35],
+  journeyTimeInbound: [0, 35],
+  departureAirports: [],
+  arrivalAirports: [],
+  airlines: [],
+  extras: [],
+};

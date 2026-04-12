@@ -18,11 +18,11 @@ import { useBookingStore } from "@/store/bookingStore";
 import { usePriceCheck } from "@/hooks/usePriceCheck";
 import { TransformedPriceOption } from "@/types/priceCheck";
 import { ErrorMessage } from "@/components/ui/error-message";
-import { airportCache } from "@/lib/cache/airportCache";
-import { shortenAirportName } from "@/lib/vyspa/utils";
+import { useAirportNames } from "@/hooks/useAirportNames";
+import { getJourneySegments } from "@/lib/flight/segments";
 
 /** Debug component to display raw API response */
-function RawResponseDebug({ rawResponse, title }: { rawResponse: any; title: string }) {
+function RawResponseDebug({ rawResponse, title }: { rawResponse: unknown; title: string }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
@@ -104,73 +104,11 @@ export default function FlightInfoModal({
 
   const hasUpgradeOptions = !!(priceCheck && priceCheck.priceOptions && priceCheck.priceOptions.some((opt) => opt.isUpgrade));
 
-  // State for resolved airport names from cache
-  const [airportNameCache, setAirportNameCache] = useState<Record<string, string>>({});
+  const { getAirportName, getCityName } = useAirportNames(flight);
 
-  // Load airport names from cache when modal opens
-  useEffect(() => {
-    if (!open) return;
-
-    const loadAirportNames = async () => {
-      await airportCache.getAirports();
-
-      // Get all unique airport codes from the flight
-      const codes = new Set<string>();
-      const segments = flight.segments && flight.segments.length > 0
-        ? flight.segments
-        : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
-
-      segments.forEach((seg) => {
-        if (seg) {
-          codes.add(seg.departureAirport.code);
-          codes.add(seg.arrivalAirport.code);
-          // Also add individual flight airport codes
-          if (seg.individualFlights) {
-            seg.individualFlights.forEach((f) => {
-              if (f.departureAirport) codes.add(f.departureAirport);
-              if (f.arrivalAirport) codes.add(f.arrivalAirport);
-            });
-          }
-        }
-      });
-
-      const nameMap: Record<string, string> = {};
-      codes.forEach((code) => {
-        nameMap[code] = airportCache.getAirportName(code);
-      });
-      setAirportNameCache(nameMap);
-    };
-
-    loadAirportNames();
-  }, [open, flight]);
-
-  // Helper to get airport name - prefer cache, then flight data, then code
-  const getAirportName = (code: string, flightName?: string, city?: string) => {
-    const cached = airportNameCache[code];
-    if (cached && cached !== code) return shortenAirportName(cached);
-    if (flightName && flightName !== code) return shortenAirportName(flightName);
-    if (city && city !== code) return shortenAirportName(city);
-    return code;
-  };
-
-  // Helper to get city name from airport code using cache
-  const getCityName = (code: string) => {
-    const airport = airportCache.getAirportByCode(code);
-    if (airport?.city && airport.city !== code) {
-      return airport.city;
-    }
-    // Fallback to airport name if city not available
-    if (airport?.name && airport.name !== code) {
-      return shortenAirportName(airport.name);
-    }
-    return code;
-  };
-
-  const journeySegments = flight.segments && flight.segments.length > 0
-    ? flight.segments
-    : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])].filter(
-      (seg): seg is FlightSegment => !!seg
-    );
+  const journeySegments = getJourneySegments(flight).filter(
+    (seg): seg is FlightSegment => !!seg
+  );
 
   const normalizedIndex =
     selectedLegIndex >= 0 && selectedLegIndex < journeySegments.length

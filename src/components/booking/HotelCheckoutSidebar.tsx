@@ -24,11 +24,8 @@ function formatMoney(currency: string | undefined, amount: number | undefined) {
   return c ? `${c} ${a.toFixed(2)}` : a.toFixed(2);
 }
 
-function calculateNights(checkIn: string, checkOut: string): number {
-  const d1 = new Date(checkIn);
-  const d2 = new Date(checkOut);
-  return Math.max(1, Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24)));
-}
+import { calculateNights } from "@/lib/hotels/nights";
+
 
 function formatDateDisplay(dateStr: string): string {
   const d = new Date(dateStr + "T12:00:00");

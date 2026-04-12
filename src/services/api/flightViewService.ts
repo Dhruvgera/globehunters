@@ -7,6 +7,7 @@
 import { Flight, FlightSegment, Airport, Airline, SearchParams } from '@/types/flight';
 import { formatTime, formatDuration, parseIntSafe, parsePriceValue, shortenAirportName } from '@/lib/vyspa/utils';
 import { getAircraftName } from '@/lib/vyspa/aircraftTypes';
+import { cabinCodeToDisplayName } from '@/lib/utils/cabinClass';
 
 // ============================================================================
 // FlightView API Response Types
@@ -291,7 +292,7 @@ export function transformFlightViewResponse(data: FlightViewResponse): Transform
       children,
       infants,
     },
-    class: mapCabinClass(firstFlight.cabin_class),
+    class: cabinCodeToDisplayName(firstFlight.cabin_class),
     tripType,
   };
 
@@ -501,48 +502,6 @@ function extractCityFromAirportName(airportName: string): string {
   // If no pattern matches, return the first word(s) before common suffixes
   const firstPart = airportName.split(/\s+(International|Airport|Intl)/i)[0];
   return firstPart.trim();
-}
-
-/**
- * Map cabin class code to display name
- */
-function mapCabinClass(cabinCode: string): 'Economy' | 'Premium Economy' | 'Business' | 'First' {
-  const code = (cabinCode || '').toUpperCase();
-
-  // Common cabin class codes
-  switch (code) {
-    case 'F':
-    case 'A':
-    case 'P':
-      return 'First';
-    case 'C':
-    case 'J':
-    case 'D':
-    case 'I':
-    case 'Z':
-      return 'Business';
-    case 'W':
-    case 'S':
-      return 'Premium Economy';
-    case 'Y':
-    case 'M':
-    case 'B':
-    case 'H':
-    case 'K':
-    case 'L':
-    case 'Q':
-    case 'T':
-    case 'U':
-    case 'V':
-    case 'X':
-    case 'E':
-    case 'G':
-    case 'N':
-    case 'O':
-    case 'R':
-    default:
-      return 'Economy';
-  }
 }
 
 

@@ -5,6 +5,7 @@
  */
 
 import { getRegion } from '@/lib/utils/domainMapping';
+import { getCabinClassSubsource } from '@/lib/utils/cabinClass';
 
 // Portal API uses its own credentials (different from main Vyspa API)
 export const VYSPA_PORTAL_CONFIG = {
@@ -80,26 +81,7 @@ export function getPortalRegionConfig(overrideRegion?: string) {
     return regionConfigs[region] || regionConfigs['UK'];
 }
 
-/**
- * Map cabin class display to market sub-source code
- */
-export function getCabinClassSubsource(cabinClass: string): string {
-    const cabinMap: Record<string, string> = {
-        'Economy': '122',
-        'Premium Economy': '123',
-        'Business': '124',
-        'First': '125',
-    };
-
-    // Normalize cabin class string
-    const normalized = cabinClass?.toLowerCase().trim();
-
-    if (normalized?.includes('premium')) return cabinMap['Premium Economy'];
-    if (normalized?.includes('business')) return cabinMap['Business'];
-    if (normalized?.includes('first')) return cabinMap['First'];
-
-    return cabinMap['Economy'];
-}
+export { getCabinClassSubsource } from '@/lib/utils/cabinClass';
 
 /**
  * Contact type codes for CustomerNumber array

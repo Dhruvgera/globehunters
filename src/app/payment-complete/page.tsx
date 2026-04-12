@@ -43,6 +43,7 @@ import {
 import Image from "next/image";
 import { useMemo } from "react";
 import { FOLDER_STATUS_CODES } from "@/types/portal";
+import { calculateNights } from "@/lib/hotels/nights";
 
 const REFUNDABLE_TERMS_URL = "https://refundablebooking.com/refundable-terms";
 const REFUNDABLE_CLAIMS_URL = "https://form.refundablebooking.com";
@@ -654,7 +655,7 @@ function PaymentCompleteContent() {
     const isRefundable = roomSummary?.isRefundable;
     const roomName = roomSummary?.roomName || "Selected Room";
     const nightsCount = hs
-      ? Math.max(1, Math.round((new Date(hs.checkOut).getTime() - new Date(hs.checkIn).getTime()) / (1000 * 60 * 60 * 24)))
+      ? calculateNights(hs.checkIn, hs.checkOut)
       : 0;
     const rooms = hs?.rooms || 1;
     const adults = hs?.adults || 1;
@@ -1011,7 +1012,7 @@ function PaymentCompleteContent() {
             address: hotelDetails?.address || '',
             checkIn: ctx?.checkIn || storeHotelSearch?.checkIn || '',
             checkOut: ctx?.checkOut || storeHotelSearch?.checkOut || '',
-            nights: ctx?.nights || (storeHotelSearch?.checkIn && storeHotelSearch?.checkOut ? Math.ceil((new Date(storeHotelSearch.checkOut).getTime() - new Date(storeHotelSearch.checkIn).getTime()) / (1000 * 3600 * 24)) : 1),
+            nights: ctx?.nights || (storeHotelSearch?.checkIn && storeHotelSearch?.checkOut ? calculateNights(storeHotelSearch.checkIn, storeHotelSearch.checkOut) : 1),
             rooms: ctx?.rooms || storeHotelSearch?.rooms || 1,
             amenities: hotelDetails?.amenities || [],
           },

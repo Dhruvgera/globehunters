@@ -1,3 +1,5 @@
+import { decodeHtmlEntities } from '../utils/html';
+
 export interface PackageHotelNearbyPlace {
   name: string;
   distanceKm?: number;
@@ -73,16 +75,6 @@ const POLICY_SPLIT_MARKERS = [
   "No pets and no service animals are allowed",
   "Contactless check-in and contactless check-out are available",
 ];
-
-function decodeHtmlEntities(value: string): string {
-  return value
-    .replace(/&amp;/gi, "&")
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&quot;/gi, '"')
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">");
-}
 
 export function sanitizePackageHotelText(value: unknown): string {
   const text = decodeHtmlEntities(String(value ?? ""))

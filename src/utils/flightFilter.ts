@@ -3,6 +3,7 @@
  */
 
 import { Flight, FilterState } from '@/types/flight';
+export { formatDuration } from '@/lib/vyspa/utils';
 
 /**
  * Parse time string (HH:MM) to minutes since midnight
@@ -25,23 +26,6 @@ export function parseDurationToMinutes(durationString: string): number {
   return hours * 60 + minutes;
 }
 
-/**
- * Format minutes to duration string (e.g., 130 -> "2h 10m")
- */
-export function formatDuration(minutes: number): string {
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-
-  if (hours === 0) {
-    return `${mins}m`;
-  }
-
-  if (mins === 0) {
-    return `${hours}h`;
-  }
-
-  return `${hours}h ${mins}m`;
-}
 
 /**
  * Check if flight matches stop filter

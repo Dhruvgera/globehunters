@@ -29,6 +29,7 @@ import { normalizeHotelChildAges, parseHotelChildAges, serializeHotelChildAges }
 import { getHotelProvider, parseHotelProvider, type HotelProvider } from "@/lib/hotels/provider";
 import { fixStubaImageUrl } from "@/lib/hotels/imageUrl";
 import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
+import { calculateNights } from "@/lib/hotels/nights";
 
 const DEFAULT_FILTERS: HotelFiltersState = {
   propertyQuery: "",
@@ -759,10 +760,7 @@ function HotelsPageInner() {
             throw new Error("No matching package destination found.");
           }
           
-          // Calculate nights from check-in/check-out
-          const nights = Math.max(1, Math.round(
-            (new Date(search.checkOut).getTime() - new Date(search.checkIn).getTime()) / (1000 * 60 * 60 * 24)
-          ));
+          const nights = calculateNights(search.checkIn, search.checkOut);
           
           console.log('[Hotels Page] Package mode - searching packages:', {
             from: fromCode,
@@ -991,13 +989,7 @@ function HotelsPageInner() {
           timeout: VYSPA_SEARCH_TIMEOUT_SEC,
         });
 
-        const nights =
-          Math.max(
-            1,
-            Math.round(
-              (new Date(search.checkOut).getTime() - new Date(search.checkIn).getTime()) / (1000 * 60 * 60 * 24)
-            )
-          ) || 1;
+        const nights = calculateNights(search.checkIn, search.checkOut) || 1;
 
         type ParsedAvailability = {
           mapped: Hotel[];

@@ -9,7 +9,7 @@ import type { TransformedPriceOption } from "@/types/priceCheck";
 import { useBookingStore } from "@/store/bookingStore";
 
 /** Debug component to display raw API response */
-function RawResponseDebug({ rawResponse, title }: { rawResponse: any; title: string }) {
+function RawResponseDebug({ rawResponse, title }: { rawResponse: unknown; title: string }) {
   const [isExpanded, setIsExpanded] = useState(false);
   
   return (
@@ -42,7 +42,7 @@ interface TicketOptionsPanelProps {
   isLoading?: boolean;
   onSelectFlight?: (fareType: "Eco Value" | "Eco Classic" | "Eco Flex") => void;
   onViewFlightInfo?: () => void;
-  rawResponse?: any;
+  rawResponse?: unknown;
 }
 
 function prettify(name: string) {

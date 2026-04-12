@@ -1,13 +1,9 @@
 import type { Flight, FlightSegment } from "@/types/flight";
 import type { HolidayFlightDirection, TransformedAlternateFlight } from "@/types/holidayPackage";
+import { getCurrencySymbol } from "@/lib/currency/converter";
+import { formatDuration } from "@/lib/vyspa/utils";
+import { buildFlightFilters } from "@/lib/utils/filterBuilder";
 
-function toCurrencySymbol(code?: string): string {
-  const normalized = String(code || "").trim().toUpperCase();
-  if (normalized === "GBP") return "£";
-  if (normalized === "USD") return "$";
-  if (normalized === "EUR") return "€";
-  return normalized || "£";
-}
 
 function formatClock(value: unknown): string {
   const raw = String(value ?? "").trim();
@@ -30,14 +26,6 @@ function formatDateLabel(isoDate: unknown): string {
     .toUpperCase();
 }
 
-function formatDuration(minutes: number): string {
-  const total = Math.max(0, Math.trunc(Number(minutes) || 0));
-  const hours = Math.floor(total / 60);
-  const mins = total % 60;
-  if (hours === 0) return `${mins}m`;
-  if (mins === 0) return `${hours}h`;
-  return `${hours}h ${mins}m`;
-}
 
 function getDirectionFlights(direction: HolidayFlightDirection | undefined): Array<Record<string, unknown>> {
   const rawDirection = direction as unknown as { Flights?: unknown[]; flights?: unknown[] } | undefined;
@@ -149,7 +137,7 @@ export function mapPackageAlternateFlightToFlight(
     tripType: inbound ? "round-trip" : "one-way",
     price: Number(flight.totalFare || 0),
     pricePerPerson: Number(flight.totalFare || 0),
-    currency: toCurrencySymbol(flight.currency),
+    currency: getCurrencySymbol(flight.currency || 'GBP'),
     packagePriceDeltaTotal: Number(flight.priceDifference || 0),
     packagePriceDeltaPerPerson:
       typeof flight.priceDifferencePerPerson === "number"
@@ -168,59 +156,13 @@ export function mapPackageAlternateFlightToFlight(
 }
 
 export function buildPackageFlightFilters(flights: Flight[]) {
-  const airlineMap = new Map<string, { name: string; code: string; count: number; minPrice: number }>();
-  const departureMap = new Map<string, { code: string; name: string; count: number; minPrice: number }>();
-  const arrivalMap = new Map<string, { code: string; name: string; count: number; minPrice: number }>();
-
-  let minPrice = Number.POSITIVE_INFINITY;
-  let maxPrice = 0;
-
-  for (const flight of flights) {
-    const price = Number(flight.price || 0);
-    if (price > 0) {
-      minPrice = Math.min(minPrice, price);
-      maxPrice = Math.max(maxPrice, price);
-    }
-
-    const airlineKey = flight.airline.name || flight.airline.code;
-    const airline = airlineMap.get(airlineKey) || {
-      name: flight.airline.name,
-      code: flight.airline.code,
-      count: 0,
-      minPrice: price || 0,
-    };
-    airline.count += 1;
-    airline.minPrice = airline.minPrice === 0 ? price : Math.min(airline.minPrice, price || airline.minPrice);
-    airlineMap.set(airlineKey, airline);
-
-    const departureKey = flight.outbound.departureAirport.code;
-    const departure = departureMap.get(departureKey) || {
-      code: departureKey,
-      name: flight.outbound.departureAirport.name || departureKey,
-      count: 0,
-      minPrice: price || 0,
-    };
-    departure.count += 1;
-    departure.minPrice = departure.minPrice === 0 ? price : Math.min(departure.minPrice, price || departure.minPrice);
-    departureMap.set(departureKey, departure);
-
-    const arrivalKey = flight.outbound.arrivalAirport.code;
-    const arrival = arrivalMap.get(arrivalKey) || {
-      code: arrivalKey,
-      name: flight.outbound.arrivalAirport.name || arrivalKey,
-      count: 0,
-      minPrice: price || 0,
-    };
-    arrival.count += 1;
-    arrival.minPrice = arrival.minPrice === 0 ? price : Math.min(arrival.minPrice, price || arrival.minPrice);
-    arrivalMap.set(arrivalKey, arrival);
-  }
+  const filterResult = buildFlightFilters(flights, (f) => Number(f.price || 0));
 
   return {
-    airlines: Array.from(airlineMap.values()),
-    departureAirports: Array.from(departureMap.values()),
-    arrivalAirports: Array.from(arrivalMap.values()),
-    minPrice: Number.isFinite(minPrice) ? Math.floor(minPrice) : 0,
-    maxPrice: maxPrice > 0 ? Math.ceil(maxPrice) : 0,
+    airlines: Array.from(filterResult.airlines.values()),
+    departureAirports: Array.from(filterResult.departureAirports.values()),
+    arrivalAirports: Array.from(filterResult.arrivalAirports.values()),
+    minPrice: filterResult.priceRange.min,
+    maxPrice: filterResult.priceRange.max,
   };
 }

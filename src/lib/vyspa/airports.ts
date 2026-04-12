@@ -7,62 +7,9 @@ import { VYSPA_CONFIG } from '@/config/vyspa';
 import type { Airport, VyspaAirportResponse } from '@/types/airport';
 import { VyspaErrorType } from '@/types/vyspa';
 import { createVyspaError } from './errors';
+import { normalizeCountryCode } from '@/lib/utils/countryUtils';
 
-/**
- * Normalize country code to ISO2 format
- * Based on travcart-be logic
- */
-function normalizeCountryCode(countryInput?: string): string {
-  if (!countryInput) return '';
-  
-  const raw = String(countryInput).trim();
-  const upper = raw.toUpperCase();
-  
-  // Common mappings to ISO2
-  const mapping: Record<string, string> = {
-    'UNITED KINGDOM': 'GB', 'UK': 'GB', 'GREAT BRITAIN': 'GB',
-    'UNITED STATES': 'US', 'USA': 'US', 'U.S.A.': 'US',
-    'UNITED ARAB EMIRATES': 'AE', 'UAE': 'AE', 'U.A.E.': 'AE',
-    'SAUDI ARABIA': 'SA', 'KSA': 'SA',
-    'TURKEY': 'TR', 'TÜRKİYE': 'TR', 'TURKIYE': 'TR',
-    'SOUTH KOREA': 'KR', 'KOREA, REPUBLIC OF': 'KR',
-    'NETHERLANDS': 'NL',
-    'GERMANY': 'DE', 'FRANCE': 'FR', 'SPAIN': 'ES', 'ITALY': 'IT',
-    'CANADA': 'CA', 'INDIA': 'IN', 'AUSTRALIA': 'AU', 'JAPAN': 'JP',
-    'CHINA': 'CN', 'BRAZIL': 'BR', 'MEXICO': 'MX', 'RUSSIA': 'RU',
-  };
-  
-  if (mapping[upper]) {
-    return mapping[upper];
-  }
-  
-  // If already ISO2
-  if (upper.length === 2 && upper.match(/^[A-Z]{2}$/)) {
-    return upper;
-  }
-  
-  // If ISO3-like, try common conversions
-  if (upper.length === 3 && upper.match(/^[A-Z]{3}$/)) {
-    const iso3Map: Record<string, string> = {
-      'UAE': 'AE',
-      'GBR': 'GB',
-      'USA': 'US',
-      'CAN': 'CA',
-      'AUS': 'AU',
-      'IND': 'IN',
-    };
-    if (iso3Map[upper]) {
-      return iso3Map[upper];
-    }
-  }
-  
-  // Fallback to first 2 letters
-  return upper.substring(0, 2);
-}
 
-/**
- * Transform Vyspa airport response to Airport type
- */
 function transformVyspaAirport(item: VyspaAirportResponse): Airport | null {
   const code = String(item.id || '').toUpperCase().trim();
   const name = String(item.name || '').trim();

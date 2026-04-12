@@ -6,6 +6,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { VYSPA_PORTAL_CONFIG } from '@/config/vyspaPortal';
+import { formatDateToPortal } from '@/lib/utils/dateFormat';
+import { isPortalSuccess } from '@/lib/utils/portalHelpers';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -32,27 +34,6 @@ interface AddExtrasRequestBody {
     extras: (InsuranceExtra | BaggageExtra)[];
 }
 
-/**
- * Format date to DD/MM/YYYY
- */
-function formatDateForPortal(dateStr: string): string {
-    if (!dateStr) return '';
-
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
-        return dateStr;
-    }
-
-    const date = new Date(dateStr);
-    if (!isNaN(date.getTime())) {
-        const day = String(date.getDate()).padStart(2, '0');
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const year = date.getFullYear();
-        return `${day}/${month}/${year}`;
-    }
-
-    return dateStr;
-}
-
 function getIAssurePlanDescription(planType: string): string {
     const descriptions: Record<string, string> = {
         basic: 'Basic',
@@ -67,26 +48,6 @@ function getInsuranceDisplayName(extra: InsuranceExtra): string {
         return extra.productName || 'Refund Shield';
     }
     return extra.productName || 'iAssure Insurance';
-}
-
-function isPortalSuccess(payload: unknown): boolean {
-    if (!payload || typeof payload !== 'object') return false;
-    const parsed = payload as { success?: unknown; status?: unknown; errors?: unknown };
-
-    if (typeof parsed.success !== 'undefined') {
-        if (parsed.success === true || parsed.success === 1 || parsed.success === '1') return true;
-        if (parsed.success === false || parsed.success === 0 || parsed.success === '0') return false;
-    }
-
-    if (typeof parsed.status === 'string' && parsed.status.toLowerCase() === 'error') {
-        return false;
-    }
-
-    if (Array.isArray(parsed.errors) && parsed.errors.length > 0) {
-        return false;
-    }
-
-    return true;
 }
 
 export async function POST(request: NextRequest) {
@@ -137,8 +98,8 @@ export async function POST(request: NextRequest) {
                 manualItem = {
                     Segment: {
                         fi_type: 'OTH',
-                        start_date_time_dt: formatDateForPortal(body.startDate),
-                        end_date_time_dt: formatDateForPortal(body.endDate),
+                        start_date_time_dt: formatDateToPortal(body.startDate),
+                        end_date_time_dt: formatDateToPortal(body.endDate),
                         status: 'OK',
                         finan_vend_id: isRefundShield ? 0 : iAssureVendorId,
                         itin_vend_id: isRefundShield ? 0 : iAssureVendorId,
@@ -159,8 +120,8 @@ export async function POST(request: NextRequest) {
                 manualItem = {
                     Segment: {
                         fi_type: 'OTH',
-                        start_date_time_dt: formatDateForPortal(body.startDate),
-                        end_date_time_dt: formatDateForPortal(body.endDate),
+                        start_date_time_dt: formatDateToPortal(body.startDate),
+                        end_date_time_dt: formatDateToPortal(body.endDate),
                         status: 'OK',
                         finan_vend_id: 0,
                         itin_vend_id: 0,

@@ -22,6 +22,7 @@ import { getRegion } from "@/lib/utils/domainMapping";
 import { formatFareLabel } from "@/lib/utils";
 import { resolvePackagePricing } from "@/lib/package/pricing";
 import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
+import { calculateNights } from "@/lib/hotels/nights";
 
 function formatDateLabel(value?: string) {
   if (!value) return "—";
@@ -144,9 +145,7 @@ function PackageReviewPageInner() {
 
   const nights = useMemo(() => {
     if (hotelSearch?.checkIn && hotelSearch?.checkOut) {
-      const start = new Date(`${hotelSearch.checkIn}T12:00:00`);
-      const end = new Date(`${hotelSearch.checkOut}T12:00:00`);
-      return Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
+      return calculateNights(hotelSearch.checkIn, hotelSearch.checkOut);
     }
     return packageDetails?.hotel?.rooms?.[0]?.nights || 1;
   }, [hotelSearch?.checkIn, hotelSearch?.checkOut, packageDetails?.hotel?.rooms]);

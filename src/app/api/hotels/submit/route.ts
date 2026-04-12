@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getHotelProvider } from '@/lib/hotels/provider';
 import { VYSPA_PORTAL_CONFIG } from '@/config/vyspaPortal';
 import { convertLocalTaxesToCurrency, type LocalPayableTaxItem, normalizeCurrencyCode } from '@/lib/currency/serverFx';
+import { formatDateToPortal } from '@/lib/utils/dateFormat';
+import { isPortalSuccess } from '@/lib/utils/portalHelpers';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -46,36 +48,6 @@ type SubmitBody =
         localPayableTaxes?: LocalPayableTaxItem[];
       };
     };
-
-function formatDateForPortal(dateStr: string): string {
-  if (!dateStr) return '';
-  const parts = dateStr.split('-');
-  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
-  const d = new Date(dateStr);
-  if (!isNaN(d.getTime())) {
-    const dd = String(d.getDate()).padStart(2, '0');
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const yy = d.getFullYear();
-    return `${dd}/${mm}/${yy}`;
-  }
-  return dateStr;
-}
-
-function isPortalSuccess(payload: unknown): boolean {
-  if (!payload || typeof payload !== 'object') return false;
-  const parsed = payload as { success?: unknown; status?: unknown; errors?: unknown; error?: unknown };
-
-  if (typeof parsed.success !== 'undefined') {
-    if (parsed.success === true || parsed.success === 1 || parsed.success === '1') return true;
-    if (parsed.success === false || parsed.success === 0 || parsed.success === '0') return false;
-  }
-
-  if (typeof parsed.status === 'string' && parsed.status.toLowerCase() === 'error') return false;
-  if (Array.isArray(parsed.errors) && parsed.errors.length > 0) return false;
-  if (Array.isArray(parsed.error) && parsed.error.length > 0) return false;
-
-  return true;
-}
 
 function extractFolderEntries(folderDetails: unknown): Array<{ fiType: string; description: string }> {
   const root = folderDetails as { pagedata?: unknown[]; items?: unknown[]; folderItems?: unknown[] } | null;
@@ -196,8 +168,8 @@ export async function POST(req: Request) {
   const manualItem = {
     Segment: {
       fi_type: 'OTH',
-      start_date_time_dt: formatDateForPortal(body.stay.checkIn),
-      end_date_time_dt: formatDateForPortal(body.stay.checkOut),
+      start_date_time_dt: formatDateToPortal(body.stay.checkIn),
+      end_date_time_dt: formatDateToPortal(body.stay.checkOut),
       status: 'OK',
       finan_vend_id: 0,
       itin_vend_id: 0,
