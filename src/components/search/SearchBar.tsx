@@ -112,12 +112,17 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
 
   const productFromUrl: Product = useMemo(() => {
     if (pathname?.startsWith("/hotels")) {
-      // Check if it's a package search (Flight+Hotel)
       const typeParam = urlParams.get("type");
       if (typeParam === "package") {
         return "package";
       }
       return "hotel";
+    }
+    if (typeof window !== "undefined") {
+      const hostname = window.location.hostname;
+      if (hostname.startsWith("package")) return "package";
+      if (hostname.startsWith("flight")) return "flight";
+      if (hostname.startsWith("hotel")) return "hotel";
     }
     return "flight";
   }, [pathname, urlParams]);
