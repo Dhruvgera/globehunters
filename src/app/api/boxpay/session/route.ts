@@ -15,6 +15,13 @@ interface CreateSessionRequestBody {
   currency: string;
   flow?: 'flight' | 'package' | 'hotel';
   localPayableTaxes?: LocalPayableTaxItem[];
+  order?: {
+    items?: Array<{
+      itemName: string;
+      quantity: number;
+      amountWithoutTax: number;
+    }>;
+  };
   shopper: {
     firstName: string;
     lastName: string;
@@ -63,12 +70,21 @@ export async function POST(request: NextRequest) {
     const gatewayCurrency = normalizeCurrencyCode(body.currency) || 'GBP';
     const localTaxesConverted = await convertLocalTaxesToCurrency(body.localPayableTaxes, gatewayCurrency);
     const finalAmount = Number(body.amount || 0) + localTaxesConverted;
+    const orderItems =
+      body.order?.items
+        ?.filter((item) => item && item.itemName && Number(item.quantity) > 0 && Number.isFinite(Number(item.amountWithoutTax)))
+        .map((item) => ({
+          itemName: item.itemName,
+          quantity: Number(item.quantity),
+          amountWithoutTax: Number(Number(item.amountWithoutTax).toFixed(2)),
+        })) || [];
 
     // Build and send the session request
     const sessionRequest = boxpayService.buildSessionRequest({
       orderId: body.orderId,
       amount: finalAmount,
       currency: gatewayCurrency,
+      orderItems,
       shopper: body.shopper,
       returnUrl,
       backUrl,

@@ -375,12 +375,10 @@ export default function HotelCheckoutPage() {
     if (phone.trim() && !validatePhone(phone.trim())) errors.phone = "Please enter a valid phone number";
     for (let i = 0; i < otherTravellers.length; i += 1) {
       const traveller = otherTravellers[i];
-      if (!hasCustomizedTravellerDetails(traveller)) continue;
-      const hasFirstName = Boolean(traveller?.firstName?.trim());
-      const hasLastName = Boolean(traveller?.lastName?.trim());
-
-      if (hasFirstName && !hasLastName) errors[`traveller_${i}_lastName`] = "Last name is required";
-      if (hasLastName && !hasFirstName) errors[`traveller_${i}_firstName`] = "First name is required";
+      const hasCustomizedDetails = hasCustomizedTravellerDetails(traveller);
+      const hasCompleteDetails = hasCompleteTravellerDetails(traveller);
+      // Additional traveller fields are optional. We only validate when a full optional profile is provided.
+      if (!hasCustomizedDetails || !hasCompleteDetails) continue;
 
       if (traveller?.dateOfBirth) {
         const dobCheck = validateDateOfBirthForType(traveller.dateOfBirth, traveller.type === "child" ? "child" : "adult");

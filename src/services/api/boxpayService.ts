@@ -12,6 +12,7 @@ import {
   PaymentCompletionInfo,
   PaymentCompletionStatus,
   BoxPayOperationStatus,
+  BoxPayOrderItem,
 } from '@/types/boxpay';
 import { normalizeCountryCode as toIso2CountryCode } from '@/lib/utils/countryUtils';
 
@@ -47,6 +48,8 @@ class BoxPayService {
    */
   async createSession(request: BoxPaySessionRequest): Promise<BoxPaySessionResponse> {
     try {
+      console.log(`[BoxPay] Create session payload ${JSON.stringify(request)}`);
+
       const response = await fetch(this.endpoints.createSession, {
         method: 'POST',
         headers: {
@@ -112,6 +115,7 @@ class BoxPayService {
     orderId: string;
     amount: number;
     currency: string;
+    orderItems?: BoxPayOrderItem[];
     shopper: {
       firstName: string;
       lastName: string;
@@ -129,6 +133,14 @@ class BoxPayService {
     returnUrl: string;
     backUrl: string;
   }): BoxPaySessionRequest {
+    const defaultOrderItems: BoxPayOrderItem[] = [
+      {
+        itemName: params.orderId,
+        quantity: 1,
+        amountWithoutTax: Number(params.amount.toFixed(2)),
+      },
+    ];
+
     return {
       context: {
         ...BOXPAY_CONFIG.defaultContext,
@@ -138,6 +150,9 @@ class BoxPayService {
       money: {
         amount: params.amount.toFixed(2),
         currencyCode: params.currency,
+      },
+      order: {
+        items: params.orderItems?.length ? params.orderItems : defaultOrderItems,
       },
       shopper: {
         firstName: params.shopper.firstName,

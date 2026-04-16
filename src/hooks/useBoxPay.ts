@@ -12,6 +12,13 @@ interface BoxPaySessionParams {
   /** Optional flow discriminator so return/back URLs can be routed correctly */
   flow?: "flight" | "package" | "hotel";
   localPayableTaxes?: Array<{ amount: number; currency: string; label?: string }>;
+  order?: {
+    items?: Array<{
+      itemName: string;
+      quantity: number;
+      amountWithoutTax: number;
+    }>;
+  };
   shopper: {
     firstName: string;
     lastName: string;

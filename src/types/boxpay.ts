@@ -19,6 +19,16 @@ export interface BoxPayMoney {
   currencyCode: string;
 }
 
+export interface BoxPayOrderItem {
+  itemName: string;
+  quantity: number;
+  amountWithoutTax: number;
+}
+
+export interface BoxPayOrder {
+  items: BoxPayOrderItem[];
+}
+
 export interface BoxPayAddress {
   address1: string;
   address2?: string;
@@ -46,6 +56,7 @@ export interface BoxPaySessionRequest {
   context: BoxPayContext;
   paymentType: string;
   money: BoxPayMoney;
+  order: BoxPayOrder;
   shopper: BoxPayShopper;
   shopperAuthentication: BoxPayShopperAuthentication;
   frontendBackUrl: string;
