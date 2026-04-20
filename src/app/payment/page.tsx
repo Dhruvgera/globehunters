@@ -439,6 +439,25 @@ function PaymentContent() {
           : "None";
 
   const paymentSummaryRows = useMemo(() => {
+    if (isHotelMode) {
+      const totalGuests = (hotelSearch?.adults || 0) + (hotelSearch?.children || 0);
+      const guestLabel = totalGuests === 1 ? "guest" : "guests";
+      const rows: Array<{ label: string; value: string; valueClassName?: string }> = [
+        {
+          label: `Traveler: ${totalGuests} ${guestLabel}`,
+          value: formatPrice(baseFare, currency || "GBP"),
+          valueClassName: "text-sm font-medium text-[#010D50]",
+        },
+      ];
+      if (protectionPlanCost > 0) {
+        rows.push({
+          label: `iAssure Protection Plan (${protectionPlanName})`,
+          value: formatPrice(protectionPlanCost, currency || "GBP"),
+        });
+      }
+      return rows;
+    }
+
     if (!isPackageMode) return undefined;
 
     const rows: Array<{ label: string; value: string; valueClassName?: string }> = [
@@ -470,14 +489,19 @@ function PaymentContent() {
 
     return rows;
   }, [
+    baseFare,
+    currency,
+    hotelSearch?.adults,
+    hotelSearch?.children,
+    isHotelMode,
+    protectionPlanCost,
+    protectionPlanName,
     additionalBaggage,
     baggageCost,
-    currency,
     hotelSearch?.checkIn,
     hotelSearch?.checkOut,
     isPackageMode,
     packageSearch?.nights,
-    protectionPlanCost,
   ]);
   const paymentTotalSubtext = useMemo(() => {
     if (!isPackageMode) return undefined;
