@@ -801,9 +801,9 @@ export default function FlightInfoModal({
                       onClick={() => setSelectedUpgradeOption(option)}
                     >
                       {prettifyCabinName(option.cabinClassDisplay)}
-                      {/* Always show actual total fare, not price difference */}
+                      {/* Show per-person price */}
                       <span className="ml-2 text-xs opacity-80">
-                        {formatPrice(option.totalPrice, option.currency)}
+                        {formatPrice(option.pricePerPerson, option.currency)}
                       </span>
                     </Button>
                   ))}
