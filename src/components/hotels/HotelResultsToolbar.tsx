@@ -113,7 +113,7 @@ export function HotelResultsToolbar({
           </div>
         )}
 
-        {!loading && (
+        {!loading && resultCount > 0 && (
           <div className="hidden sm:flex items-center gap-2 text-sm text-[#3A478A]">
             <span>Showing</span>
             <span className="font-semibold text-[#010D50]">{resultCount}</span>
