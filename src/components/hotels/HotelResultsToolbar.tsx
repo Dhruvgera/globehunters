@@ -31,6 +31,7 @@ export function HotelResultsToolbar({
   hybridSupplierFilter = "all",
   onHybridSupplierFilterChange,
   showHybridSupplierFilter = false,
+  loading = false,
 }: {
   resultCount: number;
   viewMode: HotelViewMode;
@@ -44,6 +45,7 @@ export function HotelResultsToolbar({
   hybridSupplierFilter?: HybridSupplierFilterMode;
   onHybridSupplierFilterChange?: (mode: HybridSupplierFilterMode) => void;
   showHybridSupplierFilter?: boolean;
+  loading?: boolean;
 }) {
   const [isMounted, setIsMounted] = useState(false);
 
@@ -111,11 +113,13 @@ export function HotelResultsToolbar({
           </div>
         )}
 
-        <div className="hidden sm:flex items-center gap-2 text-sm text-[#3A478A]">
-          <span>Showing</span>
-          <span className="font-semibold text-[#010D50]">{resultCount}</span>
-          <span>results</span>
-        </div>
+        {!loading && (
+          <div className="hidden sm:flex items-center gap-2 text-sm text-[#3A478A]">
+            <span>Showing</span>
+            <span className="font-semibold text-[#010D50]">{resultCount}</span>
+            <span>results</span>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-2">
