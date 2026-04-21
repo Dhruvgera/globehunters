@@ -332,7 +332,7 @@ function sanitizeHotelText(value: unknown): string {
     .split("\n")
     .map((line) => line.replace(/\s+/g, " ").trim())
     .filter(Boolean)
-    .join("\n");
+    .join("\n\n");
 }
 
 function sanitizeRoomDisplayText(value: unknown): string {
