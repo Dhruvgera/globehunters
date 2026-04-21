@@ -41,6 +41,11 @@ function RoomBullet({ text }: { text: string }) {
   );
 }
 
+function formatHotelDate(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00");
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
 function RawHotelResultDebug({ raw }: { raw: unknown }) {
   return (
     <details className="rounded-lg border border-yellow-200 bg-yellow-50 p-2" onClick={(e) => e.stopPropagation()}>
@@ -213,6 +218,12 @@ export function HotelResultCard({
 
               {/* Meal plans and Price section - right aligned and bottom aligned */}
               <div className="mt-auto flex flex-col items-end gap-1">
+                {hotel.checkInDate && hotel.checkOutDate && (
+                  <div className="flex items-center gap-1.5 text-xs text-[#3A478A]">
+                    <Calendar className="h-3.5 w-3.5" />
+                    <span>{formatHotelDate(hotel.checkInDate)} – {formatHotelDate(hotel.checkOutDate)}</span>
+                  </div>
+                )}
                 <div className="text-xs text-[#3A478A]">
                   for {hotel.price.nights} nights, {hotel.price.rooms} room
                 </div>
@@ -325,6 +336,12 @@ export function HotelResultCard({
               )}
 
               <div className="flex flex-col items-end gap-2">
+                {hotel.checkInDate && hotel.checkOutDate && (
+                  <div className="flex items-center gap-1.5 text-xs text-[#3A478A]">
+                    <Calendar className="h-3.5 w-3.5" />
+                    <span>{formatHotelDate(hotel.checkInDate)} – {formatHotelDate(hotel.checkOutDate)}</span>
+                  </div>
+                )}
                 <div className="text-xs text-[#3A478A]">
                   for {hotel.price.nights} nights, {hotel.price.rooms} room
                 </div>

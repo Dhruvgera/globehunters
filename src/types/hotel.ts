@@ -65,4 +65,8 @@ export interface Hotel {
   refundable?: boolean | null;
   /** Raw provider search row for debug rendering on listing/detail pages */
   rawSearchResult?: unknown;
+  /** Check-in date from package search response (YYYY-MM-DD) */
+  checkInDate?: string;
+  /** Check-out date from package search response (YYYY-MM-DD) */
+  checkOutDate?: string;
 }

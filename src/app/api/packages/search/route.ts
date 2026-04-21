@@ -206,6 +206,10 @@ export function transformResponse(
     : [];
   const hotelRows = rawHotelRows.filter(isPackageHotelResultRow);
 
+  // Dates come from SearchCriteria (not per-hotel row)
+  const checkInDate = typeof criteria?.CheckInDate === 'string' ? criteria.CheckInDate : undefined;
+  const checkOutDate = typeof criteria?.CheckOutDate === 'string' ? criteria.CheckOutDate : undefined;
+
   const results: PackageSearchResult[] = hotelRows.map((hotel) => {
     const hotelRow = hotel as unknown as Record<string, unknown>;
     return {
@@ -234,6 +238,8 @@ export function transformResponse(
       cityName: typeof hotelRow.cityName === 'string' ? hotelRow.cityName : undefined,
       countryName: typeof hotelRow.countryName === 'string' ? hotelRow.countryName : undefined,
       rawSearchResult: hotelRow,
+      checkInDate,
+      checkOutDate,
       flight: outboundLeg ? { outbound: outboundLeg, inbound: inboundLeg } : undefined,
     };
   });

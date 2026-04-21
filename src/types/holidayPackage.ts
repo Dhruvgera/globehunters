@@ -450,6 +450,10 @@ export interface HolidaySearchCriteria {
   HotelDayOption?: number;
   /** Whether upstream search has completed */
   searchComplete?: boolean;
+  /** Check-in date from API (YYYY-MM-DD) */
+  CheckInDate?: string;
+  /** Check-out date from API (YYYY-MM-DD) */
+  CheckOutDate?: string;
   /** Legacy IDs shape kept for compatibility with older callers */
   ids?: HolidaySearchCriteriaIds;
   /** Room occupancy breakdown */
@@ -962,6 +966,10 @@ export interface PackageSearchResult {
   countryName?: string;
   /** Keep the upstream hotel row so package mode can reuse richer hotel data */
   rawSearchResult?: unknown;
+  /** Check-in date from API response (YYYY-MM-DD) */
+  checkInDate?: string;
+  /** Check-out date from API response (YYYY-MM-DD) */
+  checkOutDate?: string;
   /** Flight details for this package */
   flight?: {
     outbound: TransformedFlightLeg;

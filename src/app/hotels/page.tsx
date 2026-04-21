@@ -835,6 +835,8 @@ function HotelsPageInner() {
                 countryName: pkg.address?.country || pkg.countryName || "",
                 mealPlans: pkg.mealPlans || [],
                 refundable: undefined,
+                checkInDate: pkg.checkInDate,
+                checkOutDate: pkg.checkOutDate,
                 rawSearchResult: pkg.rawSearchResult ?? pkg,
               };
             });
