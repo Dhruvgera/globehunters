@@ -1581,7 +1581,10 @@ export default function HotelRoomsPage() {
   const hasImportantInfo = hotel.importantInfo.trim().length > 0;
   const hasAccessibilitySection = hasImportantInfo;
   const hasAboutProperty = hotel.about.description.trim().length > 0;
-  const aboutParagraphs = useMemo(() => splitHotelTextIntoParagraphs(hotel.about.description), [hotel.about.description]);
+  const aboutParagraphs = useMemo(
+    () => splitHotelTextIntoParagraphs(hotel.about.description).filter((p) => !/^Type is:/i.test(p)),
+    [hotel.about.description]
+  );
   const hasNearbySection = hotel.nearby.length > 0;
   const hasAmenitiesSection = hotel.amenities.length > 0;
   const hasAboutSection = hasAboutProperty || hasNearbySection || hasAmenitiesSection;
