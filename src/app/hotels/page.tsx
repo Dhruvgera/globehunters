@@ -2055,10 +2055,10 @@ function HotelsPageInner() {
               </div>
             )}
 
-            {((loadingMoreHotels && hasAttemptedFetch) || (hotels.length > 0 && (breakfastEnriching || contentEnriching || trustYouEnriching))) && (
+            {((loadingMoreHotels && hasAttemptedFetch ) || (hotels.length > 0 && (breakfastEnriching || contentEnriching || trustYouEnriching))) && (
               <div className="inline-flex items-center gap-2 text-xs text-[#3A478A]">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#3754ED] animate-pulse" />
-                {loadingMoreHotels ? "More hotels are being added…" : "Updating hotel details…"}
+                {hotels.length > 0 ? "More hotels are being added…" : "Updating hotel details…"}
               </div>
             )}
 

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import {useRouter} from "next/navigation";
 import { Check, ChevronRight, PawPrint, Bus, Coffee, X, Star } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -77,6 +78,7 @@ export function HotelResultCard({
   const criteriaId = raw?.searchCriteriaId;
   const srId = raw?.id;
   const provider = raw?.provider;
+  const router = useRouter();
   if (criteriaId != null && String(criteriaId).trim()) detailParams.set("searchCriteriaId", String(criteriaId));
   // Avoid `.../hotels/<srId>?srId=<srId>` when our route param already equals srId.
   if (srId != null && String(srId).trim() && String(srId) !== String(hotel.id)) detailParams.set("srId", String(srId));
@@ -103,7 +105,11 @@ export function HotelResultCard({
     <motion.div
       role="button"
       tabIndex={0}
-      onClick={onSelect}
+      onClick={(e) => {
+        e.preventDefault();
+        onSelect?.();
+        router.push(hotelDetailUrl);
+      }}
       onKeyDown={(e) => {
         if (!onSelect) return;
         if (e.key === "Enter" || e.key === " ") onSelect();
@@ -223,7 +229,7 @@ export function HotelResultCard({
 
             {/* CTA Button */}
             <Link href={hotelDetailUrl} className="w-full">
-              <Button className="rounded-full py-3 h-auto gap-2 text-sm font-semibold w-full bg-[#3754ED] hover:bg-[#2A3FB8] text-white">
+              <Button className="rounded-full py-3 h-auto gap-2 text-sm font-semibold w-full bg-[#3754ED] hover:bg-[#2A3FB8] text-white cursor-pointer">
                 Check Rooms
                 <ChevronRight className="h-4 w-4" />
               </Button>
