@@ -5,6 +5,7 @@ import Link from "next/link";
 import {useRouter} from "next/navigation";
 import { Check, ChevronRight, PawPrint, Bus, Coffee, X, Star } from "lucide-react";
 import { motion } from "framer-motion";
+import { useState, useCallback } from "react";
 
 import { Button } from "@/components/ui/button";
 import type { Hotel } from "@/types/hotel";
@@ -63,12 +64,14 @@ export function HotelResultCard({
   selected = false,
   onSelect,
   isPackageMode = false,
+  onImageError,
 }: {
   hotel: Hotel;
   view: Exclude<HotelViewMode, "map">;
   selected?: boolean;
   onSelect?: () => void;
   isPackageMode?: boolean;
+  onImageError?: () => void;
 }) {
   const isGrid = view === "grid";
   const showNightlyPrice = !isPackageMode;
@@ -94,6 +97,13 @@ export function HotelResultCard({
   const isHotelDatesDebugMode = process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES === "true";
   const hasReviewRating = hotel.reviews.score > 0;
   const packagePerPersonPrice = isPackageMode ? hotel.price.perPerson : undefined;
+  const [imageError, setImageError] = useState(false);
+  const handleImageError = useCallback(() => {
+    setImageError(true);
+    onImageError?.();
+  }, [onImageError]);
+
+  if (imageError) return null;
 
   const rootClass = [
     "bg-white border rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden w-full max-w-full cursor-pointer",
@@ -129,6 +139,7 @@ export function HotelResultCard({
               className="object-cover object-center"
               sizes="(max-width: 1024px) 100vw, 360px"
               priority={false}
+              onError={handleImageError}
             />
           </div>
 
@@ -247,6 +258,7 @@ export function HotelResultCard({
               className="object-cover object-center"
               sizes="(max-width: 1024px) 100vw, 220px"
               priority={false}
+              onError={handleImageError}
             />
           </div>
 

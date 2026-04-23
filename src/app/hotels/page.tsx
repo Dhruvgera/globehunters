@@ -362,6 +362,7 @@ function HotelsPageInner() {
   const [noResultsMessage, setNoResultsMessage] = useState<string | null>(null);
   const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
   const [displayedHotelsCount, setDisplayedHotelsCount] = useState(12);
+  const [hiddenImageHotelIds, setHiddenImageHotelIds] = useState<Set<string>>(new Set());
   const activeRequestSeq = useRef(0);
   const contentInflightRef = useRef<Set<string>>(new Set());
   const contentAttemptRef = useRef<Map<string, { attempts: number; lastAttemptAt: number; ok: boolean }>>(new Map());
@@ -710,6 +711,7 @@ function HotelsPageInner() {
       setHotels([]);
       setSelectedHotelKey("");
       setDisplayedHotelsCount(12);
+      setHiddenImageHotelIds(new Set());
       setBreakfastByHotelId({});
       setBreakfastEnriching(false);
       setTrustYouEnriching(false);
@@ -1619,6 +1621,19 @@ function HotelsPageInner() {
     return filteredHotels.slice(0, displayedHotelsCount);
   }, [displayedHotelsCount, filteredHotels]);
 
+  const visibleDisplayedCount = displayedHotels.filter((h) => !hiddenImageHotelIds.has(h.id)).length;
+
+  useEffect(() => {
+    if (hiddenImageHotelIds.size === 0) return;
+    const targetVisible = displayedHotelsCount;
+    if (visibleDisplayedCount >= targetVisible) return;
+    const deficit = targetVisible - visibleDisplayedCount;
+    const nextCount = Math.min(displayedHotelsCount + deficit, filteredHotels.length);
+    if (nextCount > displayedHotelsCount) {
+      setDisplayedHotelsCount(nextCount);
+    }
+  }, [hiddenImageHotelIds.size, visibleDisplayedCount, displayedHotelsCount, filteredHotels.length]);
+
   const hasMoreHotels = displayedHotelsCount < filteredHotels.length;
 
   // TrustYou enrichment: fetch live review scores for visible hotels and merge into card ratings.
@@ -2079,6 +2094,7 @@ function HotelsPageInner() {
                     selected={hotelKey === selectedHotelKey}
                     onSelect={() => setSelectedHotelKey(hotelKey)}
                     isPackageMode={isPackageMode}
+                    onImageError={() => setHiddenImageHotelIds((prev) => { const next = new Set(prev); next.add(hotel.id); return next; })}
                   />
                     );
                   })()
@@ -2099,6 +2115,7 @@ function HotelsPageInner() {
                       selected={hotelKey === selectedHotelKey}
                       onSelect={() => setSelectedHotelKey(hotelKey)}
                       isPackageMode={isPackageMode}
+                      onImageError={() => setHiddenImageHotelIds((prev) => { const next = new Set(prev); next.add(hotel.id); return next; })}
                     />
                       );
                     })()
@@ -2117,6 +2134,7 @@ function HotelsPageInner() {
                       selected={hotelKey === selectedHotelKey}
                       onSelect={() => setSelectedHotelKey(hotelKey)}
                       isPackageMode={isPackageMode}
+                      onImageError={() => setHiddenImageHotelIds((prev) => { const next = new Set(prev); next.add(hotel.id); return next; })}
                     />
                       );
                     })()

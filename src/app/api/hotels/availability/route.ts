@@ -11,6 +11,7 @@ import { buildHotelbedsOccupancy } from '@/lib/hotelbeds/occupancy';
 import { fetchVyspaLiveProperties } from '@/lib/vyspa/liveProperties';
 import { buildHotelbedsToVyspaIdMap, dedupeVyspaWithHotelbedsByLiveProperties } from '@/lib/hotels/dedupe';
 import { normalizeVyspaAvailabilityPayload } from '@/lib/vyspa/hotelsAvailability';
+import { fixResultsImageUrls } from '@/lib/hotels/imageUrl';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -702,7 +703,8 @@ export async function POST(req: Request) {
       fingerprint: hybridRequestFingerprint,
     });
     if (cachedVyspa) {
-      return NextResponse.json(withCriteriaProvider(cachedVyspa, 'vyspa'), { status: 200 });
+      const fixed = { ...cachedVyspa, Results: fixResultsImageUrls(Array.isArray((cachedVyspa as any)?.Results) ? (cachedVyspa as any).Results : []) };
+      return NextResponse.json(withCriteriaProvider(fixed, 'vyspa'), { status: 200 });
     }
 
     const background = ensureVyspaBackgroundSearch({
@@ -719,7 +721,8 @@ export async function POST(req: Request) {
       fingerprint: hybridRequestFingerprint,
     });
     if (resolvedVyspa) {
-      return NextResponse.json(withCriteriaProvider(resolvedVyspa, 'vyspa'), { status: 200 });
+      const fixed = { ...resolvedVyspa, Results: fixResultsImageUrls(Array.isArray((resolvedVyspa as any)?.Results) ? (resolvedVyspa as any).Results : []) };
+      return NextResponse.json(withCriteriaProvider(fixed, 'vyspa'), { status: 200 });
     }
 
     return NextResponse.json({
@@ -754,7 +757,7 @@ export async function POST(req: Request) {
     }
     return NextResponse.json(
       {
-        Results: hb.results,
+        Results: fixResultsImageUrls(hb.results),
         Criteria: { searchCriteriaId: hb.token, provider: 'hotelbeds' },
         ...(hb.debugInfo ? { debug: hb.debugInfo } : {}),
       },
@@ -797,7 +800,7 @@ export async function POST(req: Request) {
     if (hb.ok) {
       return NextResponse.json(
         {
-          Results: hb.results,
+          Results: fixResultsImageUrls(hb.results),
           Criteria: {
             provider: 'hybrid',
             ...(requestedSearchCriteriaId ? { searchCriteriaId: requestedSearchCriteriaId } : {}),
@@ -849,7 +852,7 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         ...vyspaPayloadData,
-        Results: vyspaResults,
+        Results: fixResultsImageUrls(vyspaResults),
         Criteria: {
           ...((vyspaPayloadData as any)?.Criteria || {}),
           provider: 'hybrid',
@@ -906,7 +909,7 @@ export async function POST(req: Request) {
   return NextResponse.json(
     {
       ...vyspaPayloadData,
-      Results: dedupe.results,
+      Results: fixResultsImageUrls(dedupe.results),
       Criteria: {
         ...((vyspaPayloadData as any)?.Criteria || {}),
         provider: 'hybrid',

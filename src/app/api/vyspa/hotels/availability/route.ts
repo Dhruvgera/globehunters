@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { vyspaRestFetch } from '@/lib/vyspa/restClient';
 import { normalizeVyspaAvailabilityPayload } from '@/lib/vyspa/hotelsAvailability';
+import { fixResultsImageUrls } from '@/lib/hotels/imageUrl';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -80,7 +81,7 @@ export async function POST(req: Request) {
   return NextResponse.json(
     {
       ...(result.data as any),
-      Results: filteredResults,
+      Results: fixResultsImageUrls(filteredResults),
     },
     { status: 200 }
   );
