@@ -13,6 +13,8 @@ import type {
   TransformedAlternateFlight,
   HolidayHotelFilters,
   HolidayFlightFilter,
+  HolidayPackageViewResponse,
+  AccommodationViewResponse,
 } from '@/types/holidayPackage';
 
 // ============================================================================
@@ -308,6 +310,58 @@ class PackageService {
       };
     } catch (error) {
       console.error('[PackageService] Error getting package details:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get package details via encrypted deeplink key (holiday_package_view)
+   * Self-contained — no session/RequestId needed.
+   */
+  async getPackageView(key: string): Promise<HolidayPackageViewResponse> {
+    try {
+      console.log('[PackageService] Getting package view via deeplink key');
+
+      const response = await fetch(`/api/packages/view?key=${encodeURIComponent(key)}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+        console.error('[PackageService] Package view error:', error);
+        throw new Error(error.message || 'Failed to get package view');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('[PackageService] Error getting package view:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get hotel details via encrypted deeplink key (accommodationView)
+   * Self-contained — no session/searchCriteriaId needed.
+   */
+  async getHotelView(key: string): Promise<AccommodationViewResponse> {
+    try {
+      console.log('[PackageService] Getting hotel view via deeplink key');
+
+      const response = await fetch(`/api/hotels/view?key=${encodeURIComponent(key)}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+        console.error('[PackageService] Hotel view error:', error);
+        throw new Error(error.message || 'Failed to get hotel view');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('[PackageService] Error getting hotel view:', error);
       throw error;
     }
   }

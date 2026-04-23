@@ -970,10 +970,133 @@ export interface PackageSearchResult {
   checkInDate?: string;
   /** Check-out date from API response (YYYY-MM-DD) */
   checkOutDate?: string;
+  /** Encrypted deep link keys per meal plan code (e.g. { RO: "...", BB: "...", HB: "..." }) */
+  deepLinkKeys?: Record<string, string>;
+  /** Deep link base URL (without key appended) */
+  deepLinkUrl?: string;
   /** Flight details for this package */
   flight?: {
     outbound: TransformedFlightLeg;
     inbound?: TransformedFlightLeg;
+  };
+}
+
+// ─── View API Response Types (v5.17.0 deeplink key detail retrieval) ───
+
+/** Room option from holiday_package_view / accommodationView */
+export interface ViewRoomOption {
+  id: string;
+  room_name: string;
+  days_spent: number;
+  allocated_rooms: number;
+  allocation_status: number;
+  allocation_status_text: string;
+  supplier_id: number;
+  supplier_name: string;
+  MealPlan: string; // e.g. "RO", "BB", "HB"
+  meal_name: string;
+  mealId: number;
+  currency_code: string;
+  sell_currency_code: string;
+  cust_tot_sell_amt: number;
+  net_price: number;
+  exchange_rate: number;
+  nonRef: number; // 1 = non-refundable
+  cancellation_policy: string;
+  specialoffer: boolean;
+  has_specialoffer: boolean;
+  CheckInDate: string;
+  CheckOutDate: string;
+  locally_payable_fees?: {
+    billable?: { value: number; currency: string };
+    request?: { value: number; currency: string };
+  };
+  occupancies?: {
+    room_no: number;
+    adults: number;
+    children: number;
+    children_ages?: number[];
+  };
+}
+
+/** Hotel details from holiday_package_view response */
+export interface PackageViewHotelDetails {
+  hotel_id: number;
+  VmapId: number;
+  hotel_name: string;
+  quickDescription: string;
+  hotel_rating: number;
+  searchCriteriaId: number;
+  image_name: string;
+  vendor_name: string;
+  geo_loc_latitude: number;
+  geo_loc_longitude: number;
+  address1: string | null;
+  address2: string | null;
+  post_code: string;
+  SellCur: string;
+  rooms: Record<string, ViewRoomOption[]>; // room1options, room2options, etc.
+}
+
+/** Full holiday_package_view API response */
+export interface HolidayPackageViewResponse {
+  success: boolean;
+  status: string;
+  results: {
+    HotelDayOption: number;
+    HotelDayOptionRemarks: string;
+    RequestId: number;
+    HotelResultId: number;
+    FlightResultId: string;
+    FlightDetails: Array<{
+      Segment_number: number;
+      Route: string;
+      Flying_time: number;
+      Total_travel_time: number;
+      Stops: number;
+      Majority_carrier: string;
+      Flights: Array<{
+        cabin_class: string;
+        fare_basis: string;
+        fare_class: string;
+        airline_code: string;
+        flight_number: number;
+        baggage: string;
+        departure_terminal: number | string;
+        arrival_terminal: string;
+        departure_airport: string;
+        arrival_airport: string;
+        departure_date: string;
+        arrival_date: string;
+        departure_time: number;
+        arrival_time: number;
+        dep_arr_date_diff: number;
+        aircraft_type: number;
+        distance: number;
+        travel_time: number;
+        airline_name: string;
+        class_name: string;
+        cabin_type: number;
+        operating_airline_code: string;
+        operating_airline_name: string;
+        available_seats: number;
+        refundable: number;
+        refundable_text: string;
+        code_share_info: string;
+      }>;
+    }>;
+    HotelDetails: PackageViewHotelDetails;
+  };
+}
+
+/** Full accommodationView API response (hotel-only via deeplink key) */
+export interface AccommodationViewResponse {
+  success: boolean;
+  status: string;
+  results: {
+    RequestId: number;
+    HotelResultId: number;
+    HotelDetails: PackageViewHotelDetails;
   };
 }
 

@@ -8,6 +8,7 @@ import Footer from "@/components/navigation/Footer";
 import SearchBar from "@/components/search/SearchBar";
 import { Plane, Loader2, MapPin, Phone, ChevronRight } from "lucide-react";
 import { useBookingStore } from "@/store/bookingStore";
+import { usePackageDeeplink } from "@/hooks/usePackageDeeplink";
 import { useAffiliate, useAffiliatePhone } from "@/lib/AffiliateContext";
 import { normalizeCabinClass } from "@/lib/utils";
 import type { SearchParams } from "@/types/flight";
@@ -255,6 +256,7 @@ function HomeContent() {
   const searchSectionRef = useRef<HTMLElement | null>(null);
 
   const [isLoadingDeeplink, setIsLoadingDeeplink] = useState(false);
+  usePackageDeeplink();
 
   const getBaseSearchParams = (): SearchParams => ({
     from: searchFormState?.from || "",

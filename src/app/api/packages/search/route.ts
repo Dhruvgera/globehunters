@@ -240,6 +240,10 @@ export function transformResponse(
       rawSearchResult: hotelRow,
       checkInDate,
       checkOutDate,
+      deepLinkKeys: typeof hotelRow.keys === 'object' && hotelRow.keys !== null && !Array.isArray(hotelRow.keys)
+        ? hotelRow.keys as Record<string, string>
+        : undefined,
+      deepLinkUrl: typeof hotelRow.DeepLink === 'string' ? hotelRow.DeepLink : undefined,
       flight: outboundLeg ? { outbound: outboundLeg, inbound: inboundLeg } : undefined,
     };
   });

@@ -22,6 +22,8 @@ import type {
   SelectedPackage,
   TransformedAlternateFlight,
   HolidayDestination,
+  HolidayPackageViewResponse,
+  AccommodationViewResponse,
 } from '@/types/holidayPackage';
 
 type Dateish = Date | string | number | null | undefined;
@@ -318,6 +320,10 @@ interface BookingState {
   isFromDeeplink: boolean;
   setIsFromDeeplink: (isDeeplink: boolean) => void;
 
+  // Deeplink view data (from holiday_package_view / accommodationView via encrypted key)
+  deeplinkViewData: HolidayPackageViewResponse | AccommodationViewResponse | null;
+  setDeeplinkViewData: (data: HolidayPackageViewResponse | AccommodationViewResponse | null) => void;
+
   // Selected flight
   selectedFlight: Flight | null;
   selectedFareType: string;
@@ -399,6 +405,7 @@ const initialState = {
   // End package state
   affiliateData: null,
   isFromDeeplink: false,
+  deeplinkViewData: null,
   selectedFlight: null,
   selectedFareType: 'Economy',
   selectedUpgradeOption: null,
@@ -551,6 +558,7 @@ export const useBookingStore = create<BookingState & HydrationState>()(
 
       // Deeplink tracking
       setIsFromDeeplink: (isDeeplink) => set({ isFromDeeplink: isDeeplink }),
+      setDeeplinkViewData: (data) => set({ deeplinkViewData: data }),
 
       // Selected flight
       setSelectedFlight: (flight, fareType = 'Economy') =>

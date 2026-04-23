@@ -837,6 +837,8 @@ function HotelsPageInner() {
                 refundable: undefined,
                 checkInDate: pkg.checkInDate,
                 checkOutDate: pkg.checkOutDate,
+                deepLinkKeys: pkg.deepLinkKeys,
+                deepLinkUrl: pkg.deepLinkUrl,
                 rawSearchResult: pkg.rawSearchResult ?? pkg,
               };
             });
@@ -1110,6 +1112,10 @@ function HotelsPageInner() {
               countryName,
               mealPlans,
               refundable: hbCheapest?.refundable === true ? true : hbCheapest?.refundable === false ? false : null,
+              deepLinkKeys: typeof r?.keys === 'object' && r?.keys !== null && !Array.isArray(r?.keys)
+                ? (r?.keys as Record<string, string>)
+                : undefined,
+              deepLinkUrl: typeof r?.DeepLink === 'string' ? r.DeepLink : undefined,
               rawSearchResult,
             };
           });

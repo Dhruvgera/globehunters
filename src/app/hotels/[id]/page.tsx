@@ -13,6 +13,7 @@ import {
   Grid3X3,
   Building2,
   Calendar,
+  Plane,
   Users,
   SlidersHorizontal,
   Wifi,
@@ -43,6 +44,7 @@ import { useBookingStore } from "@/store/bookingStore";
 import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
 import { resolveTrustYouHotelId } from "@/lib/trustyou/hotelMapping";
 import type { TrustYouHotelReviewSummary } from "@/types/trustyou";
+import type { HolidayPackageViewResponse, AccommodationViewResponse, ViewRoomOption } from "@/types/holidayPackage";
 import { resolvePackagePricing } from "@/lib/package/pricing";
 import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
 import {
@@ -53,6 +55,7 @@ import {
 import { fixStubaImageUrl } from "@/lib/hotels/imageUrl";
 import { convertHotelLocalTaxTotal, formatMoneyFromCode, normalizeCurrencyCode } from "@/lib/currency/localTaxDisplay";
 import { parsePackageHotelContent, type PackageHotelNearbyPlace } from "@/lib/package/hotelContent";
+import { usePackageDeeplink } from "@/hooks/usePackageDeeplink";
 
 function LoadingBlock({ className }: { className: string }) {
   return <div className={`animate-pulse bg-gray-200/70 rounded-xl ${className}`} />;
@@ -713,6 +716,56 @@ function flattenRoomImages(roomImages: Record<string, string[]> | null | undefin
   return Object.values(roomImages).flatMap((urls) => (Array.isArray(urls) ? urls.filter(Boolean) : []));
 }
 
+function normalizeDeeplinkImageCandidate(value: unknown): string {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const fixed = fixStubaImageUrl(raw);
+  if (fixed) return fixed;
+  return normalizeRemoteImageUrl(raw);
+}
+
+function extractDeeplinkImagesFromRow(row: UnknownRecord): string[] {
+  const directCandidates = [
+    row.image_name,
+    row.image,
+    row.image_url,
+    row.imageUrl,
+    row.room_image,
+    row.roomImage,
+    row.printed_image_url,
+    row.source_image_url,
+    row.url,
+  ]
+    .map(normalizeDeeplinkImageCandidate)
+    .filter(Boolean);
+
+  const groupedCandidates = [
+    ...asArray(row.images),
+    ...asArray(row.room_images),
+    ...asArray(row.roomImages),
+    ...asArray(row.gallery),
+    ...asArray(row.photos),
+    ...asArray(row.VendorImages),
+  ]
+    .flatMap((entry) => {
+      if (typeof entry === "string") return [normalizeDeeplinkImageCandidate(entry)];
+      const nested = asRecord(entry);
+      const vendorImage = asRecord(nested.VendorImage);
+      return [
+        normalizeDeeplinkImageCandidate(vendorImage.printed_image_url),
+        normalizeDeeplinkImageCandidate(vendorImage.source_image_url),
+        normalizeDeeplinkImageCandidate(vendorImage.url),
+        normalizeDeeplinkImageCandidate(nested.url),
+        normalizeDeeplinkImageCandidate(nested.image),
+        normalizeDeeplinkImageCandidate(nested.image_url),
+        normalizeDeeplinkImageCandidate(nested.image_name),
+      ];
+    })
+    .filter(Boolean);
+
+  return mergeUniqueImages(directCandidates, groupedCandidates);
+}
+
 function sanitizeFacilityText(value: unknown): string {
   const text = sanitizeHotelText(value).replace(/^[^A-Za-z0-9]+/, "").trim();
   if (!text || /^\d+$/.test(text)) return "";
@@ -971,6 +1024,12 @@ export default function HotelRoomsPage() {
   const setHotelResultsMeta = useBookingStore((s) => s.setHotelResultsMeta);
   const hotelFiltersCache = useBookingStore((s) => s.hotelFiltersCache);
   const setSearchRequestId = useBookingStore((s) => s.setSearchRequestId);
+  const deeplinkViewData = useBookingStore((s) => s.deeplinkViewData);
+  const setDeeplinkViewData = useBookingStore((s) => s.setDeeplinkViewData);
+  const isFromDeeplink = useBookingStore((s) => s.isFromDeeplink);
+
+  // Handle deeplink entry (packageKey/hotelKey URL params)
+  usePackageDeeplink();
 
   // State
   const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null);
@@ -1749,6 +1808,172 @@ export default function HotelRoomsPage() {
     let cancelled = false;
 
     async function loadRooms() {
+      // ─── Deeplink view data path (self-contained, no session needed) ───
+      if (deeplinkViewData?.success) {
+        const viewHotel = deeplinkViewData.results.HotelDetails;
+        const isDeeplinkMatch = String(viewHotel.hotel_id) === String(hotelId);
+
+        if (isDeeplinkMatch) {
+          setRoomsLoading(true);
+          setRoomsError(null);
+
+          try {
+            const roomGroups = Object.values(viewHotel.rooms || {}).filter(
+              (entry): entry is ViewRoomOption[] => Array.isArray(entry)
+            );
+            const flattenedRooms = roomGroups.flat().map((option): RoomCardData => {
+              const total = Number(option.cust_tot_sell_amt ?? option.net_price ?? 0);
+              const nights = Math.max(1, Number(option.days_spent ?? 1));
+              const currencyCode = String(option.sell_currency_code || option.currency_code || viewHotel.SellCur || "GBP").toUpperCase();
+              const currency = currencyCode === "GBP" ? "£" : currencyCode;
+              return {
+                id: String(option.id || ""),
+                sourceRoomOptionId: String(option.id || ""),
+                name: String(option.room_name || "Room"),
+                bedType: String(option.meal_name || option.MealPlan || "Meal plan"),
+                reviews: { score: 0, label: "No reviews", count: 0 },
+                isRefundable: Number(option.nonRef ?? 1) === 0,
+                paymentType: "Pay now",
+                amenities: [] as RoomAmenity[],
+                price: { currency, nightly: nights > 0 ? total / nights : total, total },
+                _raw: option as unknown as Record<string, unknown>,
+              };
+            });
+
+            flattenedRooms.sort((a, b) => (a.price.total || 0) - (b.price.total || 0));
+
+            const headerImage = fixStubaImageUrl(viewHotel.image_name) || "";
+            const headerAddress = [viewHotel.address1, viewHotel.address2].filter(Boolean).join(", ");
+            const roomImageCandidates = roomGroups
+              .flat()
+              .flatMap((option) => extractDeeplinkImagesFromRow(option as unknown as UnknownRecord));
+            const hotelImageCandidates = extractDeeplinkImagesFromRow(viewHotel as unknown as UnknownRecord);
+            const deeplinkGallery = mergeUniqueImages(
+              [headerImage],
+              hotelImageCandidates,
+              roomImageCandidates
+            ).slice(0, 24);
+            const latitude = Number(
+              (viewHotel as unknown as UnknownRecord).geo_loc_latitude ??
+              (viewHotel as unknown as UnknownRecord).latitude ??
+              0
+            );
+            const longitude = Number(
+              (viewHotel as unknown as UnknownRecord).geo_loc_longitude ??
+              (viewHotel as unknown as UnknownRecord).longitude ??
+              0
+            );
+            const hasCoordinates =
+              Number.isFinite(latitude) &&
+              Number.isFinite(longitude) &&
+              latitude !== 0 &&
+              longitude !== 0;
+
+            setRemoteHotelHeader({
+              name: viewHotel.hotel_name,
+              rating: Number(viewHotel.hotel_rating || 0),
+              image: headerImage,
+              address: headerAddress,
+            });
+
+            setRemoteRooms(flattenedRooms);
+            setSelectedHotel({ hotelId, hotelName: viewHotel.hotel_name });
+            if (deeplinkGallery.length > 0) setGalleryImages(deeplinkGallery);
+            if (hasCoordinates) setCoordinates({ lat: latitude, lng: longitude });
+            setHotelDetailsCache(hotelId, {
+              hotelId,
+              hotelName: viewHotel.hotel_name,
+              hotelRating: Number(viewHotel.hotel_rating || 0) || undefined,
+              mainImage: headerImage || deeplinkGallery[0] || undefined,
+              address: headerAddress || undefined,
+              galleryImages: deeplinkGallery,
+              rooms: flattenedRooms,
+              fetchedAt: Date.now(),
+            });
+
+            // Enrich deeplink payload with the same details API used in normal flow.
+            // package_view/accommodationView usually has one primary image, while
+            // get_hotel_details can provide VendorImages and richer media metadata.
+            const resolvedHotelId = Number((viewHotel as unknown as UnknownRecord).hotel_id);
+            const resolvedVMapId = Number((viewHotel as unknown as UnknownRecord).VmapId);
+            const detailsPayload: any[] = Number.isFinite(resolvedHotelId) && resolvedHotelId > 0
+              ? [String(resolvedHotelId)]
+              : Number.isFinite(resolvedVMapId) && resolvedVMapId > 0
+                ? [0, { vMapId: resolvedVMapId }]
+                : [];
+
+            if (detailsPayload.length > 0) {
+              hotelService
+                .hotelSearchDetails(detailsPayload)
+                .then((detailsResponse: any) => {
+                  if (cancelled) return;
+
+                  const detailsData = extractVyspaGetHotelDetailsData(detailsResponse);
+                  const vyspaMedia = parseVyspaHotelDetailsMedia(detailsResponse);
+                  const nextGallery = mergeUniqueImages(
+                    detailsData.galleryImages || [],
+                    vyspaMedia.hotelImages || [],
+                    flattenRoomImages(vyspaMedia.roomImages),
+                    deeplinkGallery
+                  ).slice(0, 24);
+
+                  if (nextGallery.length > 0) {
+                    setGalleryImages(nextGallery);
+                  }
+                  if (detailsData.coordinates && !hasCoordinates) {
+                    setCoordinates(detailsData.coordinates);
+                  }
+                  if (detailsData.description) {
+                    setDetailsText((previous) =>
+                      previous.trim() ? mergeTextContent(previous, detailsData.description) : detailsData.description
+                    );
+                  }
+                  if (detailsData.policies) {
+                    setCancellationText((previous) => mergeTextContent(previous, detailsData.policies));
+                  }
+                  if (detailsData.importantInfo) {
+                    setImportantInfoText((previous) => mergeTextContent(previous, detailsData.importantInfo));
+                  }
+                  if (detailsData.amenities.length > 0) {
+                    setRemoteAmenities((previous) => Array.from(new Set([...(previous || []), ...detailsData.amenities])));
+                  }
+
+                  setHotelDetailsCache(hotelId, {
+                    hotelId,
+                    hotelName: viewHotel.hotel_name,
+                    hotelRating: Number(viewHotel.hotel_rating || 0) || undefined,
+                    mainImage: headerImage || nextGallery[0] || undefined,
+                    address: headerAddress || undefined,
+                    galleryImages: nextGallery.length > 0 ? nextGallery : deeplinkGallery,
+                    rooms: flattenedRooms,
+                    detailsText: detailsData.description || "",
+                    cancellationText: detailsData.policies || "",
+                    amenities: detailsData.amenities,
+                    fetchedAt: Date.now(),
+                  });
+                })
+                .catch(() => {});
+            }
+
+            if (!cancelled) {
+              setRoomsLoading(false);
+            }
+
+            return; // Skip normal flow
+          } catch (err) {
+            console.error("[loadRooms] Failed to process deeplink view data:", err);
+            if (!cancelled) {
+              setRoomsError(err instanceof Error ? err.message : "Failed to load room details");
+              setRoomsLoading(false);
+            }
+            // Clear stale deeplink data so user can retry normal flow
+            setDeeplinkViewData(null);
+            return;
+          }
+        }
+      }
+      // ─── End deeplink path ───
+
       const meta = hotelResultsMeta?.[hotelId];
       const metaProvider =
         meta?.provider === "hotelbeds" || meta?.provider === "vyspa" ? meta.provider : undefined;
@@ -2576,6 +2801,47 @@ export default function HotelRoomsPage() {
                 </div>
               </div>
 
+                  {/* Flight summary — only shown for package deeplink with flight data */}
+                  {deeplinkViewData?.success && "FlightResultId" in deeplinkViewData.results && (() => {
+                    const flights = (deeplinkViewData as HolidayPackageViewResponse).results.FlightDetails;
+                    if (flights?.length > 0) {
+                      return (
+                        <div className="mt-3 rounded-xl border border-[#DFE0E4] bg-[#F8FAFC] p-4">
+                          <div className="flex items-center gap-2 text-sm font-semibold text-[#010D50] mb-3">
+                            <Plane className="w-4 h-4 text-[#3754ED]" />
+                            Flight Details
+                          </div>
+                          {flights.map((seg, idx) => (
+                            <div key={idx} className="flex flex-col gap-1 text-sm">
+                              <div className="font-medium text-[#010D50]">
+                                {idx === 0 ? "Outbound" : "Inbound"} · {seg.Route}
+                              </div>
+                              {seg.Flights?.map((leg, legIdx) => (
+                                <div key={legIdx} className="flex items-center gap-2 text-xs text-[#3A478A] ml-2">
+                                  <span className="min-w-[60px]">{leg.departure_airport}</span>
+                                  <span>→</span>
+                                  <span className="min-w-[60px]">{leg.arrival_airport}</span>
+                                  <span className="ml-auto">{leg.airline_name}</span>
+                                  <span>{leg.flight_number}</span>
+                                  <span className="text-[#6B7280]">
+                                    {String(leg.departure_time || "").replace(/(\d{2})(\d{2})/, "$1:$2")}
+                                    {" - "}
+                                    {String(leg.arrival_time || "").replace(/(\d{2})(\d{2})/, "$1:$2")}
+                                  </span>
+                                </div>
+                              ))}
+                              <div className="text-xs text-[#6B7280] mt-1">
+                                {seg.Flying_time ? `${Math.ceil(seg.Flying_time / 60)}h ${seg.Flying_time % 60}m` : ""}
+                                {seg.Stops > 0 ? ` · ${seg.Stops} stop${seg.Stops > 1 ? "s" : ""}` : ""}
+                                · {seg.Majority_carrier}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }
+                  })()}
+
               {/* Image Gallery - Main image left, 3 thumbnails stacked right */}
               <div className="flex flex-col lg:flex-row gap-3">
                 {(() => {
@@ -3341,7 +3607,12 @@ export default function HotelRoomsPage() {
                     params.set("adults", adults);
                     params.set("children", children);
                     params.set("tripType", "round-trip");
-                    router.push(`/search?${params.toString()}`);
+                    // Deeplink: flight already selected, skip flight selection → go to review
+                    if (isFromDeeplink) {
+                      router.push(`/packages/review?${params.toString()}`);
+                    } else {
+                      router.push(`/search?${params.toString()}`);
+                    }
                   };
                   const handleMultiRoomCardSelect = () => {
                     setActiveRoomCardId(String(room.id));

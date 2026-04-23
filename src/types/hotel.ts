@@ -69,4 +69,8 @@ export interface Hotel {
   checkInDate?: string;
   /** Check-out date from package search response (YYYY-MM-DD) */
   checkOutDate?: string;
+  /** Encrypted deep link keys per meal plan code (e.g. { RO: "...", BB: "..." }) */
+  deepLinkKeys?: Record<string, string>;
+  /** Deep link base URL (without key appended) */
+  deepLinkUrl?: string;
 }

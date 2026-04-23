@@ -146,7 +146,7 @@ function buildPackageRoomPassengers(
   return mapping;
 }
 
-function selectPackageRoomDetails(
+function resolveBookingRoomIdsFromDetail(
   rooms: Array<{ id?: number; selectionKey?: string }>,
   selectedRoomCount: number
 ) {
@@ -162,7 +162,51 @@ function selectPackageRoomDetails(
     uniqueRooms.push(room);
   }
 
-  return uniqueRooms.slice(0, Math.max(1, selectedRoomCount));
+  return uniqueRooms
+    .slice(0, Math.max(1, selectedRoomCount))
+    .map((room) => String(room.id || "").trim())
+    .filter(Boolean);
+}
+
+function normalizeRoomCodesToBookingIds(
+  rows: unknown[],
+  selectedRoomIds: string[]
+) {
+  const map = new Map<string, string>();
+  const normalizedSelected = selectedRoomIds.map((id) => String(id || "").trim()).filter(Boolean);
+
+  rows.forEach((row, index) => {
+    const current =
+      row && typeof row === "object" && "SearchResultRoomDetail" in (row as Record<string, unknown>)
+        ? ((row as Record<string, unknown>).SearchResultRoomDetail as Record<string, unknown>)
+        : (row as Record<string, unknown>);
+    const rawRow = (row as Record<string, unknown>) || {};
+
+    const bookingRoomId = String(
+      current?.id ?? current?.search_result_detail_id ?? ""
+    ).trim();
+    if (!bookingRoomId) return;
+
+    const candidates = [
+      rawRow?.roomCode,
+      rawRow?.room_code,
+      current?.roomCode,
+      current?.room_code,
+      current?.source_room_code,
+      current?.request_room_code,
+      normalizedSelected[index],
+    ]
+      .map((value) => String(value ?? "").trim())
+      .filter(Boolean);
+
+    for (const candidate of candidates) {
+      if (!map.has(candidate)) {
+        map.set(candidate, bookingRoomId);
+      }
+    }
+  });
+
+  return normalizedSelected.map((roomId) => map.get(roomId) || roomId);
 }
 
 function PackageTravellerDetailsInner() {
@@ -395,11 +439,19 @@ function PackageTravellerDetailsInner() {
   }, [hotelDetailsCache, packageDetails?.hotel, selectedHotel]);
 
   const stayDetails = useMemo(() => {
-    const checkIn = hotelSearch?.checkIn || packageDetails?.hotel?.rooms?.[0]?.checkIn || packageSearch?.checkIn || "";
+    const checkIn =
+      hotelSearch?.checkIn ||
+      packageDetails?.hotel?.rooms?.[0]?.checkIn ||
+      packageSearch?.checkIn ||
+      sp.get("checkIn") ||
+      sp.get("departureDate") ||
+      "";
     const checkOut =
       hotelSearch?.checkOut ||
       packageDetails?.hotel?.rooms?.[0]?.checkOut ||
       packageDetails?.hotel?.checkOutDate ||
+      sp.get("checkOut") ||
+      sp.get("returnDate") ||
       "";
     const derivedNights =
       checkIn && checkOut
@@ -428,6 +480,7 @@ function PackageTravellerDetailsInner() {
     packageSearch?.nights,
     packageSearch?.rooms,
     selectedHotelRoomIds.length,
+    sp,
   ]);
 
   const handleContinue = async () => {
@@ -457,19 +510,33 @@ function PackageTravellerDetailsInner() {
       setContactInfo(leadPassenger.email, `${leadPassenger.countryCode || ""}${leadPassenger.phone || ""}`);
 
       const currency = toIsoCurrency(selectedUpgrade?.currency || flight.currency);
+      const selectedRoomCodes = selectedHotelRoomIds
+        .map((id) => String(id || "").trim())
+        .filter(Boolean);
+      if (selectedRoomCodes.length === 0) {
+        throw new Error("Failed to resolve the selected package rooms for booking.");
+      }
+
+      const accommodationDetails = await hotelService.accommodationDetails([{ roomCode: selectedRoomCodes }]);
+      const accommodationRows =
+        accommodationDetails &&
+        typeof accommodationDetails === "object" &&
+        Array.isArray((accommodationDetails as { rooms?: unknown[] }).rooms)
+          ? (accommodationDetails as { rooms: unknown[] }).rooms
+          : [];
+      const canonicalSelectedRoomIds = normalizeRoomCodesToBookingIds(accommodationRows, selectedRoomCodes);
+
       const packageDetail = await packageService.getPackageDetails({
         flightResultId: flight.segmentResultId || flight.id,
-        hotelResultRoomIds: selectedHotelRoomIds,
+        hotelResultRoomIds: canonicalSelectedRoomIds,
       });
       const liveHotel = packageDetail.details.hotel;
       const liveFlight = packageDetail.details.flight;
-      const resolvedRoomIds = selectPackageRoomDetails(
+      const resolvedRoomIds = resolveBookingRoomIdsFromDetail(
         liveHotel?.rooms || [],
         selectedHotelRoomIds.length
-      )
-        .map((room) => String(room.id || "").trim())
-        .filter(Boolean);
-      if (!liveHotel?.id || resolvedRoomIds.length === 0) {
+      );
+      if (resolvedRoomIds.length === 0) {
         throw new Error("Failed to resolve the selected package rooms for booking.");
       }
 
