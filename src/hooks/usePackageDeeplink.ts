@@ -146,10 +146,9 @@ function buildSelectedFlightFromView(viewData: HolidayPackageViewResponse): Flig
 }
 
 function extractRoomConfigurations(hotelDetails: HolidayPackageViewResponse["results"]["HotelDetails"]) {
-  const groups = Object.values(hotelDetails.rooms || {}).filter(
-    (entry): entry is Array<{ occupancies?: { adults?: number; children?: number; children_ages?: number[] } }> =>
-      Array.isArray(entry)
-  );
+  const groups = Object.values(hotelDetails.rooms || {}).filter((entry) => Array.isArray(entry)) as Array<
+    Array<{ occupancies?: { adults?: number; children?: number; children_ages?: number[] } }>
+  >;
 
   const fromOccupancy = groups
     .map((group) => group[0]?.occupancies)

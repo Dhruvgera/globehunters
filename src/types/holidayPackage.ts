@@ -1035,6 +1035,8 @@ export interface PackageViewHotelDetails {
   address2: string | null;
   post_code: string;
   SellCur: string;
+  CheckInDate?: string | null;
+  CheckOutDate?: string | null;
   rooms: Record<string, ViewRoomOption[]>; // room1options, room2options, etc.
 }
 
