@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import Navbar from "@/components/navigation/Navbar";
@@ -1621,18 +1621,36 @@ function HotelsPageInner() {
     return filteredHotels.slice(0, displayedHotelsCount);
   }, [displayedHotelsCount, filteredHotels]);
 
-  const visibleDisplayedCount = displayedHotels.filter((h) => !hiddenImageHotelIds.has(h.id)).length;
+  const filteredHotelsRef = useRef(filteredHotels);
+  filteredHotelsRef.current = filteredHotels;
 
-  useEffect(() => {
-    if (hiddenImageHotelIds.size === 0) return;
-    const targetVisible = displayedHotelsCount;
-    if (visibleDisplayedCount >= targetVisible) return;
-    const deficit = targetVisible - visibleDisplayedCount;
-    const nextCount = Math.min(displayedHotelsCount + deficit, filteredHotels.length);
-    if (nextCount > displayedHotelsCount) {
-      setDisplayedHotelsCount(nextCount);
+  const pendingImageErrorsRef = useRef<Set<string>>(new Set());
+  const imageErrorFlushHandleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flushImageErrors = useCallback(() => {
+    imageErrorFlushHandleRef.current = null;
+    const pending = pendingImageErrorsRef.current;
+    if (pending.size === 0) return;
+    const batch = new Set(pending);
+    pending.clear();
+    setHiddenImageHotelIds((prev) => {
+      const merged = new Set(prev);
+      let added = 0;
+      for (const id of batch) {
+        if (!merged.has(id)) { merged.add(id); added++; }
+      }
+      if (added === 0) return prev;
+      setDisplayedHotelsCount((c) => Math.min(c + added, filteredHotelsRef.current.length));
+      return merged;
+    });
+  }, []);
+
+  const handleHotelImageError = useCallback((hotelId: string) => {
+    pendingImageErrorsRef.current.add(hotelId);
+    if (!imageErrorFlushHandleRef.current) {
+      imageErrorFlushHandleRef.current = setTimeout(flushImageErrors, 0);
     }
-  }, [hiddenImageHotelIds.size, visibleDisplayedCount, displayedHotelsCount, filteredHotels.length]);
+  }, [flushImageErrors]);
 
   const hasMoreHotels = displayedHotelsCount < filteredHotels.length;
 
@@ -2094,7 +2112,7 @@ function HotelsPageInner() {
                     selected={hotelKey === selectedHotelKey}
                     onSelect={() => setSelectedHotelKey(hotelKey)}
                     isPackageMode={isPackageMode}
-                    onImageError={() => setHiddenImageHotelIds((prev) => { const next = new Set(prev); next.add(hotel.id); return next; })}
+                    onImageError={() => handleHotelImageError(hotel.id)}
                   />
                     );
                   })()
@@ -2115,7 +2133,7 @@ function HotelsPageInner() {
                       selected={hotelKey === selectedHotelKey}
                       onSelect={() => setSelectedHotelKey(hotelKey)}
                       isPackageMode={isPackageMode}
-                      onImageError={() => setHiddenImageHotelIds((prev) => { const next = new Set(prev); next.add(hotel.id); return next; })}
+                      onImageError={() => handleHotelImageError(hotel.id)}
                     />
                       );
                     })()
@@ -2134,7 +2152,7 @@ function HotelsPageInner() {
                       selected={hotelKey === selectedHotelKey}
                       onSelect={() => setSelectedHotelKey(hotelKey)}
                       isPackageMode={isPackageMode}
-                      onImageError={() => setHiddenImageHotelIds((prev) => { const next = new Set(prev); next.add(hotel.id); return next; })}
+                      onImageError={() => handleHotelImageError(hotel.id)}
                     />
                       );
                     })()
