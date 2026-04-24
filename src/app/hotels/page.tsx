@@ -17,6 +17,7 @@ import {
 } from "@/components/hotels/HotelResultsToolbar";
 import { HotelResultCard } from "@/components/hotels/HotelResultCard";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { Hotel } from "@/types/hotel";
 import { hotelService } from "@/services/api/hotelService";
 import { packageService } from "@/services/api/packageService";
@@ -355,6 +356,7 @@ function HotelsPageInner() {
   const [providerMode, setProviderMode] = useState<HotelProvider>(getHotelProvider());
   const [providerOverrideReady, setProviderOverrideReady] = useState(!HOTEL_PROVIDER_TOGGLE_ENABLED);
   const [hybridSupplierFilter, setHybridSupplierFilter] = useState<HybridSupplierFilterMode>("all");
+  const [isMobileFiltersOpen, setIsMobileFiltersOpen] = useState(false);
 
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(false);
@@ -2056,6 +2058,7 @@ function HotelsPageInner() {
               onViewModeChange={setViewMode}
               sortMode={sortMode}
               onSortModeChange={setSortMode}
+              onOpenFilters={() => setIsMobileFiltersOpen(true)}
               hybridSupplierFilter={hybridSupplierFilter}
               onHybridSupplierFilterChange={setHybridSupplierFilter}
               providerMode={providerMode}
@@ -2067,6 +2070,38 @@ function HotelsPageInner() {
               showHybridSupplierFilter={!isPackageMode && HYBRID_SUPPLIER_FILTER_ENABLED && providerMode === "hybrid"}
               loading={loading}
             />
+            <Sheet open={isMobileFiltersOpen} onOpenChange={setIsMobileFiltersOpen}>
+              <SheetContent side="left" className="w-full max-w-none sm:max-w-sm p-0 lg:hidden">
+                <SheetHeader className="px-4 py-4 border-b border-[#DFE0E4]">
+                  <SheetTitle className="text-[#010D50]">Hotel filters</SheetTitle>
+                </SheetHeader>
+                <div className="h-[calc(100vh-64px)] overflow-y-auto px-4 py-4">
+                  {!loading && hotels.length > 0 ? (
+                    <HotelFiltersSidebar
+                      resultCount={filteredHotels.length}
+                      value={filters}
+                      onChange={updateFilters}
+                      onPriceModeChange={onPriceModeChange}
+                      onPriceRangeChange={onPriceRangeChange}
+                      minPrice={priceBounds.min}
+                      maxPrice={priceBounds.max}
+                      currencySymbol={currency}
+                      expanded={expanded}
+                      onToggleExpanded={(key) => setExpanded((prev) => ({ ...prev, [key]: !prev[key] }))}
+                      availableMealPlans={availableMealPlans}
+                      availableNeighborhoods={availableNeighborhoods}
+                      availableAmenities={availableAmenities}
+                      minPriceByStarRating={minPriceByStarRating}
+                      refundableFilterEnabled={refundableFilterEnabled}
+                    />
+                  ) : (
+                    <div className="text-sm text-[#3A478A]">
+                      Filters will appear once hotel results are loaded.
+                    </div>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
 
             {loading && hotels.length === 0 && <HotelSearchLoading />}
             {error && !isPackageMode && (

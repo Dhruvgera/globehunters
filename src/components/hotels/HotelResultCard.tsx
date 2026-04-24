@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
-import { Check, ChevronRight, PawPrint, Bus, Coffee, X, Star } from "lucide-react";
+import { Calendar, Check, ChevronRight, PawPrint, Bus, Coffee, X, Star } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, useCallback } from "react";
 
