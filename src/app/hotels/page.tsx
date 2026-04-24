@@ -370,6 +370,10 @@ function HotelsPageInner() {
   const contentAttemptRef = useRef<Map<string, { attempts: number; lastAttemptAt: number; ok: boolean }>>(new Map());
   const hotelResultsCacheRef = useRef(hotelResultsCache);
   const prevPriceModeRef = useRef<HotelFiltersState["priceMode"]>(DEFAULT_FILTERS.priceMode);
+  // Tracks the resolved search params (after city lookup) of the last in-flight or completed
+  // availability request. Prevents duplicate API calls when setHotelSearch feedback changes
+  // queryKey but the actual API params are identical.
+  const lastFetchedParamsRef = useRef<string | null>(null);
   const [searchCriteriaId, setSearchCriteriaId] = useState<number | string | null>(null);
   const [breakfastByHotelId, setBreakfastByHotelId] = useState<Record<string, BreakfastStatus>>({});
   const [breakfastEnriching, setBreakfastEnriching] = useState(false);
@@ -705,23 +709,23 @@ function HotelsPageInner() {
         return;
       }
 
-      setLoading(true);
-      setLoadingMoreHotels(false);
-      setError(null);
-      setNoResultsMessage(null);
-      // Clear stale results immediately on a new search (match flights UX).
-      setHotels([]);
-      setSelectedHotelKey("");
-      setDisplayedHotelsCount(12);
-      setHiddenImageHotelIds(new Set());
-      setBreakfastByHotelId({});
-      setBreakfastEnriching(false);
-      setTrustYouEnriching(false);
-      trustYouInflightRef.current.clear();
-      trustYouAttemptRef.current.clear();
-
       if (isPackageMode) {
         // Use package search API for Flight+Hotel packages
+        // Clear stale results for a new package search (match flights UX).
+        setLoading(true);
+        setLoadingMoreHotels(false);
+        setError(null);
+        setNoResultsMessage(null);
+        setHotels([]);
+        setSelectedHotelKey("");
+        setDisplayedHotelsCount(12);
+        setHiddenImageHotelIds(new Set());
+        setBreakfastByHotelId({});
+        setBreakfastEnriching(false);
+        setTrustYouEnriching(false);
+        trustYouInflightRef.current.clear();
+        trustYouAttemptRef.current.clear();
+
         try {
           const search = resolvedSearchRef.current;
           const p = new URLSearchParams(urlParamsKey);
@@ -981,6 +985,48 @@ function HotelsPageInner() {
         if (!pick?.id || !pick?.label || !pick?.loc) {
           throw new Error("No matching city/hotel found for the selected destination.");
         }
+
+        // Build a stable key from the resolved params that will actually be sent to the API.
+        // This prevents duplicate calls when setHotelSearch feedback changes queryKey but
+        // the real API parameters are identical.
+        const resolvedParamsKey = JSON.stringify({
+          providerOverride: providerOverride || undefined,
+          location: pick.label,
+          hidden_id: String(pick.id),
+          hidden_key: String(pick.loc),
+          checkIn: search.checkIn,
+          checkOut: search.checkOut,
+          rooms: search.rooms,
+          adults: search.adults,
+          children: search.children,
+          child_age: serializeHotelChildAges(search.child_age, search.rooms, search.children),
+          branches: search.branches,
+        });
+
+        if (resolvedParamsKey === lastFetchedParamsRef.current) {
+          // Same resolved params as the last in-flight/completed request — skip duplicate fetch.
+          if (!cancelled && requestSeq === activeRequestSeq.current) {
+            setLoading(false);
+            setHasAttemptedFetch(true);
+          }
+          return;
+        }
+        lastFetchedParamsRef.current = resolvedParamsKey;
+
+        // Clear stale results for a genuinely new search (after dedup check passed).
+        setLoading(true);
+        setLoadingMoreHotels(false);
+        setError(null);
+        setNoResultsMessage(null);
+        setHotels([]);
+        setSelectedHotelKey("");
+        setDisplayedHotelsCount(12);
+        setHiddenImageHotelIds(new Set());
+        setBreakfastByHotelId({});
+        setBreakfastEnriching(false);
+        setTrustYouEnriching(false);
+        trustYouInflightRef.current.clear();
+        trustYouAttemptRef.current.clear();
 
         const availability = await hotelService.searchAvailabilityV3({
           providerOverride: providerOverride || undefined,

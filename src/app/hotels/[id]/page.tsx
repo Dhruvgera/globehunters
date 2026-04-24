@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
@@ -52,7 +52,7 @@ import {
   flattenHotelChildAges,
   serializeHotelChildAges,
 } from "@/lib/hotels/childAges";
-import { fixStubaImageUrl } from "@/lib/hotels/imageUrl";
+import { ensureGiataImageUrl, filterReachableImageUrls, fixStubaImageUrl } from "@/lib/hotels/imageUrl";
 import { convertHotelLocalTaxTotal, formatMoneyFromCode, normalizeCurrencyCode } from "@/lib/currency/localTaxDisplay";
 import { parsePackageHotelContent, type PackageHotelNearbyPlace } from "@/lib/package/hotelContent";
 import { usePackageDeeplink } from "@/hooks/usePackageDeeplink";
@@ -1095,6 +1095,48 @@ export default function HotelRoomsPage() {
   const [rawAccommodationDetailsResponse, setRawAccommodationDetailsResponse] = useState<unknown>(null);
   const trustYouFetchKeyRef = useRef<string>("");
   const isHotelDatesDebugMode = process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES === "true";
+  const brokenImageUrlsRef = useRef<Set<string>>(new Set());
+  const [brokenImageUrls, setBrokenImageUrls] = useState<Set<string>>(new Set());
+
+  const markImageBroken = useCallback((url: string) => {
+    if (!url || brokenImageUrlsRef.current.has(url)) return;
+    brokenImageUrlsRef.current.add(url);
+    setBrokenImageUrls((prev) => new Set(prev).add(url));
+  }, []);
+
+  const galleryImagesFiltered = useMemo(
+    () => galleryImages.filter((url) => !brokenImageUrls.has(url)),
+    [galleryImages, brokenImageUrls]
+  );
+
+  const headerImageOk = useMemo(() => {
+    const url = remoteHotelHeader?.image;
+    return url && !brokenImageUrls.has(url) ? url : "";
+  }, [remoteHotelHeader?.image, brokenImageUrls]);
+
+  useEffect(() => {
+    const toCheck: string[] = [];
+    const known = brokenImageUrlsRef.current;
+    for (const url of galleryImages) {
+      if (url && !known.has(url)) toCheck.push(url);
+    }
+    const headerUrl = remoteHotelHeader?.image;
+    if (headerUrl && !known.has(headerUrl) && !toCheck.includes(headerUrl)) {
+      toCheck.push(headerUrl);
+    }
+    if (toCheck.length === 0) return;
+    let cancelled = false;
+    filterReachableImageUrls(toCheck).then((valid) => {
+      if (cancelled) return;
+      const broken = toCheck.filter((url) => !valid.includes(url));
+      if (broken.length === 0) return;
+      broken.forEach((url) => {
+        known.add(url);
+        markImageBroken(url);
+      });
+    });
+    return () => { cancelled = true; };
+  }, [galleryImages, remoteHotelHeader?.image, markImageBroken]);
 
   useEffect(() => {
     // Keep local editor state in sync with global search state when navigating between hotels.
@@ -1613,8 +1655,8 @@ export default function HotelRoomsPage() {
     return {
       name: remoteHotelHeader?.name || "",
       starRating: remoteHotelHeader?.rating || 0,
-      mainImage: remoteHotelHeader?.image || galleryImages[0] || "",
-      galleryImages: galleryImages.length > 0 ? galleryImages : (remoteHotelHeader?.image ? [remoteHotelHeader.image] : []),
+      mainImage: headerImageOk || galleryImagesFiltered[0] || "",
+      galleryImages: galleryImagesFiltered.length > 0 ? galleryImagesFiltered : (headerImageOk ? [headerImageOk] : []),
       address: remoteHotelHeader?.address || "",
       about: {
         description: sanitizeHotelText(detailsText || ""),
@@ -1639,7 +1681,8 @@ export default function HotelRoomsPage() {
     cancellationText,
     coordinates,
     detailsText,
-    galleryImages,
+    galleryImagesFiltered,
+    headerImageOk,
     importantInfoText,
     nearbyPlaces,
     remoteAmenities,
@@ -2003,6 +2046,19 @@ export default function HotelRoomsPage() {
         urlProviderNormalized || metaProvider || (hotelSearch?.provider === "hotelbeds" ? "hotelbeds" : "vyspa");
       let effectiveSearchCriteriaId = urlSearchCriteriaId ?? meta?.searchCriteriaId ?? hotelSearch?.searchCriteriaId;
       if (!effectiveSearchCriteriaId) return;
+
+      // 🔍 DIAGNOSTIC: log why loadRooms effect fired
+      console.log("[loadRooms] effect fired", {
+        hotelId,
+        "hotelSearch.provider": hotelSearch?.provider,
+        "hotelSearch.searchCriteriaId": hotelSearch?.searchCriteriaId,
+        effectiveProvider,
+        effectiveSearchCriteriaId,
+        urlSearchCriteriaId,
+        urlProvider,
+        metaProvider,
+      });
+
       const searchResultSeed = extractSearchResultHotelData(meta?.rawSearchResult);
       setRoomsLoading(true);
       setRoomsError(null);
@@ -2137,7 +2193,7 @@ export default function HotelRoomsPage() {
                   vyspaMedia.hotelImages || [],
                   flattenRoomImages(vyspaMedia.roomImages),
                   headerImage ? [headerImage] : []
-                ).slice(0, 24);
+                ).map((u) => ensureGiataImageUrl(u, 'original') as string).slice(0, 24);
 
                 if (detailsData.description) {
                   setDetailsText((previous) =>
@@ -2338,7 +2394,7 @@ export default function HotelRoomsPage() {
         const respAny: any = respRoot as any;
         const headerName = respAny?.hotel_name || meta?.hotelName || remoteHotelHeader?.name || "";
         const headerRating = Number(respAny?.hotel_rating || meta?.hotelRating || remoteHotelHeader?.rating || 0) || 0;
-        const headerImage = fixStubaImageUrl(respAny?.image_name || meta?.imageName || "");
+        const headerImage = ensureGiataImageUrl(fixStubaImageUrl(respAny?.image_name || meta?.imageName || ""), 'original') as string;
         const headerAddress =
           respAny?.address1 || respAny?.address2
             ? [respAny?.address1, respAny?.address2].filter(Boolean).join(", ")
@@ -2380,6 +2436,13 @@ export default function HotelRoomsPage() {
           hotelSearch &&
           (hotelSearch.provider !== effectiveProvider || hotelSearch.searchCriteriaId !== effectiveSearchCriteriaId)
         ) {
+          // 🔍 DIAGNOSTIC: this setHotelSearch call likely triggers the feedback loop
+          console.log("[loadRooms] setHotelSearch (feedback loop candidate)", {
+            "prev.provider": hotelSearch.provider,
+            "prev.searchCriteriaId": hotelSearch.searchCriteriaId,
+            "next.provider": effectiveProvider,
+            "next.searchCriteriaId": effectiveSearchCriteriaId,
+          });
           setHotelSearch({
             ...hotelSearch,
             provider: effectiveProvider,
@@ -2622,7 +2685,7 @@ export default function HotelRoomsPage() {
                   flattenRoomImages(vyspaMedia.roomImages),
                   parsed?.photos || [],
                   imgs || []
-                );
+                ).map((u) => ensureGiataImageUrl(u, 'original') as string);
                 if (detailsData.amenities.length > 0) {
                   setRemoteAmenities((previous) => Array.from(new Set([...(previous || []), ...detailsData.amenities])));
                 }
@@ -2945,6 +3008,7 @@ export default function HotelRoomsPage() {
                             fill
                             className="object-cover transition-transform duration-500 group-hover:scale-105"
                             priority
+                            onError={() => markImageBroken(hotel.mainImage)}
                           />
                         ) : (
                           <div className="absolute inset-0 bg-[#F6F6F6]" />
@@ -2983,6 +3047,7 @@ export default function HotelRoomsPage() {
                                   alt={`${hotel.name} - ${idx + 1}`}
                                   fill
                                   className="object-cover transition-transform duration-500 group-hover:scale-110"
+                                  onError={() => markImageBroken(img)}
                                 />
                                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
                               </div>
@@ -3025,6 +3090,7 @@ export default function HotelRoomsPage() {
                         fill
                         className="object-contain"
                         sizes="100vw"
+                        onError={() => markImageBroken(hotel.galleryImages[currentPhotoIndex])}
                       />
                     </motion.div>
                   </AnimatePresence>
@@ -3076,6 +3142,7 @@ export default function HotelRoomsPage() {
                           alt={`Thumbnail ${idx + 1}`}
                           fill
                           className="object-cover"
+                          onError={() => markImageBroken(img)}
                         />
                       </button>
                     ))}
