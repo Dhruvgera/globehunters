@@ -1,8 +1,9 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Edit2, Loader2 } from "lucide-react";
 
 import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
@@ -438,6 +439,16 @@ function PackageTravellerDetailsInner() {
     };
   }, [hotelDetailsCache, packageDetails?.hotel, selectedHotel]);
 
+  const changeFlightHref = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("type", "package");
+    if (selectedHotel?.hotelId) params.set("hotelId", selectedHotel.hotelId);
+    if (flight?.segmentResultId || flight?.id) {
+      params.set("flightResultId", flight?.segmentResultId || flight?.id || "");
+    }
+    return `/search?${params.toString()}`;
+  }, [flight?.id, flight?.segmentResultId, selectedHotel?.hotelId]);
+
   const stayDetails = useMemo(() => {
     const checkIn =
       hotelSearch?.checkIn ||
@@ -723,16 +734,25 @@ function PackageTravellerDetailsInner() {
               </div>
             </div>
 
-            <div className="flex flex-col gap-3">
-              {summaryLegs.map((leg, idx) => (
-                <FlightSummaryCard
-                  key={`${leg.fromCode}-${leg.toCode}-${idx}`}
-                  leg={leg}
-                  passengers={passengerLabel || "1 Adult"}
-                  onViewDetails={() => setShowFlightInfo(true)}
-                  cabinLabel={cabinLabel}
-                />
-              ))}
+            <div className="bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden">
+              <div className="px-4 sm:px-6 py-4 border-b border-[#DFE0E4] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <h2 className="text-xl font-semibold text-[#010D50]">Flight Details</h2>
+                <Link href={changeFlightHref} className="text-[#3754ED] text-sm font-medium flex items-center gap-1 hover:underline">
+                  <Edit2 className="w-4 h-4" />
+                  Change selection
+                </Link>
+              </div>
+              <div className="p-4 sm:p-6 flex flex-col gap-3">
+                {summaryLegs.map((leg, idx) => (
+                  <FlightSummaryCard
+                    key={`${leg.fromCode}-${leg.toCode}-${idx}`}
+                    leg={leg}
+                    passengers={passengerLabel || "1 Adult"}
+                    onViewDetails={() => setShowFlightInfo(true)}
+                    cabinLabel={cabinLabel}
+                  />
+                ))}
+              </div>
             </div>
 
             <PassengerFormsSection />

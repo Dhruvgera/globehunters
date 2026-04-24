@@ -117,6 +117,26 @@ function formatDisplayPrice(currency: string | undefined, amount: number | undef
   })}`;
 }
 
+function formatFlightClock(value: number | string | undefined): string {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  if (!digits) return "—";
+  const normalized = digits.slice(-4).padStart(4, "0");
+  const hh = Number(normalized.slice(0, 2));
+  const mm = Number(normalized.slice(2, 4));
+  if (hh > 23 || mm > 59) return "—";
+  return `${normalized.slice(0, 2)}:${normalized.slice(2, 4)}`;
+}
+
+function formatMinutesToDuration(totalMinutes: number | undefined): string {
+  const minutes = Number(totalMinutes || 0);
+  if (!Number.isFinite(minutes) || minutes <= 0) return "—";
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
+  if (hours > 0) return `${hours}h`;
+  return `${mins}m`;
+}
+
 type UnknownRecord = Record<string, unknown>;
 
 interface RoomAmenity {
@@ -2801,46 +2821,100 @@ export default function HotelRoomsPage() {
                 </div>
               </div>
 
-                  {/* Flight summary — only shown for package deeplink with flight data */}
-                  {deeplinkViewData?.success && "FlightResultId" in deeplinkViewData.results && (() => {
-                    const flights = (deeplinkViewData as HolidayPackageViewResponse).results.FlightDetails;
-                    if (flights?.length > 0) {
-                      return (
-                        <div className="mt-3 rounded-xl border border-[#DFE0E4] bg-[#F8FAFC] p-4">
-                          <div className="flex items-center gap-2 text-sm font-semibold text-[#010D50] mb-3">
-                            <Plane className="w-4 h-4 text-[#3754ED]" />
-                            Flight Details
-                          </div>
-                          {flights.map((seg, idx) => (
-                            <div key={idx} className="flex flex-col gap-1 text-sm">
-                              <div className="font-medium text-[#010D50]">
-                                {idx === 0 ? "Outbound" : "Inbound"} · {seg.Route}
-                              </div>
-                              {seg.Flights?.map((leg, legIdx) => (
-                                <div key={legIdx} className="flex items-center gap-2 text-xs text-[#3A478A] ml-2">
-                                  <span className="min-w-[60px]">{leg.departure_airport}</span>
-                                  <span>→</span>
-                                  <span className="min-w-[60px]">{leg.arrival_airport}</span>
-                                  <span className="ml-auto">{leg.airline_name}</span>
-                                  <span>{leg.flight_number}</span>
-                                  <span className="text-[#6B7280]">
-                                    {String(leg.departure_time || "").replace(/(\d{2})(\d{2})/, "$1:$2")}
-                                    {" - "}
-                                    {String(leg.arrival_time || "").replace(/(\d{2})(\d{2})/, "$1:$2")}
-                                  </span>
+              {/* Flight summary — only shown for package deeplink with flight data */}
+              {deeplinkViewData?.success && "FlightResultId" in deeplinkViewData.results && (() => {
+                const flights = (deeplinkViewData as HolidayPackageViewResponse).results.FlightDetails;
+                if (flights?.length > 0) {
+                  return (
+                    <div className="mt-4 bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden">
+                      <div className="px-4 sm:px-6 py-4 border-b border-[#DFE0E4] flex items-center gap-2">
+                        <Plane className="w-4 h-4 text-[#3754ED]" />
+                        <h2 className="text-xl font-semibold text-[#010D50]">Flight Details</h2>
+                      </div>
+                      <div className="p-4 sm:p-6 flex flex-col gap-3">
+                        {flights.map((seg, idx) => {
+                          const legs = seg.Flights || [];
+                          const firstLeg = legs[0];
+                          const lastLeg = legs[legs.length - 1];
+                          const airlineCode = String(firstLeg?.airline_code || "").trim().toUpperCase();
+                          const airlineLogo = airlineCode
+                            ? `https://images.kiwi.com/airlines/64/${airlineCode}.png`
+                            : null;
+                          const routeFrom = firstLeg?.departure_airport || "—";
+                          const routeTo = lastLeg?.arrival_airport || "—";
+                          const departureTime = formatFlightClock(firstLeg?.departure_time);
+                          const arrivalTime = formatFlightClock(lastLeg?.arrival_time);
+                          const duration = formatMinutesToDuration(seg.Total_travel_time || seg.Flying_time);
+                          const stopsLabel = Number(seg.Stops || 0) > 0
+                            ? `${seg.Stops} stop${Number(seg.Stops) > 1 ? "s" : ""}`
+                            : "Direct";
+                          const flightClass = firstLeg?.class_name || "Economy";
+
+                          return (
+                            <div key={`${seg.Route}-${idx}`} className="bg-[#F5F7FF] rounded-xl p-4 flex flex-col gap-4">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  {airlineLogo ? (
+                                    <img
+                                      src={airlineLogo}
+                                      alt={`${firstLeg?.airline_name || seg.Majority_carrier} logo`}
+                                      className="w-8 h-8 object-contain rounded"
+                                      loading="lazy"
+                                    />
+                                  ) : (
+                                    <div className="w-8 h-8 rounded bg-[#3754ED] text-white flex items-center justify-center">
+                                      <Plane className="w-4 h-4" />
+                                    </div>
+                                  )}
+                                  <div className="min-w-0">
+                                    <div className="text-sm font-semibold text-[#010D50] truncate">
+                                      {firstLeg?.airline_name || seg.Majority_carrier || "Selected airline"}
+                                    </div>
+                                    <div className="text-xs text-[#3A478A] truncate">
+                                      {idx === 0 ? "Outbound" : "Inbound"} · {routeFrom} to {routeTo}
+                                    </div>
+                                  </div>
                                 </div>
-                              ))}
-                              <div className="text-xs text-[#6B7280] mt-1">
-                                {seg.Flying_time ? `${Math.ceil(seg.Flying_time / 60)}h ${seg.Flying_time % 60}m` : ""}
-                                {seg.Stops > 0 ? ` · ${seg.Stops} stop${seg.Stops > 1 ? "s" : ""}` : ""}
-                                · {seg.Majority_carrier}
+                                <div className="text-xs text-[#010D50] font-medium whitespace-nowrap">
+                                  {flightClass}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-3 flex-wrap text-sm text-[#010D50]">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-[#3A478A]">{routeFrom}</span>
+                                  <span className="font-semibold">{departureTime}</span>
+                                </div>
+                                <svg width="60" height="5" viewBox="0 0 60 5" fill="none" aria-hidden="true">
+                                  <circle cx="20" cy="2.5" r="2.5" fill="#010D50" />
+                                  <line x1="0" y1="2.5" x2="60" y2="2.5" stroke="#010D50" strokeDasharray="4 4" />
+                                </svg>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-semibold">{arrivalTime}</span>
+                                  <span className="text-xs text-[#3A478A]">{routeTo}</span>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2 flex-wrap text-xs text-[#3A478A]">
+                                <span>{stopsLabel}</span>
+                                <span className="w-1 h-1 rounded-full bg-[#3A478A]" />
+                                <span>{duration}</span>
+                                {legs.length > 0 ? (
+                                  <>
+                                    <span className="w-1 h-1 rounded-full bg-[#3A478A]" />
+                                    <span>{legs.length} flight leg{legs.length > 1 ? "s" : ""}</span>
+                                  </>
+                                ) : null}
                               </div>
                             </div>
-                          ))}
-                        </div>
-                      );
-                    }
-                  })()}
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
 
               {/* Image Gallery - Main image left, 3 thumbnails stacked right */}
               <div className="flex flex-col lg:flex-row gap-3">
