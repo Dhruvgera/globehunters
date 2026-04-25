@@ -40,7 +40,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { hotelService } from "@/services/api/hotelService";
 import { packageService } from "@/services/api/packageService";
-import { useBookingStore } from "@/store/bookingStore";
+import { useBookingStore, useStoreHydration } from "@/store/bookingStore";
 import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
 import { resolveTrustYouHotelId } from "@/lib/trustyou/hotelMapping";
 import type { TrustYouHotelReviewSummary } from "@/types/trustyou";
@@ -1018,6 +1018,8 @@ function resolveHotelResultId(result: unknown): string {
 
 export default function HotelRoomsPage() {
   const params = useParams();
+  const hasHydrated = useStoreHydration();
+  
   const hotelId = params?.id as string;
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1871,6 +1873,9 @@ export default function HotelRoomsPage() {
     let cancelled = false;
 
     async function loadRooms() {
+       if(!hasHydrated){
+        return;
+      }
       // ─── Deeplink view data path (self-contained, no session needed) ───
       if (deeplinkViewData?.success) {
         const viewHotel = deeplinkViewData.results.HotelDetails;
@@ -2064,7 +2069,7 @@ export default function HotelRoomsPage() {
       setRoomsError(null);
 
       try {
-        if (isPackageMode) {
+        if (isPackageMode) {  
           const packageHotel = packageResults?.find((row) => String(row.id) === String(hotelId));
           const roomResponse = await packageService.getPackageRooms({
             hotelResultId: Number(hotelId),
@@ -2297,14 +2302,18 @@ export default function HotelRoomsPage() {
             effectiveProvider = "hotelbeds";
             effectiveSearchCriteriaId = hybridHotelbedsToken;
           } catch {
+
             resp = await hotelService.getRoomsV3(effectiveSearchCriteriaId, hotelId, srId);
+
           }
         } else {
           try {
             resp = await hotelService.getRoomsV3(effectiveSearchCriteriaId, hotelId, srId);
+
           } catch (initialError) {
             if (!canFallbackToHotelbeds) throw initialError;
             resp = await hotelService.getRoomsV3(hybridHotelbedsToken, hybridHotelbedsCode);
+
             effectiveProvider = "hotelbeds";
             effectiveSearchCriteriaId = hybridHotelbedsToken;
           }
@@ -2360,6 +2369,7 @@ export default function HotelRoomsPage() {
 
             const refreshedSrId = refreshedHit?.id != null ? String(refreshedHit.id) : undefined;
             if (refreshedCriteriaId && refreshedSrId) {
+
               resp = await hotelService.getRoomsV3(refreshedCriteriaId, hotelId, refreshedSrId);
               respRoot = Array.isArray(resp) ? resp[0] : resp;
               if (hotelSearch) {
@@ -2731,14 +2741,13 @@ export default function HotelRoomsPage() {
         if (!cancelled) setRoomsLoading(false);
       }
     }
-
     loadRooms();
     return () => {
       cancelled = true;
     };
   }, [
     hotelId,
-    hotelResultsMeta,
+    hasHydrated,
     hotelSearch?.provider,
     hotelSearch?.searchCriteriaId,
     hotelSearch?.location,
