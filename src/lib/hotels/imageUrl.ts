@@ -38,27 +38,18 @@ export function fixResultsImageUrls(results: unknown[]): unknown[] {
   return results;
 }
 
-function checkImageLoads(url: string): Promise<boolean> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    const timer = setTimeout(() => {
-      img.src = '';
-      resolve(false);
-    }, 5000);
-    img.onload = () => {
-      clearTimeout(timer);
-      if (img.naturalWidth === 0 && img.naturalHeight === 0) {
-        resolve(false);
-        return;
-      }
-      resolve(true);
-    };
-    img.onerror = () => {
-      clearTimeout(timer);
-      resolve(false);
-    };
-    img.src = url;
-  });
+function checkImageHead(url: string): Promise<boolean> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+  return fetch(url, { method: 'HEAD', mode: 'no-cors', signal: controller.signal })
+    .then((res) => {
+      clearTimeout(timeout);
+      return res.ok || res.type === 'opaque';
+    })
+    .catch(() => {
+      clearTimeout(timeout);
+      return false;
+    });
 }
 
 export async function filterReachableImageUrls(urls: string[]): Promise<string[]> {
@@ -66,7 +57,7 @@ export async function filterReachableImageUrls(urls: string[]): Promise<string[]
 
   const results = await Promise.all(
     urls.map(async (url) => {
-      const ok = await checkImageLoads(url);
+      const ok = await checkImageHead(url);
       return ok ? url : '';
     })
   );
