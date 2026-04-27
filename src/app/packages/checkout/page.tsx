@@ -221,6 +221,7 @@ function PackageTravellerDetailsInner() {
   const setSearchParams = useBookingStore((s) => s.setSearchParams);
   const storeSearchParams = useBookingStore((s) => s.searchParams);
   const packageSearch = useBookingStore((s) => s.packageSearch);
+  const packageResultsMeta = useBookingStore((s) => s.packageResultsMeta);
   const hotelSearch = useBookingStore((s) => s.hotelSearch);
   const selectedHotel = useBookingStore((s) => s.selectedHotel);
   const hotelDetailsCache = useBookingStore((s) => s.hotelDetailsCache);
@@ -442,12 +443,13 @@ function PackageTravellerDetailsInner() {
   const changeFlightHref = useMemo(() => {
     const params = new URLSearchParams();
     params.set("type", "package");
-    if (selectedHotel?.hotelId) params.set("hotelId", selectedHotel.hotelId);
+    const effectiveHotelId = String(packageResultsMeta?.hotelRequestId || selectedHotel?.hotelId || "");
+    if (effectiveHotelId) params.set("hotelId", effectiveHotelId);
     if (flight?.segmentResultId || flight?.id) {
       params.set("flightResultId", flight?.segmentResultId || flight?.id || "");
     }
     return `/search?${params.toString()}`;
-  }, [flight?.id, flight?.segmentResultId, selectedHotel?.hotelId]);
+  }, [flight?.id, flight?.segmentResultId, selectedHotel?.hotelId, packageResultsMeta?.hotelRequestId]);
 
   const stayDetails = useMemo(() => {
     const checkIn =

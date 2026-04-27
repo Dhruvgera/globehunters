@@ -167,6 +167,7 @@ function PackageReviewPageInner() {
   const storeSearchParams = useBookingStore((state) => state.searchParams);
   const packageSearch = useBookingStore((state) => state.packageSearch);
   const packageResults = useBookingStore((state) => state.packageResults);
+  const packageResultsMeta = useBookingStore((state) => state.packageResultsMeta);
   const deeplinkViewData = useBookingStore((state) => state.deeplinkViewData);
   const isFromDeeplink = useBookingStore((state) => state.isFromDeeplink);
   const selectedFareType = useBookingStore((state) => state.selectedFareType);
@@ -397,10 +398,11 @@ function PackageReviewPageInner() {
   const changeFlightHref = useMemo(() => {
     const params = new URLSearchParams();
     params.set("type", "package");
-    if (hotelId) params.set("hotelId", hotelId);
+    const effectiveHotelId = String(packageResultsMeta?.hotelRequestId || hotelId || "");
+    if (effectiveHotelId) params.set("hotelId", effectiveHotelId);
     if (flightResultId) params.set("flightResultId", flightResultId);
     return `/search?${params.toString()}`;
-  }, [flightResultId, hotelId]);
+  }, [flightResultId, hotelId, packageResultsMeta?.hotelRequestId]);
 
   const handleContinue = () => {
     const params = new URLSearchParams(searchParams.toString());

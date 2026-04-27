@@ -3651,7 +3651,9 @@ export default function HotelRoomsPage() {
                     });
                     const params = new URLSearchParams();
                     params.set("type", "package");
-                    params.set("hotelId", hotelId);
+                    // Use search result ID for change-flights API; fall back to vendor ID
+                    const effectiveHotelId = String(packageResultsMeta?.hotelRequestId || hotelId);
+                    params.set("hotelId", effectiveHotelId);
                     params.set("hotelName", hotel.name);
                     params.set("roomId", String(rid));
                     if (packageResultsMeta?.selectedFlightResultId) {
@@ -3681,12 +3683,7 @@ export default function HotelRoomsPage() {
                     params.set("adults", adults);
                     params.set("children", children);
                     params.set("tripType", "round-trip");
-                    // Deeplink: flight already selected, skip flight selection → go to review
-                    if (isFromDeeplink) {
-                      router.push(`/packages/review?${params.toString()}`);
-                    } else {
-                      router.push(`/search?${params.toString()}`);
-                    }
+                    router.push(`/search?${params.toString()}`);
                   };
                   const handleMultiRoomCardSelect = () => {
                     setActiveRoomCardId(String(room.id));

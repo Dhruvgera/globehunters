@@ -214,7 +214,10 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
       // Store full view data for detail page room rendering
       setDeeplinkViewData(viewData);
 
-      // Extract hotel ID for navigation
+      // Extract hotel ID for navigation — always use vendor hotel_id since /hotels/[id]
+      // route parameter must be a valid vendor hotel ID for room/content API calls.
+      // HotelResultId (search result ID) is stored in packageResultsMeta.hotelRequestId
+      // for downstream change-flight URLs.
       const hotelId = String(viewData.results.HotelDetails.hotel_id);
       const hd = viewData.results.HotelDetails;
       const allRooms = Object.values(hd.rooms || {}).flat();
