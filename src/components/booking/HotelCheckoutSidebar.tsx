@@ -464,7 +464,7 @@ export function HotelCheckoutSidebar({
             <span className="text-sm font-semibold text-[#010D50]">
               {formatMoney(
                 display.currency,
-                (display.total || 0) +
+                ((display.baseTotal ?? display.total) || 0) +
                   (convertedLocalTaxRows.length > 0
                     ? convertedLocalTaxRows.reduce((sum, row) => sum + Number(row.amount || 0), 0)
                     : 0)
