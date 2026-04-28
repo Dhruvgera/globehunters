@@ -331,6 +331,7 @@ function HotelsPageInner() {
   const setHotelFiltersCache = useBookingStore((s) => s.setHotelFiltersCache);
   const setHotelResultsCache = useBookingStore((s) => s.setHotelResultsCache);
   const savedHotelSearch = useBookingStore((s) => s.hotelSearch);
+  const savedPackageSearch = useBookingStore((s) => s.packageSearch);
 
   const [filters, setFilters] = useState<HotelFiltersState>(DEFAULT_FILTERS);
   const hasUserAdjustedPriceRef = useRef(false);
@@ -732,32 +733,51 @@ function HotelsPageInner() {
             search.child_age
           );
           
-          // Get package-specific params from URL
-          const fromCode = p.get("fromCode") || "LON";
-          const fromName = p.get("from") || "London";
-          let destinationHiddenValue = p.get("hidden_key") || search.hidden_key || "";
-          if (!destinationHiddenValue.includes(";") && search.location) {
-            try {
-              const destinationResponse = await fetch(
-                `/api/packages/destinations?location=${encodeURIComponent(search.location)}`
-              );
-              if (destinationResponse.ok) {
-                const destinations = await destinationResponse.json() as Array<{
-                  id?: string | number;
-                  name?: string;
-                  hiddenvalue?: string;
-                }>;
-                const normalizedLocation = search.location.trim().toLowerCase();
-                const normalizedHiddenId = String(p.get("hidden_id") || search.hidden_id || "");
-                const matchedDestination =
-                  destinations.find((destination) => String(destination.id || "") === normalizedHiddenId) ||
-                  destinations.find((destination) => String(destination.name || "").trim().toLowerCase() === normalizedLocation);
-                if (matchedDestination?.hiddenvalue) {
-                  destinationHiddenValue = matchedDestination.hiddenvalue;
+          // Get package-specific params from URL or saved package search
+          const fromCode = p.get("fromCode") || savedPackageSearch?.departureCode || "LON";
+          const fromName = p.get("from") || savedPackageSearch?.departureName || "London";
+          let destinationHiddenValue = p.get("hidden_key") || savedPackageSearch?.destinationHiddenValue || search.hidden_key || "";
+
+          // Resolve destination hidden value via API when:
+          // - No semicolons at all (not a valid hidden value)
+          // - Has semicolons but empty middle segment (deeplink-generated value like "DXB;;HotelName")
+          const hiddenValueParts = destinationHiddenValue.split(";");
+          const needsDestinationLookup = !destinationHiddenValue.includes(";") ||
+            (hiddenValueParts.length >= 3 && !hiddenValueParts[1]?.trim());
+
+          if (needsDestinationLookup) {
+            const destCode = hiddenValueParts[0]?.trim() || "";
+            // Try looking up by IATA code first (more reliable for deeplink flows), then by location name
+            const lookupTerms = [destCode, search.location].filter((t) => t && t.length >= 2);
+
+            for (const lookupTerm of lookupTerms) {
+              if (destinationHiddenValue.includes(";") && hiddenValueParts[1]?.trim()) break;
+              try {
+                const destinationResponse = await fetch(
+                  `/api/packages/destinations?location=${encodeURIComponent(lookupTerm)}`
+                );
+                if (destinationResponse.ok) {
+                  const destinations = await destinationResponse.json() as Array<{
+                    id?: string | number;
+                    name?: string;
+                    hiddenvalue?: string;
+                  }>;
+                  const normalizedHiddenId = String(p.get("hidden_id") || search.hidden_id || "");
+                  const matchedDestination =
+                    destinations.find((destination) => String(destination.id || "") === normalizedHiddenId) ||
+                    (destCode && destinations.find((destination) => {
+                      const hv = String(destination.hiddenvalue || "");
+                      return hv.split(";")[0]?.trim().toUpperCase() === destCode.toUpperCase();
+                    })) ||
+                    destinations.find((destination) => String(destination.name || "").trim().toLowerCase() === lookupTerm.trim().toLowerCase());
+                  if (matchedDestination?.hiddenvalue) {
+                    destinationHiddenValue = matchedDestination.hiddenvalue;
+                    break;
+                  }
                 }
+              } catch (destinationError) {
+                console.warn("[Hotels Page] Failed to resolve package destination hidden value", destinationError);
               }
-            } catch (destinationError) {
-              console.warn("[Hotels Page] Failed to resolve package destination hidden value", destinationError);
             }
           }
           if (!destinationHiddenValue.includes(";")) {

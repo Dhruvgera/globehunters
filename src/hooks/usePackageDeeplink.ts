@@ -261,15 +261,22 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
         const results = pkgView.results;
         const selectedFlight = buildSelectedFlightFromView(pkgView);
 
-        const destinationCode = String(pkgView.results.FlightDetails?.[0]?.Flights?.slice(-1)?.[0]?.arrival_airport || "").toUpperCase();
+        const lastOutboundLeg = pkgView.results.FlightDetails?.[0]?.Flights?.slice(-1)?.[0];
+        const destinationCode = String(lastOutboundLeg?.arrival_airport || "").toUpperCase();
         const departureCode = String(pkgView.results.FlightDetails?.[0]?.Flights?.[0]?.departure_airport || "").toUpperCase();
+        const destinationCity = String(
+          (lastOutboundLeg as Record<string, unknown>)?.arrive_airport_city ||
+          (lastOutboundLeg as Record<string, unknown>)?.arrival_city ||
+          ""
+        ).trim();
+        const destinationDisplayName = destinationCity || hd.hotel_name;
 
         const deeplinkPackageSearch: PackageSearchCriteria = {
           departureCode,
           departureName: departureCode,
           destinationCode,
-          destinationName: hd.hotel_name,
-          destinationHiddenValue: destinationCode ? `${destinationCode};;${hd.hotel_name}` : `${hd.hotel_id};;${hd.hotel_name}`,
+          destinationName: destinationDisplayName,
+          destinationHiddenValue: destinationCode ? `${destinationCode};;${destinationDisplayName}` : `${hd.hotel_id};;${hd.hotel_name}`,
           checkIn,
           nights: Math.max(1, Number(firstRoom?.days_spent || 1)),
           rooms: roomConfigurations,

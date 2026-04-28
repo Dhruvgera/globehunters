@@ -1077,6 +1077,7 @@ export default function HotelRoomsPage() {
   const [selectedRoomCounts, setSelectedRoomCounts] = useState<Record<string, number>>({});
   const [stayEditorOpen, setStayEditorOpen] = useState(false);
   const [stayUpdateLoading, setStayUpdateLoading] = useState(false);
+  const packageHotelResultIdRef = useRef<number | null>(null);
   const [roomsFilterOpen, setRoomsFilterOpen] = useState(false);
   const [expandedRoomInfoById, setExpandedRoomInfoById] = useState<Record<string, boolean>>({});
   const [stayCheckIn, setStayCheckIn] = useState<string>(() => hotelSearch?.checkIn || "");
@@ -1231,6 +1232,10 @@ export default function HotelRoomsPage() {
     rooms: number;
     childAges: number[];
   }) {
+    if (isPackageMode && packageSearch) {
+      return runPackageStaySearch(next);
+    }
+
     if (!hotelSearch?.location || !hotelSearch?.hidden_id || !hotelSearch?.hidden_key) {
       throw new Error("Missing search context (destination) to update availability.");
     }
@@ -1320,6 +1325,151 @@ export default function HotelRoomsPage() {
         rawSearchResult: hitRow ?? nextMeta[String(hotelId)]?.rawSearchResult,
       };
       setHotelResultsMeta(nextMeta);
+    }
+  }
+
+  async function runPackageStaySearch(next: {
+    checkIn: string;
+    checkOut: string;
+    adults: number;
+    children: number;
+    rooms: number;
+    childAges: number[];
+  }) {
+    if (!packageSearch) {
+      throw new Error("Missing package search context to update dates.");
+    }
+
+    const nights = calculateStayNights(next.checkIn, next.checkOut);
+    if (nights <= 0) {
+      throw new Error("Check-out must be after check-in.");
+    }
+
+    const roomConfigs = packageSearch.rooms.length > 0
+      ? packageSearch.rooms.map((room, idx) => ({
+          ...room,
+          adults: idx === 0 ? Math.max(1, next.adults - (next.rooms - 1)) : 1,
+          children: idx === 0 ? next.children : 0,
+          childAges: idx === 0 ? next.childAges : [],
+        }))
+      : Array.from({ length: next.rooms }, (_, idx) => ({
+          adults: idx === 0 ? Math.max(1, next.adults - (next.rooms - 1)) : 1,
+          children: idx === 0 ? next.children : 0,
+          childAges: idx === 0 ? next.childAges : [],
+          infants: 0,
+        }));
+
+    const adjustedRoomConfigs = next.rooms !== roomConfigs.length
+      ? Array.from({ length: next.rooms }, (_, idx) => {
+          const baseAdults = Math.floor(next.adults / next.rooms);
+          const extraAdult = idx < (next.adults % next.rooms) ? 1 : 0;
+          return {
+            adults: Math.max(1, baseAdults + extraAdult),
+            children: idx === 0 ? next.children : 0,
+            childAges: idx === 0 ? next.childAges : [],
+            infants: 0,
+          };
+        })
+      : roomConfigs;
+
+    let destinationHiddenValue = packageSearch.destinationHiddenValue;
+
+    const hiddenParts = destinationHiddenValue.split(";");
+    const needsLookup = !destinationHiddenValue.includes(";") ||
+      (hiddenParts.length >= 3 && !hiddenParts[1]?.trim());
+
+    if (needsLookup) {
+      const destCode = hiddenParts[0]?.trim() || packageSearch.destinationCode || "";
+      const lookupTerms = [destCode, packageSearch.destinationName].filter((t) => t && t.length >= 2);
+
+      for (const term of lookupTerms) {
+        if (destinationHiddenValue.includes(";") && hiddenParts[1]?.trim()) break;
+        try {
+          const destResp = await fetch(`/api/packages/destinations?location=${encodeURIComponent(term)}`);
+          if (destResp.ok) {
+            const destinations = (await destResp.json()) as Array<{
+              id?: string | number;
+              name?: string;
+              hiddenvalue?: string;
+            }>;
+            const match =
+              (destCode && destinations.find((d) => {
+                const hv = String(d.hiddenvalue || "");
+                return hv.split(";")[0]?.trim().toUpperCase() === destCode.toUpperCase();
+              })) ||
+              destinations.find((d) => String(d.name || "").trim().toLowerCase() === term.trim().toLowerCase());
+            if (match?.hiddenvalue) {
+              destinationHiddenValue = match.hiddenvalue;
+              break;
+            }
+          }
+        } catch {
+          // destination lookup failed, continue with next term
+        }
+      }
+    }
+
+    if (!destinationHiddenValue.includes(";")) {
+      throw new Error("Could not resolve package destination for updated dates.");
+    }
+
+    const newSearchCriteria = {
+      departureCode: packageSearch.departureCode,
+      departureName: packageSearch.departureName,
+      destinationCode: packageSearch.destinationCode,
+      destinationName: packageSearch.destinationName,
+      destinationHiddenValue,
+      checkIn: next.checkIn,
+      nights,
+      rooms: adjustedRoomConfigs,
+      timeout: 30,
+    };
+
+    const pkgResponse = await packageService.searchPackages(newSearchCriteria);
+
+    if (!pkgResponse.results || pkgResponse.results.length === 0) {
+      throw new Error("No package results found for the updated dates.");
+    }
+
+    const currentHotelName = (remoteHotelHeader?.name || "").toLowerCase();
+    const vendorHotelId = hotelResultsMeta?.[hotelId]?.vyspaHotelId;
+
+    const matchedHotel =
+      pkgResponse.results.find((r) => vendorHotelId && String(r.hotelId) === String(vendorHotelId)) ||
+      pkgResponse.results.find((r) => currentHotelName && r.hotelName.toLowerCase() === currentHotelName) ||
+      pkgResponse.results.find((r) => currentHotelName && r.hotelName.toLowerCase().includes(currentHotelName));
+
+    if (!matchedHotel) {
+      throw new Error("The selected hotel is not available for the updated dates. Please try different dates.");
+    }
+
+    packageHotelResultIdRef.current = matchedHotel.id;
+
+    const { setPackageSearch: storeSetPkgSearch, setPackageResults: storeSetPkgResults } = useBookingStore.getState();
+    storeSetPkgSearch({
+      ...newSearchCriteria,
+      requestId: pkgResponse.meta.requestId || undefined,
+    });
+    storeSetPkgResults(pkgResponse.results, pkgResponse.meta);
+
+    setHotelSearch({
+      provider: "vyspa",
+      location: hotelSearch?.location || packageSearch.destinationName,
+      hidden_id: hotelSearch?.hidden_id || "",
+      hidden_key: hotelSearch?.hidden_key || "",
+      checkIn: next.checkIn,
+      checkOut: next.checkOut,
+      rooms: next.rooms,
+      adults: next.adults,
+      children: next.children,
+      child_age: buildHotelChildAgesFromFlat(next.childAges, next.rooms, next.children),
+      branches: hotelSearch?.branches || "UK",
+      searchCriteriaId: pkgResponse.meta.requestId,
+      arrivalPointCode: hotelSearch?.arrivalPointCode,
+    });
+
+    if (pkgResponse.meta.requestId) {
+      setSearchRequestId(String(pkgResponse.meta.requestId));
     }
   }
 
@@ -2009,14 +2159,17 @@ export default function HotelRoomsPage() {
 
       try {
         if (isPackageMode) {
-          const packageHotel = packageResults?.find((row) => String(row.id) === String(hotelId));
+          const effectivePkgHotelId = packageHotelResultIdRef.current || Number(hotelId);
+          const packageHotel = packageResults?.find((row) => String(row.id) === String(effectivePkgHotelId)) ||
+            packageResults?.find((row) => String(row.id) === String(hotelId));
           const roomResponse = await packageService.getPackageRooms({
-            hotelResultId: Number(hotelId),
+            hotelResultId: effectivePkgHotelId,
             requestId: packageResultsMeta?.requestId,
             flightResultId: packageResultsMeta?.selectedFlightResultId || undefined,
           });
 
           const roomHotel =
+            roomResponse.results.find((row) => String(row.id) === String(effectivePkgHotelId)) ||
             roomResponse.results.find((row) => String(row.id) === String(hotelId)) ||
             roomResponse.results[0];
 
@@ -3651,8 +3804,14 @@ export default function HotelRoomsPage() {
                     });
                     const params = new URLSearchParams();
                     params.set("type", "package");
-                    // Use search result ID for change-flights API; fall back to vendor ID
-                    const effectiveHotelId = String(packageResultsMeta?.hotelRequestId || hotelId);
+                    // After a date re-search the hotel result ID changes; use the override if set.
+                    // In deeplink flow the route param is the vendor hotel_id, so fall back to meta.
+                    // In normal flow the route param IS the result ID.
+                    const effectiveHotelId = packageHotelResultIdRef.current
+                      ? String(packageHotelResultIdRef.current)
+                      : (isFromDeeplink && packageResultsMeta?.hotelRequestId)
+                        ? String(packageResultsMeta.hotelRequestId)
+                        : hotelId;
                     params.set("hotelId", effectiveHotelId);
                     params.set("hotelName", hotel.name);
                     params.set("roomId", String(rid));

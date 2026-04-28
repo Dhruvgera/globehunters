@@ -192,11 +192,16 @@ function PackageReviewPageInner() {
       ? (deeplinkViewData as HolidayPackageViewResponse)
       : null;
 
+  // Use deeplink view data only if user hasn't done a change selection.
+  // When selectedHotelRoomIds are populated, the user explicitly selected rooms
+  // (via change selection flow), so we should fetch fresh pricing from the API.
+  const useDeeplinkData = deeplinkPackageView && selectedHotelRoomIds.length === 0;
+
   useEffect(() => {
-    if (deeplinkPackageView) {
+    if (useDeeplinkData) {
       setDetailLoading(false);
       setDetailError(null);
-      setPackageDetails(buildDetailsFromDeeplinkView(deeplinkPackageView));
+      setPackageDetails(buildDetailsFromDeeplinkView(deeplinkPackageView!));
       return;
     }
 
@@ -228,7 +233,7 @@ function PackageReviewPageInner() {
     return () => {
       cancelled = true;
     };
-  }, [deeplinkPackageView, flightResultId, selectedHotelRoomIds]);
+  }, [useDeeplinkData, deeplinkPackageView, flightResultId, selectedHotelRoomIds]);
 
   const nights = useMemo(() => {
     const checkIn =
@@ -395,6 +400,28 @@ function PackageReviewPageInner() {
     };
   }, [hotelDetailsCache, packageDetails?.hotel, selectedHotel]);
 
+  const changeHotelHref = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("type", "package");
+    if (packageSearch?.destinationName) params.set("location", packageSearch.destinationName);
+    if (packageSearch?.destinationHiddenValue) params.set("hidden_key", packageSearch.destinationHiddenValue);
+    if (packageSearch?.destinationCode) params.set("hidden_id", packageSearch.destinationCode);
+    if (packageSearch?.departureCode) params.set("fromCode", packageSearch.departureCode);
+    if (packageSearch?.departureName) params.set("from", packageSearch.departureName);
+    const checkIn = hotelSearch?.checkIn || packageSearch?.checkIn || "";
+    const checkOut = hotelSearch?.checkOut || (checkIn && packageSearch?.nights ? shiftIsoDateByDays(checkIn, packageSearch.nights) : "");
+    if (checkIn) params.set("checkIn", checkIn);
+    if (checkOut) params.set("checkOut", checkOut);
+    const rooms = hotelSearch?.rooms || packageSearch?.rooms?.length || 1;
+    const adults = hotelSearch?.adults || packageSearch?.rooms?.reduce((s, r) => s + r.adults, 0) || 2;
+    const children = hotelSearch?.children || packageSearch?.rooms?.reduce((s, r) => s + r.children, 0) || 0;
+    params.set("rooms", String(rooms));
+    params.set("adults", String(adults));
+    params.set("children", String(children));
+    if (hotelSearch?.branches) params.set("branches", hotelSearch.branches);
+    return `/hotels?${params.toString()}`;
+  }, [hotelSearch, packageSearch]);
+
   const changeFlightHref = useMemo(() => {
     const params = new URLSearchParams();
     params.set("type", "package");
@@ -458,7 +485,15 @@ function PackageReviewPageInner() {
             <div className="bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden">
               <div className="px-4 sm:px-6 py-4 border-b border-[#DFE0E4] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <h2 className="text-xl font-semibold text-[#010D50]">Stay Details</h2>
-                <Link href="/hotels?type=package" className="text-[#3754ED] text-sm font-medium flex items-center gap-1 hover:underline">
+                <Link
+                  href={changeHotelHref}
+                  onClick={() => {
+                    if (isFromDeeplink) {
+                      useBookingStore.getState().setDeeplinkViewData(null);
+                    }
+                  }}
+                  className="text-[#3754ED] text-sm font-medium flex items-center gap-1 hover:underline"
+                >
                   <Edit2 className="w-4 h-4" />
                   Change selection
                 </Link>
