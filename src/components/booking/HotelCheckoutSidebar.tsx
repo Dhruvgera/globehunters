@@ -238,7 +238,7 @@ export function HotelCheckoutSidebar({
     const roomSummary = selectedHotelRoomSummary;
     const currency = roomSummary?.currency || "$";
     const total = roomSummary?.total;
-    const nightly = roomSummary?.nightly;
+    const rawNightly = roomSummary?.nightly;
     const roomName = roomSummary?.roomName || "Selected Room";
     const isRefundable = roomSummary?.isRefundable;
 
@@ -246,6 +246,14 @@ export function HotelCheckoutSidebar({
     const rooms = hotelSearch?.rooms || 1;
     const adults = hotelSearch?.adults || 1;
     const children = hotelSearch?.children || 0;
+
+    // Derive nightly from the API total so the breakdown always matches the total.
+    // rawNightly was computed as total/nights at selection time — if dates changed
+    // since then, multiplying rawNightly × new_nights would diverge from total.
+    const nightly =
+      total != null && nights > 0 && rooms > 0
+        ? total / (nights * rooms)
+        : rawNightly;
 
     const roomNames: string[] = [];
     if (Array.isArray(cached?.rooms) && selectedHotelRoomIds.length > 0) {
@@ -464,7 +472,7 @@ export function HotelCheckoutSidebar({
             <span className="text-sm font-semibold text-[#010D50]">
               {formatMoney(
                 display.currency,
-                ((display.baseTotal ?? display.total) || 0) +
+                ((display.total ?? display.baseTotal) || 0) +
                   (convertedLocalTaxRows.length > 0
                     ? convertedLocalTaxRows.reduce((sum, row) => sum + Number(row.amount || 0), 0)
                     : 0)

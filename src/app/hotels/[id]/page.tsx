@@ -1232,6 +1232,12 @@ export default function HotelRoomsPage() {
     rooms: number;
     childAges: number[];
   }) {
+    // Immediately invalidate stale room selection/pricing from the previous dates
+    // so the sidebar never mixes old prices with new dates.
+    setSelectedHotelRoomSummary(null);
+    setSelectedHotelRoomIds([]);
+    setSelectedRoomCounts({});
+
     if (isPackageMode && packageSearch) {
       return runPackageStaySearch(next);
     }
@@ -2149,9 +2155,11 @@ export default function HotelRoomsPage() {
         meta?.provider === "hotelbeds" || meta?.provider === "vyspa" ? meta.provider : undefined;
       const urlProviderNormalized =
         urlProvider === "hotelbeds" || urlProvider === "vyspa" ? (urlProvider as "hotelbeds" | "vyspa") : undefined;
+      // Prefer store values (updated by runStaySearch after a date change) over
+      // URL params which become stale once the user re-searches with new dates.
       let effectiveProvider: "vyspa" | "hotelbeds" =
-        urlProviderNormalized || metaProvider || (hotelSearch?.provider === "hotelbeds" ? "hotelbeds" : "vyspa");
-      let effectiveSearchCriteriaId = urlSearchCriteriaId ?? meta?.searchCriteriaId ?? hotelSearch?.searchCriteriaId;
+        metaProvider || (hotelSearch?.provider === "hotelbeds" ? "hotelbeds" : undefined) || urlProviderNormalized || "vyspa";
+      let effectiveSearchCriteriaId = meta?.searchCriteriaId ?? hotelSearch?.searchCriteriaId ?? urlSearchCriteriaId;
       if (!effectiveSearchCriteriaId) return;
       const searchResultSeed = extractSearchResultHotelData(meta?.rawSearchResult);
       setRoomsLoading(true);
@@ -2365,7 +2373,7 @@ export default function HotelRoomsPage() {
           setCoordinates((previous) => previous || searchResultSeed.coordinates);
         }
 
-        const srId = urlSrId || meta?.srId || meta?.searchResultId;
+        const srId = meta?.srId || meta?.searchResultId || urlSrId || undefined;
         const rawResult = asRecord(meta?.rawSearchResult);
         const hbMeta = asRecord(rawResult._hotelbeds);
         const dedupeMeta = asRecord(rawResult._dedupe);
