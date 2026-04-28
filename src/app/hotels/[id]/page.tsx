@@ -1128,7 +1128,7 @@ export default function HotelRoomsPage() {
     }
     if (toCheck.length === 0) return;
     let cancelled = false;
-    filterReachableImageUrls(toCheck).then((valid) => {
+    filterReachableImageUrls(toCheck, { maxValid: 5 }).then((valid) => {
       if (cancelled) return;
       const broken = toCheck.filter((url) => !valid.includes(url));
       if (broken.length === 0) return;
@@ -1139,6 +1139,31 @@ export default function HotelRoomsPage() {
     });
     return () => { cancelled = true; };
   }, [galleryImages, remoteHotelHeader?.image, markImageBroken]);
+
+  useEffect(() => {
+    if (!galleryOpen) return;
+    const toCheck: string[] = [];
+    const known = brokenImageUrlsRef.current;
+    for (const url of galleryImages) {
+      if (url && !known.has(url)) toCheck.push(url);
+    }
+    const headerUrl = remoteHotelHeader?.image;
+    if (headerUrl && !known.has(headerUrl) && !toCheck.includes(headerUrl)) {
+      toCheck.push(headerUrl);
+    }
+    if (toCheck.length === 0) return;
+    let cancelled = false;
+    filterReachableImageUrls(toCheck).then((valid) => {
+      if (cancelled) return;
+      const broken = toCheck.filter((url) => !valid.includes(url));
+      if (broken.length === 0) return;
+      broken.forEach((url) => {
+        known.add(url);
+        markImageBroken(url);
+      });
+    });
+    return () => { cancelled = true; };
+  }, [galleryOpen, galleryImages, remoteHotelHeader?.image, markImageBroken]);
 
   useEffect(() => {
     // Keep local editor state in sync with global search state when navigating between hotels.

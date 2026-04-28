@@ -52,15 +52,27 @@ function checkImageHead(url: string): Promise<boolean> {
     });
 }
 
-export async function filterReachableImageUrls(urls: string[]): Promise<string[]> {
-  if (typeof window === 'undefined' || urls.length === 0) return urls;
+export async function filterReachableImageUrls(
+  urls: string[],
+  options?: { maxValid?: number }
+): Promise<string[]> {
+  const uniqueUrls = [...new Set(urls)];
+  if (typeof window === 'undefined' || uniqueUrls.length === 0) return uniqueUrls;
 
-  const results = await Promise.all(
-    urls.map(async (url) => {
-      const ok = await checkImageHead(url);
-      return ok ? url : '';
-    })
-  );
+  const maxValid = options?.maxValid ?? Infinity;
+  const batchSize = maxValid >= uniqueUrls.length ? uniqueUrls.length : maxValid + 1;
+  const valid: string[] = [];
+  let offset = 0;
 
-  return results.filter(Boolean) as string[];
+  while (offset < uniqueUrls.length && valid.length < maxValid) {
+    const batch = uniqueUrls.slice(offset, offset + batchSize);
+    offset += batch.length;
+    const checked = await Promise.all(batch.map((url) => checkImageHead(url).then((ok) => (ok ? url : ''))));
+    for (const url of checked) {
+      if (url) valid.push(url);
+      if (valid.length >= maxValid) break;
+    }
+  }
+
+  return valid;
 }
