@@ -1099,11 +1099,20 @@ export default function HotelRoomsPage() {
   const isHotelDatesDebugMode = process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES === "true";
   const brokenImageUrlsRef = useRef<Set<string>>(new Set());
   const [brokenImageUrls, setBrokenImageUrls] = useState<Set<string>>(new Set());
+  const [loadedImageUrls, setLoadedImageUrls] = useState<Set<string>>(new Set());
 
   const markImageBroken = useCallback((url: string) => {
     if (!url || brokenImageUrlsRef.current.has(url)) return;
     brokenImageUrlsRef.current.add(url);
     setBrokenImageUrls((prev) => new Set(prev).add(url));
+  }, []);
+
+  const markImageLoaded = useCallback((url: string) => {
+    if (!url) return;
+    setLoadedImageUrls((prev) => {
+      if (prev.has(url)) return prev;
+      return new Set(prev).add(url);
+    });
   }, []);
 
   const galleryImagesFiltered = useMemo(
@@ -1128,12 +1137,13 @@ export default function HotelRoomsPage() {
     }
     if (toCheck.length === 0) return;
     let cancelled = false;
-    filterReachableImageUrls(toCheck, { maxValid: 5 }).then((valid) => {
+    filterReachableImageUrls(toCheck, { maxValid: 5 }).then(({ valid, checked }) => {
       if (cancelled) return;
-      const broken = toCheck.filter((url) => !valid.includes(url));
+      // Only mark URLs that were actually checked AND failed.
+      // Unchecked URLs (past the maxValid cutoff) must NOT be treated as broken.
+      const broken = checked.filter((url) => !valid.includes(url));
       if (broken.length === 0) return;
       broken.forEach((url) => {
-        known.add(url);
         markImageBroken(url);
       });
     });
@@ -1153,9 +1163,9 @@ export default function HotelRoomsPage() {
     }
     if (toCheck.length === 0) return;
     let cancelled = false;
-    filterReachableImageUrls(toCheck).then((valid) => {
+    filterReachableImageUrls(toCheck).then(({ valid, checked }) => {
       if (cancelled) return;
-      const broken = toCheck.filter((url) => !valid.includes(url));
+      const broken = checked.filter((url) => !valid.includes(url));
       if (broken.length === 0) return;
       broken.forEach((url) => {
         known.add(url);
@@ -3018,16 +3028,12 @@ export default function HotelRoomsPage() {
                 {(() => {
                   const firstIsMain = hotel.galleryImages?.[0] === hotel.mainImage;
                   const thumbImages = firstIsMain ? (hotel.galleryImages || []).slice(1, 4) : (hotel.galleryImages || []).slice(0, 3);
-                  const hasThumbImages = thumbImages.length > 0;
 
                   return (
                     <>
-                      {/* Main Image - full width when there are no side thumbnails */}
+                      {/* Main Image */}
                       <div
-                        className={[
-                          "relative min-h-[300px] lg:min-h-[450px] rounded-2xl overflow-hidden cursor-pointer group",
-                          hasThumbImages ? "flex-[2]" : "w-full flex-1",
-                        ].join(" ")}
+                        className="relative min-h-[300px] lg:min-h-[450px] flex-[2] rounded-2xl overflow-hidden cursor-pointer group"
                         onClick={() => {
                           if (hotel.galleryImages.length > 0) {
                             setCurrentPhotoIndex(0);
@@ -3045,7 +3051,7 @@ export default function HotelRoomsPage() {
                             onError={() => markImageBroken(hotel.mainImage)}
                           />
                         ) : (
-                          <div className="absolute inset-0 bg-[#F6F6F6]" />
+                          <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-[#EEEEF2] to-[#E2E2E8]" />
                         )}
                         {/* Show All Photos Button - Bottom left of main image */}
                         {hotel.galleryImages.length > 0 && (
@@ -3055,7 +3061,7 @@ export default function HotelRoomsPage() {
                               e.stopPropagation();
                               setGalleryOpen(true);
                             }}
-                            className="absolute bottom-4 left-4 flex items-center gap-2 px-4 py-2 rounded-lg bg-white/90 backdrop-blur-sm hover:bg-white transition-all shadow-sm hover:shadow-md"
+                            className="absolute bottom-4 left-4 flex items-center gap-2 px-4 py-2 rounded-lg bg-white/90 backdrop-blur-sm hover:bg-white transition-all shadow-sm hover-shadow-md"
                           >
                             <Grid3X3 className="w-4 h-4 text-[#010D50]" />
                             <span className="text-sm font-medium text-[#010D50]">Show All Photos</span>
@@ -3063,32 +3069,47 @@ export default function HotelRoomsPage() {
                         )}
                       </div>
 
-                      {hasThumbImages && (
-                        <div className="flex flex-row lg:flex-col gap-3 lg:w-[220px]">
-                          {thumbImages.map((img: string, idx: number) => {
-                            const imgIndex = firstIsMain ? idx + 1 : idx;
+                      {/* Thumbnail column — always rendered to prevent layout shift */}
+                      <div className="flex flex-row lg:flex-col gap-3 lg:w-[220px]">
+                        {[0, 1, 2].map((idx) => {
+                          const img = thumbImages[idx];
+                          if (!img) {
+                            // Skeleton placeholder for unfilled slots
                             return (
                               <div
-                                key={`${img}-${idx}`}
-                                className="relative flex-1 lg:flex-none lg:h-[140px] min-h-[100px] rounded-xl overflow-hidden bg-gray-100 cursor-pointer group"
-                                onClick={() => {
-                                  setCurrentPhotoIndex(imgIndex);
-                                  setGalleryOpen(true);
-                                }}
-                              >
-                                <Image
-                                  src={img}
-                                  alt={`${hotel.name} - ${idx + 1}`}
-                                  fill
-                                  className="object-cover transition-transform duration-500 group-hover:scale-110"
-                                  onError={() => markImageBroken(img)}
-                                />
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-                              </div>
+                                key={`skeleton-${idx}`}
+                                className="relative flex-1 lg:flex-none lg:h-[140px] min-h-[100px] rounded-xl overflow-hidden animate-pulse bg-gradient-to-br from-[#EEEEF2] to-[#E2E2E8]"
+                              />
                             );
-                          })}
-                        </div>
-                      )}
+                          }
+                          const imgIndex = firstIsMain ? idx + 1 : idx;
+                          const isLoaded = loadedImageUrls.has(img);
+                          return (
+                            <div
+                              key={`${img}-${idx}`}
+                              className="relative flex-1 lg:flex-none lg:h-[140px] min-h-[100px] rounded-xl overflow-hidden bg-[#F6F6F6] cursor-pointer group"
+                              onClick={() => {
+                                setCurrentPhotoIndex(imgIndex);
+                                setGalleryOpen(true);
+                              }}
+                            >
+                              {/* Shimmer placeholder */}
+                              {!isLoaded && (
+                                <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-[#EEEEF2] to-[#E2E2E8]" />
+                              )}
+                              <Image
+                                src={img}
+                                alt={`${hotel.name} - ${idx + 1}`}
+                                fill
+                                className={`object-cover transition-all duration-500 group-hover:scale-110 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+                                onLoad={() => markImageLoaded(img)}
+                                onError={() => markImageBroken(img)}
+                              />
+                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                            </div>
+                          );
+                        })}
+                      </div>
                     </>
                   );
                 })()}
