@@ -365,7 +365,6 @@ function HotelsPageInner() {
   const [noResultsMessage, setNoResultsMessage] = useState<string | null>(null);
   const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
   const [displayedHotelsCount, setDisplayedHotelsCount] = useState(12);
-  const [hiddenImageHotelIds, setHiddenImageHotelIds] = useState<Set<string>>(new Set());
   const activeRequestSeq = useRef(0);
   const contentInflightRef = useRef<Set<string>>(new Set());
   const contentAttemptRef = useRef<Map<string, { attempts: number; lastAttemptAt: number; ok: boolean }>>(new Map());
@@ -714,7 +713,6 @@ function HotelsPageInner() {
       setHotels([]);
       setSelectedHotelKey("");
       setDisplayedHotelsCount(12);
-      setHiddenImageHotelIds(new Set());
       setBreakfastByHotelId({});
       setBreakfastEnriching(false);
       setTrustYouEnriching(false);
@@ -1654,34 +1652,6 @@ function HotelsPageInner() {
   const filteredHotelsRef = useRef(filteredHotels);
   filteredHotelsRef.current = filteredHotels;
 
-  const pendingImageErrorsRef = useRef<Set<string>>(new Set());
-  const imageErrorFlushHandleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const flushImageErrors = useCallback(() => {
-    imageErrorFlushHandleRef.current = null;
-    const pending = pendingImageErrorsRef.current;
-    if (pending.size === 0) return;
-    const batch = new Set(pending);
-    pending.clear();
-    setHiddenImageHotelIds((prev) => {
-      const merged = new Set(prev);
-      let added = 0;
-      for (const id of batch) {
-        if (!merged.has(id)) { merged.add(id); added++; }
-      }
-      if (added === 0) return prev;
-      setDisplayedHotelsCount((c) => Math.min(c + added, filteredHotelsRef.current.length));
-      return merged;
-    });
-  }, []);
-
-  const handleHotelImageError = useCallback((hotelId: string) => {
-    pendingImageErrorsRef.current.add(hotelId);
-    if (!imageErrorFlushHandleRef.current) {
-      imageErrorFlushHandleRef.current = setTimeout(flushImageErrors, 0);
-    }
-  }, [flushImageErrors]);
-
   const hasMoreHotels = displayedHotelsCount < filteredHotels.length;
 
   // TrustYou enrichment: fetch live review scores for visible hotels and merge into card ratings.
@@ -2154,7 +2124,7 @@ function HotelsPageInner() {
             {((loadingMoreHotels && hasAttemptedFetch ) || (hotels.length > 0 && (breakfastEnriching || contentEnriching || trustYouEnriching))) && (
               <div className="inline-flex items-center gap-2 text-xs text-[#3A478A]">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#3754ED] animate-pulse" />
-                {hotels.length > 0 ? "More hotels are being added…" : "Updating hotel details…"}
+                {loadingMoreHotels ? "More hotels are being added…" : "Updating hotel details…"}
               </div>
             )}
 
@@ -2175,7 +2145,6 @@ function HotelsPageInner() {
                     selected={hotelKey === selectedHotelKey}
                     onSelect={() => setSelectedHotelKey(hotelKey)}
                     isPackageMode={isPackageMode}
-                    onImageError={() => handleHotelImageError(hotel.id)}
                   />
                     );
                   })()
@@ -2196,7 +2165,6 @@ function HotelsPageInner() {
                       selected={hotelKey === selectedHotelKey}
                       onSelect={() => setSelectedHotelKey(hotelKey)}
                       isPackageMode={isPackageMode}
-                      onImageError={() => handleHotelImageError(hotel.id)}
                     />
                       );
                     })()
@@ -2215,7 +2183,6 @@ function HotelsPageInner() {
                       selected={hotelKey === selectedHotelKey}
                       onSelect={() => setSelectedHotelKey(hotelKey)}
                       isPackageMode={isPackageMode}
-                      onImageError={() => handleHotelImageError(hotel.id)}
                     />
                       );
                     })()
