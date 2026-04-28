@@ -736,7 +736,7 @@ function PackageTravellerDetailsInner() {
           <PackageStepProgress currentStep="details" />
 
         <div className="mt-4">
-          <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={true} />
+          <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={true} isJourneyRef={!!vyspaFolderNumber} />
           <div className="mt-4 lg:hidden bg-white border border-[#DFE0E4] rounded-xl p-4">
             <div className="text-xs uppercase tracking-[0.12em] text-[#3A478A]">Total package price</div>
             <div className="mt-1 text-2xl font-semibold text-[#010D50]">{packageTotalLabel}</div>
@@ -885,7 +885,7 @@ function PackageTravellerDetailsInner() {
           </div>
 
           <div className="w-full lg:w-[482px] flex flex-col gap-4">
-            <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={false} />
+            <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={false} isJourneyRef={!!vyspaFolderNumber} />
 
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 sm:p-5">
               <div className="text-xs uppercase tracking-[0.12em] text-[#3A478A]">Total package price</div>

@@ -629,11 +629,12 @@ function PaymentContent() {
 
         {/* Main Layout */}
         <div className="flex flex-col lg:flex-row gap-4">
-          {/* Web Ref Card - Mobile Only */}
+          {/* Web/Journey Ref Card - Mobile Only */}
           <WebRefCard
             refNumber={refNumber}
             phoneNumber={affiliatePhone}
             isMobile={true}
+            isJourneyRef={!!vyspaFolderNumber}
           />
 
           {/* Left Column */}
@@ -1155,11 +1156,12 @@ function PaymentContent() {
 
           {/* Right Sidebar */}
           <div className="w-full lg:w-[482px] flex flex-col gap-4">
-            {/* Web Ref Card - Desktop Only */}
+            {/* Web/Journey Ref Card - Desktop Only */}
             <WebRefCard
               refNumber={refNumber}
               phoneNumber={affiliatePhone}
               isMobile={false}
+              isJourneyRef={!!vyspaFolderNumber}
             />
 
             {/* Price Summary */}

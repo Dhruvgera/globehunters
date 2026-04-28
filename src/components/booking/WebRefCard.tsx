@@ -7,21 +7,24 @@ interface WebRefCardProps {
   refNumber: string;
   phoneNumber: string;
   isMobile?: boolean;
+  isJourneyRef?: boolean;
 }
 
 export function WebRefCard({
   refNumber,
   phoneNumber,
   isMobile = false,
+  isJourneyRef = false,
 }: WebRefCardProps) {
   const t = useTranslations('booking.webRef');
+  const refLabel = isJourneyRef ? t('journeyRefTitle') : t('title');
   const tNav = useTranslations('common.navigation.phone');
   const phoneHref = `tel:${phoneNumber.replace(/[^\d+]/g, "")}`;
   if (isMobile) {
     return (
       <div className="lg:hidden bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
         <span className="text-base font-semibold text-[#3754ED]">
-          {t('title')}: {refNumber}
+          {refLabel}: {refNumber}
         </span>
         <div className="flex items-center gap-3 bg-[rgba(55,84,237,0.12)] rounded-full px-4 py-3">
           <div className="w-10 h-10 rounded-full bg-[#0B229E] flex items-center justify-center">
@@ -43,7 +46,7 @@ export function WebRefCard({
   return (
     <div className="hidden lg:flex bg-white border border-[#DFE0E4] rounded-xl p-4 flex-col gap-4">
       <span className="text-base font-semibold text-[#3754ED]">
-        {t('title')}: {refNumber}
+        {refLabel}: {refNumber}
       </span>
       <p className="text-sm text-[#3A478A]">
         {t('message')}

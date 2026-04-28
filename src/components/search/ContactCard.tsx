@@ -5,22 +5,23 @@ import { useTranslations } from "next-intl";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
 
 interface ContactCardProps {
-  /** Web reference ID from the flight search (Request_id) */
+  /** Reference ID from the flight/hotel search */
   webRef?: string | number;
+  isJourneyRef?: boolean;
 }
 
-export function ContactCard({ webRef }: ContactCardProps) {
+export function ContactCard({ webRef, isJourneyRef = false }: ContactCardProps) {
   const t = useTranslations('search.contact');
   const { phoneNumber } = useAffiliatePhone();
   
-  // Format web ref - use the Request_id directly
   const displayWebRef = webRef ? `${webRef}` : null;
+  const refLabel = isJourneyRef ? t('journeyRef') : t('webRef');
   
   return (
     <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-3 sticky top-20 z-20 shadow-sm">
       {displayWebRef && (
         <span className="text-base font-semibold text-[#3754ED]">
-          {t('webRef')}: {displayWebRef}
+          {refLabel}: {displayWebRef}
         </span>
       )}
       <p className="text-xs text-[#3A478A]">

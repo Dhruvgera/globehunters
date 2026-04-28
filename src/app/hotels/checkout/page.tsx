@@ -973,6 +973,7 @@ export default function HotelCheckoutPage() {
             webRef={webRefNumber}
             phoneNumber={affiliatePhone}
             changeSelectionHref={hotelDetailsBackUrl}
+            isJourneyRef={!!vyspaFolderNumber}
           />
         </div>
       </div>

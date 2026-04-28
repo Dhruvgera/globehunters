@@ -71,12 +71,14 @@ interface HotelCheckoutSidebarProps {
   webRef: string;
   phoneNumber: string;
   changeSelectionHref?: string;
+  isJourneyRef?: boolean;
 }
 
 export function HotelCheckoutSidebar({
   webRef,
   phoneNumber,
   changeSelectionHref,
+  isJourneyRef = false,
 }: HotelCheckoutSidebarProps) {
   const hotelSearch = useBookingStore((s) => s.hotelSearch);
   const selectedHotel = useBookingStore((s) => s.selectedHotel);
@@ -298,10 +300,10 @@ export function HotelCheckoutSidebar({
 
   return (
     <aside className="w-full lg:w-[482px] flex flex-col gap-4">
-      {/* WEB REF Card */}
+      {/* Reference Card */}
       <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
         <span className="text-base font-semibold text-[#3754ED]">
-          WEB REF: {webRef}
+          {isJourneyRef ? "JOURNEY REF" : "WEB REF"}: {webRef}
         </span>
         <p className="text-sm text-[#3A478A]">
           If you would like to speak to one of our travel consultants please call us on the given number below.

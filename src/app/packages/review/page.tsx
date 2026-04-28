@@ -470,7 +470,7 @@ function PackageReviewPageInner() {
         <PackageStepProgress currentStep="review" />
 
         <div className="mt-4">
-          <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={true} />
+          <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={true} isJourneyRef={!!vyspaFolderNumber} />
         </div>
 
         <div className="mt-4 sm:mt-6 bg-[#F5F7FF] border border-[#DFE0E4] rounded-xl p-3.5 sm:p-4 flex items-start gap-3">
@@ -661,7 +661,7 @@ function PackageReviewPageInner() {
           </div>
 
           <div className="w-full lg:w-96 flex-shrink-0 flex flex-col gap-4">
-            <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={false} />
+            <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={false} isJourneyRef={!!vyspaFolderNumber} />
 
             <div className="bg-white border border-[#DFE0E4] rounded-xl lg:sticky lg:top-4">
               <div className="p-4 sm:p-6 space-y-4">
