@@ -92,7 +92,7 @@
     },
     "contact": {
       "webRef": "WEB REF",
-      "journeyRef": "JOURNEY REF",
+      "journeyRef": "ORDER ID",
       "title": "If you would like to speak to one of our travel consultants please call us on the given number below.",
       "tollFree": "24/7 Toll-Free",
       "phone": "020 4502 2984"
@@ -239,7 +239,7 @@
     },
     "webRef": {
       "title": "WEB REF",
-      "journeyRefTitle": "JOURNEY REF",
+      "journeyRefTitle": "ORDER ID",
       "message": "If you would like to speak to one of our travel consultants please call us on the given number below."
     },
     "flightSummary": {
