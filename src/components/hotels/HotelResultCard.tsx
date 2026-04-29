@@ -69,14 +69,12 @@ export function HotelResultCard({
   selected = false,
   onSelect,
   isPackageMode = false,
-  onImageError,
 }: {
   hotel: Hotel;
   view: Exclude<HotelViewMode, "map">;
   selected?: boolean;
   onSelect?: () => void;
   isPackageMode?: boolean;
-  onImageError?: () => void;
 }) {
   const isGrid = view === "grid";
   const showNightlyPrice = !isPackageMode;
@@ -103,13 +101,6 @@ export function HotelResultCard({
   const hasReviewRating = hotel.reviews.score > 0;
   const packagePerPersonPrice = isPackageMode ? hotel.price.perPerson : undefined;
   const [imageError, setImageError] = useState(false);
-  const handleImageError = useCallback(() => {
-    setImageError(true);
-    onImageError?.();
-  }, [onImageError]);
-
-  if (imageError) return null;
-
   const rootClass = [
     "bg-white border rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden w-full max-w-full cursor-pointer",
     selected ? "border-[#3754ED] bg-[rgba(55,84,237,0.08)]" : "border-[#DFE0E4]",
@@ -136,16 +127,24 @@ export function HotelResultCard({
       {isGrid ? (
         <div className="flex flex-col h-full">
           {/* Image edge-to-edge like Figma (no padding) */}
-          <div className="relative w-full aspect-[4/3] overflow-hidden">
-            <Image
-              src={hotel.imageSrc}
-              alt={hotel.name}
-              fill
-              className="object-cover object-center"
-              sizes="(max-width: 1024px) 100vw, 360px"
-              priority={false}
-              onError={handleImageError}
-            />
+          <div className="relative w-full aspect-[4/3] overflow-hidden bg-gradient-to-br from-[#E8EAFF] to-[#D0D5F5]">
+            {!imageError && hotel.imageSrc ? (
+              <Image
+                src={hotel.imageSrc}
+                alt={hotel.name}
+                fill
+                className="object-cover object-center"
+                sizes="(max-width: 1024px) 100vw, 360px"
+                priority={false}
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <div className="flex items-center justify-center w-full h-full">
+                <svg className="w-10 h-10 text-[#3754ED]/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 7.5h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008z" />
+                </svg>
+              </div>
+            )}
           </div>
 
           {/* Content padded; CTA pinned to bottom so all cards align */}
@@ -261,16 +260,24 @@ export function HotelResultCard({
       ) : (
         <div className="flex flex-col lg:flex-row">
           {/* Image - edge to edge, no padding, rounded only on left side */}
-          <div className="relative w-full lg:w-[220px] h-[180px] lg:h-auto lg:min-h-[200px] flex-shrink-0 lg:rounded-l-xl lg:rounded-r-none rounded-t-xl lg:rounded-t-none overflow-hidden">
-            <Image
-              src={hotel.imageSrc}
-              alt={hotel.name}
-              fill
-              className="object-cover object-center"
-              sizes="(max-width: 1024px) 100vw, 220px"
-              priority={false}
-              onError={handleImageError}
-            />
+          <div className="relative w-full lg:w-[220px] h-[180px] lg:h-auto lg:min-h-[200px] flex-shrink-0 lg:rounded-l-xl lg:rounded-r-none rounded-t-xl lg:rounded-t-none overflow-hidden bg-gradient-to-br from-[#E8EAFF] to-[#D0D5F5]">
+            {!imageError && hotel.imageSrc ? (
+              <Image
+                src={hotel.imageSrc}
+                alt={hotel.name}
+                fill
+                className="object-cover object-center"
+                sizes="(max-width: 1024px) 100vw, 220px"
+                priority={false}
+                onError={() => setImageError(true)}
+              />
+            ) : (
+              <div className="flex items-center justify-center w-full h-full">
+                <svg className="w-10 h-10 text-[#3754ED]/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 7.5h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008z" />
+                </svg>
+              </div>
+            )}
           </div>
 
           {/* Content area with padding */}

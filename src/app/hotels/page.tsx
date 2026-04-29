@@ -365,6 +365,8 @@ function HotelsPageInner() {
   const [noResultsMessage, setNoResultsMessage] = useState<string | null>(null);
   const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
   const [displayedHotelsCount, setDisplayedHotelsCount] = useState(12);
+  const [loadMorePending, setLoadMorePending] = useState(false);
+  const failedImageIdsRef = useRef<Set<string>>(new Set());
   const activeRequestSeq = useRef(0);
   const contentInflightRef = useRef<Set<string>>(new Set());
   const contentAttemptRef = useRef<Map<string, { attempts: number; lastAttemptAt: number; ok: boolean }>>(new Map());
@@ -713,6 +715,7 @@ function HotelsPageInner() {
       setHotels([]);
       setSelectedHotelKey("");
       setDisplayedHotelsCount(12);
+      failedImageIdsRef.current = new Set();
       setBreakfastByHotelId({});
       setBreakfastEnriching(false);
       setTrustYouEnriching(false);
@@ -1654,6 +1657,43 @@ function HotelsPageInner() {
 
   const hasMoreHotels = displayedHotelsCount < filteredHotels.length;
 
+  const handleLoadMore = useCallback(async () => {
+    const BATCH = 12;
+    const nextSlice = filteredHotelsRef.current.slice(
+      displayedHotelsCount,
+      displayedHotelsCount + BATCH
+    );
+    if (nextSlice.length === 0) return;
+
+    setLoadMorePending(true);
+
+    await Promise.allSettled(
+      nextSlice.map(
+        (h) =>
+          new Promise<void>((resolve) => {
+            if (!h.imageSrc || failedImageIdsRef.current.has(h.id)) {
+              resolve();
+              return;
+            }
+            const img = new window.Image();
+            img.src = h.imageSrc;
+            const done = () => { img.onload = null; img.onerror = null; resolve(); };
+            img.onload = done;
+            img.onerror = () => {
+              failedImageIdsRef.current.add(h.id);
+              done();
+            };
+            setTimeout(done, 4000);
+          })
+      )
+    );
+
+    setDisplayedHotelsCount((prev) =>
+      Math.min(prev + BATCH, filteredHotelsRef.current.length)
+    );
+    setLoadMorePending(false);
+  }, [displayedHotelsCount]);
+
   // TrustYou enrichment: fetch live review scores for visible hotels and merge into card ratings.
   useEffect(() => {
     if (!ENABLE_TRUSTYOU_ENRICHMENT) return;
@@ -2195,13 +2235,22 @@ function HotelsPageInner() {
             {hasMoreHotels && (
               <div className="flex justify-center mt-4">
                 <Button
-                  onClick={() =>
-                    setDisplayedHotelsCount((prev) => Math.min(prev + 12, filteredHotels.length))
-                  }
+                  onClick={handleLoadMore}
+                  disabled={loadMorePending}
                   variant="outline"
-                  className="bg-white hover:bg-[#F5F7FF] text-[#3754ED] border-[#3754ED] rounded-full px-8 py-2 h-auto text-sm font-medium"
+                  className="bg-white hover:bg-[#F5F7FF] text-[#3754ED] border-[#3754ED] rounded-full px-8 py-2 h-auto text-sm font-medium disabled:opacity-60"
                 >
-                  Load more
+                  {loadMorePending ? (
+                    <span className="inline-flex items-center gap-2">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Loading…
+                    </span>
+                  ) : (
+                    "Load more"
+                  )}
                 </Button>
               </div>
             )}
