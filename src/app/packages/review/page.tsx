@@ -425,10 +425,11 @@ function PackageReviewPageInner() {
   const changeFlightHref = useMemo(() => {
     const params = new URLSearchParams();
     params.set("type", "package");
-    // The change-flights API requires the hotel *result* ID (from package search
-    // results), not the hotel *request* ID (search-level). hotelId here is the
-    // result ID stored via setSelectedHotel or the URL param.
-    const effectiveHotelId = String(hotelId || packageResultsMeta?.hotelRequestId || "");
+    // The change-flights API requires the hotel *result* ID from the package
+    // search response, NOT the vendor hotel_id. In deeplink flows the route
+    // param (selectedHotel.hotelId) is the vendor hotel_id, while
+    // packageResultsMeta.hotelRequestId stores the correct HotelResultId.
+    const effectiveHotelId = String(packageResultsMeta?.hotelRequestId || hotelId || "");
     if (effectiveHotelId) params.set("hotelId", effectiveHotelId);
     if (flightResultId) params.set("flightResultId", flightResultId);
     return `/search?${params.toString()}`;

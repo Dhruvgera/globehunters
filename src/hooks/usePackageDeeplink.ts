@@ -233,9 +233,24 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
       const children = roomConfigurations.reduce((sum, room) => sum + room.children, 0);
 
       // Populate hotel search context for hotel checkout sidebar + submission flow.
+      // Use the destination city/code for the location field (not the hotel name)
+      // so the search bar shows the actual destination when changing hotel.
+      const hotelSearchLocation = (() => {
+        if (mode === "package" && "FlightResultId" in viewData.results) {
+          const lastLeg = (viewData as HolidayPackageViewResponse).results.FlightDetails?.[0]?.Flights?.slice(-1)?.[0];
+          const city = String(
+            (lastLeg as Record<string, unknown>)?.arrive_airport_city ||
+            (lastLeg as Record<string, unknown>)?.arrival_city ||
+            ""
+          ).trim();
+          const code = String(lastLeg?.arrival_airport || "").toUpperCase();
+          return city || code || String(hd.hotel_name || "");
+        }
+        return String(hd.hotel_name || "");
+      })();
       setHotelSearch({
         provider: "vyspa",
-        location: String(hd.hotel_name || ""),
+        location: hotelSearchLocation,
         hidden_id: String(hd.hotel_id || ""),
         hidden_key: String(hd.VmapId || ""),
         checkIn,
@@ -269,7 +284,7 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
           (lastOutboundLeg as Record<string, unknown>)?.arrival_city ||
           ""
         ).trim();
-        const destinationDisplayName = destinationCity || hd.hotel_name;
+        const destinationDisplayName = destinationCity || destinationCode || hd.hotel_name;
 
         const deeplinkPackageSearch: PackageSearchCriteria = {
           departureCode,

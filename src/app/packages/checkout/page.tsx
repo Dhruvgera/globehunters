@@ -546,7 +546,7 @@ function PackageTravellerDetailsInner() {
   const changeFlightHref = useMemo(() => {
     const params = new URLSearchParams();
     params.set("type", "package");
-    const effectiveHotelId = String(selectedHotel?.hotelId || packageResultsMeta?.hotelRequestId || "");
+    const effectiveHotelId = String(packageResultsMeta?.hotelRequestId || selectedHotel?.hotelId || "");
     if (effectiveHotelId) params.set("hotelId", effectiveHotelId);
     if (flight?.segmentResultId || flight?.id) {
       params.set("flightResultId", flight?.segmentResultId || flight?.id || "");
