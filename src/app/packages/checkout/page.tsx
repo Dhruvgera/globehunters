@@ -521,10 +521,32 @@ function PackageTravellerDetailsInner() {
     };
   }, [hotelDetailsCache, packageDetails?.hotel, selectedHotel]);
 
+  const changeHotelHref = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("type", "package");
+    if (packageSearch?.destinationName) params.set("location", packageSearch.destinationName);
+    if (packageSearch?.destinationHiddenValue) params.set("hidden_key", packageSearch.destinationHiddenValue);
+    if (packageSearch?.destinationCode) params.set("hidden_id", packageSearch.destinationCode);
+    if (packageSearch?.departureCode) params.set("fromCode", packageSearch.departureCode);
+    if (packageSearch?.departureName) params.set("from", packageSearch.departureName);
+    const checkIn = hotelSearch?.checkIn || packageSearch?.checkIn || "";
+    const checkOut = hotelSearch?.checkOut || "";
+    if (checkIn) params.set("checkIn", checkIn);
+    if (checkOut) params.set("checkOut", checkOut);
+    const rooms = hotelSearch?.rooms || packageSearch?.rooms?.length || 1;
+    const adults = hotelSearch?.adults || packageSearch?.rooms?.reduce((s, r) => s + r.adults, 0) || 2;
+    const children = hotelSearch?.children || packageSearch?.rooms?.reduce((s, r) => s + r.children, 0) || 0;
+    params.set("rooms", String(rooms));
+    params.set("adults", String(adults));
+    params.set("children", String(children));
+    if (hotelSearch?.branches) params.set("branches", hotelSearch.branches);
+    return `/hotels?${params.toString()}`;
+  }, [hotelSearch, packageSearch]);
+
   const changeFlightHref = useMemo(() => {
     const params = new URLSearchParams();
     params.set("type", "package");
-    const effectiveHotelId = String(packageResultsMeta?.hotelRequestId || selectedHotel?.hotelId || "");
+    const effectiveHotelId = String(selectedHotel?.hotelId || packageResultsMeta?.hotelRequestId || "");
     if (effectiveHotelId) params.set("hotelId", effectiveHotelId);
     if (flight?.segmentResultId || flight?.id) {
       params.set("flightResultId", flight?.segmentResultId || flight?.id || "");
@@ -747,7 +769,13 @@ function PackageTravellerDetailsInner() {
         <div className="mt-5 sm:mt-6 flex flex-col lg:flex-row gap-5 sm:gap-6">
           <div className="flex-1 flex flex-col gap-4">
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 sm:p-5 flex flex-col gap-4">
-              <div className="text-sm font-semibold text-[#010D50]">Your hotel</div>
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold text-[#010D50]">Your hotel</div>
+                <Link href={changeHotelHref} className="text-[#3754ED] text-sm font-medium flex items-center gap-1 hover:underline">
+                  <Edit2 className="w-3.5 h-3.5" />
+                  Change selection
+                </Link>
+              </div>
               <div className="flex gap-3">
                 <div className="relative w-[96px] h-[72px] rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                   <img

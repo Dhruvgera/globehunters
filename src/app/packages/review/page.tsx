@@ -425,7 +425,10 @@ function PackageReviewPageInner() {
   const changeFlightHref = useMemo(() => {
     const params = new URLSearchParams();
     params.set("type", "package");
-    const effectiveHotelId = String(packageResultsMeta?.hotelRequestId || hotelId || "");
+    // The change-flights API requires the hotel *result* ID (from package search
+    // results), not the hotel *request* ID (search-level). hotelId here is the
+    // result ID stored via setSelectedHotel or the URL param.
+    const effectiveHotelId = String(hotelId || packageResultsMeta?.hotelRequestId || "");
     if (effectiveHotelId) params.set("hotelId", effectiveHotelId);
     if (flightResultId) params.set("flightResultId", flightResultId);
     return `/search?${params.toString()}`;
