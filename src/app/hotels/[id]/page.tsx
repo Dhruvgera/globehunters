@@ -1374,7 +1374,7 @@ export default function HotelRoomsPage() {
         availability.Criteria?.searchComplete === false && availability.Results?.length === 0)
 
 
-    const availabilityRow = asRecord(availability); 
+    const availabilityRow = asRecord(availability);
     const criteriaIdAny = asRecord(availabilityRow.Criteria).searchCriteriaId;
     const criteriaId =
       typeof criteriaIdAny === "number" || typeof criteriaIdAny === "string" ? criteriaIdAny : null;
