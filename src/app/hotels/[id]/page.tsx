@@ -1019,7 +1019,7 @@ function resolveHotelResultId(result: unknown): string {
 export default function HotelRoomsPage() {
   const params = useParams();
   const hasHydrated = useStoreHydration();
-  
+
   const hotelId = params?.id as string;
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1311,38 +1311,38 @@ export default function HotelRoomsPage() {
     rooms: number;
     childAges: number[];
   }) {
-          try {
-              setStayUpdateLoading(true);
-              setRoomsError(null);
-              setRoomsLoading(true);
-              let retries = 1;
-              let searchResultsSuccess = await runStaySearch({
-                checkIn: stayCheckIn,
-                checkOut: stayCheckOut,
-                adults: stayAdults,
-                children: stayChildren,
-                rooms: stayRooms,
-                childAges: stayChildAges,
-              });
-              
-              while(retries < 5 && !searchResultsSuccess){
-              searchResultsSuccess =   await runStaySearch({
-                checkIn: stayCheckIn,
-                checkOut: stayCheckOut,
-                adults: stayAdults,
-                children: stayChildren,
-                rooms: stayRooms,
-                childAges: stayChildAges,
-              });
-              retries ++;
-              }
-              setStayEditorOpen(false);
-            } catch (e: any) {
-              setRoomsError(e?.message || "Failed to update availability");
-            } finally {
-              setRoomsLoading(false);
-              setStayUpdateLoading(false);
-            }
+    try {
+      setStayUpdateLoading(true);
+      setRoomsError(null);
+      setRoomsLoading(true);
+      let retries = 1;
+      let searchResultsSuccess = await runStaySearch({
+        checkIn: stayCheckIn,
+        checkOut: stayCheckOut,
+        adults: stayAdults,
+        children: stayChildren,
+        rooms: stayRooms,
+        childAges: stayChildAges,
+      });
+
+      while (retries < 5 && !searchResultsSuccess) {
+        searchResultsSuccess = await runStaySearch({
+          checkIn: stayCheckIn,
+          checkOut: stayCheckOut,
+          adults: stayAdults,
+          children: stayChildren,
+          rooms: stayRooms,
+          childAges: stayChildAges,
+        });
+        retries++;
+      }
+      setStayEditorOpen(false);
+    } catch (e: any) {
+      setRoomsError(e?.message || "Failed to update availability");
+    } finally {
+      setRoomsLoading(false);
+      setStayUpdateLoading(false);
+    }
   }
 
   async function runStaySearch(next: {
@@ -1368,25 +1368,24 @@ export default function HotelRoomsPage() {
       child_age: buildHotelChildAgesFromFlat(next.childAges, next.rooms, next.children),
       branches: hotelSearch.branches,
     });
-     const shouldPollMore =
-          (availability.Criteria?.provider === "hybrid" || availability.Criteria?.provider === "vyspa") &&
-          (
-            availability.Criteria?.searchComplete === false && availability.Results?.length === 0)
-    
-            
+    const shouldPollMore =
+      (availability.Criteria?.provider === "hybrid" || availability.Criteria?.provider === "vyspa") &&
+      (
+        availability.Criteria?.searchComplete === false && availability.Results?.length === 0)
+
+
     const availabilityRow = asRecord(availability);
     const criteriaIdAny = asRecord(availabilityRow.Criteria).searchCriteriaId;
     const criteriaId =
       typeof criteriaIdAny === "number" || typeof criteriaIdAny === "string" ? criteriaIdAny : null;
-    if (!criteriaId)
-      {
-        if(shouldPollMore){
+    if (!criteriaId) {
+      if (shouldPollMore) {
         return false;
 
-        }
-        setStayEditorOpen(false);
-          throw new Error("No searchCriteriaId returned from availability search.");
       }
+      setStayEditorOpen(false);
+      throw new Error("No searchCriteriaId returned from availability search.");
+    }
     const results = asArray(availabilityRow.Results);
     const hit = results.find((row) => resolveHotelResultId(row) === String(hotelId));
     const hitRow = asRecord(hit);
@@ -1693,7 +1692,7 @@ export default function HotelRoomsPage() {
       setTrustYouReview(data.review as TrustYouHotelReviewSummary);
     };
 
-    run().catch(() => {});
+    run().catch(() => { });
 
     return () => {
       cancelled = true;
@@ -1876,9 +1875,9 @@ export default function HotelRoomsPage() {
 
     return fallback.amount != null
       ? {
-          amount: fallback.amount,
-          currency: fallback.currency,
-        }
+        amount: fallback.amount,
+        currency: fallback.currency,
+      }
       : null;
   }, [
     activePackageRoom?.price?.currency,
@@ -1895,9 +1894,9 @@ export default function HotelRoomsPage() {
   const packagePerPersonLabel =
     resolvedPackagePrice?.amount != null
       ? formatDisplayPrice(
-          resolvedPackagePrice.currency,
-          calculatePackagePerPersonPrice(resolvedPackagePrice.amount, packageSearch?.rooms)
-        )
+        resolvedPackagePrice.currency,
+        calculatePackagePerPersonPrice(resolvedPackagePrice.amount, packageSearch?.rooms)
+      )
       : "";
   const reviews: Array<{
     id: string;
@@ -1964,7 +1963,7 @@ export default function HotelRoomsPage() {
     let cancelled = false;
 
     async function loadRooms() {
-       if(!hasHydrated){
+      if (!hasHydrated) {
         return;
       }
       // ─── Deeplink view data path (self-contained, no session needed) ───
@@ -2111,7 +2110,7 @@ export default function HotelRoomsPage() {
                     fetchedAt: Date.now(),
                   });
                 })
-                .catch(() => {});
+                .catch(() => { });
             }
 
             if (!cancelled) {
@@ -2140,7 +2139,7 @@ export default function HotelRoomsPage() {
         urlProvider === "hotelbeds" || urlProvider === "vyspa" ? (urlProvider as "hotelbeds" | "vyspa") : undefined;
       let effectiveProvider: "vyspa" | "hotelbeds" =
         urlProviderNormalized || metaProvider || (hotelSearch?.provider === "hotelbeds" ? "hotelbeds" : "vyspa");
-      let effectiveSearchCriteriaId =  hotelSearch?.searchCriteriaId  ?? urlSearchCriteriaId ?? meta?.searchCriteriaId ;
+      let effectiveSearchCriteriaId = hotelSearch?.searchCriteriaId ?? urlSearchCriteriaId ?? meta?.searchCriteriaId;
       if (!effectiveSearchCriteriaId) return;
 
       // 🔍 DIAGNOSTIC: log why loadRooms effect fired
@@ -2160,7 +2159,7 @@ export default function HotelRoomsPage() {
       setRoomsError(null);
 
       try {
-        if (isPackageMode) {  
+        if (isPackageMode) {
           const packageHotel = packageResults?.find((row) => String(row.id) === String(hotelId));
           const roomResponse = await packageService.getPackageRooms({
             hotelResultId: Number(hotelId),
@@ -2503,7 +2502,7 @@ export default function HotelRoomsPage() {
             ? [respAny?.address1, respAny?.address2].filter(Boolean).join(", ")
             : meta?.address1 || meta?.address2
               ? [meta?.address1, meta?.address2].filter(Boolean).join(", ")
-            : undefined;
+              : undefined;
         const useGetRoomsContent = effectiveProvider !== "hotelbeds";
         const getRoomsDescription = useGetRoomsContent
           ? sanitizeHotelText(respAny?.quickDescription ?? respAny?.description ?? "")
@@ -2587,7 +2586,7 @@ export default function HotelRoomsPage() {
               const desc = typeof data?.description === "string" ? data.description.trim() : "";
               if (desc) setDetailsText(desc);
             })
-            .catch(() => {});
+            .catch(() => { });
         }
 
         // Real schema (seen in stage): rooms.room1options[] with {id, room_name, meal_name, cust_tot_sell_amt, net_price, nonRef, ...}
@@ -3505,13 +3504,13 @@ export default function HotelRoomsPage() {
                   variant="default"
                   className="flex items-center gap-2 px-6 py-3 h-auto rounded-full bg-[#3754ED] hover:bg-[#2A3FB8] text-white font-bold"
                   onClick={async () => updateAvailabilityFromDateChanges({
-                        checkIn: stayCheckIn,
-                        checkOut: stayCheckOut,
-                        adults: stayAdults,
-                        children: stayChildren,
-                        rooms: stayRooms,
-                        childAges: stayChildAges,
-                      })}
+                    checkIn: stayCheckIn,
+                    checkOut: stayCheckOut,
+                    adults: stayAdults,
+                    children: stayChildren,
+                    rooms: stayRooms,
+                    childAges: stayChildAges,
+                  })}
                 >
                   Search
                 </Button>
@@ -3532,9 +3531,9 @@ export default function HotelRoomsPage() {
                         value={stayCheckIn}
                         onChange={(e) => {
                           setStayCheckIn(e.target.value)
-                          if(checkoutRef.current)
+                          if (checkoutRef.current)
                             checkoutRef.current.showPicker();
-                        }} 
+                        }}
                         disabled={stayUpdateLoading}
                         className="border border-[#DFE0E4] rounded-lg px-3 py-2 bg-white text-[#010D50]"
                       />
@@ -3685,11 +3684,10 @@ export default function HotelRoomsPage() {
                           key={board}
                           type="button"
                           onClick={() => setFilterBoardQuery(board)}
-                          className={`px-3 py-1.5 text-xs rounded-full border ${
-                            filterBoardQuery.trim().toLowerCase() === board.toLowerCase()
-                              ? "bg-[#3754ED] text-white border-[#3754ED]"
-                              : "bg-white text-[#010D50] border-[#DFE0E4]"
-                          }`}
+                          className={`px-3 py-1.5 text-xs rounded-full border ${filterBoardQuery.trim().toLowerCase() === board.toLowerCase()
+                            ? "bg-[#3754ED] text-white border-[#3754ED]"
+                            : "bg-white text-[#010D50] border-[#DFE0E4]"
+                            }`}
                         >
                           {board}
                         </button>
@@ -3774,8 +3772,8 @@ export default function HotelRoomsPage() {
                     const cancellationRow = firstCancellation as Record<string, unknown>;
                     return sanitizeHotelText(
                       cancellationRow.policy ??
-                        cancellationRow.description ??
-                        cancellationRow.text
+                      cancellationRow.description ??
+                      cancellationRow.text
                     );
                   })();
                   const roomCancellationSummary = roomCancellationPolicy || hbCancellationSummary;
