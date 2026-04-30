@@ -1315,6 +1315,7 @@ export default function HotelRoomsPage() {
               setStayUpdateLoading(true);
               setRoomsError(null);
               setRoomsLoading(true);
+              let retries = 1;
               let searchResultsSuccess = await runStaySearch({
                 checkIn: stayCheckIn,
                 checkOut: stayCheckOut,
@@ -1323,8 +1324,9 @@ export default function HotelRoomsPage() {
                 rooms: stayRooms,
                 childAges: stayChildAges,
               });
-              if(!searchResultsSuccess){
-                await runStaySearch({
+              
+              while(retries < 5 && !searchResultsSuccess){
+              searchResultsSuccess =   await runStaySearch({
                 checkIn: stayCheckIn,
                 checkOut: stayCheckOut,
                 adults: stayAdults,
@@ -1332,6 +1334,7 @@ export default function HotelRoomsPage() {
                 rooms: stayRooms,
                 childAges: stayChildAges,
               });
+              retries ++;
               }
               setStayEditorOpen(false);
             } catch (e: any) {
@@ -1368,20 +1371,21 @@ export default function HotelRoomsPage() {
      const shouldPollMore =
           (availability.Criteria?.provider === "hybrid" || availability.Criteria?.provider === "vyspa") &&
           (
-            availability.Criteria?.searchComplete === false ||
-            (availability.Criteria?.searchComplete === null && availability.results.length === 0)
-          );
-        if(shouldPollMore){
-          return false;
-        }
+            availability.Criteria?.searchComplete === false && availability.Results?.length === 0)
+    
+            
     const availabilityRow = asRecord(availability);
     const criteriaIdAny = asRecord(availabilityRow.Criteria).searchCriteriaId;
     const criteriaId =
       typeof criteriaIdAny === "number" || typeof criteriaIdAny === "string" ? criteriaIdAny : null;
     if (!criteriaId)
       {
+        if(shouldPollMore){
+        return false;
+
+        }
         setStayEditorOpen(false);
-        throw new Error("No searchCriteriaId returned from availability search.");
+          throw new Error("No searchCriteriaId returned from availability search.");
       }
     const results = asArray(availabilityRow.Results);
     const hit = results.find((row) => resolveHotelResultId(row) === String(hotelId));
@@ -1414,7 +1418,6 @@ export default function HotelRoomsPage() {
       searchCriteriaId: effectiveSearchCriteriaId,
       arrivalPointCode: hotelSearch.arrivalPointCode,
     });
-
     setSearchRequestId(
       typeof effectiveSearchCriteriaId === "string"
         ? shortWebRefFromToken(effectiveSearchCriteriaId)
@@ -2137,7 +2140,7 @@ export default function HotelRoomsPage() {
         urlProvider === "hotelbeds" || urlProvider === "vyspa" ? (urlProvider as "hotelbeds" | "vyspa") : undefined;
       let effectiveProvider: "vyspa" | "hotelbeds" =
         urlProviderNormalized || metaProvider || (hotelSearch?.provider === "hotelbeds" ? "hotelbeds" : "vyspa");
-      let effectiveSearchCriteriaId = urlSearchCriteriaId ?? meta?.searchCriteriaId ?? hotelSearch?.searchCriteriaId;
+      let effectiveSearchCriteriaId =  hotelSearch?.searchCriteriaId  ?? urlSearchCriteriaId ?? meta?.searchCriteriaId ;
       if (!effectiveSearchCriteriaId) return;
 
       // 🔍 DIAGNOSTIC: log why loadRooms effect fired
@@ -2838,7 +2841,6 @@ export default function HotelRoomsPage() {
   }, [
     hotelId,
     hasHydrated,
-    hotelResultsMeta,
     hotelSearch?.provider,
     hotelSearch?.searchCriteriaId,
     hotelSearch?.location,
