@@ -1098,6 +1098,7 @@ export default function HotelRoomsPage() {
   const trustYouFetchKeyRef = useRef<string>("");
   const isHotelDatesDebugMode = process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES === "true";
   const brokenImageUrlsRef = useRef<Set<string>>(new Set());
+  const checkoutRef = useRef<HTMLInputElement>(null)
   const [brokenImageUrls, setBrokenImageUrls] = useState<Set<string>>(new Set());
   const [loadedImageUrls, setLoadedImageUrls] = useState<Set<string>>(new Set());
 
@@ -1302,6 +1303,45 @@ export default function HotelRoomsPage() {
     return { hotelImages: Array.from(new Set(hotelImages)), roomImages: dedupedRoomImages };
   }
 
+  async function updateAvailabilityFromDateChanges(next: {
+    checkIn: string;
+    checkOut: string;
+    adults: number;
+    children: number;
+    rooms: number;
+    childAges: number[];
+  }) {
+          try {
+              setStayUpdateLoading(true);
+              setRoomsError(null);
+              setRoomsLoading(true);
+              let searchResultsSuccess = await runStaySearch({
+                checkIn: stayCheckIn,
+                checkOut: stayCheckOut,
+                adults: stayAdults,
+                children: stayChildren,
+                rooms: stayRooms,
+                childAges: stayChildAges,
+              });
+              if(!searchResultsSuccess){
+                await runStaySearch({
+                checkIn: stayCheckIn,
+                checkOut: stayCheckOut,
+                adults: stayAdults,
+                children: stayChildren,
+                rooms: stayRooms,
+                childAges: stayChildAges,
+              });
+              }
+              setStayEditorOpen(false);
+            } catch (e: any) {
+              setRoomsError(e?.message || "Failed to update availability");
+            } finally {
+              setRoomsLoading(false);
+              setStayUpdateLoading(false);
+            }
+  }
+
   async function runStaySearch(next: {
     checkIn: string;
     checkOut: string;
@@ -1313,7 +1353,6 @@ export default function HotelRoomsPage() {
     if (!hotelSearch?.location || !hotelSearch?.hidden_id || !hotelSearch?.hidden_key) {
       throw new Error("Missing search context (destination) to update availability.");
     }
-
     const availability = await hotelService.searchAvailabilityV3({
       location: hotelSearch.location,
       hidden_id: hotelSearch.hidden_id,
@@ -1326,12 +1365,24 @@ export default function HotelRoomsPage() {
       child_age: buildHotelChildAgesFromFlat(next.childAges, next.rooms, next.children),
       branches: hotelSearch.branches,
     });
-
+     const shouldPollMore =
+          (availability.Criteria?.provider === "hybrid" || availability.Criteria?.provider === "vyspa") &&
+          (
+            availability.Criteria?.searchComplete === false ||
+            (availability.Criteria?.searchComplete === null && availability.results.length === 0)
+          );
+        if(shouldPollMore){
+          return false;
+        }
     const availabilityRow = asRecord(availability);
     const criteriaIdAny = asRecord(availabilityRow.Criteria).searchCriteriaId;
     const criteriaId =
       typeof criteriaIdAny === "number" || typeof criteriaIdAny === "string" ? criteriaIdAny : null;
-    if (!criteriaId) throw new Error("No searchCriteriaId returned from availability search.");
+    if (!criteriaId)
+      {
+        setStayEditorOpen(false);
+        throw new Error("No searchCriteriaId returned from availability search.");
+      }
     const results = asArray(availabilityRow.Results);
     const hit = results.find((row) => resolveHotelResultId(row) === String(hotelId));
     const hitRow = asRecord(hit);
@@ -1399,7 +1450,9 @@ export default function HotelRoomsPage() {
         rawSearchResult: hitRow ?? nextMeta[String(hotelId)]?.rawSearchResult,
       };
       setHotelResultsMeta(nextMeta);
+      return true;
     }
+    return false;
   }
 
   function parseRemoteDataXml(remoteData: string) {
@@ -2291,7 +2344,9 @@ export default function HotelRoomsPage() {
 
           return;
         }
+        /** standard hotel flow starts */
 
+        /**extracting initial results from search results */
         if (searchResultSeed.description) {
           setDetailsText((previous) => (previous.trim() ? previous : searchResultSeed.description));
         }
@@ -2783,6 +2838,7 @@ export default function HotelRoomsPage() {
   }, [
     hotelId,
     hasHydrated,
+    hotelResultsMeta,
     hotelSearch?.provider,
     hotelSearch?.searchCriteriaId,
     hotelSearch?.location,
@@ -3446,24 +3502,14 @@ export default function HotelRoomsPage() {
                 <Button
                   variant="default"
                   className="flex items-center gap-2 px-6 py-3 h-auto rounded-full bg-[#3754ED] hover:bg-[#2A3FB8] text-white font-bold"
-                  onClick={async () => {
-                    try {
-                      setRoomsError(null);
-                      setRoomsLoading(true);
-                      await runStaySearch({
+                  onClick={async () => updateAvailabilityFromDateChanges({
                         checkIn: stayCheckIn,
                         checkOut: stayCheckOut,
                         adults: stayAdults,
                         children: stayChildren,
                         rooms: stayRooms,
                         childAges: stayChildAges,
-                      });
-                    } catch (e: any) {
-                      setRoomsError(e?.message || "Failed to update availability");
-                    } finally {
-                      setRoomsLoading(false);
-                    }
-                  }}
+                      })}
                 >
                   Search
                 </Button>
@@ -3482,7 +3528,11 @@ export default function HotelRoomsPage() {
                       <input
                         type="date"
                         value={stayCheckIn}
-                        onChange={(e) => setStayCheckIn(e.target.value)}
+                        onChange={(e) => {
+                          setStayCheckIn(e.target.value)
+                          if(checkoutRef.current)
+                            checkoutRef.current.showPicker();
+                        }} 
                         disabled={stayUpdateLoading}
                         className="border border-[#DFE0E4] rounded-lg px-3 py-2 bg-white text-[#010D50]"
                       />
@@ -3492,6 +3542,7 @@ export default function HotelRoomsPage() {
                       <input
                         type="date"
                         value={stayCheckOut}
+                        ref={checkoutRef}
                         onChange={(e) => setStayCheckOut(e.target.value)}
                         disabled={stayUpdateLoading}
                         className="border border-[#DFE0E4] rounded-lg px-3 py-2 bg-white text-[#010D50]"
@@ -3575,27 +3626,14 @@ export default function HotelRoomsPage() {
                       Cancel
                     </Button>
                     <Button
-                      onClick={async () => {
-                        try {
-                          setStayUpdateLoading(true);
-                          setRoomsError(null);
-                          setRoomsLoading(true);
-                          await runStaySearch({
-                            checkIn: stayCheckIn,
-                            checkOut: stayCheckOut,
-                            adults: stayAdults,
-                            children: stayChildren,
-                            rooms: stayRooms,
-                            childAges: stayChildAges,
-                          });
-                          setStayEditorOpen(false);
-                        } catch (e: any) {
-                          setRoomsError(e?.message || "Failed to update availability");
-                        } finally {
-                          setRoomsLoading(false);
-                          setStayUpdateLoading(false);
-                        }
-                      }}
+                      onClick={async () => updateAvailabilityFromDateChanges({
+                        checkIn: stayCheckIn,
+                        checkOut: stayCheckOut,
+                        adults: stayAdults,
+                        children: stayChildren,
+                        rooms: stayRooms,
+                        childAges: stayChildAges,
+                      })}
                       disabled={stayUpdateLoading}
                       className="bg-[#3754ED] hover:bg-[#2A3FB8]"
                     >
