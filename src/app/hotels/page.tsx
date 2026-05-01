@@ -1673,6 +1673,11 @@ function HotelsPageInner() {
     return sorted;
   }, [filters, hotelsWithSelectedMealPricing, hybridSupplierFilter, providerMode, resolvedSearch.location, sortMode]);
 
+  const visibleResultCount = useMemo(() => {
+    if (hiddenImageHotelIds.size === 0) return filteredHotels.length;
+    return filteredHotels.filter((h) => !hiddenImageHotelIds.has(h.id)).length;
+  }, [filteredHotels, hiddenImageHotelIds]);
+
   const displayedHotels = useMemo(() => {
     return filteredHotels.slice(0, displayedHotelsCount);
   }, [displayedHotelsCount, filteredHotels]);
@@ -2076,7 +2081,7 @@ function HotelsPageInner() {
             {!loading && hotels.length > 0 && (
               <>
                 <HotelFiltersSidebar
-                  resultCount={filteredHotels.length}
+                  resultCount={visibleResultCount}
                   value={filters}
                   onChange={updateFilters}
                   onPriceModeChange={onPriceModeChange}
@@ -2099,7 +2104,7 @@ function HotelsPageInner() {
           {/* Results */}
           <main className="flex-1 min-w-0 flex flex-col gap-4">
             <HotelResultsToolbar
-              resultCount={filteredHotels.length}
+              resultCount={visibleResultCount}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
               sortMode={sortMode}
@@ -2124,7 +2129,7 @@ function HotelsPageInner() {
                 <div className="h-[calc(100vh-64px)] overflow-y-auto px-4 py-4">
                   {!loading && hotels.length > 0 ? (
                     <HotelFiltersSidebar
-                      resultCount={filteredHotels.length}
+                      resultCount={visibleResultCount}
                       value={filters}
                       onChange={updateFilters}
                       onPriceModeChange={onPriceModeChange}
