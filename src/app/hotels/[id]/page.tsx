@@ -64,7 +64,8 @@ function LoadingBlock({ className }: { className: string }) {
 function formatIsoDateLabel(d?: string): string {
   const s = String(d || "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "Add Date";
-  return s;
+  const [y, m, day] = s.split("-");
+  return `${day}-${m}-${y}`;
 }
 
 function formatStayDate(d?: string): string {

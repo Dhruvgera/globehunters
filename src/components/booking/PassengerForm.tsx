@@ -78,6 +78,18 @@ export function PassengerForm({
       }
     }
 
+    // Real-time validation for phone: must be exactly 10 digits, no leading zero
+    if (field === 'phone' && value) {
+      const digits = value.replace(/\D/g, '');
+      if (digits.length > 0 && (digits.startsWith('0') || digits.length > 10)) {
+        setErrors((prev) => ({ ...prev, phone: 'Enter exactly 10 digits without leading zero (e.g. 7678452537)' }));
+        return;
+      }
+      if (digits.length === 10 && !digits.startsWith('0')) {
+        setErrors((prev) => ({ ...prev, phone: undefined }));
+      }
+    }
+
     // Clear error for this field when user starts typing
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));

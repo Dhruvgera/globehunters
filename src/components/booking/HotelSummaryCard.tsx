@@ -12,6 +12,13 @@ import {
   type ConvertedHotelLocalTaxRow,
 } from "@/lib/currency/localTaxDisplay";
 
+function formatDateLabel(d?: string): string {
+  const s = String(d || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "—";
+  const [y, m, day] = s.split("-");
+  return `${day}-${m}-${y}`;
+}
+
 function formatMoney(currency: string | undefined, amount: number | undefined) {
   const c = currency || "";
   const a = typeof amount === "number" ? amount : undefined;
@@ -107,7 +114,7 @@ export function HotelSummaryCard(props: HotelSummaryCardProps) {
             {display.address || "Content missing from API: address"}
           </div>
           <div className="text-xs text-[#3A478A] mt-1">
-            {hotelSearch?.checkIn || "—"} → {hotelSearch?.checkOut || "—"}
+            {formatDateLabel(hotelSearch?.checkIn)} → {formatDateLabel(hotelSearch?.checkOut)}
           </div>
           {isHotelDatesDebugMode && (
             <div className="mt-1 text-[10px] font-mono text-orange-600 bg-orange-50 px-1 py-0.5 rounded w-fit">
