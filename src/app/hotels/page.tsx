@@ -632,7 +632,10 @@ function HotelsPageInner() {
       const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
       const isCacheFresh = cacheAge < CACHE_TTL;
 
-      if (cache?.queryKey === queryKey && cache.hotels.length > 0 && isCacheFresh) {
+      if (cache?.queryKey === queryKey && cache.hotels.length > 0) {
+        // Always restore cached results immediately so the user sees hotels while a background
+        // refresh runs (or if the refresh gets deduped/cancelled). Only skip the network fetch
+        // entirely when the cache is still fresh.
         if (!cancelled && requestSeq === activeRequestSeq.current) {
           setHotels(cache.hotels);
           setSelectedHotelKey(cache.selectedHotelKey || (cache.hotels.length > 0 ? `${cache.hotels[0]?.id}-0` : ""));
@@ -706,7 +709,11 @@ function HotelsPageInner() {
           setLoadingMoreHotels(false);
           setHasAttemptedFetch(true);
         }
-        return;
+        if (isCacheFresh) {
+          // Cache is fresh enough — don't hit the network at all.
+          return;
+        }
+        // Cache is stale: continue below to trigger a background refresh.
       }
 
       if (isPackageMode) {
@@ -1003,9 +1010,15 @@ function HotelsPageInner() {
           branches: search.branches,
         });
 
-        if (resolvedParamsKey === lastFetchedParamsRef.current) {
+        const isDedup = resolvedParamsKey === lastFetchedParamsRef.current;
+        if (isDedup) {
           // Same resolved params as the last in-flight/completed request — skip duplicate fetch.
+          // If we have stale cached results for this queryKey, restore them so the UI isn't empty.
           if (!cancelled && requestSeq === activeRequestSeq.current) {
+            if (cache?.queryKey === queryKey && cache.hotels.length > 0 && hotels.length === 0) {
+              setHotels(cache.hotels);
+              setSelectedHotelKey(cache.selectedHotelKey || (cache.hotels.length > 0 ? `${cache.hotels[0]?.id}-0` : ""));
+            }
             setLoading(false);
             setHasAttemptedFetch(true);
           }
@@ -1217,7 +1230,12 @@ function HotelsPageInner() {
         };
 
         const applyAvailabilityToState = (parsed: ParsedAvailability) => {
-          if (cancelled || requestSeq !== activeRequestSeq.current) return;
+          // Only check requestSeq — not cancelled. The requestSeq check is sufficient to
+          // prevent stale updates (a new effect run increments activeRequestSeq). The
+          // cancelled flag was causing a bug where effect cleanup (e.g. Strict Mode
+          // double-mount) would discard fresh API results from an in-flight request.
+          const isStale = requestSeq !== activeRequestSeq.current;
+          if (isStale) return;
 
           const { mapped, meta, results, criteriaId, criteriaProvider } = parsed;
 
@@ -1303,12 +1321,13 @@ function HotelsPageInner() {
         };
 
         const parsedInitial = mapAvailability(availability);
-        if (cancelled || requestSeq !== activeRequestSeq.current) return;
+        // Only check requestSeq — not cancelled (same rationale as applyAvailabilityToState).
+        if (requestSeq !== activeRequestSeq.current) return;
         applyAvailabilityToState(parsedInitial);
 
         // As soon as we have the first batch, enable result interactions (filters/sort/cards)
         // while background polling continues to append/refresh results.
-        if (!cancelled && requestSeq === activeRequestSeq.current) {
+        if (requestSeq === activeRequestSeq.current) {
           setLoading(false);
           setHasAttemptedFetch(true);
         }
@@ -1325,10 +1344,10 @@ function HotelsPageInner() {
           let latestCriteriaId: number | string | null = parsedInitial.criteriaId;
 
           for (let attempt = 0; attempt < HYBRID_MAX_POLLS; attempt += 1) {
-            if (cancelled || requestSeq !== activeRequestSeq.current) break;
+            if (requestSeq !== activeRequestSeq.current) break;
             const pollDelayMs = isVyspaSearchCriteriaId(latestCriteriaId) ? HYBRID_POLL_INTERVAL_MS : 750;
             await new Promise((resolve) => setTimeout(resolve, pollDelayMs));
-            if (cancelled || requestSeq !== activeRequestSeq.current) break;
+            if (requestSeq !== activeRequestSeq.current) break;
             try {
               const polledAvailability = await hotelService.searchAvailabilityV3({
                 providerOverride: providerOverride || undefined,
