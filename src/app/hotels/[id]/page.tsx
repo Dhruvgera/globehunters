@@ -1,8 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import Image from "next/image";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -10,7 +8,6 @@ import {
   ChevronUp,
   ChevronDown,
   Star,
-  Grid3X3,
   Building2,
   Calendar,
   Plane,
@@ -29,7 +26,6 @@ import {
   Wind,
   Bath,
   X,
-  ChevronLeft,
   Loader2,
   MapPin,
 } from "lucide-react";
@@ -38,6 +34,7 @@ import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import HotelGallery from "@/components/hotels/HotelGallery";
 import { hotelService } from "@/services/api/hotelService";
 import { packageService } from "@/services/api/packageService";
 import { useBookingStore, useStoreHydration } from "@/store/bookingStore";
@@ -52,7 +49,7 @@ import {
   flattenHotelChildAges,
   serializeHotelChildAges,
 } from "@/lib/hotels/childAges";
-import { ensureGiataImageUrl, filterReachableImageUrls, fixStubaImageUrl } from "@/lib/hotels/imageUrl";
+import { ensureGiataImageUrl, fixStubaImageUrl } from "@/lib/hotels/imageUrl";
 import { convertHotelLocalTaxTotal, formatMoneyFromCode, normalizeCurrencyCode } from "@/lib/currency/localTaxDisplay";
 import { parsePackageHotelContent, type PackageHotelNearbyPlace } from "@/lib/package/hotelContent";
 import { usePackageDeeplink } from "@/hooks/usePackageDeeplink";
@@ -1063,8 +1060,6 @@ export default function HotelRoomsPage() {
     image?: string;
     address?: string;
   } | null>(null);
-  const [galleryOpen, setGalleryOpen] = useState(false);
-  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [detailsText, setDetailsText] = useState<string>("");
   const [cancellationText, setCancellationText] = useState<string>("");
@@ -1097,84 +1092,7 @@ export default function HotelRoomsPage() {
   const [rawAccommodationDetailsResponse, setRawAccommodationDetailsResponse] = useState<unknown>(null);
   const trustYouFetchKeyRef = useRef<string>("");
   const isHotelDatesDebugMode = process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES === "true";
-  const brokenImageUrlsRef = useRef<Set<string>>(new Set());
   const checkoutRef = useRef<HTMLInputElement>(null)
-  const [brokenImageUrls, setBrokenImageUrls] = useState<Set<string>>(new Set());
-  const [loadedImageUrls, setLoadedImageUrls] = useState<Set<string>>(new Set());
-
-  const markImageBroken = useCallback((url: string) => {
-    if (!url || brokenImageUrlsRef.current.has(url)) return;
-    brokenImageUrlsRef.current.add(url);
-    setBrokenImageUrls((prev) => new Set(prev).add(url));
-  }, []);
-
-  const markImageLoaded = useCallback((url: string) => {
-    if (!url) return;
-    setLoadedImageUrls((prev) => {
-      if (prev.has(url)) return prev;
-      return new Set(prev).add(url);
-    });
-  }, []);
-
-  const galleryImagesFiltered = useMemo(
-    () => galleryImages.filter((url) => !brokenImageUrls.has(url)),
-    [galleryImages, brokenImageUrls]
-  );
-
-  const headerImageOk = useMemo(() => {
-    const url = remoteHotelHeader?.image;
-    return url && !brokenImageUrls.has(url) ? url : "";
-  }, [remoteHotelHeader?.image, brokenImageUrls]);
-
-  useEffect(() => {
-    const toCheck: string[] = [];
-    const known = brokenImageUrlsRef.current;
-    for (const url of galleryImages) {
-      if (url && !known.has(url)) toCheck.push(url);
-    }
-    const headerUrl = remoteHotelHeader?.image;
-    if (headerUrl && !known.has(headerUrl) && !toCheck.includes(headerUrl)) {
-      toCheck.push(headerUrl);
-    }
-    if (toCheck.length === 0) return;
-    let cancelled = false;
-    filterReachableImageUrls(toCheck, { maxValid: 5 }).then(({ valid, checked }) => {
-      if (cancelled) return;
-      // Only mark URLs that were actually checked AND failed.
-      // Unchecked URLs (past the maxValid cutoff) must NOT be treated as broken.
-      const broken = checked.filter((url) => !valid.includes(url));
-      if (broken.length === 0) return;
-      broken.forEach((url) => {
-        markImageBroken(url);
-      });
-    });
-    return () => { cancelled = true; };
-  }, [galleryImages, remoteHotelHeader?.image, markImageBroken]);
-
-  useEffect(() => {
-    if (!galleryOpen) return;
-    const toCheck: string[] = [];
-    const known = brokenImageUrlsRef.current;
-    for (const url of galleryImages) {
-      if (url && !known.has(url)) toCheck.push(url);
-    }
-    const headerUrl = remoteHotelHeader?.image;
-    if (headerUrl && !known.has(headerUrl) && !toCheck.includes(headerUrl)) {
-      toCheck.push(headerUrl);
-    }
-    if (toCheck.length === 0) return;
-    let cancelled = false;
-    filterReachableImageUrls(toCheck).then(({ valid, checked }) => {
-      if (cancelled) return;
-      const broken = checked.filter((url) => !valid.includes(url));
-      if (broken.length === 0) return;
-      broken.forEach((url) => {
-        known.add(url);
-        markImageBroken(url);
-      });
-    });
-    return () => { cancelled = true; };
-  }, [galleryOpen, galleryImages, remoteHotelHeader?.image, markImageBroken]);
 
   useEffect(() => {
     // Keep local editor state in sync with global search state when navigating between hotels.
@@ -1747,8 +1665,8 @@ export default function HotelRoomsPage() {
     return {
       name: remoteHotelHeader?.name || "",
       starRating: remoteHotelHeader?.rating || 0,
-      mainImage: headerImageOk || galleryImagesFiltered[0] || "",
-      galleryImages: galleryImagesFiltered.length > 0 ? galleryImagesFiltered : (headerImageOk ? [headerImageOk] : []),
+      mainImage: remoteHotelHeader?.image || galleryImages[0] || "",
+      galleryImages: galleryImages.length > 0 ? galleryImages : (remoteHotelHeader?.image ? [remoteHotelHeader.image] : []),
       address: remoteHotelHeader?.address || "",
       about: {
         description: sanitizeHotelText(detailsText || ""),
@@ -1773,8 +1691,7 @@ export default function HotelRoomsPage() {
     cancellationText,
     coordinates,
     detailsText,
-    galleryImagesFiltered,
-    headerImageOk,
+    galleryImages,
     importantInfoText,
     nearbyPlaces,
     remoteAmenities,
@@ -3080,189 +2997,13 @@ export default function HotelRoomsPage() {
                 return null;
               })()}
 
-              {/* Image Gallery - Main image left, 3 thumbnails stacked right */}
-              <div className="flex flex-col lg:flex-row gap-3">
-                {(() => {
-                  const firstIsMain = hotel.galleryImages?.[0] === hotel.mainImage;
-                  const thumbImages = firstIsMain ? (hotel.galleryImages || []).slice(1, 4) : (hotel.galleryImages || []).slice(0, 3);
-
-                  return (
-                    <>
-                      {/* Main Image */}
-                      <div
-                        className="relative min-h-[300px] lg:min-h-[450px] flex-[2] rounded-2xl overflow-hidden cursor-pointer group"
-                        onClick={() => {
-                          if (hotel.galleryImages.length > 0) {
-                            setCurrentPhotoIndex(0);
-                            setGalleryOpen(true);
-                          }
-                        }}
-                      >
-                        {hotel.mainImage ? (
-                          <Image
-                            src={hotel.mainImage}
-                            alt={hotel.name}
-                            fill
-                            className="object-cover transition-transform duration-500 group-hover:scale-105"
-                            priority
-                            onError={() => markImageBroken(hotel.mainImage)}
-                          />
-                        ) : (
-                          <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-[#EEEEF2] to-[#E2E2E8]" />
-                        )}
-                        {/* Show All Photos Button - Bottom left of main image */}
-                        {hotel.galleryImages.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setGalleryOpen(true);
-                            }}
-                            className="absolute bottom-4 left-4 flex items-center gap-2 px-4 py-2 rounded-lg bg-white/90 backdrop-blur-sm hover:bg-white transition-all shadow-sm hover-shadow-md"
-                          >
-                            <Grid3X3 className="w-4 h-4 text-[#010D50]" />
-                            <span className="text-sm font-medium text-[#010D50]">Show All Photos</span>
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Thumbnail column — always rendered to prevent layout shift */}
-                      <div className="flex flex-row lg:flex-col gap-3 lg:w-[220px]">
-                        {[0, 1, 2].map((idx) => {
-                          const img = thumbImages[idx];
-                          if (!img) {
-                            // Skeleton placeholder for unfilled slots
-                            return (
-                              <div
-                                key={`skeleton-${idx}`}
-                                className="relative flex-1 lg:flex-none lg:h-[140px] min-h-[100px] rounded-xl overflow-hidden animate-pulse bg-gradient-to-br from-[#EEEEF2] to-[#E2E2E8]"
-                              />
-                            );
-                          }
-                          const imgIndex = firstIsMain ? idx + 1 : idx;
-                          const isLoaded = loadedImageUrls.has(img);
-                          return (
-                            <div
-                              key={`${img}-${idx}`}
-                              className="relative flex-1 lg:flex-none lg:h-[140px] min-h-[100px] rounded-xl overflow-hidden bg-[#F6F6F6] cursor-pointer group"
-                              onClick={() => {
-                                setCurrentPhotoIndex(imgIndex);
-                                setGalleryOpen(true);
-                              }}
-                            >
-                              {/* Shimmer placeholder */}
-                              {!isLoaded && (
-                                <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-[#EEEEF2] to-[#E2E2E8]" />
-                              )}
-                              <Image
-                                src={img}
-                                alt={`${hotel.name} - ${idx + 1}`}
-                                fill
-                                className={`object-cover transition-all duration-500 group-hover:scale-110 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
-                                onLoad={() => markImageLoaded(img)}
-                                onError={() => markImageBroken(img)}
-                              />
-                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
+              <HotelGallery
+                images={hotel.galleryImages}
+                mainImage={hotel.mainImage}
+                hotelName={hotel.name}
+              />
             </div>
           </div>
-
-          <Dialog open={galleryOpen} onOpenChange={setGalleryOpen}>
-            <DialogContent className="max-w-none w-screen h-screen p-0 bg-black/95 border-none rounded-none overflow-hidden z-[9999]">
-              <div className="relative w-full h-full flex flex-col pt-12 pb-24">
-                {/* Close Button */}
-                <button
-                  onClick={() => setGalleryOpen(false)}
-                  className="absolute top-6 right-6 z-50 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all backdrop-blur-md border border-white/20 group"
-                >
-                  <X className="w-6 h-6 transition-transform group-hover:scale-110" />
-                </button>
-
-                {/* Main Viewer Area */}
-                <div className="flex-1 relative flex items-center justify-center px-4 overflow-hidden">
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={currentPhotoIndex}
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      transition={{ duration: 0.3, ease: "easeOut" }}
-                      className="relative w-full h-full max-w-6xl max-h-[80vh] rounded-2xl overflow-hidden shadow-2xl"
-                    >
-                      <Image
-                        src={hotel.galleryImages[currentPhotoIndex]}
-                        alt={`Photo ${currentPhotoIndex + 1}`}
-                        fill
-                        className="object-contain"
-                        sizes="100vw"
-                        onError={() => markImageBroken(hotel.galleryImages[currentPhotoIndex])}
-                      />
-                    </motion.div>
-                  </AnimatePresence>
-
-                  {/* Navigation Arrows */}
-                  {hotel.galleryImages.length > 1 && (
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCurrentPhotoIndex((prev) => (prev > 0 ? prev - 1 : hotel.galleryImages.length - 1));
-                        }}
-                        className="absolute left-6 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all backdrop-blur-md border border-white/20 group hidden md:block"
-                      >
-                        <ChevronLeft className="w-8 h-8 transition-transform group-hover:-translate-x-1" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCurrentPhotoIndex((prev) => (prev < hotel.galleryImages.length - 1 ? prev + 1 : 0));
-                        }}
-                        className="absolute right-6 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all backdrop-blur-md border border-white/20 group hidden md:block"
-                      >
-                        <ChevronRight className="w-8 h-8 transition-transform group-hover:translate-x-1" />
-                      </button>
-                    </>
-                  )}
-
-                  {/* Photo Counter */}
-                  <div className="absolute top-6 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-white/90 text-sm font-medium">
-                    {currentPhotoIndex + 1} / {hotel.galleryImages.length}
-                  </div>
-                </div>
-
-                {/* Thumbnail Strip */}
-                <div className="absolute bottom-0 left-0 right-0 h-32 bg-black/40 backdrop-blur-md border-t border-white/10 p-4">
-                  <div className="flex items-center justify-center gap-3 overflow-x-auto pb-2 h-full scrollbar-hide">
-                    {hotel.galleryImages.map((img: string, idx: number) => (
-                      <button
-                        key={`${img}-${idx}`}
-                        onClick={() => setCurrentPhotoIndex(idx)}
-                        className={`relative h-20 aspect-[4/3] rounded-lg overflow-hidden flex-shrink-0 transition-all duration-300 ${currentPhotoIndex === idx
-                          ? "ring-2 ring-[#3754ED] scale-110 translate-y-[-4px] opacity-100"
-                          : "opacity-40 hover:opacity-100"
-                          }`}
-                      >
-                        <Image
-                          src={img}
-                          alt={`Thumbnail ${idx + 1}`}
-                          fill
-                          className="object-cover"
-                          onError={() => markImageBroken(img)}
-                        />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
 
           {/* Content Grid */}
           <div className="p-4 lg:p-6 space-y-8">

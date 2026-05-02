@@ -18,7 +18,7 @@ export function fixStubaImageUrl(url: unknown): string {
 const GIATA_PREFIX = 'https://photos.hotelbeds.com/giata/';
 const GIATA_SIZE_RE = /^(small|medium|bigger|xl|xxl|original)\//;
 
-export function ensureGiataImageUrl(url: unknown, size: 'small' | 'medium' | 'bigger' | 'xl' | 'xxl' | 'original' = 'bigger'): unknown {
+export function ensureGiataImageUrl(url: unknown, size: 'small' | 'medium' | 'bigger' | 'xl' | 'xxl' | 'original' = 'original'): unknown {
   if (typeof url !== 'string') return url;
   if (!url.startsWith(GIATA_PREFIX)) return url;
   const rest = url.slice(GIATA_PREFIX.length);
