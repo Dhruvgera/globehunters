@@ -50,6 +50,8 @@ import {
   serializeHotelChildAges,
 } from "@/lib/hotels/childAges";
 import { ensureGiataImageUrl, fixStubaImageUrl } from "@/lib/hotels/imageUrl";
+import { syncPdpUrl } from "@/lib/hotels/syncPdpUrl";
+import { decodeHotelSearchContext } from "@/lib/hotels/searchContextCodec";
 import { convertHotelLocalTaxTotal, formatMoneyFromCode, normalizeCurrencyCode } from "@/lib/currency/localTaxDisplay";
 import { parsePackageHotelContent, type PackageHotelNearbyPlace } from "@/lib/package/hotelContent";
 import { usePackageDeeplink } from "@/hooks/usePackageDeeplink";
@@ -1050,6 +1052,76 @@ export default function HotelRoomsPage() {
   // Handle deeplink entry (packageKey/hotelKey URL params)
   usePackageDeeplink();
 
+  // Hydrate hotelSearch from URL params when the store is empty (fresh browser tab).
+  // This ensures the page can load rooms even without prior session state.
+  useEffect(() => {
+    if (!hasHydrated) return;
+    if (hotelSearch) return;
+    if (isPackageMode) return;
+    if (deeplinkViewData?.success) return;
+
+    const urlCtx = searchParams.get("ctx");
+    const decoded = urlCtx ? decodeHotelSearchContext(urlCtx) : null;
+
+    if (decoded) {
+      setHotelSearch({
+        ...decoded,
+        provider: decoded.provider ?? (urlProvider === "hotelbeds" || urlProvider === "vyspa" ? urlProvider as "hotelbeds" | "vyspa" : undefined),
+        searchCriteriaId: decoded.searchCriteriaId ?? (urlSearchCriteriaId ? (Number(urlSearchCriteriaId) || urlSearchCriteriaId) : undefined),
+      });
+      if (decoded.searchCriteriaId) {
+        setSearchRequestId(String(decoded.searchCriteriaId));
+      }
+      return;
+    }
+
+    const urlLocation = searchParams.get("location");
+    const urlHiddenId = searchParams.get("hidden_id");
+    const urlHiddenKey = searchParams.get("hidden_key");
+    const urlCheckIn = searchParams.get("checkIn");
+    const urlCheckOut = searchParams.get("checkOut");
+    const urlRooms = searchParams.get("rooms");
+    const urlAdults = searchParams.get("adults");
+    const urlChildren = searchParams.get("children");
+    const urlChildAge = searchParams.get("child_age");
+    const urlBranches = searchParams.get("branches");
+    const urlArrivalPointCode = searchParams.get("arrivalPointCode");
+
+    if (!urlSearchCriteriaId && !urlLocation) return;
+
+    const children = urlChildren != null ? Number(urlChildren) : 0;
+    const rooms = urlRooms != null ? Number(urlRooms) : 1;
+    const adults = urlAdults != null ? Number(urlAdults) : 2;
+
+    setHotelSearch({
+      provider: (urlProvider === "hotelbeds" || urlProvider === "vyspa") ? urlProvider as "hotelbeds" | "vyspa" : undefined,
+      location: urlLocation || "",
+      hidden_id: urlHiddenId || "",
+      hidden_key: urlHiddenKey || "",
+      checkIn: urlCheckIn || "",
+      checkOut: urlCheckOut || "",
+      rooms,
+      adults,
+      children,
+      child_age: urlChildAge ? buildHotelChildAgesFromFlat(
+        flattenHotelChildAges(
+          serializeHotelChildAges(urlChildAge, rooms, children),
+          rooms,
+          children
+        ),
+        rooms,
+        children,
+      ) : undefined,
+      branches: urlBranches || undefined,
+      searchCriteriaId: urlSearchCriteriaId ? (Number(urlSearchCriteriaId) || urlSearchCriteriaId) : undefined,
+      arrivalPointCode: urlArrivalPointCode || undefined,
+    });
+
+    if (urlSearchCriteriaId) {
+      setSearchRequestId(String(urlSearchCriteriaId));
+    }
+  }, [hasHydrated, hotelSearch, isPackageMode, deeplinkViewData?.success]);
+
   // State
   const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
@@ -1091,8 +1163,23 @@ export default function HotelRoomsPage() {
   const [rawGetRoomsV3Response, setRawGetRoomsV3Response] = useState<unknown>(null);
   const [rawAccommodationDetailsResponse, setRawAccommodationDetailsResponse] = useState<unknown>(null);
   const trustYouFetchKeyRef = useRef<string>("");
+  const lastRoomsLoadKeyRef = useRef<string>("");
   const isHotelDatesDebugMode = process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES === "true";
   const checkoutRef = useRef<HTMLInputElement>(null)
+
+  // Reset rooms-load dedup guard when navigating to a different hotel,
+  // or when hotelSearch transitions from null to populated (URL hydration).
+  const prevHotelSearchRef = useRef(hotelSearch);
+  useEffect(() => {
+    if (!prevHotelSearchRef.current && hotelSearch) {
+      lastRoomsLoadKeyRef.current = "";
+    }
+    prevHotelSearchRef.current = hotelSearch;
+  }, [hotelSearch]);
+
+  useEffect(() => {
+    lastRoomsLoadKeyRef.current = "";
+  }, [hotelId]);
 
   useEffect(() => {
     // Keep local editor state in sync with global search state when navigating between hotels.
@@ -1234,26 +1321,28 @@ export default function HotelRoomsPage() {
       setRoomsError(null);
       setRoomsLoading(true);
       let retries = 1;
-      let searchResultsSuccess = await runStaySearch({
-        checkIn: stayCheckIn,
-        checkOut: stayCheckOut,
-        adults: stayAdults,
-        children: stayChildren,
-        rooms: stayRooms,
-        childAges: stayChildAges,
-      });
+      let searchResultsSuccess = await runStaySearch(next);
 
       while (retries < 5 && !searchResultsSuccess) {
-        searchResultsSuccess = await runStaySearch({
-          checkIn: stayCheckIn,
-          checkOut: stayCheckOut,
-          adults: stayAdults,
-          children: stayChildren,
-          rooms: stayRooms,
-          childAges: stayChildAges,
-        });
+        searchResultsSuccess = await runStaySearch(next);
         retries++;
       }
+
+      // Sync URL with the new search context so refreshes / shares use the correct criteria.
+      const latestState = useBookingStore.getState();
+      const latestMeta = latestState.hotelResultsMeta?.[hotelId];
+      syncPdpUrl({
+        router,
+        hotelId,
+        searchParams: new URLSearchParams(searchParams?.toString() || ""),
+        searchCriteriaId: latestState.hotelSearch?.searchCriteriaId,
+        provider: latestState.hotelSearch?.provider,
+        srId: latestMeta?.srId || latestMeta?.searchResultId,
+        prevSearchCriteriaId: urlSearchCriteriaId,
+        prevSrId: urlSrId,
+        hotelSearch: latestState.hotelSearch,
+      });
+
       setStayEditorOpen(false);
     } catch (e: any) {
       setRoomsError(e?.message || "Failed to update availability");
@@ -2059,6 +2148,13 @@ export default function HotelRoomsPage() {
       let effectiveSearchCriteriaId = hotelSearch?.searchCriteriaId ?? urlSearchCriteriaId ?? meta?.searchCriteriaId;
       if (!effectiveSearchCriteriaId) return;
 
+      const srId = urlSrId || meta?.srId || meta?.searchResultId;
+      const roomsLoadKey = `${hotelId}|${effectiveProvider}|${String(effectiveSearchCriteriaId)}|${srId || ""}|${isPackageMode ? "pkg" : "std"}`;
+      if (lastRoomsLoadKeyRef.current === roomsLoadKey) {
+        return;
+      }
+      lastRoomsLoadKeyRef.current = roomsLoadKey;
+
       // 🔍 DIAGNOSTIC: log why loadRooms effect fired
       console.log("[loadRooms] effect fired", {
         hotelId,
@@ -2282,7 +2378,6 @@ export default function HotelRoomsPage() {
           setCoordinates((previous) => previous || searchResultSeed.coordinates);
         }
 
-        const srId = urlSrId || meta?.srId || meta?.searchResultId;
         const rawResult = asRecord(meta?.rawSearchResult);
         const hbMeta = asRecord(rawResult._hotelbeds);
         const dedupeMeta = asRecord(rawResult._dedupe);
