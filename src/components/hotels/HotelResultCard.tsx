@@ -1,8 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
-import {useRouter} from "next/navigation";
 import { Calendar, Check, ChevronRight, PawPrint, Bus, Coffee, X, Star } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, useCallback } from "react";
@@ -86,7 +84,6 @@ export function HotelResultCard({
   const criteriaId = raw?.searchCriteriaId;
   const srId = raw?.id;
   const provider = raw?.provider;
-  const router = useRouter();
   if (criteriaId != null && String(criteriaId).trim()) detailParams.set("searchCriteriaId", String(criteriaId));
   // Avoid `.../hotels/<srId>?srId=<srId>` when our route param already equals srId.
   if (srId != null && String(srId).trim() && String(srId) !== String(hotel.id)) detailParams.set("srId", String(srId));
@@ -121,17 +118,22 @@ export function HotelResultCard({
   ].join(" ");
 
   return (
-    <motion.div
-      role="button"
+    <motion.a
+      href={hotelDetailUrl}
+      target="_blank"
+      rel="noopener noreferrer"
       tabIndex={0}
       onClick={(e) => {
         e.preventDefault();
         onSelect?.();
-        router.push(hotelDetailUrl);
+        window.open(hotelDetailUrl, "_blank", "noopener,noreferrer");
       }}
       onKeyDown={(e) => {
-        if (!onSelect) return;
-        if (e.key === "Enter" || e.key === " ") onSelect();
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect?.();
+          window.open(hotelDetailUrl, "_blank", "noopener,noreferrer");
+        }
       }}
       className={rootClass}
       animate={{ scale: selected ? 1.02 : 1 }}
@@ -254,12 +256,13 @@ export function HotelResultCard({
             </div>
 
             {/* CTA Button */}
-            <Link href={hotelDetailUrl} className="w-full">
-              <Button className="rounded-full py-3 h-auto gap-2 text-sm font-semibold w-full bg-[#3754ED] hover:bg-[#2A3FB8] text-white cursor-pointer">
-                Check Rooms
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </Link>
+            <Button
+              tabIndex={-1}
+              className="rounded-full py-3 h-auto gap-2 text-sm font-semibold w-full bg-[#3754ED] hover:bg-[#2A3FB8] text-white cursor-pointer pointer-events-none"
+            >
+              Check Rooms
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       ) : (
@@ -374,17 +377,18 @@ export function HotelResultCard({
               </div>
 
               <div className="mt-auto w-full flex justify-end">
-                <Link href={hotelDetailUrl}>
-                  <Button className="rounded-full px-4 py-2 h-auto gap-1.5 text-sm font-medium bg-[#3754ED] hover:bg-[#2A3FB8] text-white w-[170px]">
-                    Check Rooms
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </Link>
+                <Button
+                  tabIndex={-1}
+                  className="rounded-full px-4 py-2 h-auto gap-1.5 text-sm font-medium bg-[#3754ED] hover:bg-[#2A3FB8] text-white w-[170px] pointer-events-none"
+                >
+                  Check Rooms
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
             </div>
           </div>
         </div>
       )}
-    </motion.div>
+    </motion.a>
   );
 }
