@@ -212,6 +212,18 @@ interface BookingState {
     hotels: Hotel[];
     selectedHotelId?: string;
     selectedHotelKey?: string;
+    criteria?: {
+      mode?: 'hotel' | 'package';
+      location?: string;
+      checkIn?: string;
+      checkOut?: string;
+      rooms?: number;
+      adults?: number;
+      children?: number;
+      child_age?: string;
+      branches?: string;
+      fromCode?: string;
+    };
     /** Timestamp when results were fetched - used to invalidate stale cache */
     fetchedAt?: number;
   } | null;

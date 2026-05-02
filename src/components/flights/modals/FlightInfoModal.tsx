@@ -54,7 +54,7 @@ interface FlightInfoModalProps {
 
 function formatPackageDeltaLabel(amount?: number, currency?: string): string {
   const delta = Number(amount || 0);
-  if (Math.abs(delta) < 0.01) return "Included";
+  if (Math.abs(delta) < 0.01) return formatPrice(0, currency || "GBP");
   return `${delta > 0 ? "+" : "-"}${formatPrice(Math.abs(delta), currency || "GBP")}`;
 }
 
@@ -1279,7 +1279,7 @@ export default function FlightInfoModal({
                 </span>
                 <span className="text-xs text-[#3A478A]">
                   {isPackageMode
-                    ? "Included in package total"
+                    ? `${formatPrice(0, flight.currency || "GBP")} package adjustment`
                     : selectedUpgradeOption
                       ? `${formatPrice(selectedUpgradeOption.pricePerPerson, selectedUpgradeOption.currency)} per person`
                       : `${formatPrice(flight.pricePerPerson, flight.currency)} per person`}

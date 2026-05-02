@@ -236,8 +236,8 @@ export function HotelResultCard({
                     <div className="text-2xl font-bold text-[#010D50]">
                       {hotel.price.currency}{packagePerPersonPrice.toLocaleString()}
                     </div>
-                    <div className="text-xs font-medium uppercase tracking-[0.08em] text-[#3A478A]">
-                      Per Person
+                    <div className="text-xs font-medium text-[#3A478A]">
+                      Per person
                     </div>
                   </>
                 ) : (
@@ -364,8 +364,8 @@ export function HotelResultCard({
                       {hotel.price.currency}
                       {packagePerPersonPrice.toLocaleString()}
                     </div>
-                    <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-[#3A478A]">
-                      Per Person
+                    <div className="text-[11px] font-medium text-[#3A478A]">
+                      Per person
                     </div>
                   </>
                 ) : (

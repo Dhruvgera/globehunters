@@ -118,6 +118,14 @@ function formatDisplayPrice(currency: string | undefined, amount: number | undef
   })}`;
 }
 
+function parsePositivePriceCandidate(value: unknown): number | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const parsed = Number(raw.replace(/[^0-9.-]/g, ""));
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
+}
+
 function formatFlightClock(value: number | string | undefined): string {
   const digits = String(value ?? "").replace(/\D/g, "");
   if (!digits) return "—";
@@ -1035,6 +1043,7 @@ export default function HotelRoomsPage() {
   const packageResults = useBookingStore((s) => s.packageResults);
   const packageResultsMeta = useBookingStore((s) => s.packageResultsMeta);
   const selectedPackage = useBookingStore((s) => s.selectedPackage);
+  const selectedFlight = useBookingStore((s) => s.selectedFlight);
   const hotelResultsMeta = useBookingStore((s) => s.hotelResultsMeta);
   const setSelectedHotel = useBookingStore((s) => s.setSelectedHotel);
   const setSelectedHotelRoomIds = useBookingStore((s) => s.setSelectedHotelRoomIds);
@@ -1871,6 +1880,62 @@ export default function HotelRoomsPage() {
     () => packageResults?.find((row) => String(row.id) === String(hotelId)),
     [hotelId, packageResults]
   );
+  const displayedSearchPrice = useMemo(() => {
+    if (isPackageMode) {
+      const amount = Number(
+        matchedPackageResult?.startingPrice ?? selectedPackage?.totalPrice ?? NaN
+      );
+      if (!Number.isFinite(amount) || amount <= 0) return null;
+      return {
+        amount,
+        currency:
+          String(matchedPackageResult?.currency || selectedPackage?.hotel?.currency || "GBP"),
+      };
+    }
+
+    const metaRow = asRecord(hotelResultsMeta[String(hotelId)]);
+    const raw = asRecord(metaRow.rawSearchResult);
+    const amountCandidates = [
+      raw.min_price,
+      raw.minPrice,
+      raw.price,
+      raw.total_price,
+      raw.totalPrice,
+      raw.amount,
+      raw.MinPrice,
+    ];
+    let amount: number | null = null;
+    for (const candidate of amountCandidates) {
+      amount = parsePositivePriceCandidate(candidate);
+      if (amount != null) break;
+    }
+    if (amount == null) return null;
+
+    const currencyCode = String(raw.SellCur || raw.sellCur || raw.currency || "GBP").trim() || "GBP";
+    return {
+      amount,
+      currency: currencyCode,
+    };
+  }, [
+    hotelId,
+    hotelResultsMeta,
+    isPackageMode,
+    matchedPackageResult?.currency,
+    matchedPackageResult?.startingPrice,
+    selectedPackage?.hotel?.currency,
+    selectedPackage?.totalPrice,
+  ]);
+  const priceIncreaseNotice = useMemo(() => {
+    if (!displayedSearchPrice || minRoomPrice <= 0) return null;
+    const increase = minRoomPrice - displayedSearchPrice.amount;
+    if (!Number.isFinite(increase) || increase <= 0.01) return null;
+    return {
+      previous: displayedSearchPrice.amount,
+      checked: minRoomPrice,
+      increase,
+      currency: displayedSearchPrice.currency,
+    };
+  }, [displayedSearchPrice, minRoomPrice]);
   const activePackageRoom = useMemo(
     () =>
       isPackageMode
@@ -3077,6 +3142,55 @@ export default function HotelRoomsPage() {
                 }
                 return null;
               })()}
+              {(!deeplinkViewData?.success || !("FlightResultId" in deeplinkViewData.results)) &&
+                selectedFlight &&
+                (() => {
+                  const fallbackSegments =
+                    selectedFlight.segments && selectedFlight.segments.length > 0
+                      ? selectedFlight.segments
+                      : [selectedFlight.outbound, ...(selectedFlight.inbound ? [selectedFlight.inbound] : [])];
+                  if (fallbackSegments.length === 0) return null;
+                  return (
+                    <div className="mt-4 bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden">
+                      <div className="px-4 sm:px-6 py-4 border-b border-[#DFE0E4] flex items-center gap-2">
+                        <Plane className="w-4 h-4 text-[#3754ED]" />
+                        <h2 className="text-xl font-semibold text-[#010D50]">Flight Details</h2>
+                      </div>
+                      <div className="p-4 sm:p-6 flex flex-col gap-3">
+                        {fallbackSegments.map((seg, idx) => (
+                          <div
+                            key={`${seg.departureAirport.code}-${seg.arrivalAirport.code}-${idx}`}
+                            className="bg-[#F5F7FF] rounded-xl p-4 flex flex-col gap-4"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-8 h-8 rounded bg-[#3754ED] text-white flex items-center justify-center">
+                                  <Plane className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-sm font-semibold text-[#010D50] truncate">
+                                    {seg.carrierName || selectedFlight.airline.name || "Selected airline"}
+                                  </div>
+                                  <div className="text-xs text-[#3A478A] truncate">
+                                    {idx === 0 ? "Outbound" : "Inbound"} · {seg.departureAirport.code} to {seg.arrivalAirport.code}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-xs text-[#010D50] font-medium whitespace-nowrap">
+                                {seg.cabinClass || "Economy"}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap text-xs text-[#3A478A]">
+                              <span>{seg.stopDetails || `${seg.stops || 0} stop${Number(seg.stops || 0) === 1 ? "" : "s"}`}</span>
+                              <span className="w-1 h-1 rounded-full bg-[#3A478A]" />
+                              <span>{seg.totalJourneyTime || seg.duration || "—"}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
 
               {/* Image Gallery - Main image left, 3 thumbnails stacked right */}
               <div className="flex flex-col lg:flex-row gap-3">
@@ -3427,6 +3541,19 @@ export default function HotelRoomsPage() {
                   </div>
                 )}
               </div>
+              {priceIncreaseNotice && (
+                <div className="bg-[#FFF5EA] border border-[#FFD699] rounded-xl px-4 py-3">
+                  <p className="text-sm font-semibold text-[#B45309]">Price update</p>
+                  <p className="text-sm text-[#9A3412]">
+                    Latest checked price is{" "}
+                    {formatDisplayPrice(priceIncreaseNotice.currency, priceIncreaseNotice.checked)}
+                    , which is{" "}
+                    {formatDisplayPrice(priceIncreaseNotice.currency, priceIncreaseNotice.increase)}
+                    {" "}higher than the previously shown{" "}
+                    {formatDisplayPrice(priceIncreaseNotice.currency, priceIncreaseNotice.previous)}.
+                  </p>
+                </div>
+              )}
 
               <div className="flex flex-wrap items-center gap-4">
                 {/* Hotel Name Input */}
@@ -4036,7 +4163,7 @@ export default function HotelRoomsPage() {
                                 if (Math.abs(delta) < 0.01) {
                                   return (
                                     <span className="text-xl font-semibold text-[#008234]">
-                                      Included
+                                      {formatDisplayPrice(room.price.currency, 0)}
                                     </span>
                                   );
                                 }

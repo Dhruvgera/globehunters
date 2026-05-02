@@ -26,6 +26,7 @@ import { resolvePackagePricing } from "@/lib/package/pricing";
 import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
 import { hasErrors, validatePassenger } from "@/utils/validation";
 import type { HolidayPackageViewResponse } from "@/types/holidayPackage";
+import { formatPrice } from "@/lib/currency";
 
 function formatDateLabel(value?: string) {
   if (!value) return "—";
@@ -41,7 +42,7 @@ function formatDateLabel(value?: string) {
 
 function parseMoneyString(value?: string | null) {
   const raw = String(value || "").trim();
-  const match = raw.match(/^([A-Z]{3}|Â£|\$|â‚¬)?\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Z]{3}|Â£|\$|â‚¬)?$/i);
+  const match = raw.match(/^([A-Z]{3}|£|\$|€)?\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Z]{3}|£|\$|€)?$/i);
   if (!match) return { amount: undefined, currency: undefined as string | undefined };
   const leading = match[1];
   const trailing = match[3];
@@ -52,15 +53,14 @@ function parseMoneyString(value?: string | null) {
 }
 
 function formatMoney(currency: string | undefined, amount: number | undefined) {
-  if (amount == null || Number.isNaN(amount)) return "â€”";
-  const normalized = String(currency || "").trim();
-  if (normalized === "Â£" || normalized === "$" || normalized === "â‚¬") {
-    return `${normalized}${amount.toFixed(2)}`;
+  if (amount == null || Number.isNaN(amount)) return "—";
+  const normalized = String(currency || "").trim().toUpperCase();
+  const symbolToCode: Record<string, string> = { "£": "GBP", "$": "USD", "€": "EUR" };
+  const currencyCode = symbolToCode[normalized] || normalized;
+  if (/^[A-Z]{3}$/.test(currencyCode)) {
+    return formatPrice(amount, currencyCode);
   }
-  if (/^[A-Z]{3}$/.test(normalized)) {
-    return `${amount.toFixed(2)} ${normalized}`;
-  }
-  return amount.toFixed(2);
+  return `${String(currency || "£").trim()}${amount.toFixed(2)}`;
 }
 
 function toIsoCurrency(currency: string | undefined) {

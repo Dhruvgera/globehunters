@@ -24,6 +24,7 @@ import { formatFareLabel } from "@/lib/utils";
 import { resolvePackagePricing } from "@/lib/package/pricing";
 import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
 import { calculateNights } from "@/lib/hotels/nights";
+import { formatPrice } from "@/lib/currency";
 
 function formatDateLabel(value?: string) {
   if (!value) return "—";
@@ -58,14 +59,13 @@ function parseMoneyString(value?: string | null) {
 
 function formatMoney(currency: string | undefined, amount: number | undefined) {
   if (amount == null || Number.isNaN(amount)) return "—";
-  const normalized = String(currency || "").trim();
-  if (normalized === "£" || normalized === "$" || normalized === "€") {
-    return `${normalized}${amount.toFixed(2)}`;
+  const normalized = String(currency || "").trim().toUpperCase();
+  const symbolToCode: Record<string, string> = { "£": "GBP", "$": "USD", "€": "EUR" };
+  const currencyCode = symbolToCode[normalized] || normalized;
+  if (/^[A-Z]{3}$/.test(currencyCode)) {
+    return formatPrice(amount, currencyCode);
   }
-  if (/^[A-Z]{3}$/.test(normalized)) {
-    return `${amount.toFixed(2)} ${normalized}`;
-  }
-  return amount.toFixed(2);
+  return `${String(currency || "£").trim()}${amount.toFixed(2)}`;
 }
 
 function getUniquePackageRooms<T>(rooms: T[] | undefined) {
@@ -457,6 +457,26 @@ function PackageReviewPageInner() {
     : 0;
   const totalPrice = pricing.packageTotal + baggageCost + protectionPlanCost;
   const totalPerPersonPrice = calculatePackagePerPersonPrice(totalPrice, packageSearch?.rooms);
+  const packagePriceIncrease = useMemo(() => {
+    if (parsedPackagePrice.amount == null || fallbackPackagePricing?.amount == null) return null;
+    const liveAmount = parsedPackagePrice.amount;
+    const baselineAmount = fallbackPackagePricing.amount;
+    const increase = liveAmount - baselineAmount;
+    if (!Number.isFinite(increase) || increase <= 0.01) return null;
+    const currency = parsedPackagePrice.currency || fallbackPackagePricing.currency || pricing.currency;
+    return {
+      liveAmount,
+      baselineAmount,
+      increase,
+      currency,
+    };
+  }, [
+    fallbackPackagePricing?.amount,
+    fallbackPackagePricing?.currency,
+    parsedPackagePrice.amount,
+    parsedPackagePrice.currency,
+    pricing.currency,
+  ]);
 
   if (!selectedFlight) {
     return (
@@ -483,6 +503,16 @@ function PackageReviewPageInner() {
             Please remember that it is your responsibility to have in your possession all the necessary travel documents.
           </p>
         </div>
+        {packagePriceIncrease && (
+          <div className="mt-4 sm:mt-5 bg-[#FFF5EA] border border-[#FFD699] rounded-xl p-3.5 sm:p-4">
+            <p className="text-sm font-semibold text-[#B45309]">Price update</p>
+            <p className="text-sm text-[#9A3412]">
+              The latest package check is {formatMoney(packagePriceIncrease.currency, packagePriceIncrease.liveAmount)}, which is{" "}
+              {formatMoney(packagePriceIncrease.currency, packagePriceIncrease.increase)} higher than the previously shown{" "}
+              {formatMoney(packagePriceIncrease.currency, packagePriceIncrease.baselineAmount)}.
+            </p>
+          </div>
+        )}
 
         <div className="mt-6 sm:mt-8 flex flex-col lg:flex-row gap-6 lg:gap-8">
           <div className="flex-1 space-y-5 sm:space-y-6">
@@ -674,11 +704,11 @@ function PackageReviewPageInner() {
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
                     <span className="text-[#3A478A]">Hotel ({nights} nights)</span>
-                    <span className="font-medium text-[#010D50]">Included</span>
+                    <span className="font-medium text-[#010D50]">{formatMoney(pricing.currency, 0)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[#3A478A]">Flights (per booking)</span>
-                    <span className="font-medium text-[#010D50]">Included</span>
+                    <span className="font-medium text-[#010D50]">{formatMoney(pricing.currency, 0)}</span>
                   </div>
                   {addOns.additionalBaggage > 0 && (
                     <div className="flex justify-between">

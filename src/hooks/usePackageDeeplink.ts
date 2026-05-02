@@ -110,7 +110,10 @@ function buildFlightSegment(direction: HolidayPackageViewResponse["results"]["Fl
   };
 }
 
-function buildSelectedFlightFromView(viewData: HolidayPackageViewResponse): Flight | null {
+function buildSelectedFlightFromView(
+  viewData: HolidayPackageViewResponse,
+  deeplinkKey?: string
+): Flight | null {
   const directions = Array.isArray(viewData.results?.FlightDetails) ? viewData.results.FlightDetails : [];
   if (directions.length === 0) return null;
 
@@ -142,6 +145,7 @@ function buildSelectedFlightFromView(viewData: HolidayPackageViewResponse): Flig
     refundableText: String(firstLeg?.refundable_text || "") || undefined,
     hasBaggage: Boolean(outbound.segmentBaggage),
     segmentResultId: String(viewData.results.FlightResultId || ""),
+    flightKey: String(deeplinkKey || "").trim() || undefined,
   };
 }
 
@@ -274,7 +278,7 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
       if (mode === "package" && "FlightResultId" in viewData.results) {
         const pkgView = viewData as HolidayPackageViewResponse;
         const results = pkgView.results;
-        const selectedFlight = buildSelectedFlightFromView(pkgView);
+        const selectedFlight = buildSelectedFlightFromView(pkgView, key);
 
         const lastOutboundLeg = pkgView.results.FlightDetails?.[0]?.Flights?.slice(-1)?.[0];
         const destinationCode = String(lastOutboundLeg?.arrival_airport || "").toUpperCase();

@@ -16,7 +16,10 @@ import { formatPrice } from "@/lib/currency";
 
 function formatPackageDeltaLabel(amount?: number, currency?: string, perPerson = false): string {
   const delta = Number(amount || 0);
-  if (Math.abs(delta) < 0.01) return "Included";
+  if (Math.abs(delta) < 0.01) {
+    const zeroLabel = formatPrice(0, currency || "GBP");
+    return perPerson ? `${zeroLabel} per person` : zeroLabel;
+  }
   const prefix = `${delta > 0 ? "+" : "-"}${formatPrice(Math.abs(delta), currency || "GBP")}`;
   return perPerson ? `${prefix} per person` : prefix;
 }
@@ -93,6 +96,10 @@ export default function FlightCard({
     router.push("/booking");
   };
 
+  const handleBookFlight = () => {
+    handleSelectFlight("Eco Value");
+  };
+
   // Debug mode - show module_id and Result_id when enabled
   const isDebugMode = process.env.NEXT_PUBLIC_DEBUG_FLIGHT_IDS === 'true';
 
@@ -166,6 +173,7 @@ export default function FlightCard({
           setShowTicketOptions(!showTicketOptions);
         }}
         onPrefetchOptions={prefetchOptions}
+        onBook={isPackageMode ? handleBookFlight : undefined}
       />
 
       {/* Expandable Ticket Options */}

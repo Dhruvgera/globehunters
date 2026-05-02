@@ -577,7 +577,19 @@ function HotelsPageInner() {
     resolvedSearchRef.current = resolvedSearch;
   }, [resolvedSearch]);
 
-  const queryKey = useMemo(() => {
+  const serializedChildAges = useMemo(
+    () => serializeHotelChildAges(resolvedSearch.child_age, resolvedSearch.rooms, resolvedSearch.children),
+    [resolvedSearch.child_age, resolvedSearch.children, resolvedSearch.rooms]
+  );
+
+  const packageFromCode = useMemo(() => {
+    const p = new URLSearchParams(urlParamsKey);
+    return String(p.get("fromCode") || savedPackageSearch?.departureCode || "LON")
+      .trim()
+      .toUpperCase();
+  }, [savedPackageSearch, urlParamsKey]);
+
+  const strictQueryKey = useMemo(() => {
     return JSON.stringify({
       providerOverride,
       location: resolvedSearch.location,
@@ -585,13 +597,45 @@ function HotelsPageInner() {
       checkOut: resolvedSearch.checkOut,
       adults: resolvedSearch.adults,
       children: resolvedSearch.children,
-      child_age: serializeHotelChildAges(resolvedSearch.child_age, resolvedSearch.rooms, resolvedSearch.children),
+      child_age: serializedChildAges,
       rooms: resolvedSearch.rooms,
       hidden_id: resolvedSearch.hidden_id,
       hidden_key: resolvedSearch.hidden_key,
       branches: resolvedSearch.branches,
     });
-  }, [providerOverride, resolvedSearch]);
+  }, [providerOverride, resolvedSearch, serializedChildAges]);
+
+  const packageStableQueryKey = useMemo(() => {
+    return JSON.stringify({
+      mode: "package",
+      fromCode: packageFromCode,
+      location: resolvedSearch.location,
+      checkIn: resolvedSearch.checkIn,
+      checkOut: resolvedSearch.checkOut,
+      adults: resolvedSearch.adults,
+      children: resolvedSearch.children,
+      child_age: serializedChildAges,
+      rooms: resolvedSearch.rooms,
+      branches: resolvedSearch.branches,
+    });
+  }, [packageFromCode, resolvedSearch, serializedChildAges]);
+
+  const queryKey = isPackageMode ? packageStableQueryKey : strictQueryKey;
+  const cacheCriteria = useMemo(
+    () => ({
+      mode: isPackageMode ? ("package" as const) : ("hotel" as const),
+      location: resolvedSearch.location,
+      checkIn: resolvedSearch.checkIn,
+      checkOut: resolvedSearch.checkOut,
+      rooms: resolvedSearch.rooms,
+      adults: resolvedSearch.adults,
+      children: resolvedSearch.children,
+      child_age: serializedChildAges,
+      branches: resolvedSearch.branches,
+      fromCode: packageFromCode,
+    }),
+    [isPackageMode, packageFromCode, resolvedSearch, serializedChildAges]
+  );
 
   // Hydrate filters for this queryKey (so opening a hotel and coming back doesn't reset price slider).
   useEffect(() => {
@@ -624,13 +668,41 @@ function HotelsPageInner() {
       const requestSeq = ++activeRequestSeq.current;
 
       // Hydrate from cache immediately to preserve results on back-navigation.
-      // Only use cache if queryKey matches and cache has results and is fresh (< 2 min).
+      // Only use cache if queryKey matches and cache has results and is fresh.
+      // Package results are intentionally kept longer to reduce repeat backend calls
+      // when users revisit the same package search.
       const cache = hotelResultsCacheRef.current;
       const cacheAge = cache?.fetchedAt ? Date.now() - cache.fetchedAt : Infinity;
-      const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
+      const CACHE_TTL = isPackageMode ? 15 * 60 * 1000 : 2 * 60 * 1000;
       const isCacheFresh = cacheAge < CACHE_TTL;
 
-      if (cache?.queryKey === queryKey && cache.hotels.length > 0 && isCacheFresh) {
+      const packageLegacyQueryKey = strictQueryKey;
+      const cacheKeyMatches = cache?.queryKey === queryKey || (isPackageMode && cache?.queryKey === packageLegacyQueryKey);
+      const cacheCriteriaMatchesCurrent =
+        cache?.criteria != null &&
+        JSON.stringify(cache.criteria) === JSON.stringify(cacheCriteria);
+      const savedSearchMatchesCurrent =
+        isPackageMode &&
+        savedHotelSearch != null &&
+        String(savedHotelSearch.location || "").trim().toLowerCase() ===
+          String(resolvedSearch.location || "").trim().toLowerCase() &&
+        String(savedHotelSearch.checkIn || "") === String(resolvedSearch.checkIn || "") &&
+        String(savedHotelSearch.checkOut || "") === String(resolvedSearch.checkOut || "") &&
+        Number(savedHotelSearch.rooms || 0) === Number(resolvedSearch.rooms || 0) &&
+        Number(savedHotelSearch.adults || 0) === Number(resolvedSearch.adults || 0) &&
+        Number(savedHotelSearch.children || 0) === Number(resolvedSearch.children || 0) &&
+        String(savedHotelSearch.branches || "") === String(resolvedSearch.branches || "") &&
+        serializeHotelChildAges(savedHotelSearch.child_age, savedHotelSearch.rooms, savedHotelSearch.children) ===
+          serializeHotelChildAges(resolvedSearch.child_age, resolvedSearch.rooms, resolvedSearch.children);
+      const cacheCriteriaMatchFallback = Boolean(savedSearchMatchesCurrent && cache?.hotels?.length);
+      const hasUsableCache = Boolean(
+        cache &&
+        (cacheKeyMatches || cacheCriteriaMatchesCurrent || cacheCriteriaMatchFallback) &&
+        cache.hotels.length > 0 &&
+        isCacheFresh
+      );
+
+      if (hasUsableCache && cache) {
         if (!cancelled && requestSeq === activeRequestSeq.current) {
           setHotels(cache.hotels);
           setSelectedHotelKey(cache.selectedHotelKey || (cache.hotels.length > 0 ? `${cache.hotels[0]?.id}-0` : ""));
@@ -901,8 +973,16 @@ function HotelsPageInner() {
 
             if (!cancelled && requestSeq === activeRequestSeq.current) {
               if (mappedHotels.length > 0) {
+                const selectedHotelKey = `${mappedHotels[0]?.id}-0`;
+                setHotelResultsCache({
+                  queryKey,
+                  criteria: cacheCriteria,
+                  hotels: mappedHotels,
+                  selectedHotelKey,
+                  fetchedAt: Date.now(),
+                });
                 setHotels(mappedHotels);
-                setSelectedHotelKey(mappedHotels.length > 0 ? `${mappedHotels[0]?.id}-0` : "");
+                setSelectedHotelKey(selectedHotelKey);
                 setNoResultsMessage(null);
               } else {
                 setHotels([]);
@@ -1214,7 +1294,13 @@ function HotelsPageInner() {
           // Only cache if we have actual results (don't cache empty "no results" responses)
           if (mapped.length > 0) {
             const selectedHotelKey = `${mapped[0]?.id}-0`;
-            setHotelResultsCache({ queryKey, hotels: mapped, selectedHotelKey, fetchedAt: Date.now() });
+            setHotelResultsCache({
+              queryKey,
+              criteria: cacheCriteria,
+              hotels: mapped,
+              selectedHotelKey,
+              fetchedAt: Date.now(),
+            });
           }
 
           // If user hasn't interacted yet, set price slider bounds from real data (total).
@@ -1371,6 +1457,7 @@ function HotelsPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- resolvedSearch accessed via ref to avoid loop
   }, [
     queryKey,
+    strictQueryKey,
     setHotelResultsCache,
     setHotelResultsMeta,
     setHotelSearch,
