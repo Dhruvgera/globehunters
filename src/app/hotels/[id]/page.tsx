@@ -50,6 +50,7 @@ import {
   serializeHotelChildAges,
 } from "@/lib/hotels/childAges";
 import { ensureGiataImageUrl, fixStubaImageUrl } from "@/lib/hotels/imageUrl";
+import { syncPdpUrl } from "@/lib/hotels/syncPdpUrl";
 import { convertHotelLocalTaxTotal, formatMoneyFromCode, normalizeCurrencyCode } from "@/lib/currency/localTaxDisplay";
 import { parsePackageHotelContent, type PackageHotelNearbyPlace } from "@/lib/package/hotelContent";
 import { usePackageDeeplink } from "@/hooks/usePackageDeeplink";
@@ -1250,30 +1251,16 @@ export default function HotelRoomsPage() {
       // Sync URL with the new search context so refreshes / shares use the correct criteria.
       const latestState = useBookingStore.getState();
       const latestMeta = latestState.hotelResultsMeta?.[hotelId];
-      const latestCriteriaId = latestState.hotelSearch?.searchCriteriaId;
-      const latestProvider = latestState.hotelSearch?.provider;
-      const latestSrId = latestMeta?.srId || latestMeta?.searchResultId;
-
-      const params = new URLSearchParams(searchParams?.toString() || "");
-      if (latestCriteriaId != null) {
-        params.set("searchCriteriaId", String(latestCriteriaId));
-      } else {
-        params.delete("searchCriteriaId");
-      }
-      if (latestProvider) {
-        params.set("provider", latestProvider);
-      } else {
-        params.delete("provider");
-      }
-      if (latestSrId) {
-        params.set("srId", String(latestSrId));
-      } else {
-        params.delete("srId");
-      }
-      if (String(latestCriteriaId) !== String(urlSearchCriteriaId) ||
-          String(latestSrId ?? "") !== String(urlSrId ?? "")) {
-        router.replace(`/hotels/${hotelId}?${params.toString()}`, { scroll: false });
-      }
+      syncPdpUrl({
+        router,
+        hotelId,
+        searchParams: new URLSearchParams(searchParams?.toString() || ""),
+        searchCriteriaId: latestState.hotelSearch?.searchCriteriaId,
+        provider: latestState.hotelSearch?.provider,
+        srId: latestMeta?.srId || latestMeta?.searchResultId,
+        prevSearchCriteriaId: urlSearchCriteriaId,
+        prevSrId: urlSrId,
+      });
 
       setStayEditorOpen(false);
     } catch (e: any) {
