@@ -1,4 +1,6 @@
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime.js";
+import type { HotelSearchUrlContext } from "@/lib/hotels/searchContextCodec";
+import { encodeHotelSearchContext } from "@/lib/hotels/searchContextCodec";
 
 interface SyncPdpUrlOptions {
   router: AppRouterInstance;
@@ -9,12 +11,9 @@ interface SyncPdpUrlOptions {
   srId: string | null | undefined;
   prevSearchCriteriaId: string | null;
   prevSrId: string | null;
+  hotelSearch?: HotelSearchUrlContext | null;
 }
 
-/**
- * Conditionally updates the PDP URL with the latest search context
- * (searchCriteriaId, provider, srId) when they differ from the current URL.
- */
 export function syncPdpUrl({
   router,
   hotelId,
@@ -24,11 +23,14 @@ export function syncPdpUrl({
   srId,
   prevSearchCriteriaId,
   prevSrId,
+  hotelSearch,
 }: SyncPdpUrlOptions): void {
-  if (
-    String(searchCriteriaId ?? "") === String(prevSearchCriteriaId ?? "") &&
-    String(srId ?? "") === String(prevSrId ?? "")
-  ) {
+  const criteriaChanged =
+    String(searchCriteriaId ?? "") !== String(prevSearchCriteriaId ?? "");
+  const srIdChanged =
+    String(srId ?? "") !== String(prevSrId ?? "");
+
+  if (!criteriaChanged && !srIdChanged && !hotelSearch) {
     return;
   }
 
@@ -50,6 +52,14 @@ export function syncPdpUrl({
     params.set("srId", String(srId));
   } else {
     params.delete("srId");
+  }
+
+  if (hotelSearch) {
+    const encoded = encodeHotelSearchContext({
+      ...hotelSearch,
+      searchCriteriaId: hotelSearch.searchCriteriaId ?? searchCriteriaId ?? undefined,
+    });
+    if (encoded) params.set("ctx", encoded);
   }
 
   router.replace(`/hotels/${hotelId}?${params.toString()}`, { scroll: false });
