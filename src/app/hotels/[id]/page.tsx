@@ -42,6 +42,8 @@ import { hotelService } from "@/services/api/hotelService";
 import { packageService } from "@/services/api/packageService";
 import { useBookingStore } from "@/store/bookingStore";
 import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
+import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
+import type { Flight, FlightSegment } from "@/types/flight";
 import { resolveTrustYouHotelId } from "@/lib/trustyou/hotelMapping";
 import type { TrustYouHotelReviewSummary } from "@/types/trustyou";
 import type { HolidayPackageViewResponse, AccommodationViewResponse, ViewRoomOption } from "@/types/holidayPackage";
@@ -1064,6 +1066,7 @@ export default function HotelRoomsPage() {
   // State
   const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
+  const [flightInfoModalOpen, setFlightInfoModalOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("Overview");
   const [remoteHotelHeader, setRemoteHotelHeader] = useState<{
     name: string;
@@ -2008,6 +2011,77 @@ export default function HotelRoomsPage() {
   const faqs: Array<{ id: string; question: string; answer: string }> = [];
 
   const displayedAmenities = showAllAmenities ? hotel.amenities : hotel.amenities.slice(0, 6);
+  const flightForInfoModal = useMemo<Flight | null>(() => {
+    if (selectedFlight) return selectedFlight;
+    if (!deeplinkViewData?.success || !("FlightResultId" in deeplinkViewData.results)) return null;
+
+    const view = deeplinkViewData as HolidayPackageViewResponse;
+    const directions = Array.isArray(view.results?.FlightDetails) ? view.results.FlightDetails : [];
+    if (directions.length === 0) return null;
+
+    const toSegment = (
+      direction: HolidayPackageViewResponse["results"]["FlightDetails"][number]
+    ): FlightSegment | null => {
+      const legs = Array.isArray(direction?.Flights) ? direction.Flights : [];
+      if (legs.length === 0) return null;
+      const firstLeg = legs[0];
+      const lastLeg = legs[legs.length - 1];
+      const stops = Math.max(0, Number(direction.Stops ?? legs.length - 1) || 0);
+
+      return {
+        departureTime: formatFlightClock(firstLeg.departure_time),
+        arrivalTime: formatFlightClock(lastLeg.arrival_time),
+        departureAirport: {
+          code: String(firstLeg.departure_airport || ""),
+          name: String(firstLeg.departure_airport || ""),
+          city: String(firstLeg.departure_airport || ""),
+        },
+        arrivalAirport: {
+          code: String(lastLeg.arrival_airport || ""),
+          name: String(lastLeg.arrival_airport || ""),
+          city: String(lastLeg.arrival_airport || ""),
+        },
+        date: String(firstLeg.departure_date || ""),
+        arrivalDate: String(lastLeg.arrival_date || firstLeg.departure_date || ""),
+        duration: formatMinutesToDuration(Number(direction.Flying_time || 0)),
+        totalJourneyTime: formatMinutesToDuration(Number(direction.Total_travel_time || direction.Flying_time || 0)),
+        stops,
+        stopDetails: stops === 0 ? "Direct" : `${stops} stop${stops === 1 ? "" : "s"}`,
+        carrierCode: String(firstLeg.airline_code || ""),
+        carrierName: String(firstLeg.airline_name || ""),
+        flightNumber: String(firstLeg.flight_number || ""),
+        cabinClass: String(firstLeg.class_name || firstLeg.cabin_class || "Economy"),
+      };
+    };
+
+    const segments = directions.map((direction) => toSegment(direction)).filter(Boolean) as FlightSegment[];
+    if (segments.length === 0) return null;
+
+    const firstLeg = directions[0]?.Flights?.[0];
+    return {
+      id: String(view.results.FlightResultId || "deeplink-flight"),
+      airline: {
+        name: String(firstLeg?.airline_name || segments[0]?.carrierName || "Selected airline"),
+        logo: "",
+        code: String(firstLeg?.airline_code || segments[0]?.carrierCode || ""),
+      },
+      outbound: segments[0],
+      inbound: segments[1] || undefined,
+      segments,
+      tripType: segments.length > 1 ? "round-trip" : "one-way",
+      price: 0,
+      pricePerPerson: 0,
+      currency: String(view.results?.HotelDetails?.SellCur || "GBP").toUpperCase(),
+      ticketOptions: [],
+      webRef: String(view.results?.RequestId || ""),
+      baggage: segments[0]?.segmentBaggage,
+      refundable: firstLeg ? Number(firstLeg.refundable || 0) === 1 : null,
+      refundableText: String(firstLeg?.refundable_text || "") || undefined,
+      hasBaggage: Boolean(segments[0]?.segmentBaggage),
+      segmentResultId: String(view.results.FlightResultId || ""),
+    };
+  }, [selectedFlight, deeplinkViewData]);
+
   const backToResultsHref = useMemo(() => {
     const params = new URLSearchParams();
     if (hotelSearch?.location) params.set("location", hotelSearch.location);
@@ -3054,9 +3128,21 @@ export default function HotelRoomsPage() {
                 if (flights?.length > 0) {
                   return (
                     <div className="mt-4 bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden">
-                      <div className="px-4 sm:px-6 py-4 border-b border-[#DFE0E4] flex items-center gap-2">
-                        <Plane className="w-4 h-4 text-[#3754ED]" />
-                        <h2 className="text-xl font-semibold text-[#010D50]">Flight Details</h2>
+                      <div className="px-4 sm:px-6 py-4 border-b border-[#DFE0E4] flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <Plane className="w-4 h-4 text-[#3754ED]" />
+                          <h2 className="text-xl font-semibold text-[#010D50]">Flight Details</h2>
+                        </div>
+                        {flightForInfoModal ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-8 px-3 text-xs sm:text-sm border-[#3754ED] text-[#3754ED] hover:bg-[#EEF2FF]"
+                            onClick={() => setFlightInfoModalOpen(true)}
+                          >
+                            View flight info
+                          </Button>
+                        ) : null}
                       </div>
                       <div className="p-4 sm:p-6 flex flex-col gap-3">
                         {flights.map((seg, idx) => {
@@ -3152,9 +3238,21 @@ export default function HotelRoomsPage() {
                   if (fallbackSegments.length === 0) return null;
                   return (
                     <div className="mt-4 bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden">
-                      <div className="px-4 sm:px-6 py-4 border-b border-[#DFE0E4] flex items-center gap-2">
-                        <Plane className="w-4 h-4 text-[#3754ED]" />
-                        <h2 className="text-xl font-semibold text-[#010D50]">Flight Details</h2>
+                      <div className="px-4 sm:px-6 py-4 border-b border-[#DFE0E4] flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <Plane className="w-4 h-4 text-[#3754ED]" />
+                          <h2 className="text-xl font-semibold text-[#010D50]">Flight Details</h2>
+                        </div>
+                        {flightForInfoModal ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-8 px-3 text-xs sm:text-sm border-[#3754ED] text-[#3754ED] hover:bg-[#EEF2FF]"
+                            onClick={() => setFlightInfoModalOpen(true)}
+                          >
+                            View flight info
+                          </Button>
+                        ) : null}
                       </div>
                       <div className="p-4 sm:p-6 flex flex-col gap-3">
                         {fallbackSegments.map((seg, idx) => (
@@ -3191,6 +3289,15 @@ export default function HotelRoomsPage() {
                     </div>
                   );
                 })()}
+              {flightForInfoModal ? (
+                <FlightInfoModal
+                  flight={flightForInfoModal}
+                  open={flightInfoModalOpen}
+                  onOpenChange={setFlightInfoModalOpen}
+                  stayOnCurrentPage
+                  isPackageMode
+                />
+              ) : null}
 
               {/* Image Gallery - Main image left, 3 thumbnails stacked right */}
               <div className="flex flex-col lg:flex-row gap-3">
