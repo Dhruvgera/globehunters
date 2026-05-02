@@ -370,10 +370,6 @@ function HotelsPageInner() {
   const contentAttemptRef = useRef<Map<string, { attempts: number; lastAttemptAt: number; ok: boolean }>>(new Map());
   const hotelResultsCacheRef = useRef(hotelResultsCache);
   const prevPriceModeRef = useRef<HotelFiltersState["priceMode"]>(DEFAULT_FILTERS.priceMode);
-  // Tracks the resolved search params (after city lookup) of the last in-flight or completed
-  // availability request. Prevents duplicate API calls when setHotelSearch feedback changes
-  // queryKey but the actual API params are identical.
-  const lastFetchedParamsRef = useRef<string | null>(null);
   const [searchCriteriaId, setSearchCriteriaId] = useState<number | string | null>(null);
   const [breakfastByHotelId, setBreakfastByHotelId] = useState<Record<string, BreakfastStatus>>({});
   const [breakfastEnriching, setBreakfastEnriching] = useState(false);
@@ -541,8 +537,12 @@ function HotelsPageInner() {
   const resolvedSearch = useMemo(() => {
     const p = new URLSearchParams(urlParamsKey);
     const location = p.get("location") || savedHotelSearch?.location || "London";
-    const checkIn = p.get("checkIn") || savedHotelSearch?.checkIn || "2026-02-10";
-    const checkOut = p.get("checkOut") || savedHotelSearch?.checkOut || "2026-02-12";
+    const today = new Date();
+    const defaultCheckIn = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 5);
+    const defaultCheckOut = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 8);
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const checkIn = p.get("checkIn") || savedHotelSearch?.checkIn || fmt(defaultCheckIn);
+    const checkOut = p.get("checkOut") || savedHotelSearch?.checkOut || fmt(defaultCheckOut);
     const adults = Math.max(1, Number(p.get("adults") || savedHotelSearch?.adults || "2") || 2);
     const children = Math.max(0, Number(p.get("children") || savedHotelSearch?.children || "0") || 0);
     const rooms = Math.max(1, Number(p.get("rooms") || savedHotelSearch?.rooms || "1") || 1);
@@ -580,20 +580,23 @@ function HotelsPageInner() {
   }, [resolvedSearch]);
 
   const queryKey = useMemo(() => {
+    const p = new URLSearchParams(urlParamsKey);
+    const location = p.get("location") || "London";
+    const today = new Date();
+    const defaultCheckIn = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 5);
+    const defaultCheckOut = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 8);
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
     return JSON.stringify({
       providerOverride,
-      location: resolvedSearch.location,
-      checkIn: resolvedSearch.checkIn,
-      checkOut: resolvedSearch.checkOut,
-      adults: resolvedSearch.adults,
-      children: resolvedSearch.children,
-      child_age: serializeHotelChildAges(resolvedSearch.child_age, resolvedSearch.rooms, resolvedSearch.children),
-      rooms: resolvedSearch.rooms,
-      hidden_id: resolvedSearch.hidden_id,
-      hidden_key: resolvedSearch.hidden_key,
-      branches: resolvedSearch.branches,
+      location,
+      checkIn: p.get("checkIn") || fmt(defaultCheckIn),
+      checkOut: p.get("checkOut") || fmt(defaultCheckOut),
+      adults: Math.max(1, Number(p.get("adults") || "2") || 2),
+      children: Math.max(0, Number(p.get("children") || "0") || 0),
+      rooms: Math.max(1, Number(p.get("rooms") || "1") || 1),
+      branches: p.get("branches") || "UK",
     });
-  }, [providerOverride, resolvedSearch]);
+  }, [providerOverride, urlParamsKey]);
 
   // Hydrate filters for this queryKey (so opening a hotel and coming back doesn't reset price slider).
   useEffect(() => {
@@ -616,8 +619,10 @@ function HotelsPageInner() {
     setHotelFiltersCache({ queryKey, filters: sanitizeHiddenHotelFilters(DEFAULT_FILTERS) });
   }, [hotelFiltersCache, queryKey, setHotelFiltersCache]);
 
+  const effectCancelledRef = useRef(false);
+
   useEffect(() => {
-    let cancelled = false;
+    effectCancelledRef.current = false;
 
     async function load() {
       if (!hasHydrated) return;
@@ -632,8 +637,11 @@ function HotelsPageInner() {
       const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
       const isCacheFresh = cacheAge < CACHE_TTL;
 
-      if (cache?.queryKey === queryKey && cache.hotels.length > 0 && isCacheFresh) {
-        if (!cancelled && requestSeq === activeRequestSeq.current) {
+      if (cache?.queryKey === queryKey && cache.hotels.length > 0) {
+        // Always restore cached results immediately so the user sees hotels while a background
+        // refresh runs (or if the refresh gets deduped/cancelled). Only skip the network fetch
+        // entirely when the cache is still fresh.
+        if (!effectCancelledRef.current && requestSeq === activeRequestSeq.current) {
           setHotels(cache.hotels);
           setSelectedHotelKey(cache.selectedHotelKey || (cache.hotels.length > 0 ? `${cache.hotels[0]?.id}-0` : ""));
           const metaFromCache: Record<string, any> = {};
@@ -706,7 +714,11 @@ function HotelsPageInner() {
           setLoadingMoreHotels(false);
           setHasAttemptedFetch(true);
         }
-        return;
+        if (isCacheFresh) {
+          // Cache is fresh enough — don't hit the network at all.
+          return;
+        }
+        // Cache is stale: continue below to trigger a background refresh.
       }
 
       if (isPackageMode) {
@@ -882,7 +894,7 @@ function HotelsPageInner() {
               setSearchRequestId(String(packageResponse.meta.requestId));
             }
 
-            if (!cancelled && requestSeq === activeRequestSeq.current) {
+            if (!effectCancelledRef.current && requestSeq === activeRequestSeq.current) {
               if (mappedHotels.length > 0) {
                 setHotels(mappedHotels);
                 setSelectedHotelKey(mappedHotels.length > 0 ? `${mappedHotels[0]?.id}-0` : "");
@@ -906,7 +918,7 @@ function HotelsPageInner() {
 
           applyPackageResponse(packageResponse);
 
-          if (!cancelled && requestSeq === activeRequestSeq.current) {
+          if (!effectCancelledRef.current && requestSeq === activeRequestSeq.current) {
             setLoading(false);
             setHasAttemptedFetch(true);
           }
@@ -916,9 +928,9 @@ function HotelsPageInner() {
             let latestRequestId = packageResponse.meta.requestId;
 
             for (let attempt = 0; attempt < HYBRID_MAX_POLLS; attempt += 1) {
-              if (cancelled || requestSeq !== activeRequestSeq.current) break;
+              if (requestSeq !== activeRequestSeq.current) break;
               await new Promise((resolve) => setTimeout(resolve, HYBRID_POLL_INTERVAL_MS));
-              if (cancelled || requestSeq !== activeRequestSeq.current) break;
+              if (requestSeq !== activeRequestSeq.current) break;
 
               try {
                 const polledPackageResponse = await packageService.searchPackages({
@@ -944,13 +956,13 @@ function HotelsPageInner() {
             }
           }
 
-          if (!cancelled && requestSeq === activeRequestSeq.current) {
+          if (requestSeq === activeRequestSeq.current) {
             setLoadingMoreHotels(false);
             setHasAttemptedFetch(true);
           }
         } catch (err) {
           console.error('[Hotels Page] Package search error:', err);
-          if (!cancelled && requestSeq === activeRequestSeq.current) {
+          if (requestSeq === activeRequestSeq.current) {
             setError(null);
             setHotels([]);
             setSelectedHotelKey("");
@@ -986,34 +998,6 @@ function HotelsPageInner() {
           throw new Error("No matching city/hotel found for the selected destination.");
         }
 
-        // Build a stable key from the resolved params that will actually be sent to the API.
-        // This prevents duplicate calls when setHotelSearch feedback changes queryKey but
-        // the real API parameters are identical.
-        const resolvedParamsKey = JSON.stringify({
-          providerOverride: providerOverride || undefined,
-          location: pick.label,
-          hidden_id: String(pick.id),
-          hidden_key: String(pick.loc),
-          checkIn: search.checkIn,
-          checkOut: search.checkOut,
-          rooms: search.rooms,
-          adults: search.adults,
-          children: search.children,
-          child_age: serializeHotelChildAges(search.child_age, search.rooms, search.children),
-          branches: search.branches,
-        });
-
-        if (resolvedParamsKey === lastFetchedParamsRef.current) {
-          // Same resolved params as the last in-flight/completed request — skip duplicate fetch.
-          if (!cancelled && requestSeq === activeRequestSeq.current) {
-            setLoading(false);
-            setHasAttemptedFetch(true);
-          }
-          return;
-        }
-        lastFetchedParamsRef.current = resolvedParamsKey;
-
-        // Clear stale results for a genuinely new search (after dedup check passed).
         setLoading(true);
         setLoadingMoreHotels(false);
         setError(null);
@@ -1217,7 +1201,12 @@ function HotelsPageInner() {
         };
 
         const applyAvailabilityToState = (parsed: ParsedAvailability) => {
-          if (cancelled || requestSeq !== activeRequestSeq.current) return;
+          // Only check requestSeq — not cancelled. The requestSeq check is sufficient to
+          // prevent stale updates (a new effect run increments activeRequestSeq). The
+          // cancelled flag was causing a bug where effect cleanup (e.g. Strict Mode
+          // double-mount) would discard fresh API results from an in-flight request.
+          const isStale = requestSeq !== activeRequestSeq.current;
+          if (isStale) return;
 
           const { mapped, meta, results, criteriaId, criteriaProvider } = parsed;
 
@@ -1303,12 +1292,13 @@ function HotelsPageInner() {
         };
 
         const parsedInitial = mapAvailability(availability);
-        if (cancelled || requestSeq !== activeRequestSeq.current) return;
+        // Only check requestSeq — not cancelled (same rationale as applyAvailabilityToState).
+        if (requestSeq !== activeRequestSeq.current) return;
         applyAvailabilityToState(parsedInitial);
 
         // As soon as we have the first batch, enable result interactions (filters/sort/cards)
         // while background polling continues to append/refresh results.
-        if (!cancelled && requestSeq === activeRequestSeq.current) {
+        if (requestSeq === activeRequestSeq.current) {
           setLoading(false);
           setHasAttemptedFetch(true);
         }
@@ -1325,10 +1315,10 @@ function HotelsPageInner() {
           let latestCriteriaId: number | string | null = parsedInitial.criteriaId;
 
           for (let attempt = 0; attempt < HYBRID_MAX_POLLS; attempt += 1) {
-            if (cancelled || requestSeq !== activeRequestSeq.current) break;
+            if (requestSeq !== activeRequestSeq.current) break;
             const pollDelayMs = isVyspaSearchCriteriaId(latestCriteriaId) ? HYBRID_POLL_INTERVAL_MS : 750;
             await new Promise((resolve) => setTimeout(resolve, pollDelayMs));
-            if (cancelled || requestSeq !== activeRequestSeq.current) break;
+            if (requestSeq !== activeRequestSeq.current) break;
             try {
               const polledAvailability = await hotelService.searchAvailabilityV3({
                 providerOverride: providerOverride || undefined,
@@ -1347,7 +1337,7 @@ function HotelsPageInner() {
               });
 
               const parsedPoll = mapAvailability(polledAvailability);
-              if (cancelled || requestSeq !== activeRequestSeq.current) break;
+              if (requestSeq !== activeRequestSeq.current) break;
 
               applyAvailabilityToState(parsedPoll);
               if (isVyspaSearchCriteriaId(parsedPoll.criteriaId)) {
@@ -1359,12 +1349,12 @@ function HotelsPageInner() {
               break;
             }
           }
-          if (!cancelled && requestSeq === activeRequestSeq.current) {
+          if (requestSeq === activeRequestSeq.current) {
             setLoadingMoreHotels(false);
           }
         }
       } catch (e: any) {
-        if (cancelled || requestSeq !== activeRequestSeq.current) return;
+        if (requestSeq !== activeRequestSeq.current) return;
         setError(e?.message || "Failed to fetch hotels");
         setLoadingMoreHotels(false);
         let shouldResetSearchState = false;
@@ -1381,7 +1371,7 @@ function HotelsPageInner() {
           setBreakfastByHotelId({});
         }
       } finally {
-        if (!cancelled && requestSeq === activeRequestSeq.current) {
+        if (requestSeq === activeRequestSeq.current) {
           setLoading(false);
           setLoadingMoreHotels(false);
           setHasAttemptedFetch(true);
@@ -1391,7 +1381,7 @@ function HotelsPageInner() {
 
     load();
     return () => {
-      cancelled = true;
+      effectCancelledRef.current = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- resolvedSearch accessed via ref to avoid loop
   }, [
@@ -1672,6 +1662,11 @@ function HotelsPageInner() {
 
     return sorted;
   }, [filters, hotelsWithSelectedMealPricing, hybridSupplierFilter, providerMode, resolvedSearch.location, sortMode]);
+
+  const visibleResultCount = useMemo(() => {
+    if (hiddenImageHotelIds.size === 0) return filteredHotels.length;
+    return filteredHotels.filter((h) => !hiddenImageHotelIds.has(h.id)).length;
+  }, [filteredHotels, hiddenImageHotelIds]);
 
   const displayedHotels = useMemo(() => {
     return filteredHotels.slice(0, displayedHotelsCount);
@@ -2076,7 +2071,7 @@ function HotelsPageInner() {
             {!loading && hotels.length > 0 && (
               <>
                 <HotelFiltersSidebar
-                  resultCount={filteredHotels.length}
+                  resultCount={visibleResultCount}
                   value={filters}
                   onChange={updateFilters}
                   onPriceModeChange={onPriceModeChange}
@@ -2099,7 +2094,7 @@ function HotelsPageInner() {
           {/* Results */}
           <main className="flex-1 min-w-0 flex flex-col gap-4">
             <HotelResultsToolbar
-              resultCount={filteredHotels.length}
+              resultCount={visibleResultCount}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
               sortMode={sortMode}
@@ -2124,7 +2119,7 @@ function HotelsPageInner() {
                 <div className="h-[calc(100vh-64px)] overflow-y-auto px-4 py-4">
                   {!loading && hotels.length > 0 ? (
                     <HotelFiltersSidebar
-                      resultCount={filteredHotels.length}
+                      resultCount={visibleResultCount}
                       value={filters}
                       onChange={updateFilters}
                       onPriceModeChange={onPriceModeChange}

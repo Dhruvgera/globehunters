@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import type { Hotel } from "@/types/hotel";
 import type { HotelViewMode } from "./HotelResultsToolbar";
 import { useBookingStore } from "@/store/bookingStore";
-import { serializeHotelChildAges } from "@/lib/hotels/childAges";
+import { encodeHotelSearchContext } from "@/lib/hotels/searchContextCodec";
 
 function getAmenityIcon(text: string) {
   const lower = text.toLowerCase();
@@ -92,8 +92,12 @@ export function HotelResultCard({
   if (srId != null && String(srId).trim() && String(srId) !== String(hotel.id)) detailParams.set("srId", String(srId));
   if (typeof provider === "string" && provider.trim()) detailParams.set("provider", provider.trim().toLowerCase());
   if (hotel.tyId) detailParams.set("tyId", hotel.tyId);
-  if (hotelSearch?.children && hotelSearch.child_age) {
-    detailParams.set("child_age", serializeHotelChildAges(hotelSearch.child_age, hotelSearch.rooms, hotelSearch.children));
+  if (hotelSearch) {
+    const encoded = encodeHotelSearchContext({
+      ...hotelSearch,
+      searchCriteriaId: hotelSearch.searchCriteriaId ?? (criteriaId != null ? (typeof criteriaId === "number" || typeof criteriaId === "string" ? criteriaId : undefined) : undefined),
+    });
+    if (encoded) detailParams.set("ctx", encoded);
   }
   if (isPackageMode) detailParams.set("type", "package");
   const hotelDetailUrl = detailParams.toString()

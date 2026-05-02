@@ -1,8 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import Image from "next/image";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -10,7 +8,6 @@ import {
   ChevronUp,
   ChevronDown,
   Star,
-  Grid3X3,
   Building2,
   Calendar,
   Plane,
@@ -29,7 +26,6 @@ import {
   Wind,
   Bath,
   X,
-  ChevronLeft,
   Loader2,
   MapPin,
 } from "lucide-react";
@@ -38,6 +34,7 @@ import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import HotelGallery from "@/components/hotels/HotelGallery";
 import { hotelService } from "@/services/api/hotelService";
 import { packageService } from "@/services/api/packageService";
 import { useBookingStore, useStoreHydration } from "@/store/bookingStore";
@@ -52,7 +49,9 @@ import {
   flattenHotelChildAges,
   serializeHotelChildAges,
 } from "@/lib/hotels/childAges";
-import { ensureGiataImageUrl, filterReachableImageUrls, fixStubaImageUrl } from "@/lib/hotels/imageUrl";
+import { ensureGiataImageUrl, fixStubaImageUrl } from "@/lib/hotels/imageUrl";
+import { syncPdpUrl } from "@/lib/hotels/syncPdpUrl";
+import { decodeHotelSearchContext } from "@/lib/hotels/searchContextCodec";
 import { convertHotelLocalTaxTotal, formatMoneyFromCode, normalizeCurrencyCode } from "@/lib/currency/localTaxDisplay";
 import { parsePackageHotelContent, type PackageHotelNearbyPlace } from "@/lib/package/hotelContent";
 import { usePackageDeeplink } from "@/hooks/usePackageDeeplink";
@@ -1019,7 +1018,7 @@ function resolveHotelResultId(result: unknown): string {
 export default function HotelRoomsPage() {
   const params = useParams();
   const hasHydrated = useStoreHydration();
-  
+
   const hotelId = params?.id as string;
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1053,6 +1052,76 @@ export default function HotelRoomsPage() {
   // Handle deeplink entry (packageKey/hotelKey URL params)
   usePackageDeeplink();
 
+  // Hydrate hotelSearch from URL params when the store is empty (fresh browser tab).
+  // This ensures the page can load rooms even without prior session state.
+  useEffect(() => {
+    if (!hasHydrated) return;
+    if (hotelSearch) return;
+    if (isPackageMode) return;
+    if (deeplinkViewData?.success) return;
+
+    const urlCtx = searchParams.get("ctx");
+    const decoded = urlCtx ? decodeHotelSearchContext(urlCtx) : null;
+
+    if (decoded) {
+      setHotelSearch({
+        ...decoded,
+        provider: decoded.provider ?? (urlProvider === "hotelbeds" || urlProvider === "vyspa" ? urlProvider as "hotelbeds" | "vyspa" : undefined),
+        searchCriteriaId: decoded.searchCriteriaId ?? (urlSearchCriteriaId ? (Number(urlSearchCriteriaId) || urlSearchCriteriaId) : undefined),
+      });
+      if (decoded.searchCriteriaId) {
+        setSearchRequestId(String(decoded.searchCriteriaId));
+      }
+      return;
+    }
+
+    const urlLocation = searchParams.get("location");
+    const urlHiddenId = searchParams.get("hidden_id");
+    const urlHiddenKey = searchParams.get("hidden_key");
+    const urlCheckIn = searchParams.get("checkIn");
+    const urlCheckOut = searchParams.get("checkOut");
+    const urlRooms = searchParams.get("rooms");
+    const urlAdults = searchParams.get("adults");
+    const urlChildren = searchParams.get("children");
+    const urlChildAge = searchParams.get("child_age");
+    const urlBranches = searchParams.get("branches");
+    const urlArrivalPointCode = searchParams.get("arrivalPointCode");
+
+    if (!urlSearchCriteriaId && !urlLocation) return;
+
+    const children = urlChildren != null ? Number(urlChildren) : 0;
+    const rooms = urlRooms != null ? Number(urlRooms) : 1;
+    const adults = urlAdults != null ? Number(urlAdults) : 2;
+
+    setHotelSearch({
+      provider: (urlProvider === "hotelbeds" || urlProvider === "vyspa") ? urlProvider as "hotelbeds" | "vyspa" : undefined,
+      location: urlLocation || "",
+      hidden_id: urlHiddenId || "",
+      hidden_key: urlHiddenKey || "",
+      checkIn: urlCheckIn || "",
+      checkOut: urlCheckOut || "",
+      rooms,
+      adults,
+      children,
+      child_age: urlChildAge ? buildHotelChildAgesFromFlat(
+        flattenHotelChildAges(
+          serializeHotelChildAges(urlChildAge, rooms, children),
+          rooms,
+          children
+        ),
+        rooms,
+        children,
+      ) : undefined,
+      branches: urlBranches || undefined,
+      searchCriteriaId: urlSearchCriteriaId ? (Number(urlSearchCriteriaId) || urlSearchCriteriaId) : undefined,
+      arrivalPointCode: urlArrivalPointCode || undefined,
+    });
+
+    if (urlSearchCriteriaId) {
+      setSearchRequestId(String(urlSearchCriteriaId));
+    }
+  }, [hasHydrated, hotelSearch, isPackageMode, deeplinkViewData?.success]);
+
   // State
   const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
@@ -1063,8 +1132,6 @@ export default function HotelRoomsPage() {
     image?: string;
     address?: string;
   } | null>(null);
-  const [galleryOpen, setGalleryOpen] = useState(false);
-  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [galleryImages, setGalleryImages] = useState<string[]>([]);
   const [detailsText, setDetailsText] = useState<string>("");
   const [cancellationText, setCancellationText] = useState<string>("");
@@ -1096,84 +1163,23 @@ export default function HotelRoomsPage() {
   const [rawGetRoomsV3Response, setRawGetRoomsV3Response] = useState<unknown>(null);
   const [rawAccommodationDetailsResponse, setRawAccommodationDetailsResponse] = useState<unknown>(null);
   const trustYouFetchKeyRef = useRef<string>("");
+  const lastRoomsLoadKeyRef = useRef<string>("");
   const isHotelDatesDebugMode = process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES === "true";
-  const brokenImageUrlsRef = useRef<Set<string>>(new Set());
-  const [brokenImageUrls, setBrokenImageUrls] = useState<Set<string>>(new Set());
-  const [loadedImageUrls, setLoadedImageUrls] = useState<Set<string>>(new Set());
+  const checkoutRef = useRef<HTMLInputElement>(null)
 
-  const markImageBroken = useCallback((url: string) => {
-    if (!url || brokenImageUrlsRef.current.has(url)) return;
-    brokenImageUrlsRef.current.add(url);
-    setBrokenImageUrls((prev) => new Set(prev).add(url));
-  }, []);
-
-  const markImageLoaded = useCallback((url: string) => {
-    if (!url) return;
-    setLoadedImageUrls((prev) => {
-      if (prev.has(url)) return prev;
-      return new Set(prev).add(url);
-    });
-  }, []);
-
-  const galleryImagesFiltered = useMemo(
-    () => galleryImages.filter((url) => !brokenImageUrls.has(url)),
-    [galleryImages, brokenImageUrls]
-  );
-
-  const headerImageOk = useMemo(() => {
-    const url = remoteHotelHeader?.image;
-    return url && !brokenImageUrls.has(url) ? url : "";
-  }, [remoteHotelHeader?.image, brokenImageUrls]);
+  // Reset rooms-load dedup guard when navigating to a different hotel,
+  // or when hotelSearch transitions from null to populated (URL hydration).
+  const prevHotelSearchRef = useRef(hotelSearch);
+  useEffect(() => {
+    if (!prevHotelSearchRef.current && hotelSearch) {
+      lastRoomsLoadKeyRef.current = "";
+    }
+    prevHotelSearchRef.current = hotelSearch;
+  }, [hotelSearch]);
 
   useEffect(() => {
-    const toCheck: string[] = [];
-    const known = brokenImageUrlsRef.current;
-    for (const url of galleryImages) {
-      if (url && !known.has(url)) toCheck.push(url);
-    }
-    const headerUrl = remoteHotelHeader?.image;
-    if (headerUrl && !known.has(headerUrl) && !toCheck.includes(headerUrl)) {
-      toCheck.push(headerUrl);
-    }
-    if (toCheck.length === 0) return;
-    let cancelled = false;
-    filterReachableImageUrls(toCheck, { maxValid: 5 }).then(({ valid, checked }) => {
-      if (cancelled) return;
-      // Only mark URLs that were actually checked AND failed.
-      // Unchecked URLs (past the maxValid cutoff) must NOT be treated as broken.
-      const broken = checked.filter((url) => !valid.includes(url));
-      if (broken.length === 0) return;
-      broken.forEach((url) => {
-        markImageBroken(url);
-      });
-    });
-    return () => { cancelled = true; };
-  }, [galleryImages, remoteHotelHeader?.image, markImageBroken]);
-
-  useEffect(() => {
-    if (!galleryOpen) return;
-    const toCheck: string[] = [];
-    const known = brokenImageUrlsRef.current;
-    for (const url of galleryImages) {
-      if (url && !known.has(url)) toCheck.push(url);
-    }
-    const headerUrl = remoteHotelHeader?.image;
-    if (headerUrl && !known.has(headerUrl) && !toCheck.includes(headerUrl)) {
-      toCheck.push(headerUrl);
-    }
-    if (toCheck.length === 0) return;
-    let cancelled = false;
-    filterReachableImageUrls(toCheck).then(({ valid, checked }) => {
-      if (cancelled) return;
-      const broken = checked.filter((url) => !valid.includes(url));
-      if (broken.length === 0) return;
-      broken.forEach((url) => {
-        known.add(url);
-        markImageBroken(url);
-      });
-    });
-    return () => { cancelled = true; };
-  }, [galleryOpen, galleryImages, remoteHotelHeader?.image, markImageBroken]);
+    lastRoomsLoadKeyRef.current = "";
+  }, [hotelId]);
 
   useEffect(() => {
     // Keep local editor state in sync with global search state when navigating between hotels.
@@ -1302,6 +1308,50 @@ export default function HotelRoomsPage() {
     return { hotelImages: Array.from(new Set(hotelImages)), roomImages: dedupedRoomImages };
   }
 
+  async function updateAvailabilityFromDateChanges(next: {
+    checkIn: string;
+    checkOut: string;
+    adults: number;
+    children: number;
+    rooms: number;
+    childAges: number[];
+  }) {
+    try {
+      setStayUpdateLoading(true);
+      setRoomsError(null);
+      setRoomsLoading(true);
+      let retries = 1;
+      let searchResultsSuccess = await runStaySearch(next);
+
+      while (retries < 5 && !searchResultsSuccess) {
+        searchResultsSuccess = await runStaySearch(next);
+        retries++;
+      }
+
+      // Sync URL with the new search context so refreshes / shares use the correct criteria.
+      const latestState = useBookingStore.getState();
+      const latestMeta = latestState.hotelResultsMeta?.[hotelId];
+      syncPdpUrl({
+        router,
+        hotelId,
+        searchParams: new URLSearchParams(searchParams?.toString() || ""),
+        searchCriteriaId: latestState.hotelSearch?.searchCriteriaId,
+        provider: latestState.hotelSearch?.provider,
+        srId: latestMeta?.srId || latestMeta?.searchResultId,
+        prevSearchCriteriaId: urlSearchCriteriaId,
+        prevSrId: urlSrId,
+        hotelSearch: latestState.hotelSearch,
+      });
+
+      setStayEditorOpen(false);
+    } catch (e: any) {
+      setRoomsError(e?.message || "Failed to update availability");
+    } finally {
+      setRoomsLoading(false);
+      setStayUpdateLoading(false);
+    }
+  }
+
   async function runStaySearch(next: {
     checkIn: string;
     checkOut: string;
@@ -1313,7 +1363,6 @@ export default function HotelRoomsPage() {
     if (!hotelSearch?.location || !hotelSearch?.hidden_id || !hotelSearch?.hidden_key) {
       throw new Error("Missing search context (destination) to update availability.");
     }
-
     const availability = await hotelService.searchAvailabilityV3({
       location: hotelSearch.location,
       hidden_id: hotelSearch.hidden_id,
@@ -1326,12 +1375,24 @@ export default function HotelRoomsPage() {
       child_age: buildHotelChildAgesFromFlat(next.childAges, next.rooms, next.children),
       branches: hotelSearch.branches,
     });
+    const shouldPollMore =
+      (availability.Criteria?.provider === "hybrid" || availability.Criteria?.provider === "vyspa") &&
+      (
+        availability.Criteria?.searchComplete === false && availability.Results?.length === 0)
+
 
     const availabilityRow = asRecord(availability);
     const criteriaIdAny = asRecord(availabilityRow.Criteria).searchCriteriaId;
     const criteriaId =
       typeof criteriaIdAny === "number" || typeof criteriaIdAny === "string" ? criteriaIdAny : null;
-    if (!criteriaId) throw new Error("No searchCriteriaId returned from availability search.");
+    if (!criteriaId) {
+      if (shouldPollMore) {
+        return false;
+
+      }
+      setStayEditorOpen(false);
+      throw new Error("No searchCriteriaId returned from availability search.");
+    }
     const results = asArray(availabilityRow.Results);
     const hit = results.find((row) => resolveHotelResultId(row) === String(hotelId));
     const hitRow = asRecord(hit);
@@ -1363,7 +1424,6 @@ export default function HotelRoomsPage() {
       searchCriteriaId: effectiveSearchCriteriaId,
       arrivalPointCode: hotelSearch.arrivalPointCode,
     });
-
     setSearchRequestId(
       typeof effectiveSearchCriteriaId === "string"
         ? shortWebRefFromToken(effectiveSearchCriteriaId)
@@ -1399,7 +1459,9 @@ export default function HotelRoomsPage() {
         rawSearchResult: hitRow ?? nextMeta[String(hotelId)]?.rawSearchResult,
       };
       setHotelResultsMeta(nextMeta);
+      return true;
     }
+    return false;
   }
 
   function parseRemoteDataXml(remoteData: string) {
@@ -1637,7 +1699,7 @@ export default function HotelRoomsPage() {
       setTrustYouReview(data.review as TrustYouHotelReviewSummary);
     };
 
-    run().catch(() => {});
+    run().catch(() => { });
 
     return () => {
       cancelled = true;
@@ -1692,8 +1754,8 @@ export default function HotelRoomsPage() {
     return {
       name: remoteHotelHeader?.name || "",
       starRating: remoteHotelHeader?.rating || 0,
-      mainImage: headerImageOk || galleryImagesFiltered[0] || "",
-      galleryImages: galleryImagesFiltered.length > 0 ? galleryImagesFiltered : (headerImageOk ? [headerImageOk] : []),
+      mainImage: remoteHotelHeader?.image || galleryImages[0] || "",
+      galleryImages: galleryImages.length > 0 ? galleryImages : (remoteHotelHeader?.image ? [remoteHotelHeader.image] : []),
       address: remoteHotelHeader?.address || "",
       about: {
         description: sanitizeHotelText(detailsText || ""),
@@ -1718,8 +1780,7 @@ export default function HotelRoomsPage() {
     cancellationText,
     coordinates,
     detailsText,
-    galleryImagesFiltered,
-    headerImageOk,
+    galleryImages,
     importantInfoText,
     nearbyPlaces,
     remoteAmenities,
@@ -1820,9 +1881,9 @@ export default function HotelRoomsPage() {
 
     return fallback.amount != null
       ? {
-          amount: fallback.amount,
-          currency: fallback.currency,
-        }
+        amount: fallback.amount,
+        currency: fallback.currency,
+      }
       : null;
   }, [
     activePackageRoom?.price?.currency,
@@ -1839,9 +1900,9 @@ export default function HotelRoomsPage() {
   const packagePerPersonLabel =
     resolvedPackagePrice?.amount != null
       ? formatDisplayPrice(
-          resolvedPackagePrice.currency,
-          calculatePackagePerPersonPrice(resolvedPackagePrice.amount, packageSearch?.rooms)
-        )
+        resolvedPackagePrice.currency,
+        calculatePackagePerPersonPrice(resolvedPackagePrice.amount, packageSearch?.rooms)
+      )
       : "";
   const reviews: Array<{
     id: string;
@@ -1908,7 +1969,7 @@ export default function HotelRoomsPage() {
     let cancelled = false;
 
     async function loadRooms() {
-       if(!hasHydrated){
+      if (!hasHydrated) {
         return;
       }
       // ─── Deeplink view data path (self-contained, no session needed) ───
@@ -2055,7 +2116,7 @@ export default function HotelRoomsPage() {
                     fetchedAt: Date.now(),
                   });
                 })
-                .catch(() => {});
+                .catch(() => { });
             }
 
             if (!cancelled) {
@@ -2084,8 +2145,15 @@ export default function HotelRoomsPage() {
         urlProvider === "hotelbeds" || urlProvider === "vyspa" ? (urlProvider as "hotelbeds" | "vyspa") : undefined;
       let effectiveProvider: "vyspa" | "hotelbeds" =
         urlProviderNormalized || metaProvider || (hotelSearch?.provider === "hotelbeds" ? "hotelbeds" : "vyspa");
-      let effectiveSearchCriteriaId = urlSearchCriteriaId ?? meta?.searchCriteriaId ?? hotelSearch?.searchCriteriaId;
+      let effectiveSearchCriteriaId = hotelSearch?.searchCriteriaId ?? urlSearchCriteriaId ?? meta?.searchCriteriaId;
       if (!effectiveSearchCriteriaId) return;
+
+      const srId = urlSrId || meta?.srId || meta?.searchResultId;
+      const roomsLoadKey = `${hotelId}|${effectiveProvider}|${String(effectiveSearchCriteriaId)}|${srId || ""}|${isPackageMode ? "pkg" : "std"}`;
+      if (lastRoomsLoadKeyRef.current === roomsLoadKey) {
+        return;
+      }
+      lastRoomsLoadKeyRef.current = roomsLoadKey;
 
       // 🔍 DIAGNOSTIC: log why loadRooms effect fired
       console.log("[loadRooms] effect fired", {
@@ -2104,7 +2172,7 @@ export default function HotelRoomsPage() {
       setRoomsError(null);
 
       try {
-        if (isPackageMode) {  
+        if (isPackageMode) {
           const packageHotel = packageResults?.find((row) => String(row.id) === String(hotelId));
           const roomResponse = await packageService.getPackageRooms({
             hotelResultId: Number(hotelId),
@@ -2291,7 +2359,9 @@ export default function HotelRoomsPage() {
 
           return;
         }
+        /** standard hotel flow starts */
 
+        /**extracting initial results from search results */
         if (searchResultSeed.description) {
           setDetailsText((previous) => (previous.trim() ? previous : searchResultSeed.description));
         }
@@ -2308,7 +2378,6 @@ export default function HotelRoomsPage() {
           setCoordinates((previous) => previous || searchResultSeed.coordinates);
         }
 
-        const srId = urlSrId || meta?.srId || meta?.searchResultId;
         const rawResult = asRecord(meta?.rawSearchResult);
         const hbMeta = asRecord(rawResult._hotelbeds);
         const dedupeMeta = asRecord(rawResult._dedupe);
@@ -2445,7 +2514,7 @@ export default function HotelRoomsPage() {
             ? [respAny?.address1, respAny?.address2].filter(Boolean).join(", ")
             : meta?.address1 || meta?.address2
               ? [meta?.address1, meta?.address2].filter(Boolean).join(", ")
-            : undefined;
+              : undefined;
         const useGetRoomsContent = effectiveProvider !== "hotelbeds";
         const getRoomsDescription = useGetRoomsContent
           ? sanitizeHotelText(respAny?.quickDescription ?? respAny?.description ?? "")
@@ -2529,7 +2598,7 @@ export default function HotelRoomsPage() {
               const desc = typeof data?.description === "string" ? data.description.trim() : "";
               if (desc) setDetailsText(desc);
             })
-            .catch(() => {});
+            .catch(() => { });
         }
 
         // Real schema (seen in stage): rooms.room1options[] with {id, room_name, meal_name, cust_tot_sell_amt, net_price, nonRef, ...}
@@ -3023,189 +3092,13 @@ export default function HotelRoomsPage() {
                 return null;
               })()}
 
-              {/* Image Gallery - Main image left, 3 thumbnails stacked right */}
-              <div className="flex flex-col lg:flex-row gap-3">
-                {(() => {
-                  const firstIsMain = hotel.galleryImages?.[0] === hotel.mainImage;
-                  const thumbImages = firstIsMain ? (hotel.galleryImages || []).slice(1, 4) : (hotel.galleryImages || []).slice(0, 3);
-
-                  return (
-                    <>
-                      {/* Main Image */}
-                      <div
-                        className="relative min-h-[300px] lg:min-h-[450px] flex-[2] rounded-2xl overflow-hidden cursor-pointer group"
-                        onClick={() => {
-                          if (hotel.galleryImages.length > 0) {
-                            setCurrentPhotoIndex(0);
-                            setGalleryOpen(true);
-                          }
-                        }}
-                      >
-                        {hotel.mainImage ? (
-                          <Image
-                            src={hotel.mainImage}
-                            alt={hotel.name}
-                            fill
-                            className="object-cover transition-transform duration-500 group-hover:scale-105"
-                            priority
-                            onError={() => markImageBroken(hotel.mainImage)}
-                          />
-                        ) : (
-                          <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-[#EEEEF2] to-[#E2E2E8]" />
-                        )}
-                        {/* Show All Photos Button - Bottom left of main image */}
-                        {hotel.galleryImages.length > 0 && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setGalleryOpen(true);
-                            }}
-                            className="absolute bottom-4 left-4 flex items-center gap-2 px-4 py-2 rounded-lg bg-white/90 backdrop-blur-sm hover:bg-white transition-all shadow-sm hover-shadow-md"
-                          >
-                            <Grid3X3 className="w-4 h-4 text-[#010D50]" />
-                            <span className="text-sm font-medium text-[#010D50]">Show All Photos</span>
-                          </button>
-                        )}
-                      </div>
-
-                      {/* Thumbnail column — always rendered to prevent layout shift */}
-                      <div className="flex flex-row lg:flex-col gap-3 lg:w-[220px]">
-                        {[0, 1, 2].map((idx) => {
-                          const img = thumbImages[idx];
-                          if (!img) {
-                            // Skeleton placeholder for unfilled slots
-                            return (
-                              <div
-                                key={`skeleton-${idx}`}
-                                className="relative flex-1 lg:flex-none lg:h-[140px] min-h-[100px] rounded-xl overflow-hidden animate-pulse bg-gradient-to-br from-[#EEEEF2] to-[#E2E2E8]"
-                              />
-                            );
-                          }
-                          const imgIndex = firstIsMain ? idx + 1 : idx;
-                          const isLoaded = loadedImageUrls.has(img);
-                          return (
-                            <div
-                              key={`${img}-${idx}`}
-                              className="relative flex-1 lg:flex-none lg:h-[140px] min-h-[100px] rounded-xl overflow-hidden bg-[#F6F6F6] cursor-pointer group"
-                              onClick={() => {
-                                setCurrentPhotoIndex(imgIndex);
-                                setGalleryOpen(true);
-                              }}
-                            >
-                              {/* Shimmer placeholder */}
-                              {!isLoaded && (
-                                <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-[#EEEEF2] to-[#E2E2E8]" />
-                              )}
-                              <Image
-                                src={img}
-                                alt={`${hotel.name} - ${idx + 1}`}
-                                fill
-                                className={`object-cover transition-all duration-500 group-hover:scale-110 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
-                                onLoad={() => markImageLoaded(img)}
-                                onError={() => markImageBroken(img)}
-                              />
-                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
+              <HotelGallery
+                images={hotel.galleryImages}
+                mainImage={hotel.mainImage}
+                hotelName={hotel.name}
+              />
             </div>
           </div>
-
-          <Dialog open={galleryOpen} onOpenChange={setGalleryOpen}>
-            <DialogContent className="max-w-none w-screen h-screen p-0 bg-black/95 border-none rounded-none overflow-hidden z-[9999]">
-              <div className="relative w-full h-full flex flex-col pt-12 pb-24">
-                {/* Close Button */}
-                <button
-                  onClick={() => setGalleryOpen(false)}
-                  className="absolute top-6 right-6 z-50 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all backdrop-blur-md border border-white/20 group"
-                >
-                  <X className="w-6 h-6 transition-transform group-hover:scale-110" />
-                </button>
-
-                {/* Main Viewer Area */}
-                <div className="flex-1 relative flex items-center justify-center px-4 overflow-hidden">
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={currentPhotoIndex}
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      transition={{ duration: 0.3, ease: "easeOut" }}
-                      className="relative w-full h-full max-w-6xl max-h-[80vh] rounded-2xl overflow-hidden shadow-2xl"
-                    >
-                      <Image
-                        src={hotel.galleryImages[currentPhotoIndex]}
-                        alt={`Photo ${currentPhotoIndex + 1}`}
-                        fill
-                        className="object-contain"
-                        sizes="100vw"
-                        onError={() => markImageBroken(hotel.galleryImages[currentPhotoIndex])}
-                      />
-                    </motion.div>
-                  </AnimatePresence>
-
-                  {/* Navigation Arrows */}
-                  {hotel.galleryImages.length > 1 && (
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCurrentPhotoIndex((prev) => (prev > 0 ? prev - 1 : hotel.galleryImages.length - 1));
-                        }}
-                        className="absolute left-6 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all backdrop-blur-md border border-white/20 group hidden md:block"
-                      >
-                        <ChevronLeft className="w-8 h-8 transition-transform group-hover:-translate-x-1" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setCurrentPhotoIndex((prev) => (prev < hotel.galleryImages.length - 1 ? prev + 1 : 0));
-                        }}
-                        className="absolute right-6 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all backdrop-blur-md border border-white/20 group hidden md:block"
-                      >
-                        <ChevronRight className="w-8 h-8 transition-transform group-hover:translate-x-1" />
-                      </button>
-                    </>
-                  )}
-
-                  {/* Photo Counter */}
-                  <div className="absolute top-6 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-white/90 text-sm font-medium">
-                    {currentPhotoIndex + 1} / {hotel.galleryImages.length}
-                  </div>
-                </div>
-
-                {/* Thumbnail Strip */}
-                <div className="absolute bottom-0 left-0 right-0 h-32 bg-black/40 backdrop-blur-md border-t border-white/10 p-4">
-                  <div className="flex items-center justify-center gap-3 overflow-x-auto pb-2 h-full scrollbar-hide">
-                    {hotel.galleryImages.map((img: string, idx: number) => (
-                      <button
-                        key={`${img}-${idx}`}
-                        onClick={() => setCurrentPhotoIndex(idx)}
-                        className={`relative h-20 aspect-[4/3] rounded-lg overflow-hidden flex-shrink-0 transition-all duration-300 ${currentPhotoIndex === idx
-                          ? "ring-2 ring-[#3754ED] scale-110 translate-y-[-4px] opacity-100"
-                          : "opacity-40 hover:opacity-100"
-                          }`}
-                      >
-                        <Image
-                          src={img}
-                          alt={`Thumbnail ${idx + 1}`}
-                          fill
-                          className="object-cover"
-                          onError={() => markImageBroken(img)}
-                        />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
 
           {/* Content Grid */}
           <div className="p-4 lg:p-6 space-y-8">
@@ -3446,24 +3339,14 @@ export default function HotelRoomsPage() {
                 <Button
                   variant="default"
                   className="flex items-center gap-2 px-6 py-3 h-auto rounded-full bg-[#3754ED] hover:bg-[#2A3FB8] text-white font-bold"
-                  onClick={async () => {
-                    try {
-                      setRoomsError(null);
-                      setRoomsLoading(true);
-                      await runStaySearch({
-                        checkIn: stayCheckIn,
-                        checkOut: stayCheckOut,
-                        adults: stayAdults,
-                        children: stayChildren,
-                        rooms: stayRooms,
-                        childAges: stayChildAges,
-                      });
-                    } catch (e: any) {
-                      setRoomsError(e?.message || "Failed to update availability");
-                    } finally {
-                      setRoomsLoading(false);
-                    }
-                  }}
+                  onClick={async () => updateAvailabilityFromDateChanges({
+                    checkIn: stayCheckIn,
+                    checkOut: stayCheckOut,
+                    adults: stayAdults,
+                    children: stayChildren,
+                    rooms: stayRooms,
+                    childAges: stayChildAges,
+                  })}
                 >
                   Search
                 </Button>
@@ -3482,7 +3365,11 @@ export default function HotelRoomsPage() {
                       <input
                         type="date"
                         value={stayCheckIn}
-                        onChange={(e) => setStayCheckIn(e.target.value)}
+                        onChange={(e) => {
+                          setStayCheckIn(e.target.value)
+                          if (checkoutRef.current)
+                            checkoutRef.current.showPicker();
+                        }}
                         disabled={stayUpdateLoading}
                         className="border border-[#DFE0E4] rounded-lg px-3 py-2 bg-white text-[#010D50]"
                       />
@@ -3492,6 +3379,7 @@ export default function HotelRoomsPage() {
                       <input
                         type="date"
                         value={stayCheckOut}
+                        ref={checkoutRef}
                         onChange={(e) => setStayCheckOut(e.target.value)}
                         disabled={stayUpdateLoading}
                         className="border border-[#DFE0E4] rounded-lg px-3 py-2 bg-white text-[#010D50]"
@@ -3575,27 +3463,14 @@ export default function HotelRoomsPage() {
                       Cancel
                     </Button>
                     <Button
-                      onClick={async () => {
-                        try {
-                          setStayUpdateLoading(true);
-                          setRoomsError(null);
-                          setRoomsLoading(true);
-                          await runStaySearch({
-                            checkIn: stayCheckIn,
-                            checkOut: stayCheckOut,
-                            adults: stayAdults,
-                            children: stayChildren,
-                            rooms: stayRooms,
-                            childAges: stayChildAges,
-                          });
-                          setStayEditorOpen(false);
-                        } catch (e: any) {
-                          setRoomsError(e?.message || "Failed to update availability");
-                        } finally {
-                          setRoomsLoading(false);
-                          setStayUpdateLoading(false);
-                        }
-                      }}
+                      onClick={async () => updateAvailabilityFromDateChanges({
+                        checkIn: stayCheckIn,
+                        checkOut: stayCheckOut,
+                        adults: stayAdults,
+                        children: stayChildren,
+                        rooms: stayRooms,
+                        childAges: stayChildAges,
+                      })}
                       disabled={stayUpdateLoading}
                       className="bg-[#3754ED] hover:bg-[#2A3FB8]"
                     >
@@ -3645,11 +3520,10 @@ export default function HotelRoomsPage() {
                           key={board}
                           type="button"
                           onClick={() => setFilterBoardQuery(board)}
-                          className={`px-3 py-1.5 text-xs rounded-full border ${
-                            filterBoardQuery.trim().toLowerCase() === board.toLowerCase()
-                              ? "bg-[#3754ED] text-white border-[#3754ED]"
-                              : "bg-white text-[#010D50] border-[#DFE0E4]"
-                          }`}
+                          className={`px-3 py-1.5 text-xs rounded-full border ${filterBoardQuery.trim().toLowerCase() === board.toLowerCase()
+                            ? "bg-[#3754ED] text-white border-[#3754ED]"
+                            : "bg-white text-[#010D50] border-[#DFE0E4]"
+                            }`}
                         >
                           {board}
                         </button>
@@ -3734,8 +3608,8 @@ export default function HotelRoomsPage() {
                     const cancellationRow = firstCancellation as Record<string, unknown>;
                     return sanitizeHotelText(
                       cancellationRow.policy ??
-                        cancellationRow.description ??
-                        cancellationRow.text
+                      cancellationRow.description ??
+                      cancellationRow.text
                     );
                   })();
                   const roomCancellationSummary = roomCancellationPolicy || hbCancellationSummary;
