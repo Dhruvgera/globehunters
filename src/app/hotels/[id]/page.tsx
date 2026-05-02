@@ -1091,8 +1091,14 @@ export default function HotelRoomsPage() {
   const [rawGetRoomsV3Response, setRawGetRoomsV3Response] = useState<unknown>(null);
   const [rawAccommodationDetailsResponse, setRawAccommodationDetailsResponse] = useState<unknown>(null);
   const trustYouFetchKeyRef = useRef<string>("");
+  const lastRoomsLoadKeyRef = useRef<string>("");
   const isHotelDatesDebugMode = process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES === "true";
   const checkoutRef = useRef<HTMLInputElement>(null)
+
+  // Reset rooms-load dedup guard when navigating to a different hotel.
+  useEffect(() => {
+    lastRoomsLoadKeyRef.current = "";
+  }, [hotelId]);
 
   useEffect(() => {
     // Keep local editor state in sync with global search state when navigating between hotels.
@@ -1234,26 +1240,41 @@ export default function HotelRoomsPage() {
       setRoomsError(null);
       setRoomsLoading(true);
       let retries = 1;
-      let searchResultsSuccess = await runStaySearch({
-        checkIn: stayCheckIn,
-        checkOut: stayCheckOut,
-        adults: stayAdults,
-        children: stayChildren,
-        rooms: stayRooms,
-        childAges: stayChildAges,
-      });
+      let searchResultsSuccess = await runStaySearch(next);
 
       while (retries < 5 && !searchResultsSuccess) {
-        searchResultsSuccess = await runStaySearch({
-          checkIn: stayCheckIn,
-          checkOut: stayCheckOut,
-          adults: stayAdults,
-          children: stayChildren,
-          rooms: stayRooms,
-          childAges: stayChildAges,
-        });
+        searchResultsSuccess = await runStaySearch(next);
         retries++;
       }
+
+      // Sync URL with the new search context so refreshes / shares use the correct criteria.
+      const latestState = useBookingStore.getState();
+      const latestMeta = latestState.hotelResultsMeta?.[hotelId];
+      const latestCriteriaId = latestState.hotelSearch?.searchCriteriaId;
+      const latestProvider = latestState.hotelSearch?.provider;
+      const latestSrId = latestMeta?.srId || latestMeta?.searchResultId;
+
+      const params = new URLSearchParams(searchParams?.toString() || "");
+      if (latestCriteriaId != null) {
+        params.set("searchCriteriaId", String(latestCriteriaId));
+      } else {
+        params.delete("searchCriteriaId");
+      }
+      if (latestProvider) {
+        params.set("provider", latestProvider);
+      } else {
+        params.delete("provider");
+      }
+      if (latestSrId) {
+        params.set("srId", String(latestSrId));
+      } else {
+        params.delete("srId");
+      }
+      if (String(latestCriteriaId) !== String(urlSearchCriteriaId) ||
+          String(latestSrId ?? "") !== String(urlSrId ?? "")) {
+        router.replace(`/hotels/${hotelId}?${params.toString()}`, { scroll: false });
+      }
+
       setStayEditorOpen(false);
     } catch (e: any) {
       setRoomsError(e?.message || "Failed to update availability");
@@ -2059,6 +2080,13 @@ export default function HotelRoomsPage() {
       let effectiveSearchCriteriaId = hotelSearch?.searchCriteriaId ?? urlSearchCriteriaId ?? meta?.searchCriteriaId;
       if (!effectiveSearchCriteriaId) return;
 
+      const srId = urlSrId || meta?.srId || meta?.searchResultId;
+      const roomsLoadKey = `${hotelId}|${effectiveProvider}|${String(effectiveSearchCriteriaId)}|${srId || ""}|${isPackageMode ? "pkg" : "std"}`;
+      if (lastRoomsLoadKeyRef.current === roomsLoadKey) {
+        return;
+      }
+      lastRoomsLoadKeyRef.current = roomsLoadKey;
+
       // 🔍 DIAGNOSTIC: log why loadRooms effect fired
       console.log("[loadRooms] effect fired", {
         hotelId,
@@ -2282,7 +2310,6 @@ export default function HotelRoomsPage() {
           setCoordinates((previous) => previous || searchResultSeed.coordinates);
         }
 
-        const srId = urlSrId || meta?.srId || meta?.searchResultId;
         const rawResult = asRecord(meta?.rawSearchResult);
         const hbMeta = asRecord(rawResult._hotelbeds);
         const dedupeMeta = asRecord(rawResult._dedupe);
