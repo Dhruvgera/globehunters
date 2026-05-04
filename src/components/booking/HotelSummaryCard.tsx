@@ -11,6 +11,7 @@ import {
   formatMoneyFromCode,
   type ConvertedHotelLocalTaxRow,
 } from "@/lib/currency/localTaxDisplay";
+import { formatPrice } from "@/lib/currency";
 
 function formatDateLabel(d?: string): string {
   const s = String(d || "").slice(0, 10);
@@ -20,11 +21,14 @@ function formatDateLabel(d?: string): string {
 }
 
 function formatMoney(currency: string | undefined, amount: number | undefined) {
-  const c = currency || "";
   const a = typeof amount === "number" ? amount : undefined;
   if (a == null || Number.isNaN(a)) return "—";
-  if (c === "£" || c === "$" || c === "€") return `${c}${a.toFixed(2)}`;
-  return c ? `${c} ${a.toFixed(2)}` : a.toFixed(2);
+  const normalized = String(currency || "GBP").trim().toUpperCase();
+  const symbolToCode: Record<string, string> = { "£": "GBP", "$": "USD", "€": "EUR" };
+  const currencyCode = symbolToCode[normalized] || normalized;
+  return /^[A-Z]{3}$/.test(currencyCode) || symbolToCode[normalized]
+    ? formatPrice(a, currencyCode)
+    : `${String(currency || "£").trim()}${a.toFixed(2)}`;
 }
 
 interface HotelSummaryCardProps {
@@ -114,7 +118,7 @@ export function HotelSummaryCard(props: HotelSummaryCardProps) {
             {display.address || "Content missing from API: address"}
           </div>
           <div className="text-xs text-[#3A478A] mt-1">
-            {formatDateLabel(hotelSearch?.checkIn)} → {formatDateLabel(hotelSearch?.checkOut)}
+            Check-In: {formatDateLabel(hotelSearch?.checkIn)} | Check-Out: {formatDateLabel(hotelSearch?.checkOut)}
           </div>
           {isHotelDatesDebugMode && (
             <div className="mt-1 text-[10px] font-mono text-orange-600 bg-orange-50 px-1 py-0.5 rounded w-fit">

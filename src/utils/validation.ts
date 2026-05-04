@@ -320,9 +320,11 @@ export function validatePostalCode(postalCode: string, country?: string): boolea
  */
 export function validatePassenger(
   passenger: Passenger, 
-  passengerType?: 'adult' | 'child' | 'infant'
+  passengerType?: 'adult' | 'child' | 'infant',
+  options: { requireContactInfo?: boolean } = {}
 ): PassengerFormErrors {
   const errors: PassengerFormErrors = {};
+  const requireContactInfo = options.requireContactInfo ?? true;
 
   if (!validateName(passenger.firstName)) {
     errors.firstName = 'Please enter a valid first name';
@@ -339,11 +341,11 @@ export function validatePassenger(
     errors.dateOfBirth = dobValidation.error || 'Please enter a valid date of birth';
   }
 
-  if (!validateEmail(passenger.email)) {
+  if ((requireContactInfo || passenger.email) && !validateEmail(passenger.email)) {
     errors.email = 'Please enter a valid email address';
   }
 
-  if (!validatePhone(passenger.phone)) {
+  if ((requireContactInfo || passenger.phone) && !validatePhone(passenger.phone)) {
     errors.phone = 'Enter exactly 10 digits without leading zero (e.g. 7678452537)';
   }
 

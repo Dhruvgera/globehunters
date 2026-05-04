@@ -455,6 +455,20 @@ export default function FlightInfoModal({
                   <span className="text-sm text-[#3A478A]">
                     {`Flight ${normalizedIndex + 1} of ${journeySegments.length}`}
                   </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                    <div className="rounded-lg bg-[#F5F7FF] px-3 py-2">
+                      <span className="font-semibold text-[#010D50]">Origin: </span>
+                      <span className="text-[#3A478A]">
+                        {getAirportName(currentLeg.departureAirport.code, currentLeg.departureAirport.name, currentLeg.departureAirport.city)} ({currentLeg.departureAirport.code})
+                      </span>
+                    </div>
+                    <div className="rounded-lg bg-[#F5F7FF] px-3 py-2">
+                      <span className="font-semibold text-[#010D50]">Destination: </span>
+                      <span className="text-[#3A478A]">
+                        {getAirportName(currentLeg.arrivalAirport.code, currentLeg.arrivalAirport.name, currentLeg.arrivalAirport.city)} ({currentLeg.arrivalAirport.code})
+                      </span>
+                    </div>
+                  </div>
 
                   {/* Flight Card */}
                   <div className="bg-[#F5F7FF] rounded-xl p-3 sm:p-4 flex flex-col gap-4 sm:gap-6 max-w-full overflow-hidden">

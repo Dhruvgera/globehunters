@@ -611,7 +611,7 @@ function PackageTravellerDetailsInner() {
         return;
       }
 
-      const validationErrors = validatePassenger(passenger, passenger.type);
+      const validationErrors = validatePassenger(passenger, passenger.type, { requireContactInfo: i === 0 });
       if (hasErrors(validationErrors)) {
         alert(formatPassengerValidationMessage(i, validationErrors));
         return;
@@ -793,6 +793,9 @@ function PackageTravellerDetailsInner() {
                   {hotelDisplay.distance ? (
                     <div className="text-xs text-[#3A478A] truncate">{hotelDisplay.distance}</div>
                   ) : null}
+                  <div className="text-xs text-[#3A478A] mt-1">
+                    Check-In: {formatDateLabel(stayDetails.checkIn)} | Check-Out: {formatDateLabel(stayDetails.checkOut)}
+                  </div>
                   {hotelDisplay.rating ? (
                     <div className="mt-1 flex items-center gap-2">
                       <span className="bg-[#3754ED] text-white text-xs font-semibold px-2 py-0.5 rounded">
@@ -866,7 +869,7 @@ function PackageTravellerDetailsInner() {
               </div>
             </div>
 
-            <PassengerFormsSection />
+            <PassengerFormsSection requireContactInfoForAll={false} />
 
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 sm:p-5 flex flex-col gap-4">
               <div className="flex items-start gap-3">

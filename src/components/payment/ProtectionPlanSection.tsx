@@ -53,7 +53,7 @@ export function ProtectionPlanSection({
   const allFeatures = [
     t('features.allPremium'),
     t('features.priceMatch'),
-    t('features.futureCredit'),
+    // t('features.futureCredit'),
     t('features.priorityService'),
   ];
 
@@ -67,7 +67,7 @@ export function ProtectionPlanSection({
     t('features.baggageCompensationFull'),
     t('features.flightDelay'),
     t('features.priceMatch'),
-    t('features.futureCredit'),
+    // t('features.futureCredit'),
   ];
 
   return (

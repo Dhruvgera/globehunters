@@ -14,14 +14,17 @@ import {
   formatMoneyFromCode,
   type ConvertedHotelLocalTaxRow,
 } from "@/lib/currency/localTaxDisplay";
+import { formatPrice, getCurrencySymbol } from "@/lib/currency";
 
 function formatMoney(currency: string | undefined, amount: number | undefined) {
-  const c = currency || "$";
   const a = typeof amount === "number" ? amount : undefined;
   if (a == null || Number.isNaN(a)) return "—";
-  if (c === "£" || c === "$" || c === "€")
-    return `${c}${a.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  return c ? `${c} ${a.toFixed(2)}` : a.toFixed(2);
+  const normalized = String(currency || "GBP").trim().toUpperCase();
+  const symbolToCode: Record<string, string> = { "£": "GBP", "$": "USD", "€": "EUR" };
+  const currencyCode = symbolToCode[normalized] || normalized;
+  return /^[A-Z]{3}$/.test(currencyCode) || symbolToCode[normalized]
+    ? formatPrice(a, currencyCode)
+    : `${String(currency || "£").trim()}${a.toFixed(2)}`;
 }
 
 import { calculateNights } from "@/lib/hotels/nights";
@@ -64,7 +67,17 @@ function sanitizePolicyText(value: unknown): string {
     deduped.push(line);
   }
 
-  return deduped.join("\n");
+  const normalizePolicyCurrencyText = (input: string) =>
+    input.replace(
+      /\b(GBP|USD|EUR|INR|AED|SAR|CAD|AUD|JPY|CNY)\b\s*([0-9]+(?:[.,][0-9]{1,2})?)|([0-9]+(?:[.,][0-9]{1,2})?)\s*\b(GBP|USD|EUR|INR|AED|SAR|CAD|AUD|JPY|CNY)\b/gi,
+      (_, leadingCode, leadingAmount, trailingAmount, trailingCode) => {
+        const currencyCode = String(leadingCode || trailingCode || "").toUpperCase();
+        const amount = String(leadingAmount || trailingAmount || "");
+        return `${getCurrencySymbol(currencyCode)}${amount}`;
+      }
+    );
+
+  return normalizePolicyCurrencyText(deduped.join("\n"));
 }
 
 interface HotelCheckoutSidebarProps {

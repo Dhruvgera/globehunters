@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Passenger, PassengerFormErrors } from "@/types/booking";
+import { Passenger } from "@/types/booking";
 import { validatePassenger, hasErrors, validateDateOfBirthForType } from "@/utils/validation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +27,7 @@ interface PassengerFormProps {
   disabled?: boolean;
   /** Passenger type for age validation: adult (12+), child (2-11), infant (0-23 months) */
   passengerType?: 'adult' | 'child' | 'infant';
+  requireContactInfo?: boolean;
 }
 
 export function PassengerForm({
@@ -37,6 +38,7 @@ export function PassengerForm({
   showPassportFields = false,
   disabled = false,
   passengerType = 'adult',
+  requireContactInfo = true,
 }: PassengerFormProps) {
   const t = useTranslations('booking.passengerDetails');
 
@@ -96,15 +98,17 @@ export function PassengerForm({
     }
 
     // Auto-save silently when all required fields are filled (no UI lock)
-    const requiredFields = ['title', 'firstName', 'lastName', 'dateOfBirth', 'email', 'phone'];
+    const requiredFields: Array<keyof Passenger> = requireContactInfo
+      ? ['title', 'firstName', 'lastName', 'dateOfBirth', 'email', 'phone']
+      : ['title', 'firstName', 'lastName', 'dateOfBirth'];
     const allFieldsFilled = requiredFields.every(f => {
-      const val = f === field ? value : (formData as any)[f];
+      const val = f === field ? value : formData[f];
       return val && String(val).trim() !== '';
     });
 
     if (allFieldsFilled) {
       // Validate and save to store (but keep form editable)
-      const validationErrors = validatePassenger(newFormData as Passenger, passengerType);
+      const validationErrors = validatePassenger(newFormData as Passenger, passengerType, { requireContactInfo });
       if (!hasErrors(validationErrors)) {
         onSave(newFormData as Passenger);
       }
@@ -115,7 +119,7 @@ export function PassengerForm({
     e.preventDefault();
 
     // Validate form data with passenger type for age validation
-    const validationErrors = validatePassenger(formData as Passenger, passengerType);
+    const validationErrors = validatePassenger(formData as Passenger, passengerType, { requireContactInfo });
 
     console.log('[PassengerForm] Validation:', {
       passengerType,
@@ -222,7 +226,9 @@ export function PassengerForm({
 
           {/* Email */}
           <div className="space-y-2">
-            <Label htmlFor={`email-${passengerIndex}`}>{t('email')} {t('required')}</Label>
+            <Label htmlFor={`email-${passengerIndex}`}>
+              {t('email')} {requireContactInfo ? t('required') : "(Optional)"}
+            </Label>
             <Input
               id={`email-${passengerIndex}`}
               type="email"
@@ -239,7 +245,9 @@ export function PassengerForm({
 
           {/* Phone with Country Code */}
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor={`phone-${passengerIndex}`}>{t('phone')} {t('required')}</Label>
+            <Label htmlFor={`phone-${passengerIndex}`}>
+              {t('phone')} {requireContactInfo ? t('required') : "(Optional)"}
+            </Label>
             <div className="flex gap-2">
               {/* Country Code Selector */}
               <CountryCodeSelector

@@ -24,7 +24,7 @@ import { formatFareLabel } from "@/lib/utils";
 import { resolvePackagePricing } from "@/lib/package/pricing";
 import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
 import { calculateNights } from "@/lib/hotels/nights";
-import { formatPrice } from "@/lib/currency";
+import { formatPrice, getCurrencySymbol } from "@/lib/currency";
 
 function formatDateLabel(value?: string) {
   if (!value) return "—";
@@ -66,6 +66,17 @@ function formatMoney(currency: string | undefined, amount: number | undefined) {
     return formatPrice(amount, currencyCode);
   }
   return `${String(currency || "£").trim()}${amount.toFixed(2)}`;
+}
+
+function normalizePolicyCurrencyText(value?: string | null) {
+  return String(value || "").replace(
+    /\b(GBP|USD|EUR|INR|AED|SAR|CAD|AUD|JPY|CNY)\b\s*([0-9]+(?:[.,][0-9]{1,2})?)|([0-9]+(?:[.,][0-9]{1,2})?)\s*\b(GBP|USD|EUR|INR|AED|SAR|CAD|AUD|JPY|CNY)\b/gi,
+    (_, leadingCode, leadingAmount, trailingAmount, trailingCode) => {
+      const currencyCode = String(leadingCode || trailingCode || "").toUpperCase();
+      const amount = String(leadingAmount || trailingAmount || "");
+      return `${getCurrencySymbol(currencyCode)}${amount}`;
+    }
+  );
 }
 
 function getUniquePackageRooms<T>(rooms: T[] | undefined) {
@@ -549,6 +560,25 @@ function PackageReviewPageInner() {
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-[#010D50] mb-1">{hotelDisplay.name}</h3>
                     <p className="text-sm text-[#3A478A] mb-3">{hotelDisplay.distance}</p>
+                    <p className="text-sm text-[#3A478A] mb-3">
+                      Check-In: {formatDateLabel(
+                        hotelSearch?.checkIn ||
+                        packageDetails?.hotel?.rooms?.[0]?.checkIn ||
+                        packageSearch?.checkIn ||
+                        searchParams.get("checkIn") ||
+                        searchParams.get("departureDate") ||
+                        ""
+                      )} | Check-Out: {formatDateLabel(
+                        hotelSearch?.checkOut ||
+                        packageDetails?.hotel?.rooms?.[0]?.checkOut ||
+                        packageDetails?.hotel?.checkOutDate ||
+                        searchParams.get("checkOut") ||
+                        searchParams.get("returnDate") ||
+                        ((hotelSearch?.checkIn || packageSearch?.checkIn) && packageSearch?.nights
+                          ? shiftIsoDateByDays(hotelSearch?.checkIn || packageSearch?.checkIn || "", packageSearch.nights)
+                          : "")
+                      )}
+                    </p>
 
                     {hotelDisplay.rating ? (
                       <div className="flex items-center gap-2 mb-4">
@@ -679,7 +709,7 @@ function PackageReviewPageInner() {
                       Effective from {formatDateLabel(selectedCancellation.effectiveDate)}
                     </p>
                     <p className="text-sm text-[#3A478A]">
-                      {selectedCancellation.policy}
+                      {normalizePolicyCurrencyText(selectedCancellation.policy)}
                     </p>
                     {selectedCancellation.penalty != null && (
                       <p className="text-sm text-[#3A478A]">
@@ -704,11 +734,11 @@ function PackageReviewPageInner() {
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
                     <span className="text-[#3A478A]">Hotel ({nights} nights)</span>
-                    <span className="font-medium text-[#010D50]">{formatMoney(pricing.currency, 0)}</span>
+                    <span className="font-medium text-[#010D50]">Included</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[#3A478A]">Flights (per booking)</span>
-                    <span className="font-medium text-[#010D50]">{formatMoney(pricing.currency, 0)}</span>
+                    <span className="font-medium text-[#010D50]">Included</span>
                   </div>
                   {addOns.additionalBaggage > 0 && (
                     <div className="flex justify-between">
