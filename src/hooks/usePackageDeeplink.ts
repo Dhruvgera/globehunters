@@ -189,7 +189,7 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
 
   const processDeeplink = useCallback(async () => {
     const packageKey = searchParams.get("packageKey") || searchParams.get("package");
-    const hotelKey = searchParams.get("hotelKey") || searchParams.get("hotel");
+    const hotelKey = searchParams.get("key") || searchParams.get("hotel");
 
     const key = packageKey || hotelKey;
     const mode: DeeplinkMode | null = packageKey ? "package" : hotelKey ? "hotel" : null;
@@ -325,7 +325,7 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
   // Auto-process on mount if key present
   useEffect(() => {
     const packageKey = searchParams.get("packageKey") || searchParams.get("package");
-    const hotelKey = searchParams.get("hotelKey") || searchParams.get("hotel");
+    const hotelKey = searchParams.get("key") || searchParams.get("hotel");
 
     if ((packageKey?.trim() || hotelKey?.trim())) {
       processDeeplink();
