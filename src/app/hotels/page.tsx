@@ -31,6 +31,7 @@ import { getHotelProvider, parseHotelProvider, type HotelProvider } from "@/lib/
 import { fixStubaImageUrl } from "@/lib/hotels/imageUrl";
 import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
 import { calculateNights } from "@/lib/hotels/nights";
+import { usePackageDeeplink } from "@/hooks/usePackageDeeplink";
 
 const DEFAULT_FILTERS: HotelFiltersState = {
   propertyQuery: "",
@@ -333,7 +334,7 @@ function HotelsPageInner() {
   const [filters, setFilters] = useState<HotelFiltersState>(DEFAULT_FILTERS);
   const hasUserAdjustedPriceRef = useRef(false);
   const hydratedFiltersRef = useRef(false);
-
+  usePackageDeeplink();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     popular: true,
     price: true,
