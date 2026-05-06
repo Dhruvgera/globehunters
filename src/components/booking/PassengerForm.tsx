@@ -5,7 +5,6 @@ import { Passenger, PassengerFormErrors } from "@/types/booking";
 import { validatePassenger, hasErrors, validateDateOfBirthForType } from "@/utils/validation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -14,7 +13,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useTranslations } from "next-intl";
-import { countryCodes } from "@/lib/utils/countryCodes";
 import { CountryCodeSelector } from "./CountryCodeSelector";
 
 
@@ -68,7 +66,6 @@ export function PassengerForm({
   const handleChange = (field: keyof Passenger, value: string) => {
     const newFormData = { ...formData, [field]: value };
     setFormData(newFormData);
-
     // Real-time validation for date of birth
     if (field === 'dateOfBirth' && value) {
       const dobValidation = validateDateOfBirthForType(value, passengerType);
@@ -84,49 +81,27 @@ export function PassengerForm({
     }
 
     // Auto-save silently when all required fields are filled (no UI lock)
-    const requiredFields = ['title', 'firstName', 'lastName', 'dateOfBirth', 'email', 'phone'];
+    const requiredFields = ['title', 'firstName', 'lastName', 'dateOfBirth'];
     const allFieldsFilled = requiredFields.every(f => {
       const val = f === field ? value : (formData as any)[f];
       return val && String(val).trim() !== '';
     });
 
+    // Validate and save to store (but keep form editable)
+    const validationErrors = validatePassenger(newFormData as Passenger, passengerType);
     if (allFieldsFilled) {
-      // Validate and save to store (but keep form editable)
-      const validationErrors = validatePassenger(newFormData as Passenger, passengerType);
       if (!hasErrors(validationErrors)) {
         onSave(newFormData as Passenger);
+      } else if (hasErrors(validationErrors)) {
+        setErrors(validationErrors as Record<string, string | undefined>);
       }
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
 
-    // Validate form data with passenger type for age validation
-    const validationErrors = validatePassenger(formData as Passenger, passengerType);
-
-    console.log('[PassengerForm] Validation:', {
-      passengerType,
-      dateOfBirth: formData.dateOfBirth,
-      errors: validationErrors,
-      hasErrors: hasErrors(validationErrors),
-    });
-
-    if (hasErrors(validationErrors)) {
-      setErrors(validationErrors as Record<string, string | undefined>);
-      return;
-    }
-
-    // Save passenger data
-    onSave(formData as Passenger);
-  };
-
-  const handleEdit = () => {
-    onCancel?.();
-  };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form className="space-y-6">
       <div className="bg-white border border-[#DFE0E4] rounded-xl p-6">
         <h3 className="text-lg font-semibold text-[#010D50] mb-4">
           {t('passenger')} {passengerIndex + 1}
@@ -210,7 +185,7 @@ export function PassengerForm({
 
           {/* Email */}
           <div className="space-y-2">
-            <Label htmlFor={`email-${passengerIndex}`}>{t('email')} {t('required')}</Label>
+            <Label htmlFor={`email-${passengerIndex}`}>{t('email')} {passengerIndex == 0 ? t('required') : ""}</Label>
             <Input
               id={`email-${passengerIndex}`}
               type="email"
@@ -227,7 +202,7 @@ export function PassengerForm({
 
           {/* Phone with Country Code */}
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor={`phone-${passengerIndex}`}>{t('phone')} {t('required')}</Label>
+            <Label htmlFor={`phone-${passengerIndex}`}>{t('phone')} {passengerIndex == 0 ? t('required') : ""}</Label>
             <div className="flex gap-2">
               {/* Country Code Selector */}
               <CountryCodeSelector

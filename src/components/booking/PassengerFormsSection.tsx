@@ -30,8 +30,8 @@ export default function PassengerFormsSection({
     const counts = searchParams?.passengers
       ? searchParams.passengers
       : hotelSearch
-      ? { adults: hotelSearch.adults, children: hotelSearch.children, infants: 0 }
-      : { adults: 1, children: 0, infants: 0 };
+        ? { adults: hotelSearch.adults, children: hotelSearch.children, infants: 0 }
+        : { adults: 1, children: 0, infants: 0 };
     let idx = 0;
     for (let i = 0; i < counts.adults; i += 1) result.push({ type: "adult", index: idx++ });
     for (let i = 0; i < counts.children; i += 1) result.push({ type: "child", index: idx++ });
@@ -67,7 +67,11 @@ export default function PassengerFormsSection({
   useEffect(() => {
     const isCompletePassenger = (idx: number) => {
       const p = passengers[idx];
-      return !!(p && p.firstName && p.lastName && p.dateOfBirth && p.email && p.phone);
+      if (idx == 0) {
+        return !!(p && p.firstName && p.lastName && p.dateOfBirth && p.email && p.phone);
+      } else {
+        return !!(p && p.firstName && p.lastName && p.dateOfBirth);
+      }
     };
 
     const allComplete = requireOnlyLead
@@ -92,8 +96,8 @@ export default function PassengerFormsSection({
             slot.type === "adult"
               ? t("adult")
               : slot.type === "child"
-              ? t("child")
-              : t("infant");
+                ? t("child")
+                : t("infant");
           const isOptional = requireOnlyLead && idx > 0;
           const hasOptionalData = !!(
             initial &&
