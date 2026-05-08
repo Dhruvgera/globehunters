@@ -88,11 +88,11 @@ export function PassengerForm({
     });
 
     // Validate and save to store (but keep form editable)
-    const validationErrors = validatePassenger(newFormData as Passenger, passengerType);
     if (allFieldsFilled) {
+      const validationErrors = validatePassenger(newFormData as Passenger, passengerType);
       if (!hasErrors(validationErrors)) {
         onSave(newFormData as Passenger);
-      } else if (hasErrors(validationErrors)) {
+      } else {
         setErrors(validationErrors as Record<string, string | undefined>);
       }
     }
@@ -185,7 +185,7 @@ export function PassengerForm({
 
           {/* Email */}
           <div className="space-y-2">
-            <Label htmlFor={`email-${passengerIndex}`}>{t('email')} {passengerIndex == 0 ? t('required') : ""}</Label>
+            <Label htmlFor={`email-${passengerIndex}`}>{t('email')} {passengerIndex === 0 ? t('required') : ""}</Label>
             <Input
               id={`email-${passengerIndex}`}
               type="email"
@@ -202,7 +202,7 @@ export function PassengerForm({
 
           {/* Phone with Country Code */}
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor={`phone-${passengerIndex}`}>{t('phone')} {passengerIndex == 0 ? t('required') : ""}</Label>
+            <Label htmlFor={`phone-${passengerIndex}`}>{t('phone')} {passengerIndex === 0 ? t('required') : ""}</Label>
             <div className="flex gap-2">
               {/* Country Code Selector */}
               <CountryCodeSelector

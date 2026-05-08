@@ -42,7 +42,7 @@ export function TermsAndConditions({
     for (let i = 0; i < required; i++) {
       const p = passengers[i];
       if (!p) return false;
-      if (i == 0) {
+      if (i === 0) {
         if (!p.firstName || !p.lastName || !p.dateOfBirth || !p.email || !p.phone) {
           return false;
         }

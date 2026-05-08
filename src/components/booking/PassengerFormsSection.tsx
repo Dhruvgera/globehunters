@@ -67,7 +67,7 @@ export default function PassengerFormsSection({
   useEffect(() => {
     const isCompletePassenger = (idx: number) => {
       const p = passengers[idx];
-      if (idx == 0) {
+      if (idx === 0) {
         return !!(p && p.firstName && p.lastName && p.dateOfBirth && p.email && p.phone);
       } else {
         return !!(p && p.firstName && p.lastName && p.dateOfBirth);
