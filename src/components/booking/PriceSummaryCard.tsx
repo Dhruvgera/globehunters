@@ -40,9 +40,8 @@ export function PriceSummaryCard({
 
   return (
     <div
-      className={`bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-6 order-2 lg:order-none ${
-        isSticky ? "lg:sticky lg:top-20" : ""
-      }`}
+      className={`bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-6 order-2 lg:order-none z-2 ${isSticky ? "lg:sticky lg:top-20" : ""
+        }`}
     >
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-[#010D50]">
@@ -60,9 +59,8 @@ export function PriceSummaryCard({
 
       {hasBreakdown && (
         <div
-          className={`flex-col gap-2 ${
-            isExpanded ? "flex" : "hidden lg:flex"
-          }`}
+          className={`flex-col gap-2 ${isExpanded ? "flex" : "hidden lg:flex"
+            }`}
         >
           {passengerBreakdown.map((pax, idx) => (
             <div key={idx} className="flex items-center justify-between">
@@ -79,9 +77,8 @@ export function PriceSummaryCard({
 
       {hasBreakdown && (
         <div
-          className={`border-t border-[#DFE0E4] ${
-            isExpanded ? "block" : "hidden lg:block"
-          }`}
+          className={`border-t border-[#DFE0E4] ${isExpanded ? "block" : "hidden lg:block"
+            }`}
         />
       )}
 
