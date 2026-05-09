@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { Calendar, Check, ChevronRight, PawPrint, Bus, Coffee, X, Star } from "lucide-react";
 import { motion } from "framer-motion";
-import { useState, useCallback } from "react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import type { Hotel } from "@/types/hotel";
@@ -114,16 +114,13 @@ export function HotelResultCard({
       target="_blank"
       rel="noopener noreferrer"
       tabIndex={0}
-      onClick={(e) => {
-        e.preventDefault();
+      onClick={() => {
         onSelect?.();
-        window.open(hotelDetailUrl, "_blank", "noopener,noreferrer");
       }}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
+        if (e.key === " ") {
           e.preventDefault();
           onSelect?.();
-          window.open(hotelDetailUrl, "_blank", "noopener,noreferrer");
         }
       }}
       className={rootClass}

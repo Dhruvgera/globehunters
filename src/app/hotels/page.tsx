@@ -325,11 +325,9 @@ function HotelsPageInner() {
 
   const setHotelSearch = useBookingStore((s) => s.setHotelSearch);
   const setHotelResultsMeta = useBookingStore((s) => s.setHotelResultsMeta);
-  const hotelResultsCache = useBookingStore((s) => s.hotelResultsCache);
   const searchRequestId = useBookingStore((s) => s.searchRequestId);
   const hotelFiltersCache = useBookingStore((s) => s.hotelFiltersCache);
   const setHotelFiltersCache = useBookingStore((s) => s.setHotelFiltersCache);
-  const setHotelResultsCache = useBookingStore((s) => s.setHotelResultsCache);
   const savedHotelSearch = useBookingStore((s) => s.hotelSearch);
   const savedPackageSearch = useBookingStore((s) => s.packageSearch);
 
@@ -370,7 +368,6 @@ function HotelsPageInner() {
   const activeRequestSeq = useRef(0);
   const contentInflightRef = useRef<Set<string>>(new Set());
   const contentAttemptRef = useRef<Map<string, { attempts: number; lastAttemptAt: number; ok: boolean }>>(new Map());
-  const hotelResultsCacheRef = useRef(hotelResultsCache);
   const prevPriceModeRef = useRef<HotelFiltersState["priceMode"]>(DEFAULT_FILTERS.priceMode);
   const [searchCriteriaId, setSearchCriteriaId] = useState<number | string | null>(null);
   const [breakfastByHotelId, setBreakfastByHotelId] = useState<Record<string, BreakfastStatus>>({});
@@ -403,10 +400,6 @@ function HotelsPageInner() {
     }
     window.localStorage.removeItem(HOTEL_PROVIDER_OVERRIDE_STORAGE_KEY);
   }, [providerOverride]);
-
-  useEffect(() => {
-    hotelResultsCacheRef.current = hotelResultsCache;
-  }, [hotelResultsCache]);
 
   useEffect(() => {
     if (providerMode !== "hybrid" && hybridSupplierFilter !== "all") {
@@ -621,21 +614,6 @@ function HotelsPageInner() {
   }, [packageFromCode, resolvedSearch, serializedChildAges]);
 
   const queryKey = isPackageMode ? packageStableQueryKey : strictQueryKey;
-  const cacheCriteria = useMemo(
-    () => ({
-      mode: isPackageMode ? ("package" as const) : ("hotel" as const),
-      location: resolvedSearch.location,
-      checkIn: resolvedSearch.checkIn,
-      checkOut: resolvedSearch.checkOut,
-      rooms: resolvedSearch.rooms,
-      adults: resolvedSearch.adults,
-      children: resolvedSearch.children,
-      child_age: serializedChildAges,
-      branches: resolvedSearch.branches,
-      fromCode: packageFromCode,
-    }),
-    [isPackageMode, packageFromCode, resolvedSearch, serializedChildAges]
-  );
 
   // Hydrate filters for this queryKey (so opening a hotel and coming back doesn't reset price slider).
   useEffect(() => {
@@ -666,118 +644,6 @@ function HotelsPageInner() {
       if (!providerOverrideReady) return;
 
       const requestSeq = ++activeRequestSeq.current;
-
-      // Hydrate from cache immediately to preserve results on back-navigation.
-      // Only use cache if queryKey matches and cache has results and is fresh.
-      // Package results are intentionally kept longer to reduce repeat backend calls
-      // when users revisit the same package search.
-      const cache = hotelResultsCacheRef.current;
-      const cacheAge = cache?.fetchedAt ? Date.now() - cache.fetchedAt : Infinity;
-      const CACHE_TTL = isPackageMode ? 15 * 60 * 1000 : 2 * 60 * 1000;
-      const isCacheFresh = cacheAge < CACHE_TTL;
-
-      const packageLegacyQueryKey = strictQueryKey;
-      const cacheKeyMatches = cache?.queryKey === queryKey || (isPackageMode && cache?.queryKey === packageLegacyQueryKey);
-      const cacheCriteriaMatchesCurrent =
-        cache?.criteria != null &&
-        JSON.stringify(cache.criteria) === JSON.stringify(cacheCriteria);
-      const savedSearchMatchesCurrent =
-        isPackageMode &&
-        savedHotelSearch != null &&
-        String(savedHotelSearch.location || "").trim().toLowerCase() ===
-          String(resolvedSearch.location || "").trim().toLowerCase() &&
-        String(savedHotelSearch.checkIn || "") === String(resolvedSearch.checkIn || "") &&
-        String(savedHotelSearch.checkOut || "") === String(resolvedSearch.checkOut || "") &&
-        Number(savedHotelSearch.rooms || 0) === Number(resolvedSearch.rooms || 0) &&
-        Number(savedHotelSearch.adults || 0) === Number(resolvedSearch.adults || 0) &&
-        Number(savedHotelSearch.children || 0) === Number(resolvedSearch.children || 0) &&
-        String(savedHotelSearch.branches || "") === String(resolvedSearch.branches || "") &&
-        serializeHotelChildAges(savedHotelSearch.child_age, savedHotelSearch.rooms, savedHotelSearch.children) ===
-          serializeHotelChildAges(resolvedSearch.child_age, resolvedSearch.rooms, resolvedSearch.children);
-      const cacheCriteriaMatchFallback = Boolean(savedSearchMatchesCurrent && cache?.hotels?.length);
-      const hasUsableCache = Boolean(
-        cache &&
-        (cacheKeyMatches || cacheCriteriaMatchesCurrent || cacheCriteriaMatchFallback) &&
-        cache.hotels.length > 0 &&
-        isCacheFresh
-      );
-
-      if (hasUsableCache && cache) {
-        if (!cancelled && requestSeq === activeRequestSeq.current) {
-          setHotels(cache.hotels);
-          setSelectedHotelKey(cache.selectedHotelKey || (cache.hotels.length > 0 ? `${cache.hotels[0]?.id}-0` : ""));
-          const metaFromCache: Record<string, any> = {};
-          cache.hotels.forEach((h, idx) => {
-            const raw = (h as any)?.rawSearchResult as any;
-            if (!raw || typeof raw !== "object") return;
-            const hid = h.id || resolveHotelResultId(raw, idx);
-            if (!hid) return;
-            const rowProvider = String(raw?.provider || "").trim().toLowerCase() === "hotelbeds" ? "hotelbeds" : "vyspa";
-            const rowSearchCriteriaAny = rowProvider === "hotelbeds"
-              ? (raw?.searchCriteriaId ?? raw?._hotelbeds?.searchToken)
-              : raw?.searchCriteriaId;
-            const rowSearchCriteriaId =
-              typeof rowSearchCriteriaAny === "string" || typeof rowSearchCriteriaAny === "number"
-                ? rowSearchCriteriaAny
-                : undefined;
-            metaFromCache[String(hid)] = {
-              hotelId: String(hid),
-              hotelName: raw?.hotel_name || raw?.hotelName || h.name,
-              provider: rowProvider,
-              searchCriteriaId: rowSearchCriteriaId,
-              searchResultId: raw?.id ? String(raw.id) : undefined,
-              srId: raw?.id ? String(raw.id) : undefined,
-              vyspaHotelId: toPositiveNumericId(raw?.hotel_id ?? raw?.hotelId) || undefined,
-              vMapId: toPositiveNumericId(raw?.VmapId ?? raw?.vMapId) || undefined,
-              imageName: typeof raw?.image_name === "string" ? fixStubaImageUrl(raw.image_name) : undefined,
-              address1: typeof raw?.address1 === "string" ? raw.address1 : undefined,
-              address2: typeof raw?.address2 === "string" ? raw.address2 : undefined,
-              hotelRating: Number.isFinite(Number(raw?.hotel_rating)) ? Number(raw.hotel_rating) : undefined,
-              rawSearchResult: raw,
-            };
-          });
-          if (Object.keys(metaFromCache).length > 0) {
-            setHotelResultsMeta(metaFromCache);
-            const firstMeta = metaFromCache[String(cache.hotels[0]?.id)];
-            const firstCriteria = firstMeta?.searchCriteriaId;
-            const firstProvider: "vyspa" | "hotelbeds" =
-              firstMeta?.provider === "hotelbeds" ? "hotelbeds" : "vyspa";
-            const search = resolvedSearchRef.current;
-            setHotelSearch({
-              provider: firstProvider,
-              location: search.location,
-              hidden_id: search.hidden_id || "",
-              hidden_key: search.hidden_key || "",
-              checkIn: search.checkIn,
-              checkOut: search.checkOut,
-              rooms: search.rooms,
-              adults: search.adults,
-              children: search.children,
-              child_age: search.child_age,
-              branches: search.branches,
-              searchCriteriaId:
-                typeof firstCriteria === "string" || typeof firstCriteria === "number"
-                  ? firstCriteria
-                  : undefined,
-              arrivalPointCode: search.arrival_point_code || undefined,
-            });
-            setSearchCriteriaId(
-              typeof firstCriteria === "string" || typeof firstCriteria === "number" ? firstCriteria : null
-            );
-            if (firstCriteria) {
-              const displayRef =
-                typeof firstCriteria === "string"
-                  ? shortWebRefFromToken(firstCriteria)
-                  : String(firstCriteria);
-              useBookingStore.getState().setSearchRequestId(displayRef);
-            }
-          }
-          setLoading(false);
-          setLoadingMoreHotels(false);
-          setHasAttemptedFetch(true);
-        }
-        return;
-      }
 
       setLoading(true);
       setLoadingMoreHotels(false);
@@ -974,13 +840,6 @@ function HotelsPageInner() {
             if (!cancelled && requestSeq === activeRequestSeq.current) {
               if (mappedHotels.length > 0) {
                 const selectedHotelKey = `${mappedHotels[0]?.id}-0`;
-                setHotelResultsCache({
-                  queryKey,
-                  criteria: cacheCriteria,
-                  hotels: mappedHotels,
-                  selectedHotelKey,
-                  fetchedAt: Date.now(),
-                });
                 setHotels(mappedHotels);
                 setSelectedHotelKey(selectedHotelKey);
                 setNoResultsMessage(null);
@@ -1291,18 +1150,6 @@ function HotelsPageInner() {
             return next;
           });
           setSelectedHotelKey(mapped.length > 0 ? `${mapped[0]?.id}-0` : "");
-          // Only cache if we have actual results (don't cache empty "no results" responses)
-          if (mapped.length > 0) {
-            const selectedHotelKey = `${mapped[0]?.id}-0`;
-            setHotelResultsCache({
-              queryKey,
-              criteria: cacheCriteria,
-              hotels: mapped,
-              selectedHotelKey,
-              fetchedAt: Date.now(),
-            });
-          }
-
           // If user hasn't interacted yet, set price slider bounds from real data (total).
           setFilters((prev) => {
             const isDefault =
@@ -1458,7 +1305,6 @@ function HotelsPageInner() {
   }, [
     queryKey,
     strictQueryKey,
-    setHotelResultsCache,
     setHotelResultsMeta,
     setHotelSearch,
     isPackageMode,
