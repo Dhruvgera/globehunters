@@ -6,15 +6,21 @@ import { Passenger, PassengerFormErrors } from '@/types/booking';
 import { CardDetails, BillingAddress, PaymentFormErrors } from '@/types/payment';
 
 /**
+
  * Validate email address
+ * Not checking for required checks as required check is seperate
  */
 export function validateEmail(email: string): boolean {
+  if (email === '') {
+    return true;
+  }
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 }
 
 /**
  * Validate phone number (international format)
+ * Not checking for empty numbers as required check is seperate
  */
 export function validatePhone(phone: string): boolean {
   const cleaned = phone.replace(/[\s\-()]/g, '');
@@ -83,7 +89,7 @@ export function validateDateOfBirth(dateString: string, minAge: number = 0, maxA
  */
 function parseDateString(dateString: string): Date | null {
   if (!dateString) return null;
-  
+
   // Try DD/MM/YYYY format first (common in UK)
   const ddmmyyyyMatch = dateString.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (ddmmyyyyMatch) {
@@ -93,7 +99,7 @@ function parseDateString(dateString: string): Date | null {
       return date;
     }
   }
-  
+
   // Try YYYY-MM-DD format (ISO)
   const isoMatch = dateString.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (isoMatch) {
@@ -103,13 +109,13 @@ function parseDateString(dateString: string): Date | null {
       return date;
     }
   }
-  
+
   // Fallback to native Date parsing
   const date = new Date(dateString);
   if (!isNaN(date.getTime())) {
     return date;
   }
-  
+
   return null;
 }
 
@@ -120,7 +126,7 @@ function parseDateString(dateString: string): Date | null {
  * INF (Infant): 0-23 months old
  */
 export function validateDateOfBirthForType(
-  dateString: string, 
+  dateString: string,
   passengerType: 'adult' | 'child' | 'infant'
 ): { valid: boolean; error?: string } {
   const date = parseDateString(dateString);
@@ -147,7 +153,7 @@ export function validateDateOfBirthForType(
         return { valid: false, error: 'Adult passengers must be 12 years or older' };
       }
       break;
-    
+
     case 'child':
       // Children must be 2-11 years old
       if (ageInYears < 2) {
@@ -157,7 +163,7 @@ export function validateDateOfBirthForType(
         return { valid: false, error: 'Child passengers must be under 12 years old' };
       }
       break;
-    
+
     case 'infant':
       // Infants must be 0-23 months old
       if (ageInMonths >= 24) {

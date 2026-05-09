@@ -2,6 +2,7 @@
 
 import { Check } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useTranslations } from "next-intl";
 
 interface ProtectionPlanTableProps {
   features: string[];
@@ -13,6 +14,7 @@ interface ProtectionPlanTableProps {
   allLabel: string;
   selectedPlan?: "basic" | "premium" | "all";
   onSelectPlan: (plan: "basic" | "premium" | "all") => void;
+
 }
 
 export function ProtectionPlanTable({
@@ -25,7 +27,41 @@ export function ProtectionPlanTable({
   allLabel,
   selectedPlan,
   onSelectPlan,
+
 }: ProtectionPlanTableProps) {
+  const t = useTranslations('payment.iAssure');
+
+  const basicFeatures = [
+    t('features.support247Full'),
+    t('features.rebookRename'),
+    t('features.refundDeathFull'),
+    t('features.refundAirlineFull'),
+  ];
+
+  const premiumFeatures = [
+    t('features.support247Full'),
+    t('features.rebookRename'),
+    t('features.refundDeathFull'),
+    t('features.freeChangesAnytime'),
+    t('features.refundAirlineFull'),
+    t('features.refundLockdownFull'),
+    t('features.baggageCompensationFull'),
+    t('features.flightDelay'),
+  ];
+
+  const allFeatures = [
+    t('features.support247Full'),
+    t('features.rebookRename'),
+    t('features.refundDeathFull'),
+    t('features.freeChangesAnytime'),
+    t('features.refundAirlineFull'),
+    t('features.refundLockdownFull'),
+    t('features.baggageCompensationFull'),
+    t('features.flightDelay'),
+    t('features.priceMatch'),
+    t('features.futureCredit'),
+  ];
+
   return (
     <div className="hidden lg:flex flex-col gap-1">
       {/* Price Row */}
@@ -61,13 +97,21 @@ export function ProtectionPlanTable({
           </span>
           <div className="flex items-center gap-0">
             <div className="w-[109px] flex items-center justify-center">
-              <Check className="w-4 h-4 text-[#008234]" />
+              {basicFeatures.includes(feature) && (
+                <Check className="w-4 h-4 text-[#008234]" />
+              )}
             </div>
             <div className="w-[109px] flex items-center justify-center">
-              <Check className="w-4 h-4 text-[#008234]" />
+
+              {premiumFeatures.includes(feature) && (
+                <Check className="w-4 h-4 text-[#008234]" />
+
+              )}
             </div>
             <div className="w-[109px] flex items-center justify-center">
-              <Check className="w-4 h-4 text-[#008234]" />
+              {allFeatures.includes(feature) && (
+                <Check className="w-4 h-4 text-[#008234]" />
+              )}
             </div>
           </div>
         </div>

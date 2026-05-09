@@ -10,7 +10,6 @@ import { Passenger, AddOns, BookingResponse } from '@/types/booking';
 import { PaymentDetails } from '@/types/payment';
 import { PriceCheckResult, TransformedPriceOption } from '@/types/priceCheck';
 import { normalizeCabinClass } from '@/lib/utils';
-import type { Hotel } from '@/types/hotel';
 import type { TrustYouHotelReviewSummary } from '@/types/trustyou';
 import type { VyspaCityHotelLookupItem } from '@/types/vyspaHotels';
 import type { HotelFiltersState } from '@/components/hotels/HotelFiltersSidebar';
@@ -87,7 +86,6 @@ function buildPersistedStateFallbacks(value: string): string[] {
 
     const fallbackValues = [
       createFallback((draft) => {
-        draft.hotelResultsCache = null;
         draft.hotelResultsMeta = {};
         draft.hotelDetailsCache = {};
         draft.packageResults = null;
@@ -95,7 +93,6 @@ function buildPersistedStateFallbacks(value: string): string[] {
         draft.alternateFlights = null;
       }),
       createFallback((draft) => {
-        draft.hotelResultsCache = null;
         draft.hotelResultsMeta = {};
         draft.hotelDetailsCache = {};
         draft.packageResults = null;
@@ -108,7 +105,6 @@ function buildPersistedStateFallbacks(value: string): string[] {
       createFallback((draft) => {
         draft.hotelSearch = null;
         draft.hotelLocationSelection = null;
-        draft.hotelResultsCache = null;
         draft.hotelFiltersCache = null;
         draft.hotelResultsMeta = {};
         draft.selectedHotel = null;
@@ -399,7 +395,6 @@ const initialState = {
   searchParams: null,
   hotelSearch: null,
   hotelLocationSelection: null,
-  hotelResultsCache: null,
   hotelFiltersCache: null,
   hotelResultsMeta: {},
   selectedHotel: null,
@@ -474,15 +469,12 @@ export const useBookingStore = create<BookingState & HydrationState>()(
         set({
           hotelSearch: null,
           hotelLocationSelection: null,
-          hotelResultsCache: null,
           hotelFiltersCache: null,
           hotelResultsMeta: {},
           selectedHotel: null,
           selectedHotelRoomIds: [],
         }),
       setHotelLocationSelection: (item) => set({ hotelLocationSelection: item }),
-      setHotelResultsCache: (cache) => set({ hotelResultsCache: cache }),
-      clearHotelResultsCache: () => set({ hotelResultsCache: null }),
       setHotelFiltersCache: (cache) => set({ hotelFiltersCache: cache }),
       clearHotelFiltersCache: () => set({ hotelFiltersCache: null }),
       setHotelResultsMeta: (meta) => set({ hotelResultsMeta: meta }),
@@ -728,16 +720,6 @@ export const useBookingStore = create<BookingState & HydrationState>()(
       storage: createJSONStorage(() => createQuotaSafeStateStorage(sessionStorage)), // Use sessionStorage instead of localStorage
       // Only persist certain fields
       partialize: (state) => ({
-        // Remove heavy raw payloads before persisting to avoid storage quota issues.
-        hotelResultsCache: state.hotelResultsCache
-          ? {
-            ...state.hotelResultsCache,
-            hotels: state.hotelResultsCache.hotels.map((hotel) => ({
-              ...hotel,
-              rawSearchResult: undefined,
-            })),
-          }
-          : null,
         hotelResultsMeta: Object.fromEntries(
           Object.entries(state.hotelResultsMeta).map(([hotelId, meta]) => [
             hotelId,

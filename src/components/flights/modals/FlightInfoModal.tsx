@@ -314,6 +314,9 @@ export default function FlightInfoModal({
   };
 
   function cabinClassName(code?: string) {
+    if (selectedUpgradeOption?.cabinClassDisplay)
+      return selectedUpgradeOption.cabinClassDisplay.toLowerCase();
+
     if (!code) return undefined;
     const m = String(code).toUpperCase();
     switch (m) {
@@ -398,7 +401,7 @@ export default function FlightInfoModal({
             <div className="flex items-center justify-between gap-2 min-w-0">
               {/* Flight Leg Tabs (supports multi-city) - scrollable container */}
               <div className="relative flex-1 min-w-0 overflow-hidden">
-                <div 
+                <div
                   className="flex items-center gap-2 overflow-x-auto py-1 px-0.5 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent hover:scrollbar-thumb-slate-400"
                   style={{ scrollbarWidth: 'thin' }}
                 >
@@ -553,7 +556,7 @@ export default function FlightInfoModal({
                             {currentLeg.individualFlights && currentLeg.individualFlights.length > 0 ? (
                               <>
                                 {/* Individual Flight Times with Layovers */}
-                            {currentLeg.individualFlights.map((flight, idx) => {
+                                {currentLeg.individualFlights.map((flight, idx) => {
                                   // Find layover after this flight (if not the last flight)
                                   const layover = idx < currentLeg.individualFlights!.length - 1 && currentLeg.layovers
                                     ? currentLeg.layovers.find(lay => lay.viaAirport === flight.arrivalAirport)
@@ -563,22 +566,22 @@ export default function FlightInfoModal({
                                     <div key={idx} className="relative">
                                       {/* Flight Segment - Grid Layout */}
                                       <div className="grid grid-cols-[48px_16px_1fr] sm:grid-cols-[64px_24px_1fr] gap-x-3 sm:gap-x-4">
-                                        
+
                                         {/* DEPARTURE */}
                                         <div className="text-right pt-0.5">
                                           <span className="block text-sm sm:text-lg font-bold text-[#010D50] leading-tight">{flight.departureTime}</span>
                                         </div>
                                         <div className="relative flex justify-center pt-1.5">
-                                           <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full border-2 border-[#010D50] bg-white z-10" />
-                                           <div className="absolute top-2.5 bottom-0 w-0.5 bg-slate-200" />
+                                          <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full border-2 border-[#010D50] bg-white z-10" />
+                                          <div className="absolute top-2.5 bottom-0 w-0.5 bg-slate-200" />
                                         </div>
                                         <div className="pb-6">
                                           <span className="block text-sm sm:text-base font-bold text-[#010D50] leading-tight mb-0.5">
-                                             {getCityName(flight.departureAirport)} ({flight.departureAirport})
+                                            {getCityName(flight.departureAirport)} ({flight.departureAirport})
                                           </span>
-                                           <span className="text-xs sm:text-sm text-slate-500 block truncate max-w-[200px] sm:max-w-none">
-                                             {getAirportName(flight.departureAirport, undefined, undefined) || flight.departureAirport}
-                                           </span>
+                                          <span className="text-xs sm:text-sm text-slate-500 block truncate max-w-[200px] sm:max-w-none">
+                                            {getAirportName(flight.departureAirport, undefined, undefined) || flight.departureAirport}
+                                          </span>
                                         </div>
 
                                         {/* FLIGHT DURATION & INFO */}
@@ -586,24 +589,24 @@ export default function FlightInfoModal({
                                           <span className="text-xs text-slate-500 font-medium">{flight.duration}</span>
                                         </div>
                                         <div className="relative flex justify-center">
-                                           <div className="absolute top-0 bottom-0 w-0.5 bg-slate-200" />
+                                          <div className="absolute top-0 bottom-0 w-0.5 bg-slate-200" />
                                         </div>
                                         <div className="pb-6 flex items-center gap-3">
-                                            <div className="w-5 h-5 sm:w-6 sm:h-6 relative flex-shrink-0 bg-white rounded-sm">
-                                                <Image 
-                                                  src={`https://images.kiwi.com/airlines/64/${flight.carrierCode}.png`} 
-                                                  alt={flight.carrierCode || 'Airline'}
-                                                  width={24}
-                                                  height={24}
-                                                  className="object-contain"
-                                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                                />
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-xs sm:text-sm font-medium text-slate-700">
-                                                    {flight.carrierCode}{flight.flightNumber}
-                                                </span>
-                                            </div>
+                                          <div className="w-5 h-5 sm:w-6 sm:h-6 relative flex-shrink-0 bg-white rounded-sm">
+                                            <Image
+                                              src={`https://images.kiwi.com/airlines/64/${flight.carrierCode}.png`}
+                                              alt={flight.carrierCode || 'Airline'}
+                                              width={24}
+                                              height={24}
+                                              className="object-contain"
+                                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                            />
+                                          </div>
+                                          <div className="flex flex-col">
+                                            <span className="text-xs sm:text-sm font-medium text-slate-700">
+                                              {flight.carrierCode}{flight.flightNumber}
+                                            </span>
+                                          </div>
                                         </div>
 
                                         {/* ARRIVAL */}
@@ -611,18 +614,18 @@ export default function FlightInfoModal({
                                           <span className="block text-sm sm:text-lg font-bold text-[#010D50] leading-tight">{flight.arrivalTime}</span>
                                         </div>
                                         <div className="relative flex justify-center pt-1.5">
-                                           <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full border-2 border-[#010D50] bg-[#010D50] z-10" />
-                                           {/* Continue line only if there's a layover */}
-                                           {layover && <div className="absolute top-2.5 bottom-0 w-0.5 bg-slate-200" />}
+                                          <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full border-2 border-[#010D50] bg-[#010D50] z-10" />
+                                          {/* Continue line only if there's a layover */}
+                                          {layover && <div className="absolute top-2.5 bottom-0 w-0.5 bg-slate-200" />}
                                         </div>
                                         <div className="">
                                           <span className="block text-sm sm:text-base font-bold text-[#010D50] leading-tight mb-0.5">
-                                             {getCityName(flight.arrivalAirport)} ({flight.arrivalAirport})
+                                            {getCityName(flight.arrivalAirport)} ({flight.arrivalAirport})
                                           </span>
                                           <span className="text-xs sm:text-sm text-slate-500 block truncate max-w-[200px] sm:max-w-none">
-                                             {getAirportName(flight.arrivalAirport, undefined, undefined) || flight.arrivalAirport}
+                                            {getAirportName(flight.arrivalAirport, undefined, undefined) || flight.arrivalAirport}
                                           </span>
-                                          
+
                                           {/* Debug: Show raw API dates */}
                                           {process.env.NEXT_PUBLIC_DEBUG_FLIGHT_DATES === 'true' && (
                                             <div className="mt-1 text-[10px] font-mono text-orange-600 bg-orange-50 px-1 py-0.5 rounded w-fit">
@@ -636,26 +639,26 @@ export default function FlightInfoModal({
                                       {layover && (
                                         <div className="grid grid-cols-[48px_16px_1fr] sm:grid-cols-[64px_24px_1fr] gap-x-3 sm:gap-x-4 my-6">
                                           <div className="text-right">
-                                              {/* Empty time col */}
+                                            {/* Empty time col */}
                                           </div>
                                           <div className="relative flex justify-center">
-                                              {/* Dashed line for layover */}
-                                              <div className="absolute top-0 bottom-0 w-0.5 border-l-2 border-dashed border-slate-300" />
+                                            {/* Dashed line for layover */}
+                                            <div className="absolute top-0 bottom-0 w-0.5 border-l-2 border-dashed border-slate-300" />
                                           </div>
                                           <div className="py-2">
-                                              <div className="bg-orange-50 border border-orange-100 rounded-lg p-3 sm:p-4 inline-flex flex-col gap-1 w-full sm:w-auto">
-                                                  <div className="flex items-center gap-2 text-[#B91C1C]">
-                                                      <Clock className="w-4 h-4" />
-                                                      <span className="text-sm font-bold">{layover.duration} stopover</span>
-                                                  </div>
-                                                  <div className="text-xs sm:text-sm text-[#7F1D1D]">
-                                                      Connect in <span className="font-semibold">{getCityName(layover.viaAirport)}</span> ({layover.viaAirport})
-                                                  </div>
+                                            <div className="bg-orange-50 border border-orange-100 rounded-lg p-3 sm:p-4 inline-flex flex-col gap-1 w-full sm:w-auto">
+                                              <div className="flex items-center gap-2 text-[#B91C1C]">
+                                                <Clock className="w-4 h-4" />
+                                                <span className="text-sm font-bold">{layover.duration} stopover</span>
                                               </div>
+                                              <div className="text-xs sm:text-sm text-[#7F1D1D]">
+                                                Connect in <span className="font-semibold">{getCityName(layover.viaAirport)}</span> ({layover.viaAirport})
+                                              </div>
+                                            </div>
                                           </div>
                                         </div>
                                       )}
-                                      
+
                                       {/* Spacer between flights if no layover (shouldn't happen in this logic usually but good safety) */}
                                       {!layover && idx < currentLeg.individualFlights!.length - 1 && (
                                         <div className="h-8" />
@@ -701,7 +704,8 @@ export default function FlightInfoModal({
                       </div>
 
                       {/* Times */}
-                      <div className="flex flex-row md:flex-col justify-between md:justify-between gap-4 md:gap-12 shrink-0">
+                      <div className="flex flex-row md:flex-col justify-between md:justify-between gap-4 md:gap-12 shrink-0"
+                        style={{ height: '100%' }}>
                         {/* Departure Time */}
                         <div className="flex flex-col items-end gap-1">
                           <span className="text-sm sm:text-base font-semibold text-[#010D50]">
@@ -836,11 +840,11 @@ export default function FlightInfoModal({
                     {(() => {
                       const checkedBaggageServices = selectedUpgradeOption?.checkedBaggageServices || [];
                       const perLeg = selectedUpgradeOption?.baggage?.perLeg;
-                      
+
                       // Get chargeable status from OptionalService if available
                       const chargeableStatus = checkedBaggageServices[0]?.chargeable || 'included';
                       const isIncluded = chargeableStatus === 'included';
-                      
+
                       // If we have perLeg data (route-based baggage), prefer showing it
                       // This gives better UX for multi-city showing LGW-DXB, DXB-DEL etc.
                       if (perLeg && perLeg.length > 0) {
@@ -865,14 +869,14 @@ export default function FlightInfoModal({
                           </div>
                         ));
                       }
-                      
+
                       // If no perLeg but we have OptionalService data, deduplicate by text and show
                       if (checkedBaggageServices.length > 0) {
                         // Deduplicate by text to avoid showing "Checked Baggage 25kgs" multiple times
-                        const uniqueServices = checkedBaggageServices.filter((svc, idx, arr) => 
+                        const uniqueServices = checkedBaggageServices.filter((svc, idx, arr) =>
                           arr.findIndex(s => s.text === svc.text) === idx
                         );
-                        
+
                         return uniqueServices.map((svc, idx) => (
                           <div key={`checked-${idx}`} className="flex items-start justify-between gap-2">
                             <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -939,10 +943,10 @@ export default function FlightInfoModal({
 
                       if (carryOnServices.length > 0) {
                         // Deduplicate by text to avoid showing "Hand Luggage" multiple times
-                        const uniqueServices = carryOnServices.filter((svc, idx, arr) => 
+                        const uniqueServices = carryOnServices.filter((svc, idx, arr) =>
                           arr.findIndex(s => s.text === svc.text) === idx
                         );
-                        
+
                         return uniqueServices.map((svc, idx) => (
                           <div key={`carryon-${idx}`} className="flex items-start justify-between gap-2">
                             <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -1282,11 +1286,11 @@ export default function FlightInfoModal({
                 <span className="text-sm sm:text-lg font-medium text-[#3754ED] whitespace-nowrap">
                   {isPackageMode
                     ? formatPackageDeltaLabel(
-                        typeof flight.packagePriceDeltaPerPerson === "number"
-                          ? flight.packagePriceDeltaPerPerson
-                          : flight.packagePriceDeltaTotal,
-                        flight.currency
-                      )
+                      typeof flight.packagePriceDeltaPerPerson === "number"
+                        ? flight.packagePriceDeltaPerPerson
+                        : flight.packagePriceDeltaTotal,
+                      flight.currency
+                    )
                     : selectedUpgradeOption
                       ? formatPrice(selectedUpgradeOption.totalPrice, selectedUpgradeOption.currency)
                       : formatPrice(flight.price, flight.currency)}

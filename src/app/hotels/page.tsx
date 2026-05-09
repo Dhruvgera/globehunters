@@ -31,6 +31,7 @@ import { getHotelProvider, parseHotelProvider, type HotelProvider } from "@/lib/
 import { fixStubaImageUrl } from "@/lib/hotels/imageUrl";
 import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
 import { calculateNights } from "@/lib/hotels/nights";
+import { usePackageDeeplink } from "@/hooks/usePackageDeeplink";
 
 const DEFAULT_FILTERS: HotelFiltersState = {
   propertyQuery: "",
@@ -325,18 +326,16 @@ function HotelsPageInner() {
 
   const setHotelSearch = useBookingStore((s) => s.setHotelSearch);
   const setHotelResultsMeta = useBookingStore((s) => s.setHotelResultsMeta);
-  const hotelResultsCache = useBookingStore((s) => s.hotelResultsCache);
   const searchRequestId = useBookingStore((s) => s.searchRequestId);
   const hotelFiltersCache = useBookingStore((s) => s.hotelFiltersCache);
   const setHotelFiltersCache = useBookingStore((s) => s.setHotelFiltersCache);
-  const setHotelResultsCache = useBookingStore((s) => s.setHotelResultsCache);
   const savedHotelSearch = useBookingStore((s) => s.hotelSearch);
   const savedPackageSearch = useBookingStore((s) => s.packageSearch);
 
   const [filters, setFilters] = useState<HotelFiltersState>(DEFAULT_FILTERS);
   const hasUserAdjustedPriceRef = useRef(false);
   const hydratedFiltersRef = useRef(false);
-
+  usePackageDeeplink();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     popular: true,
     price: true,
@@ -370,7 +369,6 @@ function HotelsPageInner() {
   const activeRequestSeq = useRef(0);
   const contentInflightRef = useRef<Set<string>>(new Set());
   const contentAttemptRef = useRef<Map<string, { attempts: number; lastAttemptAt: number; ok: boolean }>>(new Map());
-  const hotelResultsCacheRef = useRef(hotelResultsCache);
   const prevPriceModeRef = useRef<HotelFiltersState["priceMode"]>(DEFAULT_FILTERS.priceMode);
   const [searchCriteriaId, setSearchCriteriaId] = useState<number | string | null>(null);
   const [breakfastByHotelId, setBreakfastByHotelId] = useState<Record<string, BreakfastStatus>>({});
@@ -403,10 +401,6 @@ function HotelsPageInner() {
     }
     window.localStorage.removeItem(HOTEL_PROVIDER_OVERRIDE_STORAGE_KEY);
   }, [providerOverride]);
-
-  useEffect(() => {
-    hotelResultsCacheRef.current = hotelResultsCache;
-  }, [hotelResultsCache]);
 
   useEffect(() => {
     if (providerMode !== "hybrid" && hybridSupplierFilter !== "all") {
@@ -539,8 +533,12 @@ function HotelsPageInner() {
   const resolvedSearch = useMemo(() => {
     const p = new URLSearchParams(urlParamsKey);
     const location = p.get("location") || savedHotelSearch?.location || "London";
-    const checkIn = p.get("checkIn") || savedHotelSearch?.checkIn || "2026-02-10";
-    const checkOut = p.get("checkOut") || savedHotelSearch?.checkOut || "2026-02-12";
+    const today = new Date();
+    const defaultCheckIn = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 5);
+    const defaultCheckOut = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 8);
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const checkIn = p.get("checkIn") || savedHotelSearch?.checkIn || fmt(defaultCheckIn);
+    const checkOut = p.get("checkOut") || savedHotelSearch?.checkOut || fmt(defaultCheckOut);
     const adults = Math.max(1, Number(p.get("adults") || savedHotelSearch?.adults || "2") || 2);
     const children = Math.max(0, Number(p.get("children") || savedHotelSearch?.children || "0") || 0);
     const rooms = Math.max(1, Number(p.get("rooms") || savedHotelSearch?.rooms || "1") || 1);
@@ -658,8 +656,10 @@ function HotelsPageInner() {
     setHotelFiltersCache({ queryKey, filters: sanitizeHiddenHotelFilters(DEFAULT_FILTERS) });
   }, [hotelFiltersCache, queryKey, setHotelFiltersCache]);
 
+  const effectCancelledRef = useRef(false);
+
   useEffect(() => {
-    let cancelled = false;
+    effectCancelledRef.current = false;
 
     async function load() {
       if (!hasHydrated) return;
@@ -796,6 +796,21 @@ function HotelsPageInner() {
 
       if (isPackageMode) {
         // Use package search API for Flight+Hotel packages
+        // Clear stale results for a new package search (match flights UX).
+        setLoading(true);
+        setLoadingMoreHotels(false);
+        setError(null);
+        setNoResultsMessage(null);
+        setHotels([]);
+        setSelectedHotelKey("");
+        setDisplayedHotelsCount(12);
+        setHiddenImageHotelIds(new Set());
+        setBreakfastByHotelId({});
+        setBreakfastEnriching(false);
+        setTrustYouEnriching(false);
+        trustYouInflightRef.current.clear();
+        trustYouAttemptRef.current.clear();
+
         try {
           const search = resolvedSearchRef.current;
           const p = new URLSearchParams(urlParamsKey);
@@ -971,7 +986,7 @@ function HotelsPageInner() {
               setSearchRequestId(String(packageResponse.meta.requestId));
             }
 
-            if (!cancelled && requestSeq === activeRequestSeq.current) {
+            if (!effectCancelledRef.current && requestSeq === activeRequestSeq.current) {
               if (mappedHotels.length > 0) {
                 const selectedHotelKey = `${mappedHotels[0]?.id}-0`;
                 setHotelResultsCache({
@@ -1003,7 +1018,7 @@ function HotelsPageInner() {
 
           applyPackageResponse(packageResponse);
 
-          if (!cancelled && requestSeq === activeRequestSeq.current) {
+          if (!effectCancelledRef.current && requestSeq === activeRequestSeq.current) {
             setLoading(false);
             setHasAttemptedFetch(true);
           }
@@ -1013,9 +1028,9 @@ function HotelsPageInner() {
             let latestRequestId = packageResponse.meta.requestId;
 
             for (let attempt = 0; attempt < HYBRID_MAX_POLLS; attempt += 1) {
-              if (cancelled || requestSeq !== activeRequestSeq.current) break;
+              if (requestSeq !== activeRequestSeq.current) break;
               await new Promise((resolve) => setTimeout(resolve, HYBRID_POLL_INTERVAL_MS));
-              if (cancelled || requestSeq !== activeRequestSeq.current) break;
+              if (requestSeq !== activeRequestSeq.current) break;
 
               try {
                 const polledPackageResponse = await packageService.searchPackages({
@@ -1041,13 +1056,13 @@ function HotelsPageInner() {
             }
           }
 
-          if (!cancelled && requestSeq === activeRequestSeq.current) {
+          if (requestSeq === activeRequestSeq.current) {
             setLoadingMoreHotels(false);
             setHasAttemptedFetch(true);
           }
         } catch (err) {
           console.error('[Hotels Page] Package search error:', err);
-          if (!cancelled && requestSeq === activeRequestSeq.current) {
+          if (requestSeq === activeRequestSeq.current) {
             setError(null);
             setHotels([]);
             setSelectedHotelKey("");
@@ -1082,6 +1097,20 @@ function HotelsPageInner() {
         if (!pick?.id || !pick?.label || !pick?.loc) {
           throw new Error("No matching city/hotel found for the selected destination.");
         }
+
+        setLoading(true);
+        setLoadingMoreHotels(false);
+        setError(null);
+        setNoResultsMessage(null);
+        setHotels([]);
+        setSelectedHotelKey("");
+        setDisplayedHotelsCount(12);
+        setHiddenImageHotelIds(new Set());
+        setBreakfastByHotelId({});
+        setBreakfastEnriching(false);
+        setTrustYouEnriching(false);
+        trustYouInflightRef.current.clear();
+        trustYouAttemptRef.current.clear();
 
         const availability = await hotelService.searchAvailabilityV3({
           providerOverride: providerOverride || undefined,
@@ -1272,7 +1301,12 @@ function HotelsPageInner() {
         };
 
         const applyAvailabilityToState = (parsed: ParsedAvailability) => {
-          if (cancelled || requestSeq !== activeRequestSeq.current) return;
+          // Only check requestSeq — not cancelled. The requestSeq check is sufficient to
+          // prevent stale updates (a new effect run increments activeRequestSeq). The
+          // cancelled flag was causing a bug where effect cleanup (e.g. Strict Mode
+          // double-mount) would discard fresh API results from an in-flight request.
+          const isStale = requestSeq !== activeRequestSeq.current;
+          if (isStale) return;
 
           const { mapped, meta, results, criteriaId, criteriaProvider } = parsed;
 
@@ -1364,12 +1398,13 @@ function HotelsPageInner() {
         };
 
         const parsedInitial = mapAvailability(availability);
-        if (cancelled || requestSeq !== activeRequestSeq.current) return;
+        // Only check requestSeq — not cancelled (same rationale as applyAvailabilityToState).
+        if (requestSeq !== activeRequestSeq.current) return;
         applyAvailabilityToState(parsedInitial);
 
         // As soon as we have the first batch, enable result interactions (filters/sort/cards)
         // while background polling continues to append/refresh results.
-        if (!cancelled && requestSeq === activeRequestSeq.current) {
+        if (requestSeq === activeRequestSeq.current) {
           setLoading(false);
           setHasAttemptedFetch(true);
         }
@@ -1386,10 +1421,10 @@ function HotelsPageInner() {
           let latestCriteriaId: number | string | null = parsedInitial.criteriaId;
 
           for (let attempt = 0; attempt < HYBRID_MAX_POLLS; attempt += 1) {
-            if (cancelled || requestSeq !== activeRequestSeq.current) break;
+            if (requestSeq !== activeRequestSeq.current) break;
             const pollDelayMs = isVyspaSearchCriteriaId(latestCriteriaId) ? HYBRID_POLL_INTERVAL_MS : 750;
             await new Promise((resolve) => setTimeout(resolve, pollDelayMs));
-            if (cancelled || requestSeq !== activeRequestSeq.current) break;
+            if (requestSeq !== activeRequestSeq.current) break;
             try {
               const polledAvailability = await hotelService.searchAvailabilityV3({
                 providerOverride: providerOverride || undefined,
@@ -1408,7 +1443,7 @@ function HotelsPageInner() {
               });
 
               const parsedPoll = mapAvailability(polledAvailability);
-              if (cancelled || requestSeq !== activeRequestSeq.current) break;
+              if (requestSeq !== activeRequestSeq.current) break;
 
               applyAvailabilityToState(parsedPoll);
               if (isVyspaSearchCriteriaId(parsedPoll.criteriaId)) {
@@ -1420,12 +1455,12 @@ function HotelsPageInner() {
               break;
             }
           }
-          if (!cancelled && requestSeq === activeRequestSeq.current) {
+          if (requestSeq === activeRequestSeq.current) {
             setLoadingMoreHotels(false);
           }
         }
       } catch (e: any) {
-        if (cancelled || requestSeq !== activeRequestSeq.current) return;
+        if (requestSeq !== activeRequestSeq.current) return;
         setError(e?.message || "Failed to fetch hotels");
         setLoadingMoreHotels(false);
         let shouldResetSearchState = false;
@@ -1442,7 +1477,7 @@ function HotelsPageInner() {
           setBreakfastByHotelId({});
         }
       } finally {
-        if (!cancelled && requestSeq === activeRequestSeq.current) {
+        if (requestSeq === activeRequestSeq.current) {
           setLoading(false);
           setLoadingMoreHotels(false);
           setHasAttemptedFetch(true);
@@ -1452,7 +1487,7 @@ function HotelsPageInner() {
 
     load();
     return () => {
-      cancelled = true;
+      effectCancelledRef.current = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- resolvedSearch accessed via ref to avoid loop
   }, [
@@ -1734,6 +1769,11 @@ function HotelsPageInner() {
 
     return sorted;
   }, [filters, hotelsWithSelectedMealPricing, hybridSupplierFilter, providerMode, resolvedSearch.location, sortMode]);
+
+  const visibleResultCount = useMemo(() => {
+    if (hiddenImageHotelIds.size === 0) return filteredHotels.length;
+    return filteredHotels.filter((h) => !hiddenImageHotelIds.has(h.id)).length;
+  }, [filteredHotels, hiddenImageHotelIds]);
 
   const displayedHotels = useMemo(() => {
     return filteredHotels.slice(0, displayedHotelsCount);
@@ -2147,7 +2187,7 @@ function HotelsPageInner() {
             {!loading && hotels.length > 0 && (
               <>
                 <HotelFiltersSidebar
-                  resultCount={filteredHotels.length}
+                  resultCount={visibleResultCount}
                   value={filters}
                   onChange={updateFilters}
                   onPriceModeChange={onPriceModeChange}
@@ -2170,7 +2210,7 @@ function HotelsPageInner() {
           {/* Results */}
           <main className="flex-1 min-w-0 flex flex-col gap-4">
             <HotelResultsToolbar
-              resultCount={filteredHotels.length}
+              resultCount={visibleResultCount}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
               sortMode={sortMode}
@@ -2195,7 +2235,7 @@ function HotelsPageInner() {
                 <div className="h-[calc(100vh-64px)] overflow-y-auto px-4 py-4">
                   {!loading && hotels.length > 0 ? (
                     <HotelFiltersSidebar
-                      resultCount={filteredHotels.length}
+                      resultCount={visibleResultCount}
                       value={filters}
                       onChange={updateFilters}
                       onPriceModeChange={onPriceModeChange}
