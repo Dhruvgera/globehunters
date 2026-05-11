@@ -562,5 +562,32 @@
     "perPerson": "per person",
     "features": "Features",
     "select": "Select"
+  },
+  "costSummary": {
+    "title": "Price Summary",
+    "showDetails": "Show Details",
+    "hideDetails": "Hide Details",
+    "tripTotal": "Trip Total",
+    "traveler": "Traveler",
+    "adult": "Adult",
+    "adults": "Adults",
+    "child": "Child",
+    "children": "Children",
+    "infant": "Infant",
+    "infants": "Infants",
+    "additionalBaggage": "Additional Baggage",
+    "bags": "bags",
+    "discountCode": "Discount code",
+    "guest": "guest",
+    "guests": "guests",
+    "hotel": "Hotel",
+    "nights": "nights",
+    "flightsPerBooking": "Flights (per booking)",
+    "included": "Included",
+    "protectionPlan": "Protection plan",
+    "checkedBaggage": "Checked baggage",
+    "bag": "bag",
+    "bagsPlural": "bags",
+    "iassureProtectionPlan": "iAssure Protection Plan"
   }
 }

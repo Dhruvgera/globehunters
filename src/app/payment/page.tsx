@@ -25,7 +25,7 @@ import { PaymentHeader } from "@/components/payment/PaymentHeader";
 import { BaggageSection } from "@/components/payment/BaggageSection";
 import { ProtectionPlanSection } from "@/components/payment/ProtectionPlanSection";
 import { RefundShieldSection } from "@/components/payment/RefundShieldSection";
-import { PaymentSummary } from "@/components/payment/PaymentSummary";
+import { CostSummaryCard } from "@/components/shared/CostSummaryCard";
 import { FlightSummaryCard } from "@/components/booking/FlightSummaryCard";
 import { WebRefCard } from "@/components/booking/WebRefCard";
 import { PaymentForm } from "@/components/payment/PaymentForm";
@@ -36,6 +36,7 @@ import { resolvePackagePricing } from "@/lib/package/pricing";
 import { formatPrice } from "@/lib/currency";
 import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
 import { formatPassengerLabel } from "@/lib/utils/passengerLabel";
+import { buildSummaryRows } from "@/lib/utils/buildSummaryRows";
 
 import { FOLDER_STATUS_CODES } from "@/types/portal";
 import { countryCodes } from "@/lib/utils/countryCodes";
@@ -68,6 +69,7 @@ function parseMoneyString(value: string | undefined): { amount?: number; currenc
 
 function PaymentContent() {
   const t = useTranslations('payment');
+  const tCost = useTranslations('costSummary');
   const router = useRouter();
   const searchParams = useSearchParams();
   const isPackageMode = searchParams?.get("type") === "package";
@@ -442,119 +444,78 @@ function PaymentContent() {
   const paymentSummaryRows = useMemo(() => {
     if (isHotelMode) {
       const totalGuests = (hotelSearch?.adults || 0) + (hotelSearch?.children || 0);
-      const guestLabel = totalGuests === 1 ? "guest" : "guests";
-      const rows: Array<{ label: string; value: string; valueClassName?: string }> = [
-        {
-          label: `Traveler: ${totalGuests} ${guestLabel}`,
-          value: formatPrice(baseFare, currency || "GBP"),
-          valueClassName: "text-sm font-medium text-[#010D50]",
-        },
-      ];
-      if (protectionPlanCost > 0) {
-        rows.push({
-          label: `iAssure Protection Plan (${protectionPlanName})`,
-          value: formatPrice(protectionPlanCost, currency || "GBP"),
-        });
-      }
-      return rows;
+      return buildSummaryRows({
+        mode: "hotel",
+        baseFare,
+        guestCount: totalGuests,
+        protectionPlanCost,
+        protectionPlanName,
+        currency: currency || "GBP",
+        t: tCost,
+      });
     }
 
     if (!isPackageMode) {
-      const travelerLabel = formatPassengerLabel({
-        breakdown: selectedUpgrade?.passengerBreakdown,
-        counts: storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 },
-        t,
-      });
-
-      const flightRows: Array<{ label: string; value: string; valueClassName?: string }> = [
-        {
-          label: `${t("traveler")}: ${travelerLabel}`,
-          value: formatPrice(baseFare, currency || "GBP"),
-          valueClassName: "text-sm font-medium text-[#010D50]",
-        },
-      ];
-
-      if (protectionPlanCost > 0) {
-        flightRows.push({
-          label: `iAssure Protection Plan (${protectionPlanName})`,
-          value: formatPrice(protectionPlanCost, currency || "GBP"),
-        });
-      }
-
-      if (baggageCost > 0) {
-        flightRows.push({
-          label: `${t("additionalBaggage")} (${additionalBaggage} ${t("bags")})`,
-          value: formatPrice(baggageCost, currency || "GBP"),
-        });
-      }
-
-      if (discountAmount > 0) {
-        flightRows.push({
-          label: `${t("discountCode")} (-${discountPercent * 100}%)`,
-          value: `-${formatPrice(discountAmount, currency || "GBP")}`,
-        });
-      }
-
-      return flightRows;
-    }
-
-    const rows: Array<{ label: string; value: string; valueClassName?: string }> = [
-      {
-        label: `Hotel (${hotelSearch?.checkIn && hotelSearch?.checkOut
-          ? calculateNights(hotelSearch.checkIn, hotelSearch.checkOut)
-          : packageSearch?.nights || 0} nights)`,
-        value: "Included",
-      },
-      {
-        label: "Flights (per booking)",
-        value: "Included",
-      },
-    ];
-
-    if (baggageCost > 0) {
-      rows.push({
-        label: `Checked baggage (${additionalBaggage} bag${additionalBaggage !== 1 ? "s" : ""})`,
-        value: formatPrice(baggageCost, currency || "GBP"),
+      return buildSummaryRows({
+        mode: "flight",
+        baseFare,
+        passengerBreakdown: selectedUpgrade?.passengerBreakdown,
+        searchPassengers: storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 },
+        protectionPlanCost,
+        protectionPlanName,
+        baggageCost,
+        baggageCount: additionalBaggage,
+        discountAmount,
+        discountPercent,
+        currency: currency || "GBP",
+        t: tCost,
       });
     }
 
-    if (protectionPlanCost > 0) {
-      rows.push({
-        label: "Protection plan",
-        value: formatPrice(protectionPlanCost, currency || "GBP"),
-      });
-    }
-
-    return rows;
+    return buildSummaryRows({
+      mode: "package",
+      baggageCost,
+      baggageCount: additionalBaggage,
+      protectionPlanCost,
+      hotelNights: hotelSearch?.checkIn && hotelSearch?.checkOut
+        ? calculateNights(hotelSearch.checkIn, hotelSearch.checkOut)
+        : undefined,
+      packageNights: packageSearch?.nights,
+      currency: currency || "GBP",
+      t: tCost,
+    });
   }, [
     baseFare,
     currency,
     hotelSearch?.adults,
     hotelSearch?.children,
+    hotelSearch?.checkIn,
+    hotelSearch?.checkOut,
     isHotelMode,
+    isPackageMode,
     protectionPlanCost,
     protectionPlanName,
     additionalBaggage,
     baggageCost,
-    hotelSearch?.checkIn,
-    hotelSearch?.checkOut,
-    isPackageMode,
     packageSearch?.nights,
     selectedUpgrade?.passengerBreakdown,
     storeSearchParams?.passengers,
+    discountAmount,
+    discountPercent,
+    tCost,
   ]);
   const paymentTotalSubtext = useMemo(() => {
     if (!isPackageMode) {
       const paxLabel = formatPassengerLabel({
         breakdown: selectedUpgrade?.passengerBreakdown,
         counts: storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 },
-        t,
-      }) || `1 ${t('adult')}`;
-      return `${t('traveler')}: ${paxLabel}`;
+        t: tCost,
+      }) || `1 ${tCost('adult')}`;
+      return `${tCost('traveler')}: ${paxLabel}`;
     }
     const perPerson = calculatePackagePerPersonPrice(tripTotalForDisplay, packageSearch?.rooms);
     return perPerson != null ? `${formatPrice(perPerson, currency || "GBP")} per person` : undefined;
-  }, [baseFare, currency, isPackageMode, packageSearch?.rooms, selectedUpgrade?.passengerBreakdown, storeSearchParams?.passengers, tripTotalForDisplay]);
+  }, [baseFare, currency, isPackageMode, packageSearch?.rooms, selectedUpgrade?.passengerBreakdown, storeSearchParams?.passengers, tCost, tripTotalForDisplay]);
 
   const paymentTermsText = isHotelMode
     ? "By checking this box, I acknowledge that guest information matches the passport or official ID for travel, and that name changes are not allowed. I confirm that I have reviewed the hotel details and agree to the Refund & Cancellation Policy. I understand bookings are non-transferable and non-changeable unless stated otherwise. I accept full responsibility for valid travel documentation and understand Globehunters cannot be held responsible for denied boarding due to passport or visa validity."
@@ -580,7 +541,7 @@ function PaymentContent() {
   const passengerLabel = formatPassengerLabel({
     breakdown: selectedUpgrade?.passengerBreakdown,
     counts: storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 },
-    t,
+    t: tCost,
   });
   const cabinLabel = formatFareLabel(selectedUpgrade?.cabinClassDisplay || selectedFareType);
 
@@ -775,7 +736,7 @@ function PaymentContent() {
                   <FlightSummaryCard
                     key={`${leg.fromCode}-${leg.toCode}-${index}`}
                     leg={leg}
-                    passengers={passengerLabel || `1 ${t('adult')}`}
+                    passengers={passengerLabel || `1 ${tCost('adult')}`}
                     onViewDetails={() => setShowFlightInfo(true)}
                     cabinLabel={cabinLabel}
                   />
@@ -1197,19 +1158,12 @@ function PaymentContent() {
             />
 
             {/* Price Summary */}
-            <PaymentSummary
-              baseFare={baseFare}
-              protectionPlanCost={protectionPlanCost}
-              protectionPlanName={protectionPlanName}
-              baggageCost={baggageCost}
-              baggageCount={additionalBaggage}
-              discountPercent={discountPercent}
-              discountAmount={discountAmount}
-              tripTotal={tripTotalForDisplay}
-              isSticky={true}
+            <CostSummaryCard
+              rows={paymentSummaryRows}
+              total={tripTotalForDisplay}
               currency={currency || 'GBP'}
               totalSubtext={paymentTotalSubtext}
-              rows={paymentSummaryRows}
+              isSticky={true}
             />
           </div>
         </div>

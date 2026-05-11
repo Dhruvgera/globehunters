@@ -13,6 +13,7 @@ import { useIdleTimer } from "@/hooks/useIdleTimer";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
 import { formatFareLabel } from "@/lib/utils";
 import { formatPassengerLabel } from "@/lib/utils/passengerLabel";
+import { buildSummaryRows } from "@/lib/utils/buildSummaryRows";
 import { useAirportNames } from "@/hooks/useAirportNames";
 import { getJourneySegments } from "@/lib/flight/segments";
 
@@ -22,7 +23,7 @@ import { AlertBanner } from "@/components/booking/AlertBanner";
 import { FlightSummaryCard } from "@/components/booking/FlightSummaryCard";
 import PassengerFormsSection from "@/components/booking/PassengerFormsSection";
 import { TermsAndConditions } from "@/components/booking/TermsAndConditions";
-import { PriceSummaryCard } from "@/components/booking/PriceSummaryCard";
+import { CostSummaryCard } from "@/components/shared/CostSummaryCard";
 import { CustomerReviewsCard } from "@/components/booking/CustomerReviewsCard";
 import { WebRefCard } from "@/components/booking/WebRefCard";
 import UpgradeOptionsModal from "@/components/flights/modals/UpgradeOptionsModal";
@@ -32,7 +33,7 @@ import { useReviews } from "@/hooks/useReviews";
 
 function BookingContent() {
   const t = useTranslations('booking');
-  const tPriceSummary = useTranslations('booking.priceSummary');
+  const tCost = useTranslations('costSummary');
   const router = useRouter();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showFlightInfo, setShowFlightInfo] = useState(false);
@@ -162,8 +163,25 @@ function BookingContent() {
   const passengerLabel = formatPassengerLabel({
     breakdown: selectedUpgrade?.passengerBreakdown,
     counts: storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 },
-    t: tPriceSummary,
+    t: tCost,
   });
+
+  const bookingCurrency = selectedUpgrade ? selectedUpgrade.currency : flight.currency;
+  const bookingTotal = selectedUpgrade ? selectedUpgrade.totalPrice : flight.price;
+
+  const bookingSummaryRows = useMemo(
+    () =>
+      buildSummaryRows({
+        mode: "flight",
+        baseFare: bookingTotal,
+        passengerBreakdown: passengerBreakdownForSummary,
+        searchPassengers: storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 },
+        currency: bookingCurrency,
+        t: tCost,
+      }),
+    [bookingTotal, bookingCurrency, passengerBreakdownForSummary, storeSearchParams?.passengers, tCost]
+  );
+
   const cabinLabel = formatFareLabel(selectedUpgrade?.cabinClassDisplay || selectedFareType);
 
   return (
@@ -234,7 +252,7 @@ function BookingContent() {
             {/* Terms & Conditions */}
             <TermsAndConditions
               onUpgradeClick={() => setShowUpgradeModal(true)}
-              hasUpgradeOptions={priceCheckData?.priceOptions && priceCheckData.priceOptions.length > 1}
+              hasUpgradeOptions={false}
               isCreatingFolder={isCreatingFolder}
               setIsCreatingFolder={setIsCreatingFolder}
             />
@@ -250,12 +268,11 @@ function BookingContent() {
             />
 
             {/* Price Summary */}
-            <PriceSummaryCard
-              baseTripTotal={selectedUpgrade ? selectedUpgrade.totalPrice : flight.price}
-              selectedUpgrade={selectedUpgrade}
-              passengerBreakdown={passengerBreakdownForSummary}
+            <CostSummaryCard
+              rows={bookingSummaryRows}
+              total={bookingTotal}
+              currency={bookingCurrency}
               isSticky={true}
-              currency={selectedUpgrade ? selectedUpgrade.currency : flight.currency}
             />
 
             {/* Customer Reviews */}

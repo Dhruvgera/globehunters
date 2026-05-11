@@ -18,13 +18,15 @@ export function formatPassengerLabel(params: {
 }): string {
   const { breakdown, counts, t } = params;
 
-  const adtCount = breakdown
+  const hasBreakdown = breakdown && breakdown.length > 0;
+
+  const adtCount = hasBreakdown
     ? (breakdown.find((p) => p.type === "ADT")?.count || 0)
     : (counts?.adults || 0);
-  const chdCount = breakdown
+  const chdCount = hasBreakdown
     ? (breakdown.find((p) => p.type === "CHD")?.count || 0)
     : (counts?.children || 0);
-  const infCount = breakdown
+  const infCount = hasBreakdown
     ? (breakdown.find((p) => p.type === "INF")?.count || 0)
     : (counts?.infants || 0);
 
