@@ -74,7 +74,7 @@ export function HotelResultCard({
   selected?: boolean;
   onSelect?: () => void;
   isPackageMode?: boolean;
-  onImageError?: () => void;
+  onImageError?: (hotelId: string) => void;
 }) {
   const isGrid = view === "grid";
   const showNightlyPrice = !isPackageMode;
@@ -106,8 +106,8 @@ export function HotelResultCard({
   const [imageError, setImageError] = useState(false);
   const handleImageError = useCallback(() => {
     setImageError(true);
-    onImageError?.();
-  }, [onImageError]);
+    onImageError?.(hotel.id);
+  }, [onImageError, hotel.id]);
 
   if (imageError) return null;
 

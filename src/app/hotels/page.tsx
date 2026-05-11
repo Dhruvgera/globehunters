@@ -1666,6 +1666,15 @@ function HotelsPageInner() {
     }
   }, [flushImageErrors]);
 
+  useEffect(() => {
+    return () => {
+      if (imageErrorFlushHandleRef.current) {
+        clearTimeout(imageErrorFlushHandleRef.current);
+        imageErrorFlushHandleRef.current = null;
+      }
+    };
+  }, []);
+
   // TrustYou enrichment: fetch live review scores for visible hotels and merge into card ratings.
   useEffect(() => {
     if (!ENABLE_TRUSTYOU_ENRICHMENT) return;
@@ -2157,7 +2166,7 @@ function HotelsPageInner() {
                     selected={hotelKey === selectedHotelKey}
                       onSelect={() => setSelectedHotelKey(hotelKey)}
                       isPackageMode={isPackageMode}
-                      onImageError={() => handleHotelImageError(hotel.id)}
+                      onImageError={handleHotelImageError}
                     />
                      );
                    })()
@@ -2178,7 +2187,7 @@ function HotelsPageInner() {
                       selected={hotelKey === selectedHotelKey}
                       onSelect={() => setSelectedHotelKey(hotelKey)}
                       isPackageMode={isPackageMode}
-                      onImageError={() => handleHotelImageError(hotel.id)}
+                      onImageError={handleHotelImageError}
                     />
                       );
                     })()
@@ -2197,7 +2206,7 @@ function HotelsPageInner() {
                         selected={hotelKey === selectedHotelKey}
                         onSelect={() => setSelectedHotelKey(hotelKey)}
                         isPackageMode={isPackageMode}
-                        onImageError={() => handleHotelImageError(hotel.id)}
+                        onImageError={handleHotelImageError}
                     />
                       );
                     })()
