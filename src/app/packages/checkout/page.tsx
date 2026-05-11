@@ -26,19 +26,10 @@ import { resolvePackagePricing } from "@/lib/package/pricing";
 import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
 import { hasErrors, validatePassenger } from "@/utils/validation";
 import type { HolidayPackageViewResponse } from "@/types/holidayPackage";
-import { formatPrice } from "@/lib/currency";
-
-function formatDateLabel(value?: string) {
-  if (!value) return "—";
-  const date = new Date(`${value.slice(0, 10)}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
+import { formatMoneyFromSymbol } from "@/lib/currency/formatMoney";
+import { formatLongDate } from "@/lib/utils/dateFormat";
+import { buildDetailsFromDeeplinkView } from "@/lib/package/deeplinkDetails";
+import { buildChangeHotelHref } from "@/lib/package/changeLinks";
 
 function parseMoneyString(value?: string | null) {
   const raw = String(value || "").trim();
@@ -50,17 +41,6 @@ function parseMoneyString(value?: string | null) {
     amount: Number(match[2]),
     currency: String(leading || trailing || "").trim() || undefined,
   };
-}
-
-function formatMoney(currency: string | undefined, amount: number | undefined) {
-  if (amount == null || Number.isNaN(amount)) return "—";
-  const normalized = String(currency || "").trim().toUpperCase();
-  const symbolToCode: Record<string, string> = { "£": "GBP", "$": "USD", "€": "EUR" };
-  const currencyCode = symbolToCode[normalized] || normalized;
-  if (/^[A-Z]{3}$/.test(currencyCode)) {
-    return formatPrice(amount, currencyCode);
-  }
-  return `${String(currency || "£").trim()}${amount.toFixed(2)}`;
 }
 
 function toIsoCurrency(currency: string | undefined) {
@@ -209,69 +189,6 @@ function normalizeRoomCodesToBookingIds(
   });
 
   return normalizedSelected.map((roomId) => map.get(roomId) || roomId);
-}
-
-function buildDetailsFromDeeplinkView(
-  viewData: HolidayPackageViewResponse
-): Awaited<ReturnType<typeof packageService.getPackageDetails>>["details"] {
-  const hotel = viewData.results.HotelDetails;
-  const roomOptions = Object.values(hotel.rooms || {})
-    .filter((entry): entry is HolidayPackageViewResponse["results"]["HotelDetails"]["rooms"][string] => Array.isArray(entry))
-    .flat();
-
-  const cancellationPolicies = roomOptions
-    .map((room, index) => ({
-      id: Number(room.id || index + 1),
-      roomName: room.room_name || "Room",
-      effectiveDate: room.CheckInDate,
-      endEffectiveDate: room.CheckOutDate,
-      policy: String(room.cancellation_policy || "").trim() || undefined,
-    }))
-    .filter((row) => row.policy);
-
-  const firstDirection = viewData.results.FlightDetails?.[0];
-  const firstLeg = firstDirection?.Flights?.[0];
-  const lastLeg = firstDirection?.Flights?.slice(-1)?.[0];
-
-  return {
-    quoteId: undefined,
-    packagePrice: undefined,
-    hotel: {
-      id: Number(viewData.results.HotelResultId || 0),
-      hotelId: Number(hotel.hotel_id || 0),
-      name: hotel.hotel_name,
-      description: hotel.quickDescription || undefined,
-      imageUrl: hotel.image_name || undefined,
-      starRating: Number(hotel.hotel_rating || 0) || undefined,
-      amenities: [],
-      checkOutDate: roomOptions[0]?.CheckOutDate,
-      rooms: roomOptions.map((room) => ({
-        id: Number(room.id || 0),
-        name: room.room_name || undefined,
-        nights: Number(room.days_spent || 0) || undefined,
-        checkIn: room.CheckInDate || undefined,
-        checkOut: room.CheckOutDate || undefined,
-        price: Number(room.cust_tot_sell_amt || room.net_price || 0) || undefined,
-        netPrice: Number(room.net_price || 0) || undefined,
-        mealCode: room.MealPlan || undefined,
-        mealName: room.meal_name || undefined,
-        currency: room.sell_currency_code || room.currency_code || undefined,
-        nonRefundable: Number(room.nonRef || 0) === 1,
-        remarks: room.cancellation_policy || undefined,
-      })),
-    },
-    cancellationPolicies,
-    flight: firstLeg
-      ? {
-          origin: String(firstLeg.departure_airport || ""),
-          destination: String(lastLeg?.arrival_airport || ""),
-          currency: String(hotel.SellCur || "GBP"),
-          validatingCarrier: String(firstDirection?.Majority_carrier || firstLeg.airline_name || ""),
-          refundable: Number(firstLeg.refundable || 0) === 1,
-        }
-      : undefined,
-    success: true,
-  };
 }
 
 function PackageTravellerDetailsInner() {
@@ -462,7 +379,7 @@ function PackageTravellerDetailsInner() {
       selectedFlightDelta,
       selectedFlightCurrency: selectedUpgrade?.currency || flight?.currency,
     });
-    return formatMoney(resolved.currency, resolved.amount);
+    return formatMoneyFromSymbol(resolved.currency, resolved.amount);
   }, [
     flight?.currency,
     flight?.packagePriceDeltaTotal,
@@ -491,7 +408,7 @@ function PackageTravellerDetailsInner() {
       selectedFlightDelta,
       selectedFlightCurrency: selectedUpgrade?.currency || flight?.currency,
     });
-    return formatMoney(
+    return formatMoneyFromSymbol(
       resolved.currency,
       calculatePackagePerPersonPrice(resolved.amount, packageSearch?.rooms)
     );
@@ -521,27 +438,10 @@ function PackageTravellerDetailsInner() {
     };
   }, [hotelDetailsCache, packageDetails?.hotel, selectedHotel]);
 
-  const changeHotelHref = useMemo(() => {
-    const params = new URLSearchParams();
-    params.set("type", "package");
-    if (packageSearch?.destinationName) params.set("location", packageSearch.destinationName);
-    if (packageSearch?.destinationHiddenValue) params.set("hidden_key", packageSearch.destinationHiddenValue);
-    if (packageSearch?.destinationCode) params.set("hidden_id", packageSearch.destinationCode);
-    if (packageSearch?.departureCode) params.set("fromCode", packageSearch.departureCode);
-    if (packageSearch?.departureName) params.set("from", packageSearch.departureName);
-    const checkIn = hotelSearch?.checkIn || packageSearch?.checkIn || "";
-    const checkOut = hotelSearch?.checkOut || "";
-    if (checkIn) params.set("checkIn", checkIn);
-    if (checkOut) params.set("checkOut", checkOut);
-    const rooms = hotelSearch?.rooms || packageSearch?.rooms?.length || 1;
-    const adults = hotelSearch?.adults || packageSearch?.rooms?.reduce((s, r) => s + r.adults, 0) || 2;
-    const children = hotelSearch?.children || packageSearch?.rooms?.reduce((s, r) => s + r.children, 0) || 0;
-    params.set("rooms", String(rooms));
-    params.set("adults", String(adults));
-    params.set("children", String(children));
-    if (hotelSearch?.branches) params.set("branches", hotelSearch.branches);
-    return `/hotels?${params.toString()}`;
-  }, [hotelSearch, packageSearch]);
+  const changeHotelHref = useMemo(
+    () => buildChangeHotelHref(hotelSearch, packageSearch),
+    [hotelSearch, packageSearch],
+  );
 
   const changeFlightHref = useMemo(() => {
     const params = new URLSearchParams();
@@ -794,7 +694,7 @@ function PackageTravellerDetailsInner() {
                     <div className="text-xs text-[#3A478A] truncate">{hotelDisplay.distance}</div>
                   ) : null}
                   <div className="text-xs text-[#3A478A] mt-1">
-                    Check-In: {formatDateLabel(stayDetails.checkIn)} | Check-Out: {formatDateLabel(stayDetails.checkOut)}
+                    Check-In: {formatLongDate(stayDetails.checkIn)} | Check-Out: {formatLongDate(stayDetails.checkOut)}
                   </div>
                   {hotelDisplay.rating ? (
                     <div className="mt-1 flex items-center gap-2">
@@ -822,13 +722,13 @@ function PackageTravellerDetailsInner() {
                 <div>
                   <div className="text-sm text-[#3A478A] mb-1">Check-In</div>
                   <div className="text-lg font-semibold text-[#010D50]">
-                    {formatDateLabel(stayDetails.checkIn)}
+                    {formatLongDate(stayDetails.checkIn)}
                   </div>
                 </div>
                 <div>
                   <div className="text-sm text-[#3A478A] mb-1">Check-Out</div>
                   <div className="text-lg font-semibold text-[#010D50]">
-                    {formatDateLabel(stayDetails.checkOut)}
+                    {formatLongDate(stayDetails.checkOut)}
                   </div>
                 </div>
               </div>

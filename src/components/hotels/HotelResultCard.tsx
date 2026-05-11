@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { Calendar, Check, ChevronRight, PawPrint, Bus, Coffee, X, Star } from "lucide-react";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 
 import { Button } from "@/components/ui/button";
 import type { Hotel } from "@/types/hotel";
@@ -67,12 +67,14 @@ export function HotelResultCard({
   selected = false,
   onSelect,
   isPackageMode = false,
+  onImageError,
 }: {
   hotel: Hotel;
   view: Exclude<HotelViewMode, "map">;
   selected?: boolean;
   onSelect?: () => void;
   isPackageMode?: boolean;
+  onImageError?: () => void;
 }) {
   const isGrid = view === "grid";
   const showNightlyPrice = !isPackageMode;
@@ -102,6 +104,13 @@ export function HotelResultCard({
   const hasReviewRating = hotel.reviews.score > 0;
   const packagePerPersonPrice = isPackageMode ? hotel.price.perPerson : undefined;
   const [imageError, setImageError] = useState(false);
+  const handleImageError = useCallback(() => {
+    setImageError(true);
+    onImageError?.();
+  }, [onImageError]);
+
+  if (imageError) return null;
+
   const rootClass = [
     "bg-white border rounded-xl shadow-sm hover:shadow-md transition-shadow overflow-hidden w-full max-w-full cursor-pointer",
     selected ? "border-[#3754ED] bg-[rgba(55,84,237,0.08)]" : "border-[#DFE0E4]",
@@ -114,13 +123,16 @@ export function HotelResultCard({
       target="_blank"
       rel="noopener noreferrer"
       tabIndex={0}
-      onClick={() => {
+      onClick={(e) => {
+        e.preventDefault();
         onSelect?.();
+        window.open(hotelDetailUrl, "_blank", "noopener,noreferrer");
       }}
       onKeyDown={(e) => {
-        if (e.key === " ") {
+        if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onSelect?.();
+          window.open(hotelDetailUrl, "_blank", "noopener,noreferrer");
         }
       }}
       className={rootClass}
@@ -139,7 +151,7 @@ export function HotelResultCard({
                 className="object-cover object-center"
                 sizes="(max-width: 1024px) 100vw, 360px"
                 priority={false}
-                onError={() => setImageError(true)}
+                onError={handleImageError}
               />
             ) : (
               <div className="flex items-center justify-center w-full h-full">
@@ -273,7 +285,7 @@ export function HotelResultCard({
                 className="object-cover object-center"
                 sizes="(max-width: 1024px) 100vw, 220px"
                 priority={false}
-                onError={() => setImageError(true)}
+                onError={handleImageError}
               />
             ) : (
               <div className="flex items-center justify-center w-full h-full">

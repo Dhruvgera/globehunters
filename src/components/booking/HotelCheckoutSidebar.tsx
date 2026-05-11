@@ -14,18 +14,8 @@ import {
   formatMoneyFromCode,
   type ConvertedHotelLocalTaxRow,
 } from "@/lib/currency/localTaxDisplay";
-import { formatPrice, getCurrencySymbol } from "@/lib/currency";
-
-function formatMoney(currency: string | undefined, amount: number | undefined) {
-  const a = typeof amount === "number" ? amount : undefined;
-  if (a == null || Number.isNaN(a)) return "—";
-  const normalized = String(currency || "GBP").trim().toUpperCase();
-  const symbolToCode: Record<string, string> = { "£": "GBP", "$": "USD", "€": "EUR" };
-  const currencyCode = symbolToCode[normalized] || normalized;
-  return /^[A-Z]{3}$/.test(currencyCode) || symbolToCode[normalized]
-    ? formatPrice(a, currencyCode)
-    : `${String(currency || "£").trim()}${a.toFixed(2)}`;
-}
+import { formatMoneyFromSymbol } from "@/lib/currency/formatMoney";
+import { normalizePolicyCurrencyText } from "@/lib/currency/policyText";
 
 import { calculateNights } from "@/lib/hotels/nights";
 
@@ -66,16 +56,6 @@ function sanitizePolicyText(value: unknown): string {
     seen.add(key);
     deduped.push(line);
   }
-
-  const normalizePolicyCurrencyText = (input: string) =>
-    input.replace(
-      /\b(GBP|USD|EUR|INR|AED|SAR|CAD|AUD|JPY|CNY)\b\s*([0-9]+(?:[.,][0-9]{1,2})?)|([0-9]+(?:[.,][0-9]{1,2})?)\s*\b(GBP|USD|EUR|INR|AED|SAR|CAD|AUD|JPY|CNY)\b/gi,
-      (_, leadingCode, leadingAmount, trailingAmount, trailingCode) => {
-        const currencyCode = String(leadingCode || trailingCode || "").toUpperCase();
-        const amount = String(leadingAmount || trailingAmount || "");
-        return `${getCurrencySymbol(currencyCode)}${amount}`;
-      }
-    );
 
   return normalizePolicyCurrencyText(deduped.join("\n"));
 }
@@ -459,8 +439,8 @@ export function HotelCheckoutSidebar({
         <div className="flex flex-col gap-3">
           {display.nightly != null && (
             <div className="flex items-center justify-between text-sm font-medium text-[#010D50]">
-              <span>{display.nights} nights x {display.rooms} room x {formatMoney(display.currency, display.nightly)}</span>
-              <span>{formatMoney(display.currency, display.baseTotal)}</span>
+              <span>{display.nights} nights x {display.rooms} room x {formatMoneyFromSymbol(display.currency, display.nightly)}</span>
+              <span>{formatMoneyFromSymbol(display.currency, display.baseTotal)}</span>
             </div>
           )}
 
@@ -469,14 +449,14 @@ export function HotelCheckoutSidebar({
               {display.includedTaxTotal > 0 && (
                 <div className="flex items-center justify-between text-sm font-medium text-[#010D50]">
                   <span>Taxes &amp; fees (included)</span>
-                  <span>{formatMoney(display.currency, display.includedTaxTotal)}</span>
+                  <span>{formatMoneyFromSymbol(display.currency, display.includedTaxTotal)}</span>
                 </div>
               )}
             </>
           ) : display.taxes != null && display.taxes > 0 ? (
             <div className="flex items-center justify-between text-sm font-medium text-[#010D50]">
               <span>Taxes</span>
-              <span>{formatMoney(display.currency, display.taxes)}</span>
+              <span>{formatMoneyFromSymbol(display.currency, display.taxes)}</span>
             </div>
           ) : null}
 
@@ -485,7 +465,7 @@ export function HotelCheckoutSidebar({
           <div className="flex items-center justify-between">
             <span className="text-sm font-semibold text-[#010D50]">Total</span>
             <span className="text-sm font-semibold text-[#010D50]">
-              {formatMoney(
+              {formatMoneyFromSymbol(
                 display.currency,
                 ((display.total ?? display.baseTotal) || 0) +
                   (convertedLocalTaxRows.length > 0
@@ -523,7 +503,7 @@ export function HotelCheckoutSidebar({
                 <div className="flex items-center justify-between text-xs font-semibold text-[#8B5E20] border-t border-[#F5D9B3] pt-1.5">
                   <span>Total local taxes</span>
                   <span>
-                    {convertedLocalTaxTotal || formatMoney(display.localTaxCurrency, display.localTaxTotal)}
+                    {convertedLocalTaxTotal || formatMoneyFromSymbol(display.localTaxCurrency, display.localTaxTotal)}
                   </span>
                 </div>
               )}

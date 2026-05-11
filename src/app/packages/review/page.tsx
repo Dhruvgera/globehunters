@@ -24,26 +24,11 @@ import { formatFareLabel } from "@/lib/utils";
 import { resolvePackagePricing } from "@/lib/package/pricing";
 import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
 import { calculateNights } from "@/lib/hotels/nights";
-import { formatPrice, getCurrencySymbol } from "@/lib/currency";
-
-function formatDateLabel(value?: string) {
-  if (!value) return "—";
-  const date = new Date(`${value.slice(0, 10)}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function shiftIsoDateByDays(baseIso: string, days: number): string {
-  const date = new Date(`${String(baseIso || "").slice(0, 10)}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return "";
-  date.setDate(date.getDate() + Math.max(0, Math.trunc(days || 0)));
-  return date.toISOString().slice(0, 10);
-}
+import { formatMoneyFromSymbol } from "@/lib/currency/formatMoney";
+import { normalizePolicyCurrencyText } from "@/lib/currency/policyText";
+import { formatLongDate, shiftIsoDateByDays } from "@/lib/utils/dateFormat";
+import { buildDetailsFromDeeplinkView } from "@/lib/package/deeplinkDetails";
+import { buildChangeHotelHref } from "@/lib/package/changeLinks";
 
 function parseMoneyString(value?: string | null) {
   const raw = String(value || "").trim();
@@ -55,28 +40,6 @@ function parseMoneyString(value?: string | null) {
     amount: Number(match[2]),
     currency: String(leading || trailing || "").trim() || undefined,
   };
-}
-
-function formatMoney(currency: string | undefined, amount: number | undefined) {
-  if (amount == null || Number.isNaN(amount)) return "—";
-  const normalized = String(currency || "").trim().toUpperCase();
-  const symbolToCode: Record<string, string> = { "£": "GBP", "$": "USD", "€": "EUR" };
-  const currencyCode = symbolToCode[normalized] || normalized;
-  if (/^[A-Z]{3}$/.test(currencyCode)) {
-    return formatPrice(amount, currencyCode);
-  }
-  return `${String(currency || "£").trim()}${amount.toFixed(2)}`;
-}
-
-function normalizePolicyCurrencyText(value?: string | null) {
-  return String(value || "").replace(
-    /\b(GBP|USD|EUR|INR|AED|SAR|CAD|AUD|JPY|CNY)\b\s*([0-9]+(?:[.,][0-9]{1,2})?)|([0-9]+(?:[.,][0-9]{1,2})?)\s*\b(GBP|USD|EUR|INR|AED|SAR|CAD|AUD|JPY|CNY)\b/gi,
-    (_, leadingCode, leadingAmount, trailingAmount, trailingCode) => {
-      const currencyCode = String(leadingCode || trailingCode || "").toUpperCase();
-      const amount = String(leadingAmount || trailingAmount || "");
-      return `${getCurrencySymbol(currencyCode)}${amount}`;
-    }
-  );
 }
 
 function getUniquePackageRooms<T>(rooms: T[] | undefined) {
@@ -95,69 +58,6 @@ function getUniquePackageRooms<T>(rooms: T[] | undefined) {
   }
 
   return uniqueRooms;
-}
-
-function buildDetailsFromDeeplinkView(
-  viewData: HolidayPackageViewResponse
-): Awaited<ReturnType<typeof packageService.getPackageDetails>>["details"] {
-  const hotel = viewData.results.HotelDetails;
-  const roomOptions = Object.values(hotel.rooms || {})
-    .filter((entry): entry is HolidayPackageViewResponse["results"]["HotelDetails"]["rooms"][string] => Array.isArray(entry))
-    .flat();
-
-  const cancellationPolicies = roomOptions
-    .map((room, index) => ({
-      id: Number(room.id || index + 1),
-      roomName: room.room_name || "Room",
-      effectiveDate: room.CheckInDate,
-      endEffectiveDate: room.CheckOutDate,
-      policy: String(room.cancellation_policy || "").trim() || undefined,
-    }))
-    .filter((row) => row.policy);
-
-  const firstDirection = viewData.results.FlightDetails?.[0];
-  const firstLeg = firstDirection?.Flights?.[0];
-  const lastLeg = firstDirection?.Flights?.slice(-1)?.[0];
-
-  return {
-    quoteId: undefined,
-    packagePrice: undefined,
-    hotel: {
-      id: Number(viewData.results.HotelResultId || 0),
-      hotelId: Number(hotel.hotel_id || 0),
-      name: hotel.hotel_name,
-      description: hotel.quickDescription || undefined,
-      imageUrl: hotel.image_name || undefined,
-      starRating: Number(hotel.hotel_rating || 0) || undefined,
-      amenities: [],
-      checkOutDate: roomOptions[0]?.CheckOutDate,
-      rooms: roomOptions.map((room) => ({
-        id: Number(room.id || 0),
-        name: room.room_name || undefined,
-        nights: Number(room.days_spent || 0) || undefined,
-        checkIn: room.CheckInDate || undefined,
-        checkOut: room.CheckOutDate || undefined,
-        price: Number(room.cust_tot_sell_amt || room.net_price || 0) || undefined,
-        netPrice: Number(room.net_price || 0) || undefined,
-        mealCode: room.MealPlan || undefined,
-        mealName: room.meal_name || undefined,
-        currency: room.sell_currency_code || room.currency_code || undefined,
-        nonRefundable: Number(room.nonRef || 0) === 1,
-        remarks: room.cancellation_policy || undefined,
-      })),
-    },
-    cancellationPolicies,
-    flight: firstLeg
-      ? {
-          origin: String(firstLeg.departure_airport || ""),
-          destination: String(lastLeg?.arrival_airport || ""),
-          currency: String(hotel.SellCur || "GBP"),
-          validatingCarrier: String(firstDirection?.Majority_carrier || firstLeg.airline_name || ""),
-          refundable: Number(firstLeg.refundable || 0) === 1,
-        }
-      : undefined,
-    success: true,
-  };
 }
 
 function PackageReviewPageInner() {
@@ -411,27 +311,10 @@ function PackageReviewPageInner() {
     };
   }, [hotelDetailsCache, packageDetails?.hotel, selectedHotel]);
 
-  const changeHotelHref = useMemo(() => {
-    const params = new URLSearchParams();
-    params.set("type", "package");
-    if (packageSearch?.destinationName) params.set("location", packageSearch.destinationName);
-    if (packageSearch?.destinationHiddenValue) params.set("hidden_key", packageSearch.destinationHiddenValue);
-    if (packageSearch?.destinationCode) params.set("hidden_id", packageSearch.destinationCode);
-    if (packageSearch?.departureCode) params.set("fromCode", packageSearch.departureCode);
-    if (packageSearch?.departureName) params.set("from", packageSearch.departureName);
-    const checkIn = hotelSearch?.checkIn || packageSearch?.checkIn || "";
-    const checkOut = hotelSearch?.checkOut || (checkIn && packageSearch?.nights ? shiftIsoDateByDays(checkIn, packageSearch.nights) : "");
-    if (checkIn) params.set("checkIn", checkIn);
-    if (checkOut) params.set("checkOut", checkOut);
-    const rooms = hotelSearch?.rooms || packageSearch?.rooms?.length || 1;
-    const adults = hotelSearch?.adults || packageSearch?.rooms?.reduce((s, r) => s + r.adults, 0) || 2;
-    const children = hotelSearch?.children || packageSearch?.rooms?.reduce((s, r) => s + r.children, 0) || 0;
-    params.set("rooms", String(rooms));
-    params.set("adults", String(adults));
-    params.set("children", String(children));
-    if (hotelSearch?.branches) params.set("branches", hotelSearch.branches);
-    return `/hotels?${params.toString()}`;
-  }, [hotelSearch, packageSearch]);
+  const changeHotelHref = useMemo(
+    () => buildChangeHotelHref(hotelSearch, packageSearch, true),
+    [hotelSearch, packageSearch],
+  );
 
   const changeFlightHref = useMemo(() => {
     const params = new URLSearchParams();
@@ -518,9 +401,9 @@ function PackageReviewPageInner() {
           <div className="mt-4 sm:mt-5 bg-[#FFF5EA] border border-[#FFD699] rounded-xl p-3.5 sm:p-4">
             <p className="text-sm font-semibold text-[#B45309]">Price update</p>
             <p className="text-sm text-[#9A3412]">
-              The latest package check is {formatMoney(packagePriceIncrease.currency, packagePriceIncrease.liveAmount)}, which is{" "}
-              {formatMoney(packagePriceIncrease.currency, packagePriceIncrease.increase)} higher than the previously shown{" "}
-              {formatMoney(packagePriceIncrease.currency, packagePriceIncrease.baselineAmount)}.
+              The latest package check is {formatMoneyFromSymbol(packagePriceIncrease.currency, packagePriceIncrease.liveAmount)}, which is{" "}
+              {formatMoneyFromSymbol(packagePriceIncrease.currency, packagePriceIncrease.increase)} higher than the previously shown{" "}
+              {formatMoneyFromSymbol(packagePriceIncrease.currency, packagePriceIncrease.baselineAmount)}.
             </p>
           </div>
         )}
@@ -561,14 +444,14 @@ function PackageReviewPageInner() {
                     <h3 className="text-lg font-semibold text-[#010D50] mb-1">{hotelDisplay.name}</h3>
                     <p className="text-sm text-[#3A478A] mb-3">{hotelDisplay.distance}</p>
                     <p className="text-sm text-[#3A478A] mb-3">
-                      Check-In: {formatDateLabel(
+                      Check-In: {formatLongDate(
                         hotelSearch?.checkIn ||
                         packageDetails?.hotel?.rooms?.[0]?.checkIn ||
                         packageSearch?.checkIn ||
                         searchParams.get("checkIn") ||
                         searchParams.get("departureDate") ||
                         ""
-                      )} | Check-Out: {formatDateLabel(
+                      )} | Check-Out: {formatLongDate(
                         hotelSearch?.checkOut ||
                         packageDetails?.hotel?.rooms?.[0]?.checkOut ||
                         packageDetails?.hotel?.checkOutDate ||
@@ -611,7 +494,7 @@ function PackageReviewPageInner() {
                   <div>
                     <div className="text-sm text-[#3A478A] mb-1">Check-In</div>
                     <div className="text-lg font-semibold text-[#010D50]">
-                      {formatDateLabel(
+                      {formatLongDate(
                         hotelSearch?.checkIn ||
                         packageDetails?.hotel?.rooms?.[0]?.checkIn ||
                         packageSearch?.checkIn ||
@@ -624,7 +507,7 @@ function PackageReviewPageInner() {
                   <div>
                     <div className="text-sm text-[#3A478A] mb-1">Check-Out</div>
                     <div className="text-lg font-semibold text-[#010D50]">
-                      {formatDateLabel(
+                      {formatLongDate(
                         hotelSearch?.checkOut ||
                         packageDetails?.hotel?.rooms?.[0]?.checkOut ||
                         packageDetails?.hotel?.checkOutDate ||
@@ -706,14 +589,14 @@ function PackageReviewPageInner() {
                 {selectedCancellation ? (
                   <>
                     <p className="text-sm font-medium text-[#010D50]">
-                      Effective from {formatDateLabel(selectedCancellation.effectiveDate)}
+                      Effective from {formatLongDate(selectedCancellation.effectiveDate)}
                     </p>
                     <p className="text-sm text-[#3A478A]">
                       {normalizePolicyCurrencyText(selectedCancellation.policy)}
                     </p>
                     {selectedCancellation.penalty != null && (
                       <p className="text-sm text-[#3A478A]">
-                        Penalty: {formatMoney(selectedCancellation.penaltyCurrency, selectedCancellation.penalty)}
+                        Penalty: {formatMoneyFromSymbol(selectedCancellation.penaltyCurrency, selectedCancellation.penalty)}
                       </p>
                     )}
                   </>
@@ -745,14 +628,14 @@ function PackageReviewPageInner() {
                       <span className="text-[#3A478A]">
                         Checked baggage ({addOns.additionalBaggage} bag{addOns.additionalBaggage !== 1 ? "s" : ""})
                       </span>
-                      <span className="font-medium text-[#010D50]">{formatMoney(pricing.currency, baggageCost)}</span>
+                      <span className="font-medium text-[#010D50]">{formatMoneyFromSymbol(pricing.currency, baggageCost)}</span>
                     </div>
                   )}
                   {addOns.protectionPlan && (
                     <div className="flex justify-between">
                       <span className="text-[#3A478A]">Protection plan</span>
                       <span className="font-medium text-[#010D50]">
-                        {formatMoney(pricing.currency, protectionPlanCost)}
+                        {formatMoneyFromSymbol(pricing.currency, protectionPlanCost)}
                       </span>
                     </div>
                   )}
@@ -763,10 +646,10 @@ function PackageReviewPageInner() {
                     <span className="font-semibold text-[#010D50]">Total</span>
                     <div className="text-right">
                       <div className="text-2xl font-bold text-[#3754ED]">
-                        {formatMoney(pricing.currency, totalPrice)}
+                        {formatMoneyFromSymbol(pricing.currency, totalPrice)}
                       </div>
                       <div className="text-xs text-[#3A478A]">
-                        {formatMoney(pricing.currency, totalPerPersonPrice)} per person
+                        {formatMoneyFromSymbol(pricing.currency, totalPerPersonPrice)} per person
                       </div>
                       <div className="text-xs text-[#3A478A]">Incl. all taxes & fees</div>
                     </div>

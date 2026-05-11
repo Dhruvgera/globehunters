@@ -364,6 +364,7 @@ function HotelsPageInner() {
   const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
   const [displayedHotelsCount, setDisplayedHotelsCount] = useState(12);
   const [loadMorePending, setLoadMorePending] = useState(false);
+  const [hiddenImageHotelIds, setHiddenImageHotelIds] = useState<Set<string>>(new Set());
   const failedImageIdsRef = useRef<Set<string>>(new Set());
   const activeRequestSeq = useRef(0);
   const contentInflightRef = useRef<Set<string>>(new Set());
@@ -532,8 +533,12 @@ function HotelsPageInner() {
   const resolvedSearch = useMemo(() => {
     const p = new URLSearchParams(urlParamsKey);
     const location = p.get("location") || savedHotelSearch?.location || "London";
-    const checkIn = p.get("checkIn") || savedHotelSearch?.checkIn || "2026-02-10";
-    const checkOut = p.get("checkOut") || savedHotelSearch?.checkOut || "2026-02-12";
+    const today = new Date();
+    const defaultCheckIn = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 5);
+    const defaultCheckOut = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 8);
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const checkIn = p.get("checkIn") || savedHotelSearch?.checkIn || fmt(defaultCheckIn);
+    const checkOut = p.get("checkOut") || savedHotelSearch?.checkOut || fmt(defaultCheckOut);
     const adults = Math.max(1, Number(p.get("adults") || savedHotelSearch?.adults || "2") || 2);
     const children = Math.max(0, Number(p.get("children") || savedHotelSearch?.children || "0") || 0);
     const rooms = Math.max(1, Number(p.get("rooms") || savedHotelSearch?.rooms || "1") || 1);
@@ -653,6 +658,7 @@ function HotelsPageInner() {
       setHotels([]);
       setSelectedHotelKey("");
       setDisplayedHotelsCount(12);
+      setHiddenImageHotelIds(new Set());
       failedImageIdsRef.current = new Set();
       setBreakfastByHotelId({});
       setBreakfastEnriching(false);
@@ -1585,6 +1591,11 @@ function HotelsPageInner() {
     return filteredHotels.slice(0, displayedHotelsCount);
   }, [displayedHotelsCount, filteredHotels]);
 
+  const visibleResultCount = useMemo(() => {
+    if (hiddenImageHotelIds.size === 0) return filteredHotels.length;
+    return filteredHotels.filter((h) => !hiddenImageHotelIds.has(h.id)).length;
+  }, [filteredHotels, hiddenImageHotelIds]);
+
   const filteredHotelsRef = useRef(filteredHotels);
   filteredHotelsRef.current = filteredHotels;
 
@@ -1626,6 +1637,34 @@ function HotelsPageInner() {
     );
     setLoadMorePending(false);
   }, [displayedHotelsCount]);
+
+  const pendingImageErrorsRef = useRef<Set<string>>(new Set());
+  const imageErrorFlushHandleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flushImageErrors = useCallback(() => {
+    imageErrorFlushHandleRef.current = null;
+    const pending = pendingImageErrorsRef.current;
+    if (pending.size === 0) return;
+    const batch = new Set(pending);
+    pending.clear();
+    setHiddenImageHotelIds((prev) => {
+      const merged = new Set(prev);
+      let added = 0;
+      for (const id of batch) {
+        if (!merged.has(id)) { merged.add(id); added++; }
+      }
+      if (added === 0) return prev;
+      setDisplayedHotelsCount((c) => Math.min(c + added, filteredHotelsRef.current.length));
+      return merged;
+    });
+  }, []);
+
+  const handleHotelImageError = useCallback((hotelId: string) => {
+    pendingImageErrorsRef.current.add(hotelId);
+    if (!imageErrorFlushHandleRef.current) {
+      imageErrorFlushHandleRef.current = setTimeout(flushImageErrors, 0);
+    }
+  }, [flushImageErrors]);
 
   // TrustYou enrichment: fetch live review scores for visible hotels and merge into card ratings.
   useEffect(() => {
@@ -1993,7 +2032,7 @@ function HotelsPageInner() {
             {!loading && hotels.length > 0 && (
               <>
                 <HotelFiltersSidebar
-                  resultCount={filteredHotels.length}
+                  resultCount={visibleResultCount}
                   value={filters}
                   onChange={updateFilters}
                   onPriceModeChange={onPriceModeChange}
@@ -2016,7 +2055,7 @@ function HotelsPageInner() {
           {/* Results */}
           <main className="flex-1 min-w-0 flex flex-col gap-4">
             <HotelResultsToolbar
-              resultCount={filteredHotels.length}
+              resultCount={visibleResultCount}
               viewMode={viewMode}
               onViewModeChange={setViewMode}
               sortMode={sortMode}
@@ -2041,7 +2080,7 @@ function HotelsPageInner() {
                 <div className="h-[calc(100vh-64px)] overflow-y-auto px-4 py-4">
                   {!loading && hotels.length > 0 ? (
                     <HotelFiltersSidebar
-                      resultCount={filteredHotels.length}
+                      resultCount={visibleResultCount}
                       value={filters}
                       onChange={updateFilters}
                       onPriceModeChange={onPriceModeChange}
@@ -2116,11 +2155,12 @@ function HotelsPageInner() {
                     hotel={hotel}
                     view="grid"
                     selected={hotelKey === selectedHotelKey}
-                    onSelect={() => setSelectedHotelKey(hotelKey)}
-                    isPackageMode={isPackageMode}
-                  />
-                    );
-                  })()
+                      onSelect={() => setSelectedHotelKey(hotelKey)}
+                      isPackageMode={isPackageMode}
+                      onImageError={() => handleHotelImageError(hotel.id)}
+                    />
+                     );
+                   })()
                 ))}
               </div>
             ) : (
@@ -2138,24 +2178,26 @@ function HotelsPageInner() {
                       selected={hotelKey === selectedHotelKey}
                       onSelect={() => setSelectedHotelKey(hotelKey)}
                       isPackageMode={isPackageMode}
+                      onImageError={() => handleHotelImageError(hotel.id)}
                     />
                       );
                     })()
                   ))}
-                </div>
-                {/* On desktop, show list layout */}
-                <div className="hidden sm:flex flex-col gap-4">
-                  {displayedHotels.map((hotel, idx) => (
-                    (() => {
-                      const hotelKey = `${hotel.id}-${idx}`;
-                      return (
-                    <HotelResultCard
-                      key={hotelKey}
-                      hotel={hotel}
-                      view="list"
-                      selected={hotelKey === selectedHotelKey}
-                      onSelect={() => setSelectedHotelKey(hotelKey)}
-                      isPackageMode={isPackageMode}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {displayedHotels.map((hotel, idx) => (
+                  (() => {
+                    const hotelKey = `${hotel.id}-${idx}`;
+                    return (
+                      <HotelResultCard
+                        key={hotelKey}
+                        hotel={hotel}
+                        view="list"
+                        selected={hotelKey === selectedHotelKey}
+                        onSelect={() => setSelectedHotelKey(hotelKey)}
+                        isPackageMode={isPackageMode}
+                        onImageError={() => handleHotelImageError(hotel.id)}
                     />
                       );
                     })()
