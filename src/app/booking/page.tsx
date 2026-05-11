@@ -12,6 +12,7 @@ import { ErrorMessage } from "@/components/ui/error-message";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
 import { formatFareLabel } from "@/lib/utils";
+import { formatPassengerLabel } from "@/lib/utils/passengerLabel";
 import { useAirportNames } from "@/hooks/useAirportNames";
 import { getJourneySegments } from "@/lib/flight/segments";
 
@@ -31,6 +32,7 @@ import { useReviews } from "@/hooks/useReviews";
 
 function BookingContent() {
   const t = useTranslations('booking');
+  const tPriceSummary = useTranslations('booking.priceSummary');
   const router = useRouter();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showFlightInfo, setShowFlightInfo] = useState(false);
@@ -157,25 +159,11 @@ function BookingContent() {
     airlineCode: seg.carrierCode || flight.airline.code,
   }));
 
-  const passengerLabel = (() => {
-    // Prefer selected upgrade breakdown; fallback to searched passengers
-    if (selectedUpgrade?.passengerBreakdown?.length) {
-      const adt = selectedUpgrade.passengerBreakdown.find(p => p.type === 'ADT')?.count || 0;
-      const chd = selectedUpgrade.passengerBreakdown.find(p => p.type === 'CHD')?.count || 0;
-      const inf = selectedUpgrade.passengerBreakdown.find(p => p.type === 'INF')?.count || 0;
-      const parts = [];
-      if (adt) parts.push(`${adt} Adult${adt > 1 ? 's' : ''}`);
-      if (chd) parts.push(`${chd} Child${chd > 1 ? 'ren' : ''}`);
-      if (inf) parts.push(`${inf} Infant${inf > 1 ? 's' : ''}`);
-      return parts.join(", ");
-    }
-    const counts = storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 };
-    const parts = [];
-    if (counts.adults) parts.push(`${counts.adults} Adult${counts.adults > 1 ? 's' : ''}`);
-    if (counts.children) parts.push(`${counts.children} Child${counts.children > 1 ? 'ren' : ''}`);
-    if (counts.infants) parts.push(`${counts.infants} Infant${counts.infants > 1 ? 's' : ''}`);
-    return parts.join(", ");
-  })();
+  const passengerLabel = formatPassengerLabel({
+    breakdown: selectedUpgrade?.passengerBreakdown,
+    counts: storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 },
+    t: tPriceSummary,
+  });
   const cabinLabel = formatFareLabel(selectedUpgrade?.cabinClassDisplay || selectedFareType);
 
   return (

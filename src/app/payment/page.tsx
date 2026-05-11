@@ -35,6 +35,7 @@ import { packageService } from "@/services/api/packageService";
 import { resolvePackagePricing } from "@/lib/package/pricing";
 import { formatPrice } from "@/lib/currency";
 import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
+import { formatPassengerLabel } from "@/lib/utils/passengerLabel";
 
 import { FOLDER_STATUS_CODES } from "@/types/portal";
 import { countryCodes } from "@/lib/utils/countryCodes";
@@ -458,7 +459,44 @@ function PaymentContent() {
       return rows;
     }
 
-    if (!isPackageMode) return undefined;
+    if (!isPackageMode) {
+      const travelerLabel = formatPassengerLabel({
+        breakdown: selectedUpgrade?.passengerBreakdown,
+        counts: storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 },
+        t,
+      });
+
+      const flightRows: Array<{ label: string; value: string; valueClassName?: string }> = [
+        {
+          label: `${t("traveler")}: ${travelerLabel}`,
+          value: formatPrice(baseFare, currency || "GBP"),
+          valueClassName: "text-sm font-medium text-[#010D50]",
+        },
+      ];
+
+      if (protectionPlanCost > 0) {
+        flightRows.push({
+          label: `iAssure Protection Plan (${protectionPlanName})`,
+          value: formatPrice(protectionPlanCost, currency || "GBP"),
+        });
+      }
+
+      if (baggageCost > 0) {
+        flightRows.push({
+          label: `${t("additionalBaggage")} (${additionalBaggage} ${t("bags")})`,
+          value: formatPrice(baggageCost, currency || "GBP"),
+        });
+      }
+
+      if (discountAmount > 0) {
+        flightRows.push({
+          label: `${t("discountCode")} (-${discountPercent * 100}%)`,
+          value: `-${formatPrice(discountAmount, currency || "GBP")}`,
+        });
+      }
+
+      return flightRows;
+    }
 
     const rows: Array<{ label: string; value: string; valueClassName?: string }> = [
       {
@@ -502,12 +540,21 @@ function PaymentContent() {
     hotelSearch?.checkOut,
     isPackageMode,
     packageSearch?.nights,
+    selectedUpgrade?.passengerBreakdown,
+    storeSearchParams?.passengers,
   ]);
   const paymentTotalSubtext = useMemo(() => {
-    if (!isPackageMode) return undefined;
+    if (!isPackageMode) {
+      const paxLabel = formatPassengerLabel({
+        breakdown: selectedUpgrade?.passengerBreakdown,
+        counts: storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 },
+        t,
+      }) || `1 ${t('adult')}`;
+      return `${t('traveler')}: ${paxLabel}`;
+    }
     const perPerson = calculatePackagePerPersonPrice(tripTotalForDisplay, packageSearch?.rooms);
     return perPerson != null ? `${formatPrice(perPerson, currency || "GBP")} per person` : undefined;
-  }, [currency, isPackageMode, packageSearch?.rooms, tripTotalForDisplay]);
+  }, [baseFare, currency, isPackageMode, packageSearch?.rooms, selectedUpgrade?.passengerBreakdown, storeSearchParams?.passengers, tripTotalForDisplay]);
 
   const paymentTermsText = isHotelMode
     ? "By checking this box, I acknowledge that guest information matches the passport or official ID for travel, and that name changes are not allowed. I confirm that I have reviewed the hotel details and agree to the Refund & Cancellation Policy. I understand bookings are non-transferable and non-changeable unless stated otherwise. I accept full responsibility for valid travel documentation and understand Globehunters cannot be held responsible for denied boarding due to passport or visa validity."
@@ -530,24 +577,11 @@ function PaymentContent() {
     }));
   }, [journeySegments, flight]);
 
-  const passengerLabel = (() => {
-    if (selectedUpgrade?.passengerBreakdown?.length) {
-      const adt = selectedUpgrade.passengerBreakdown.find(p => p.type === 'ADT')?.count || 0;
-      const chd = selectedUpgrade.passengerBreakdown.find(p => p.type === 'CHD')?.count || 0;
-      const inf = selectedUpgrade.passengerBreakdown.find(p => p.type === 'INF')?.count || 0;
-      const parts: string[] = [];
-      if (adt) parts.push(`${adt} ${t('adult')}${adt > 1 ? 's' : ''}`);
-      if (chd) parts.push(`${chd} Child${chd > 1 ? 'ren' : ''}`);
-      if (inf) parts.push(`${inf} Infant${inf > 1 ? 's' : ''}`);
-      return parts.join(", ");
-    }
-    const counts = storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 };
-    const parts: string[] = [];
-    if (counts.adults) parts.push(`${counts.adults} ${t('adult')}${counts.adults > 1 ? 's' : ''}`);
-    if (counts.children) parts.push(`${counts.children} Child${counts.children > 1 ? 'ren' : ''}`);
-    if (counts.infants) parts.push(`${counts.infants} Infant${counts.infants > 1 ? 's' : ''}`);
-    return parts.join(", ");
-  })();
+  const passengerLabel = formatPassengerLabel({
+    breakdown: selectedUpgrade?.passengerBreakdown,
+    counts: storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 },
+    t,
+  });
   const cabinLabel = formatFareLabel(selectedUpgrade?.cabinClassDisplay || selectedFareType);
 
   const hotelDisplay = useMemo(() => {
