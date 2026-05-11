@@ -96,7 +96,7 @@ export default function FlightCard({
     router.push("/booking");
   };
 
-  const handleBook = () => {
+  const handleBook = async () => {
     if (isPackageMode && onSelect) {
       const baseOption = priceCheckData?.priceOptions?.[0];
       if (baseOption) {
@@ -107,11 +107,14 @@ export default function FlightCard({
       return;
     }
 
-    router.push('/booking');
+    let currentPriceCheck = priceCheckData;
+    if (!currentPriceCheck && (flight.flightKey || flight.segmentResultId)) {
+      currentPriceCheck = await checkPrice(String(flight.segmentResultId || ''), flight.flightKey);
+    }
 
     setVyspaFolderInfo({ folderNumber: '', customerId: null, emailAddress: null });
 
-    const baseOption = priceCheckData?.priceOptions?.[0];
+    const baseOption = currentPriceCheck?.priceOptions?.[0];
     if (baseOption) {
       setSelectedUpgrade(baseOption);
       setSelectedFlight(flight, baseOption.cabinClassDisplay);
@@ -119,9 +122,11 @@ export default function FlightCard({
       setSelectedFlight(flight, 'Economy');
     }
 
-    if (priceCheckData) {
-      setPriceCheckData(priceCheckData);
+    if (currentPriceCheck) {
+      setPriceCheckData(currentPriceCheck);
     }
+
+    router.push('/booking');
   };
 
   // Debug mode - show module_id and Result_id when enabled
