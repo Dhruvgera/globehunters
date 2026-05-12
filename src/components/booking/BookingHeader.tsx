@@ -8,6 +8,7 @@ import { useBookingStore } from "@/store/bookingStore";
 import { SearchParams } from "@/types/flight";
 import { serializeHotelChildAges } from "@/lib/hotels/childAges";
 import { convertDateFormat } from "@/lib/vyspa";
+import { convertDatetoDateString } from "@/lib/vyspa/utils";
 
 interface BookingHeaderProps {
   currentStep?: number;
@@ -43,7 +44,7 @@ function buildSearchUrl(
     // Format date as YYYY-MM-DD
     const formatDate = (date: Date | string) => {
       const d = date instanceof Date ? date : new Date(date);
-      return convertDateFormat(d.toLocaleDateString());
+      return convertDatetoDateString(d);
     };
 
     params.set("departureDate", formatDate(searchParams.departureDate));
