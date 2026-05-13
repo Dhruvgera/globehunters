@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { formatPrice } from "@/lib/currency";
 import { ProtectionPlanCard } from "./protection-plan/ProtectionPlanCard";
 import { ProtectionPlanTable } from "./protection-plan/ProtectionPlanTable";
+import { GetInclusions } from "./protection-plan/ProtectionPlans";
 
 interface ProtectionPlanSectionProps {
   selectedPlan?: "basic" | "premium" | "all";
@@ -26,7 +27,8 @@ export function ProtectionPlanSection({
 }: ProtectionPlanSectionProps) {
   const t = useTranslations('payment.iAssure');
   const [isExpanded, setIsExpanded] = useState(false);
-
+  const features = GetInclusions();
+  const featureMobile = GetInclusions('mobile')
   const handleTogglePlan = (plan: "basic" | "premium" | "all") => {
     if (selectedPlan === plan) {
       onSelectPlan(undefined);
@@ -34,42 +36,6 @@ export function ProtectionPlanSection({
       onSelectPlan(plan);
     }
   };
-
-  const basicFeatures = [
-    t('features.support247'),
-    t('features.freeChanges24h'),
-    t('features.refundDeath'),
-    t('features.refundAirline'),
-  ];
-
-  const premiumFeatures = [
-    t('features.allBasic'),
-    t('features.freeChangesAnytime'),
-    t('features.refundLockdown'),
-    t('features.baggageCompensation'),
-    t('features.flightDelay'),
-  ];
-
-  const allFeatures = [
-    t('features.allPremium'),
-    t('features.priceMatch'),
-    t('features.futureCredit'),
-    t('features.priorityService'),
-  ];
-
-  const desktopFeatures = [
-    t('features.support247Full'),
-    t('features.rebookRename'),
-    t('features.refundDeathFull'),
-    t('features.freeChangesAnytime'),
-    t('features.refundAirlineFull'),
-    t('features.refundLockdownFull'),
-    t('features.baggageCompensationFull'),
-    t('features.flightDelay'),
-    t('features.priceMatch'),
-    t('features.futureCredit'),
-  ];
-
   return (
     <div className="bg-white border-2 border-[#3754ED] rounded-xl p-3 flex flex-col gap-3">
       <div className="flex items-center justify-between">
@@ -89,15 +55,14 @@ export function ProtectionPlanSection({
 
       {/* Mobile: Card-based layout */}
       <div
-        className={`lg:hidden flex flex-col gap-3 ${
-          isExpanded ? "flex" : "hidden"
-        }`}
+        className={`lg:hidden flex flex-col gap-3 ${isExpanded ? "flex" : "hidden"
+          }`}
       >
         <ProtectionPlanCard
           planType="basic"
           title={t('basic')}
           price={formatPrice(planPrices.basic, currency)}
-          features={basicFeatures}
+          features={featureMobile.basic}
           isSelected={selectedPlan === "basic"}
           onSelect={() => handleTogglePlan("basic")}
         />
@@ -105,7 +70,7 @@ export function ProtectionPlanSection({
           planType="premium"
           title={t('premium')}
           price={formatPrice(planPrices.premium, currency)}
-          features={premiumFeatures}
+          features={featureMobile.premium}
           isSelected={selectedPlan === "premium"}
           onSelect={() => handleTogglePlan("premium")}
         />
@@ -113,7 +78,7 @@ export function ProtectionPlanSection({
           planType="all"
           title={t('allIncluded')}
           price={formatPrice(planPrices.all, currency)}
-          features={allFeatures}
+          features={featureMobile.allIncluded}
           isSelected={selectedPlan === "all"}
           onSelect={() => handleTogglePlan("all")}
         />
@@ -121,7 +86,6 @@ export function ProtectionPlanSection({
 
       {/* Desktop: Table layout */}
       <ProtectionPlanTable
-        features={desktopFeatures}
         basicPrice={formatPrice(planPrices.basic, currency)}
         premiumPrice={formatPrice(planPrices.premium, currency)}
         allPrice={formatPrice(planPrices.all, currency)}
