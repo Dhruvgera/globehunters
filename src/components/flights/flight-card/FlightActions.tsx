@@ -43,7 +43,7 @@ export function FlightActions({
         ) : null}
         <Button
           variant="ghost"
-          className="hidden bg-[rgba(55,84,237,0.12)] hover:bg-[rgba(55,84,237,0.2)] text-[#3754ED] rounded-full px-3 sm:px-4 py-1.5 sm:py-2 h-auto text-[10px] sm:text-xs font-medium whitespace-nowrap"
+          className="bg-[rgba(55,84,237,0.12)] hover:bg-[rgba(55,84,237,0.2)] text-[#3754ED] rounded-full px-3 sm:px-4 py-1.5 sm:py-2 h-auto text-[10px] sm:text-xs font-medium whitespace-nowrap"
           onClick={onViewFlightInfo}
           onMouseEnter={onPrefetchOptions}
         >
