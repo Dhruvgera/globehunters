@@ -1465,7 +1465,7 @@ function PaymentCompleteContent() {
                 </div>
                 <p className="text-xs text-[#4B5563] leading-relaxed">
                   {termsText} At the time of booking you confirmed that you have read and agreed to our General Terms and Conditions of Carriage. Please{" "}
-                  <a href="https://www.globehunters.com/terms" target="_blank" rel="noopener noreferrer" className="text-[#3754ED] hover:underline font-medium">
+                  <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-[#3754ED] hover:underline font-medium">
                     Click Here
                   </a>{" "}
                   to review these again if necessary.
@@ -1510,7 +1510,7 @@ function PaymentCompleteContent() {
               <p className="text-xs text-[#6B7280]">
                 *Flight schedule and aircraft type are subject to change per the
                 Contract of Carriage.{" "}
-                <a href="https://www.globehunters.com/terms" target="_blank" rel="noopener noreferrer" className="text-[#3754ED] hover:underline">More</a>
+                <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-[#3754ED] hover:underline">More</a>
               </p>
             </div>
 
