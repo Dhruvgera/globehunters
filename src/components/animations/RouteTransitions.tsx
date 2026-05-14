@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { usePathname } from 'next/navigation';
 
@@ -12,6 +12,16 @@ const variants = {
 
 export default function RouteTransitions({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+
+  useEffect(() => {
+    const lenis = (window as any).lenis;
+    if (lenis) {
+      lenis.scrollTo(0, { immediate: true });
+    } else {
+      window.scrollTo(0, 0);
+    }
+  }, [pathname]);
+
   return (
     <AnimatePresence mode="wait" initial={false}>
       <motion.div

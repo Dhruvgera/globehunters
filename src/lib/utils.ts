@@ -20,6 +20,9 @@ export function formatFareLabel(label?: string | null): string {
   let s = String(label).trim();
   if (!s) return 'Economy';
 
+  // Filter out non-informative API values like "Not Specified"
+  if (/^not\s*specified$/i.test(s)) return 'Economy';
+
   // Normalize separators
   s = s.replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
 
