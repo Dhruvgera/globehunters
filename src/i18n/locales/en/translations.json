@@ -291,7 +291,7 @@
     },
     "terms": {
       "title": "Terms & Conditions",
-      "acceptTerms": "By clicking this checkbox, I acknowledge that I have read and accepted Globehunters Terms & Conditions and Privacy Policy",
+      "acceptTerms": "By clicking this checkbox, I acknowledge that I have read and accepted Globehunters <termsLink>Terms & Conditions</termsLink> and <privacyLink>Privacy Policy</privacyLink>",
       "acceptMarketing": "By clicking this checkbox, I consent to receive marketing messages via calls, texts, and emails from Globehunters at the provided contact. I understand that my consent is not a condition of purchase.",
       "upgradeOptions": "Upgrade options",
       "book": "Book"

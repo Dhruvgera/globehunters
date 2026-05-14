@@ -33,6 +33,7 @@ function DateSlider({
   loadingIndices = new Set(),
   onDateInView,
   type,
+  centered,
 }: {
   label: string;
   icon: typeof CalendarDays;
@@ -43,6 +44,7 @@ function DateSlider({
   loadingIndices?: Set<number>;
   onDateInView?: (index: number, type: 'departure' | 'return') => void;
   type: 'departure' | 'return';
+  centered?: boolean;
 }) {
   const t = useTranslations('search.flights');
   const dateStripRef = useRef<HTMLDivElement>(null);
@@ -123,7 +125,7 @@ function DateSlider({
 
         <div
           ref={dateStripRef}
-          className="flex-1 flex items-stretch gap-2 overflow-x-auto no-scrollbar snap-x snap-mandatory min-w-0"
+          className={`flex-1 flex items-stretch gap-2 overflow-x-auto no-scrollbar snap-x snap-mandatory min-w-0${centered ? ' justify-center' : ''}`}
         >
           {dates.map((datePrice, index) => {
             const active = index === selectedIndex;
@@ -197,11 +199,8 @@ export function DatePriceSelector({
 
   return (
     <div className="mx-auto max-w-7xl px-3 sm:px-4 md:px-6 lg:px-8 mb-4 sm:mb-6 mt-4 sm:mt-6">
-      <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 min-w-0">
-        {/* Departure Dates */}
-        <div className={`min-w-0 bg-white border border-[#DFE0E4] rounded-xl p-3 sm:p-4 ${
-          returnDates && onSelectReturnDate ? 'flex-1' : 'w-full max-w-2xl mx-auto'
-        }`}>
+      <div className={`flex gap-4 sm:gap-6 min-w-0 ${returnDates && onSelectReturnDate ? 'flex-col lg:flex-row' : 'flex-col'}`}>
+        <div className={`min-w-0 bg-white border border-[#DFE0E4] rounded-xl p-3 sm:p-4 ${returnDates && onSelectReturnDate ? 'flex-1' : 'w-full'}`}>
           <DateSlider
             label={t('departureDate')}
             icon={CalendarDays}
@@ -212,10 +211,10 @@ export function DatePriceSelector({
             loadingIndices={loadingIndices}
             onDateInView={handleDateInView}
             type="departure"
+            centered={!returnDates}
           />
         </div>
 
-        {/* Return Dates (if round trip) */}
         {returnDates && onSelectReturnDate && (
           <div className="flex-1 min-w-0 bg-white border border-[#DFE0E4] rounded-xl p-3 sm:p-4">
             <DateSlider
