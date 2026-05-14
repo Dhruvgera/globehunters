@@ -261,20 +261,22 @@ function BookingContent() {
 
           {/* Right Sidebar */}
           <div className="w-full lg:w-[30%] flex flex-col gap-4">
-            {/* Web Ref Card - Desktop Only */}
-            <WebRefCard
-              refNumber={webRefNumber}
-              phoneNumber={affiliatePhone}
-              isMobile={false}
-            />
+            <div className="lg:sticky lg:top-24 z-10 flex flex-col gap-4">
+              {/* Web Ref Card - Desktop Only */}
+              <WebRefCard
+                refNumber={webRefNumber}
+                phoneNumber={affiliatePhone}
+                isMobile={false}
+              />
 
-            {/* Price Summary */}
-            <CostSummaryCard
-              rows={bookingSummaryRows}
-              total={bookingTotal}
-              currency={bookingCurrency}
-              isSticky={true}
-            />
+              {/* Price Summary */}
+              <CostSummaryCard
+                rows={bookingSummaryRows}
+                total={bookingTotal}
+                currency={bookingCurrency}
+                isSticky={false}
+              />
+            </div>
 
             {/* Customer Reviews */}
             <CustomerReviewsCard

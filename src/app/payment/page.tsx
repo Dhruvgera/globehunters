@@ -1150,21 +1150,23 @@ function PaymentContent() {
 
           {/* Right Sidebar */}
           <div className="w-full lg:w-[30%] flex flex-col gap-4">
-            {/* Web Ref Card - Desktop Only */}
-            <WebRefCard
-              refNumber={refNumber}
-              phoneNumber={affiliatePhone}
-              isMobile={false}
-            />
+            <div className="lg:sticky lg:top-24 flex flex-col gap-4">
+              {/* Web Ref Card - Desktop Only */}
+              <WebRefCard
+                refNumber={refNumber}
+                phoneNumber={affiliatePhone}
+                isMobile={false}
+              />
 
-            {/* Price Summary */}
-            <CostSummaryCard
-              rows={paymentSummaryRows}
-              total={tripTotalForDisplay}
-              currency={currency || 'GBP'}
-              totalSubtext={paymentTotalSubtext}
-              isSticky={true}
-            />
+              {/* Price Summary */}
+              <CostSummaryCard
+                rows={paymentSummaryRows}
+                total={tripTotalForDisplay}
+                currency={currency || 'GBP'}
+                totalSubtext={paymentTotalSubtext}
+                isSticky={false}
+              />
+            </div>
           </div>
         </div>
       </div>
