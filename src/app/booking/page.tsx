@@ -203,19 +203,8 @@ function BookingContent() {
           />
 
           {/* Left Column - Forms */}
-          <div className="flex-1 flex flex-col gap-3">
+          <div className="w-full lg:w-[70%] flex flex-col gap-3">
             {/* Travel Documents Alert */}
-            <AlertBanner type="success">
-              <p className="font-medium">
-                {t('alerts.travelDocuments.line1')}
-              </p>
-              <p>
-                {t('alerts.travelDocuments.line2')}
-              </p>
-              <p>
-                {t('alerts.travelDocuments.line3')}
-              </p>
-            </AlertBanner>
 
             {/* Price Change Alert - Temporarily hidden */}
             {/* <AlertBanner type="info" title={t('alerts.priceChange.title')}>
@@ -225,13 +214,13 @@ function BookingContent() {
             </AlertBanner> */}
 
             {/* Baggage Alert - Only show when flights have stopovers */}
-            {journeySegments.some(seg => seg.stops > 0) && (
+            {/* {journeySegments.some(seg => seg.stops > 0) && (
               <AlertBanner type="error" title={t('alerts.baggageAlert.title')}>
                 <p>
                   {t('alerts.baggageAlert.message')}
                 </p>
               </AlertBanner>
-            )}
+            )} */}
 
             {/* Flight Summary Cards */}
             <div className="flex flex-col gap-3">
@@ -249,6 +238,18 @@ function BookingContent() {
             {/* Passenger Details Form */}
             <PassengerFormsSection />
 
+            <AlertBanner type="success">
+              <p className="font-medium">
+                {t('alerts.travelDocuments.line1')}
+              </p>
+              <p>
+                {t('alerts.travelDocuments.line2')}
+              </p>
+              <p>
+                {t('alerts.travelDocuments.line3')}
+              </p>
+            </AlertBanner>
+
             {/* Terms & Conditions */}
             <TermsAndConditions
               onUpgradeClick={() => setShowUpgradeModal(true)}
@@ -259,7 +260,7 @@ function BookingContent() {
           </div>
 
           {/* Right Sidebar */}
-          <div className="w-full lg:w-[482px] flex flex-col gap-4">
+          <div className="w-full lg:w-[30%] flex flex-col gap-4">
             {/* Web Ref Card - Desktop Only */}
             <WebRefCard
               refNumber={webRefNumber}

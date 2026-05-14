@@ -71,6 +71,14 @@ export function FlightSummaryCard({
           <span>{cabinLabel || t('economy')}</span>
           <div className="w-1 h-1 rounded-full bg-[#010D50]" />
           <span>{passengers}</span>
+          <div className="w-1 h-1 rounded-full bg-[#010D50]" />
+          <Button
+            variant="link"
+            onClick={onViewDetails}
+            className="text-sm font-medium text-[#3754ED] p-0 h-auto"
+          >
+            {t('viewDetails')}
+          </Button>
         </div>
       </div>
 
@@ -116,33 +124,31 @@ export function FlightSummaryCard({
         <span className="text-sm font-semibold text-[#010D50]">
           {leg.from} {t('to')} {leg.to}
         </span>
-        <div className="flex flex-col gap-3 w-full">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-[#010D50]">{leg.fromCode}</span>
-              <span className="text-sm font-semibold text-[#010D50]">
-                {leg.departureTime}
-              </span>
-            </div>
-            <svg width="61" height="5" viewBox="0 0 61 5" fill="none">
-              <circle cx="20" cy="2.5" r="2.5" fill="#010D50" />
-              <line
-                x1="0"
-                y1="2.5"
-                x2="61"
-                y2="2.5"
-                stroke="#010D50"
-                strokeDasharray="4 4"
-              />
-            </svg>
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold text-[#010D50]">
-                {leg.arrivalTime}
-              </span>
-              <span className="text-sm text-[#010D50]">{leg.toCode}</span>
-            </div>
+        <div className="flex items-center gap-3 flex-wrap w-full">
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-[#010D50]">{leg.fromCode}</span>
+            <span className="text-sm font-semibold text-[#010D50]">
+              {leg.departureTime}
+            </span>
           </div>
-          <div className="flex items-center gap-3 text-sm text-[#010D50] flex-wrap">
+          <svg width="61" height="5" viewBox="0 0 61 5" fill="none">
+            <circle cx="20" cy="2.5" r="2.5" fill="#010D50" />
+            <line
+              x1="0"
+              y1="2.5"
+              x2="61"
+              y2="2.5"
+              stroke="#010D50"
+              strokeDasharray="4 4"
+            />
+          </svg>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-[#010D50]">
+              {leg.arrivalTime}
+            </span>
+            <span className="text-sm text-[#010D50]">{leg.toCode}</span>
+          </div>
+          <div className="flex items-center gap-3 text-sm text-[#010D50] ml-auto">
             <span>{leg.stops}</span>
             <div className="w-1 h-1 rounded-full bg-[#010D50]" />
             <span>{leg.duration}</span>
@@ -152,16 +158,7 @@ export function FlightSummaryCard({
         </div>
       </div>
 
-      {/* Desktop: Actions aligned to the right */}
-      <div className="hidden lg:flex items-center justify-end">
-        <Button
-          variant="link"
-          onClick={onViewDetails}
-          className="text-sm font-medium text-[#3754ED] p-0 h-auto"
-        >
-          {t('viewDetails')}
-        </Button>
-      </div>
+
     </div>
   );
 }
