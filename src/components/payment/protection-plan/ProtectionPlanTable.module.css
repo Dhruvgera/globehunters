@@ -1,5 +1,5 @@
 .recommendedLabel {
-    background: green;
+    background: hsl(var(--success));
     padding: 5px;
     font-size: 14px;
     color: white;
@@ -11,7 +11,7 @@
 }
 
 .selectedLabel {
-    background: #3754ed;
+    background: hsl(var(--primary));
     padding: 5px;
     z-index: 4;
     font-size: 14px;

@@ -1,6 +1,16 @@
 @import "tailwindcss";
 @import "react-day-picker/style.css";
 
+@theme {
+  --color-primary: hsl(230 82% 57%);
+  --color-primary-foreground: hsl(210 40% 98%);
+  --color-primary-hover: hsl(230 62% 48%);
+  --color-success: hsl(147 100% 25.5%);
+  --color-success-foreground: hsl(0 0% 100%);
+  --color-success-hover: hsl(147 100% 20%);
+  --color-success-light: hsl(130 36% 88%);
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -11,6 +21,11 @@
     --popover-foreground: 222.2 84% 4.9%;
     --primary: 230 82% 57%;
     --primary-foreground: 210 40% 98%;
+    --primary-hover: 230 62% 48%;
+    --success: 147 100% 25.5%;
+    --success-foreground: 0 0% 100%;
+    --success-hover: 147 100% 20%;
+    --success-light: 130 36% 88%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96.1%;

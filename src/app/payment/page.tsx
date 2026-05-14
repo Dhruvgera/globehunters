@@ -632,7 +632,7 @@ function PaymentContent() {
           />
 
           {/* Left Column */}
-          <div className="flex-1 flex flex-col gap-4">
+          <div className="w-full lg:w-[70%] flex flex-col gap-4">
             {(isPackageMode || isHotelMode) && (
               <div className="flex flex-col gap-3">
                 <HotelSummaryCard isPackageMode={isPackageMode} />
@@ -1149,7 +1149,7 @@ function PaymentContent() {
           </div>
 
           {/* Right Sidebar */}
-          <div className="w-full lg:w-[482px] flex flex-col gap-4">
+          <div className="w-full lg:w-[30%] flex flex-col gap-4">
             {/* Web Ref Card - Desktop Only */}
             <WebRefCard
               refNumber={refNumber}
