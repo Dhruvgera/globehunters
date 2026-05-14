@@ -31,7 +31,11 @@ export async function GET() {
 
     // 2. Fetch Reviews
     // Fetch a larger batch to filter from (200 to have more quality options after filtering)
-    const reviewsResponse = await fetch(`https://api.yotpo.com/v1/apps/${APP_KEY}/reviews?utoken=${accessToken}&per_page=400&sort=date`, {
+    const sinceDate = new Date();
+    sinceDate.setDate(1);
+    sinceDate.setMonth(sinceDate.getMonth() - 2);
+    const sinceDateStr = sinceDate.toISOString();
+    const reviewsResponse = await fetch(`https://api.yotpo.com/v1/apps/${APP_KEY}/reviews?utoken=${accessToken}&count=100&sort=date&since_date=${sinceDateStr}`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
       next: { revalidate: 3600 } // Cache reviews for 1 hour
