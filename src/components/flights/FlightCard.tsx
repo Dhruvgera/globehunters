@@ -38,6 +38,9 @@ export default function FlightCard({
   const setSelectedFlight = useBookingStore(
     (state) => state.setSelectedFlight
   );
+  const setSelectedUpgrade = useBookingStore(
+    (state) => state.setSelectedUpgrade
+  );
   const setPriceCheckData = useBookingStore(
     (state) => state.setPriceCheckData
   );
@@ -91,6 +94,39 @@ export default function FlightCard({
     
     setSelectedFlight(flight, fareType);
     router.push("/booking");
+  };
+
+  const handleBook = async () => {
+    if (isPackageMode && onSelect) {
+      const baseOption = priceCheckData?.priceOptions?.[0];
+      if (baseOption) {
+        setSelectedUpgrade(baseOption);
+      }
+      setSelectedFlight(flight, baseOption?.cabinClassDisplay || 'Economy');
+      onSelect();
+      return;
+    }
+
+    let currentPriceCheck = priceCheckData;
+    if (!currentPriceCheck && (flight.flightKey || flight.segmentResultId)) {
+      currentPriceCheck = await checkPrice(String(flight.segmentResultId || ''), flight.flightKey);
+    }
+
+    setVyspaFolderInfo({ folderNumber: '', customerId: null, emailAddress: null });
+
+    const baseOption = currentPriceCheck?.priceOptions?.[0];
+    if (baseOption) {
+      setSelectedUpgrade(baseOption);
+      setSelectedFlight(flight, baseOption.cabinClassDisplay);
+    } else {
+      setSelectedFlight(flight, 'Economy');
+    }
+
+    if (currentPriceCheck) {
+      setPriceCheckData(currentPriceCheck);
+    }
+
+    router.push('/booking');
   };
 
   // Debug mode - show module_id and Result_id when enabled
@@ -161,11 +197,11 @@ export default function FlightCard({
         showTicketOptionsToggle={!isPackageMode}
         onViewFlightInfo={() => setShowFlightInfo(!showFlightInfo)}
         onToggleTicketOptions={() => {
-          // Ensure price options are loading before expanding
           if (flight.segmentResultId) prefetchOptions();
           setShowTicketOptions(!showTicketOptions);
         }}
         onPrefetchOptions={prefetchOptions}
+        onBook={handleBook}
       />
 
       {/* Expandable Ticket Options */}
