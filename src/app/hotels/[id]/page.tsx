@@ -39,6 +39,8 @@ import { hotelService } from "@/services/api/hotelService";
 import { packageService } from "@/services/api/packageService";
 import { useBookingStore, useStoreHydration } from "@/store/bookingStore";
 import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
+import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
+import type { Flight, FlightSegment } from "@/types/flight";
 import { resolveTrustYouHotelId } from "@/lib/trustyou/hotelMapping";
 import type { TrustYouHotelReviewSummary } from "@/types/trustyou";
 import type { HolidayPackageViewResponse, AccommodationViewResponse, ViewRoomOption } from "@/types/holidayPackage";
@@ -63,7 +65,8 @@ function LoadingBlock({ className }: { className: string }) {
 function formatIsoDateLabel(d?: string): string {
   const s = String(d || "").slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return "Add Date";
-  return s;
+  const [y, m, day] = s.split("-");
+  return `${day}-${m}-${y}`;
 }
 
 function formatStayDate(d?: string): string {
@@ -114,6 +117,14 @@ function formatDisplayPrice(currency: string | undefined, amount: number | undef
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+function parsePositivePriceCandidate(value: unknown): number | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const parsed = Number(raw.replace(/[^0-9.-]/g, ""));
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
 }
 
 function formatFlightClock(value: number | string | undefined): string {
@@ -1035,6 +1046,7 @@ export default function HotelRoomsPage() {
   const packageResults = useBookingStore((s) => s.packageResults);
   const packageResultsMeta = useBookingStore((s) => s.packageResultsMeta);
   const selectedPackage = useBookingStore((s) => s.selectedPackage);
+  const selectedFlight = useBookingStore((s) => s.selectedFlight);
   const hotelResultsMeta = useBookingStore((s) => s.hotelResultsMeta);
   const setSelectedHotel = useBookingStore((s) => s.setSelectedHotel);
   const setSelectedHotelRoomIds = useBookingStore((s) => s.setSelectedHotelRoomIds);
@@ -1125,6 +1137,7 @@ export default function HotelRoomsPage() {
   // State
   const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
+  const [flightInfoModalOpen, setFlightInfoModalOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("Overview");
   const [remoteHotelHeader, setRemoteHotelHeader] = useState<{
     name: string;
@@ -1146,6 +1159,7 @@ export default function HotelRoomsPage() {
   const [selectedRoomCounts, setSelectedRoomCounts] = useState<Record<string, number>>({});
   const [stayEditorOpen, setStayEditorOpen] = useState(false);
   const [stayUpdateLoading, setStayUpdateLoading] = useState(false);
+  const packageHotelResultIdRef = useRef<number | null>(null);
   const [roomsFilterOpen, setRoomsFilterOpen] = useState(false);
   const [expandedRoomInfoById, setExpandedRoomInfoById] = useState<Record<string, boolean>>({});
   const [stayCheckIn, setStayCheckIn] = useState<string>(() => hotelSearch?.checkIn || "");
@@ -1360,6 +1374,16 @@ export default function HotelRoomsPage() {
     rooms: number;
     childAges: number[];
   }) {
+    // Immediately invalidate stale room selection/pricing from the previous dates
+    // so the sidebar never mixes old prices with new dates.
+    setSelectedHotelRoomSummary(null);
+    setSelectedHotelRoomIds([]);
+    setSelectedRoomCounts({});
+
+    if (isPackageMode && packageSearch) {
+      return runPackageStaySearch(next);
+    }
+
     if (!hotelSearch?.location || !hotelSearch?.hidden_id || !hotelSearch?.hidden_key) {
       throw new Error("Missing search context (destination) to update availability.");
     }
@@ -1462,6 +1486,151 @@ export default function HotelRoomsPage() {
       return true;
     }
     return false;
+  }
+
+  async function runPackageStaySearch(next: {
+    checkIn: string;
+    checkOut: string;
+    adults: number;
+    children: number;
+    rooms: number;
+    childAges: number[];
+  }) {
+    if (!packageSearch) {
+      throw new Error("Missing package search context to update dates.");
+    }
+
+    const nights = calculateStayNights(next.checkIn, next.checkOut);
+    if (nights <= 0) {
+      throw new Error("Check-out must be after check-in.");
+    }
+
+    const roomConfigs = packageSearch.rooms.length > 0
+      ? packageSearch.rooms.map((room, idx) => ({
+          ...room,
+          adults: idx === 0 ? Math.max(1, next.adults - (next.rooms - 1)) : 1,
+          children: idx === 0 ? next.children : 0,
+          childAges: idx === 0 ? next.childAges : [],
+        }))
+      : Array.from({ length: next.rooms }, (_, idx) => ({
+          adults: idx === 0 ? Math.max(1, next.adults - (next.rooms - 1)) : 1,
+          children: idx === 0 ? next.children : 0,
+          childAges: idx === 0 ? next.childAges : [],
+          infants: 0,
+        }));
+
+    const adjustedRoomConfigs = next.rooms !== roomConfigs.length
+      ? Array.from({ length: next.rooms }, (_, idx) => {
+          const baseAdults = Math.floor(next.adults / next.rooms);
+          const extraAdult = idx < (next.adults % next.rooms) ? 1 : 0;
+          return {
+            adults: Math.max(1, baseAdults + extraAdult),
+            children: idx === 0 ? next.children : 0,
+            childAges: idx === 0 ? next.childAges : [],
+            infants: 0,
+          };
+        })
+      : roomConfigs;
+
+    let destinationHiddenValue = packageSearch.destinationHiddenValue;
+
+    const hiddenParts = destinationHiddenValue.split(";");
+    const needsLookup = !destinationHiddenValue.includes(";") ||
+      (hiddenParts.length >= 3 && !hiddenParts[1]?.trim());
+
+    if (needsLookup) {
+      const destCode = hiddenParts[0]?.trim() || packageSearch.destinationCode || "";
+      const lookupTerms = [destCode, packageSearch.destinationName].filter((t) => t && t.length >= 2);
+
+      for (const term of lookupTerms) {
+        if (destinationHiddenValue.includes(";") && hiddenParts[1]?.trim()) break;
+        try {
+          const destResp = await fetch(`/api/packages/destinations?location=${encodeURIComponent(term)}`);
+          if (destResp.ok) {
+            const destinations = (await destResp.json()) as Array<{
+              id?: string | number;
+              name?: string;
+              hiddenvalue?: string;
+            }>;
+            const match =
+              (destCode && destinations.find((d) => {
+                const hv = String(d.hiddenvalue || "");
+                return hv.split(";")[0]?.trim().toUpperCase() === destCode.toUpperCase();
+              })) ||
+              destinations.find((d) => String(d.name || "").trim().toLowerCase() === term.trim().toLowerCase());
+            if (match?.hiddenvalue) {
+              destinationHiddenValue = match.hiddenvalue;
+              break;
+            }
+          }
+        } catch {
+          // destination lookup failed, continue with next term
+        }
+      }
+    }
+
+    if (!destinationHiddenValue.includes(";")) {
+      throw new Error("Could not resolve package destination for updated dates.");
+    }
+
+    const newSearchCriteria = {
+      departureCode: packageSearch.departureCode,
+      departureName: packageSearch.departureName,
+      destinationCode: packageSearch.destinationCode,
+      destinationName: packageSearch.destinationName,
+      destinationHiddenValue,
+      checkIn: next.checkIn,
+      nights,
+      rooms: adjustedRoomConfigs,
+      timeout: 30,
+    };
+
+    const pkgResponse = await packageService.searchPackages(newSearchCriteria);
+
+    if (!pkgResponse.results || pkgResponse.results.length === 0) {
+      throw new Error("No package results found for the updated dates.");
+    }
+
+    const currentHotelName = (remoteHotelHeader?.name || "").toLowerCase();
+    const vendorHotelId = hotelResultsMeta?.[hotelId]?.vyspaHotelId;
+
+    const matchedHotel =
+      pkgResponse.results.find((r) => vendorHotelId && String(r.hotelId) === String(vendorHotelId)) ||
+      pkgResponse.results.find((r) => currentHotelName && r.hotelName.toLowerCase() === currentHotelName) ||
+      pkgResponse.results.find((r) => currentHotelName && r.hotelName.toLowerCase().includes(currentHotelName));
+
+    if (!matchedHotel) {
+      throw new Error("The selected hotel is not available for the updated dates. Please try different dates.");
+    }
+
+    packageHotelResultIdRef.current = matchedHotel.id;
+
+    const { setPackageSearch: storeSetPkgSearch, setPackageResults: storeSetPkgResults } = useBookingStore.getState();
+    storeSetPkgSearch({
+      ...newSearchCriteria,
+      requestId: pkgResponse.meta.requestId || undefined,
+    });
+    storeSetPkgResults(pkgResponse.results, pkgResponse.meta);
+
+    setHotelSearch({
+      provider: "vyspa",
+      location: hotelSearch?.location || packageSearch.destinationName,
+      hidden_id: hotelSearch?.hidden_id || "",
+      hidden_key: hotelSearch?.hidden_key || "",
+      checkIn: next.checkIn,
+      checkOut: next.checkOut,
+      rooms: next.rooms,
+      adults: next.adults,
+      children: next.children,
+      child_age: buildHotelChildAgesFromFlat(next.childAges, next.rooms, next.children),
+      branches: hotelSearch?.branches || "UK",
+      searchCriteriaId: pkgResponse.meta.requestId,
+      arrivalPointCode: hotelSearch?.arrivalPointCode,
+    });
+
+    if (pkgResponse.meta.requestId) {
+      setSearchRequestId(String(pkgResponse.meta.requestId));
+    }
   }
 
   function parseRemoteDataXml(remoteData: string) {
@@ -1855,6 +2024,62 @@ export default function HotelRoomsPage() {
     () => packageResults?.find((row) => String(row.id) === String(hotelId)),
     [hotelId, packageResults]
   );
+  const displayedSearchPrice = useMemo(() => {
+    if (isPackageMode) {
+      const amount = Number(
+        matchedPackageResult?.startingPrice ?? selectedPackage?.totalPrice ?? NaN
+      );
+      if (!Number.isFinite(amount) || amount <= 0) return null;
+      return {
+        amount,
+        currency:
+          String(matchedPackageResult?.currency || selectedPackage?.hotel?.currency || "GBP"),
+      };
+    }
+
+    const metaRow = asRecord(hotelResultsMeta[String(hotelId)]);
+    const raw = asRecord(metaRow.rawSearchResult);
+    const amountCandidates = [
+      raw.min_price,
+      raw.minPrice,
+      raw.price,
+      raw.total_price,
+      raw.totalPrice,
+      raw.amount,
+      raw.MinPrice,
+    ];
+    let amount: number | null = null;
+    for (const candidate of amountCandidates) {
+      amount = parsePositivePriceCandidate(candidate);
+      if (amount != null) break;
+    }
+    if (amount == null) return null;
+
+    const currencyCode = String(raw.SellCur || raw.sellCur || raw.currency || "GBP").trim() || "GBP";
+    return {
+      amount,
+      currency: currencyCode,
+    };
+  }, [
+    hotelId,
+    hotelResultsMeta,
+    isPackageMode,
+    matchedPackageResult?.currency,
+    matchedPackageResult?.startingPrice,
+    selectedPackage?.hotel?.currency,
+    selectedPackage?.totalPrice,
+  ]);
+  const priceIncreaseNotice = useMemo(() => {
+    if (!displayedSearchPrice || minRoomPrice <= 0) return null;
+    const increase = minRoomPrice - displayedSearchPrice.amount;
+    if (!Number.isFinite(increase) || increase <= 0.01) return null;
+    return {
+      previous: displayedSearchPrice.amount,
+      checked: minRoomPrice,
+      increase,
+      currency: displayedSearchPrice.currency,
+    };
+  }, [displayedSearchPrice, minRoomPrice]);
   const activePackageRoom = useMemo(
     () =>
       isPackageMode
@@ -1927,6 +2152,77 @@ export default function HotelRoomsPage() {
   const faqs: Array<{ id: string; question: string; answer: string }> = [];
 
   const displayedAmenities = showAllAmenities ? hotel.amenities : hotel.amenities.slice(0, 6);
+  const flightForInfoModal = useMemo<Flight | null>(() => {
+    if (selectedFlight) return selectedFlight;
+    if (!deeplinkViewData?.success || !("FlightResultId" in deeplinkViewData.results)) return null;
+
+    const view = deeplinkViewData as HolidayPackageViewResponse;
+    const directions = Array.isArray(view.results?.FlightDetails) ? view.results.FlightDetails : [];
+    if (directions.length === 0) return null;
+
+    const toSegment = (
+      direction: HolidayPackageViewResponse["results"]["FlightDetails"][number]
+    ): FlightSegment | null => {
+      const legs = Array.isArray(direction?.Flights) ? direction.Flights : [];
+      if (legs.length === 0) return null;
+      const firstLeg = legs[0];
+      const lastLeg = legs[legs.length - 1];
+      const stops = Math.max(0, Number(direction.Stops ?? legs.length - 1) || 0);
+
+      return {
+        departureTime: formatFlightClock(firstLeg.departure_time),
+        arrivalTime: formatFlightClock(lastLeg.arrival_time),
+        departureAirport: {
+          code: String(firstLeg.departure_airport || ""),
+          name: String(firstLeg.departure_airport || ""),
+          city: String(firstLeg.departure_airport || ""),
+        },
+        arrivalAirport: {
+          code: String(lastLeg.arrival_airport || ""),
+          name: String(lastLeg.arrival_airport || ""),
+          city: String(lastLeg.arrival_airport || ""),
+        },
+        date: String(firstLeg.departure_date || ""),
+        arrivalDate: String(lastLeg.arrival_date || firstLeg.departure_date || ""),
+        duration: formatMinutesToDuration(Number(direction.Flying_time || 0)),
+        totalJourneyTime: formatMinutesToDuration(Number(direction.Total_travel_time || direction.Flying_time || 0)),
+        stops,
+        stopDetails: stops === 0 ? "Direct" : `${stops} stop${stops === 1 ? "" : "s"}`,
+        carrierCode: String(firstLeg.airline_code || ""),
+        carrierName: String(firstLeg.airline_name || ""),
+        flightNumber: String(firstLeg.flight_number || ""),
+        cabinClass: String(firstLeg.class_name || firstLeg.cabin_class || "Economy"),
+      };
+    };
+
+    const segments = directions.map((direction) => toSegment(direction)).filter(Boolean) as FlightSegment[];
+    if (segments.length === 0) return null;
+
+    const firstLeg = directions[0]?.Flights?.[0];
+    return {
+      id: String(view.results.FlightResultId || "deeplink-flight"),
+      airline: {
+        name: String(firstLeg?.airline_name || segments[0]?.carrierName || "Selected airline"),
+        logo: "",
+        code: String(firstLeg?.airline_code || segments[0]?.carrierCode || ""),
+      },
+      outbound: segments[0],
+      inbound: segments[1] || undefined,
+      segments,
+      tripType: segments.length > 1 ? "round-trip" : "one-way",
+      price: 0,
+      pricePerPerson: 0,
+      currency: String(view.results?.HotelDetails?.SellCur || "GBP").toUpperCase(),
+      ticketOptions: [],
+      webRef: String(view.results?.RequestId || ""),
+      baggage: segments[0]?.segmentBaggage,
+      refundable: firstLeg ? Number(firstLeg.refundable || 0) === 1 : null,
+      refundableText: String(firstLeg?.refundable_text || "") || undefined,
+      hasBaggage: Boolean(segments[0]?.segmentBaggage),
+      segmentResultId: String(view.results.FlightResultId || ""),
+    };
+  }, [selectedFlight, deeplinkViewData]);
+
   const backToResultsHref = useMemo(() => {
     const params = new URLSearchParams();
     if (hotelSearch?.location) params.set("location", hotelSearch.location);
@@ -2143,9 +2439,11 @@ export default function HotelRoomsPage() {
         meta?.provider === "hotelbeds" || meta?.provider === "vyspa" ? meta.provider : undefined;
       const urlProviderNormalized =
         urlProvider === "hotelbeds" || urlProvider === "vyspa" ? (urlProvider as "hotelbeds" | "vyspa") : undefined;
+      // Prefer store values (updated by runStaySearch after a date change) over
+      // URL params which become stale once the user re-searches with new dates.
       let effectiveProvider: "vyspa" | "hotelbeds" =
-        urlProviderNormalized || metaProvider || (hotelSearch?.provider === "hotelbeds" ? "hotelbeds" : "vyspa");
-      let effectiveSearchCriteriaId = hotelSearch?.searchCriteriaId ?? urlSearchCriteriaId ?? meta?.searchCriteriaId;
+        metaProvider || (hotelSearch?.provider === "hotelbeds" ? "hotelbeds" : undefined) || urlProviderNormalized || "vyspa";
+      let effectiveSearchCriteriaId = meta?.searchCriteriaId ?? hotelSearch?.searchCriteriaId ?? urlSearchCriteriaId;
       if (!effectiveSearchCriteriaId) return;
 
       const srId = urlSrId || meta?.srId || meta?.searchResultId;
@@ -2173,14 +2471,17 @@ export default function HotelRoomsPage() {
 
       try {
         if (isPackageMode) {
-          const packageHotel = packageResults?.find((row) => String(row.id) === String(hotelId));
+          const effectivePkgHotelId = packageHotelResultIdRef.current || Number(hotelId);
+          const packageHotel = packageResults?.find((row) => String(row.id) === String(effectivePkgHotelId)) ||
+            packageResults?.find((row) => String(row.id) === String(hotelId));
           const roomResponse = await packageService.getPackageRooms({
-            hotelResultId: Number(hotelId),
+            hotelResultId: effectivePkgHotelId,
             requestId: packageResultsMeta?.requestId,
             flightResultId: packageResultsMeta?.selectedFlightResultId || undefined,
           });
 
           const roomHotel =
+            roomResponse.results.find((row) => String(row.id) === String(effectivePkgHotelId)) ||
             roomResponse.results.find((row) => String(row.id) === String(hotelId)) ||
             roomResponse.results[0];
 
@@ -2378,6 +2679,7 @@ export default function HotelRoomsPage() {
           setCoordinates((previous) => previous || searchResultSeed.coordinates);
         }
 
+        const srId = meta?.srId || meta?.searchResultId || urlSrId || undefined;
         const rawResult = asRecord(meta?.rawSearchResult);
         const hbMeta = asRecord(rawResult._hotelbeds);
         const dedupeMeta = asRecord(rawResult._dedupe);
@@ -3003,9 +3305,21 @@ export default function HotelRoomsPage() {
                 if (flights?.length > 0) {
                   return (
                     <div className="mt-4 bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden">
-                      <div className="px-4 sm:px-6 py-4 border-b border-[#DFE0E4] flex items-center gap-2">
-                        <Plane className="w-4 h-4 text-[#3754ED]" />
-                        <h2 className="text-xl font-semibold text-[#010D50]">Flight Details</h2>
+                      <div className="px-4 sm:px-6 py-4 border-b border-[#DFE0E4] flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <Plane className="w-4 h-4 text-[#3754ED]" />
+                          <h2 className="text-xl font-semibold text-[#010D50]">Flight Details</h2>
+                        </div>
+                        {flightForInfoModal ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-8 px-3 text-xs sm:text-sm border-[#3754ED] text-[#3754ED] hover:bg-[#EEF2FF]"
+                            onClick={() => setFlightInfoModalOpen(true)}
+                          >
+                            View flight info
+                          </Button>
+                        ) : null}
                       </div>
                       <div className="p-4 sm:p-6 flex flex-col gap-3">
                         {flights.map((seg, idx) => {
@@ -3091,6 +3405,76 @@ export default function HotelRoomsPage() {
                 }
                 return null;
               })()}
+              {(!deeplinkViewData?.success || !("FlightResultId" in deeplinkViewData.results)) &&
+                selectedFlight &&
+                (() => {
+                  const fallbackSegments =
+                    selectedFlight.segments && selectedFlight.segments.length > 0
+                      ? selectedFlight.segments
+                      : [selectedFlight.outbound, ...(selectedFlight.inbound ? [selectedFlight.inbound] : [])];
+                  if (fallbackSegments.length === 0) return null;
+                  return (
+                    <div className="mt-4 bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden">
+                      <div className="px-4 sm:px-6 py-4 border-b border-[#DFE0E4] flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <Plane className="w-4 h-4 text-[#3754ED]" />
+                          <h2 className="text-xl font-semibold text-[#010D50]">Flight Details</h2>
+                        </div>
+                        {flightForInfoModal ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-8 px-3 text-xs sm:text-sm border-[#3754ED] text-[#3754ED] hover:bg-[#EEF2FF]"
+                            onClick={() => setFlightInfoModalOpen(true)}
+                          >
+                            View flight info
+                          </Button>
+                        ) : null}
+                      </div>
+                      <div className="p-4 sm:p-6 flex flex-col gap-3">
+                        {fallbackSegments.map((seg, idx) => (
+                          <div
+                            key={`${seg.departureAirport.code}-${seg.arrivalAirport.code}-${idx}`}
+                            className="bg-[#F5F7FF] rounded-xl p-4 flex flex-col gap-4"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-8 h-8 rounded bg-[#3754ED] text-white flex items-center justify-center">
+                                  <Plane className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-sm font-semibold text-[#010D50] truncate">
+                                    {seg.carrierName || selectedFlight.airline.name || "Selected airline"}
+                                  </div>
+                                  <div className="text-xs text-[#3A478A] truncate">
+                                    {idx === 0 ? "Outbound" : "Inbound"} · {seg.departureAirport.code} to {seg.arrivalAirport.code}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-xs text-[#010D50] font-medium whitespace-nowrap">
+                                {seg.cabinClass || "Economy"}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap text-xs text-[#3A478A]">
+                              <span>{seg.stopDetails || `${seg.stops || 0} stop${Number(seg.stops || 0) === 1 ? "" : "s"}`}</span>
+                              <span className="w-1 h-1 rounded-full bg-[#3A478A]" />
+                              <span>{seg.totalJourneyTime || seg.duration || "—"}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+              {flightForInfoModal ? (
+                <FlightInfoModal
+                  flight={flightForInfoModal}
+                  open={flightInfoModalOpen}
+                  onOpenChange={setFlightInfoModalOpen}
+                  stayOnCurrentPage
+                  isPackageMode
+                />
+              ) : null}
 
               <HotelGallery
                 images={hotel.galleryImages}
@@ -3280,6 +3664,19 @@ export default function HotelRoomsPage() {
                   </div>
                 )}
               </div>
+              {priceIncreaseNotice && (
+                <div className="bg-[#FFF5EA] border border-[#FFD699] rounded-xl px-4 py-3">
+                  <p className="text-sm font-semibold text-[#B45309]">Price update</p>
+                  <p className="text-sm text-[#9A3412]">
+                    Latest checked price is{" "}
+                    {formatDisplayPrice(priceIncreaseNotice.currency, priceIncreaseNotice.checked)}
+                    , which is{" "}
+                    {formatDisplayPrice(priceIncreaseNotice.currency, priceIncreaseNotice.increase)}
+                    {" "}higher than the previously shown{" "}
+                    {formatDisplayPrice(priceIncreaseNotice.currency, priceIncreaseNotice.previous)}.
+                  </p>
+                </div>
+              )}
 
               <div className="flex flex-wrap items-center gap-4">
                 {/* Hotel Name Input */}
@@ -3647,7 +4044,15 @@ export default function HotelRoomsPage() {
                     });
                     const params = new URLSearchParams();
                     params.set("type", "package");
-                    params.set("hotelId", hotelId);
+                    // After a date re-search the hotel result ID changes; use the override if set.
+                    // In deeplink flow the route param is the vendor hotel_id, so fall back to meta.
+                    // In normal flow the route param IS the result ID.
+                    const effectiveHotelId = packageHotelResultIdRef.current
+                      ? String(packageHotelResultIdRef.current)
+                      : (isFromDeeplink && packageResultsMeta?.hotelRequestId)
+                        ? String(packageResultsMeta.hotelRequestId)
+                        : hotelId;
+                    params.set("hotelId", effectiveHotelId);
                     params.set("hotelName", hotel.name);
                     params.set("roomId", String(rid));
                     if (packageResultsMeta?.selectedFlightResultId) {
@@ -3677,12 +4082,7 @@ export default function HotelRoomsPage() {
                     params.set("adults", adults);
                     params.set("children", children);
                     params.set("tripType", "round-trip");
-                    // Deeplink: flight already selected, skip flight selection → go to review
-                    if (isFromDeeplink) {
-                      router.push(`/packages/review?${params.toString()}`);
-                    } else {
-                      router.push(`/search?${params.toString()}`);
-                    }
+                    router.push(`/search?${params.toString()}`);
                   };
                   const handleMultiRoomCardSelect = () => {
                     setActiveRoomCardId(String(room.id));
@@ -3867,7 +4267,7 @@ export default function HotelRoomsPage() {
                                 if (Math.abs(delta) < 0.01) {
                                   return (
                                     <span className="text-xl font-semibold text-[#008234]">
-                                      Included
+                                      {formatDisplayPrice(room.price.currency, 0)}
                                     </span>
                                   );
                                 }

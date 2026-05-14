@@ -110,7 +110,10 @@ function buildFlightSegment(direction: HolidayPackageViewResponse["results"]["Fl
   };
 }
 
-function buildSelectedFlightFromView(viewData: HolidayPackageViewResponse): Flight | null {
+function buildSelectedFlightFromView(
+  viewData: HolidayPackageViewResponse,
+  deeplinkKey?: string
+): Flight | null {
   const directions = Array.isArray(viewData.results?.FlightDetails) ? viewData.results.FlightDetails : [];
   if (directions.length === 0) return null;
 
@@ -142,6 +145,7 @@ function buildSelectedFlightFromView(viewData: HolidayPackageViewResponse): Flig
     refundableText: String(firstLeg?.refundable_text || "") || undefined,
     hasBaggage: Boolean(outbound.segmentBaggage),
     segmentResultId: String(viewData.results.FlightResultId || ""),
+    flightKey: String(deeplinkKey || "").trim() || undefined,
   };
 }
 
@@ -214,7 +218,10 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
       // Store full view data for detail page room rendering
       setDeeplinkViewData(viewData);
 
-      // Extract hotel ID for navigation
+      // Extract hotel ID for navigation — always use vendor hotel_id since /hotels/[id]
+      // route parameter must be a valid vendor hotel ID for room/content API calls.
+      // HotelResultId (search result ID) is stored in packageResultsMeta.hotelRequestId
+      // for downstream change-flight URLs.
       const hotelId = String(viewData.results.HotelDetails.hotel_id);
       const hd = viewData.results.HotelDetails;
       const allRooms = Object.values(hd.rooms || {}).flat();
@@ -230,9 +237,24 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
       const children = roomConfigurations.reduce((sum, room) => sum + room.children, 0);
 
       // Populate hotel search context for hotel checkout sidebar + submission flow.
+      // Use the destination city/code for the location field (not the hotel name)
+      // so the search bar shows the actual destination when changing hotel.
+      const hotelSearchLocation = (() => {
+        if (mode === "package" && "FlightResultId" in viewData.results) {
+          const lastLeg = (viewData as HolidayPackageViewResponse).results.FlightDetails?.[0]?.Flights?.slice(-1)?.[0];
+          const city = String(
+            (lastLeg as Record<string, unknown>)?.arrive_airport_city ||
+            (lastLeg as Record<string, unknown>)?.arrival_city ||
+            ""
+          ).trim();
+          const code = String(lastLeg?.arrival_airport || "").toUpperCase();
+          return city || code || String(hd.hotel_name || "");
+        }
+        return String(hd.hotel_name || "");
+      })();
       setHotelSearch({
         provider: "vyspa",
-        location: String(hd.hotel_name || ""),
+        location: hotelSearchLocation,
         hidden_id: String(hd.hotel_id || ""),
         hidden_key: String(hd.VmapId || ""),
         checkIn,
@@ -256,17 +278,24 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
       if (mode === "package" && "FlightResultId" in viewData.results) {
         const pkgView = viewData as HolidayPackageViewResponse;
         const results = pkgView.results;
-        const selectedFlight = buildSelectedFlightFromView(pkgView);
+        const selectedFlight = buildSelectedFlightFromView(pkgView, key);
 
-        const destinationCode = String(pkgView.results.FlightDetails?.[0]?.Flights?.slice(-1)?.[0]?.arrival_airport || "").toUpperCase();
+        const lastOutboundLeg = pkgView.results.FlightDetails?.[0]?.Flights?.slice(-1)?.[0];
+        const destinationCode = String(lastOutboundLeg?.arrival_airport || "").toUpperCase();
         const departureCode = String(pkgView.results.FlightDetails?.[0]?.Flights?.[0]?.departure_airport || "").toUpperCase();
+        const destinationCity = String(
+          (lastOutboundLeg as Record<string, unknown>)?.arrive_airport_city ||
+          (lastOutboundLeg as Record<string, unknown>)?.arrival_city ||
+          ""
+        ).trim();
+        const destinationDisplayName = destinationCity || destinationCode || hd.hotel_name;
 
         const deeplinkPackageSearch: PackageSearchCriteria = {
           departureCode,
           departureName: departureCode,
           destinationCode,
-          destinationName: hd.hotel_name,
-          destinationHiddenValue: destinationCode ? `${destinationCode};;${hd.hotel_name}` : `${hd.hotel_id};;${hd.hotel_name}`,
+          destinationName: destinationDisplayName,
+          destinationHiddenValue: destinationCode ? `${destinationCode};;${destinationDisplayName}` : `${hd.hotel_id};;${hd.hotel_name}`,
           checkIn,
           nights: Math.max(1, Number(firstRoom?.days_spent || 1)),
           rooms: roomConfigurations,

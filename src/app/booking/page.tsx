@@ -195,11 +195,12 @@ function BookingContent() {
 
         {/* Content Grid */}
         <div className="flex flex-col lg:flex-row gap-4">
-          {/* Web Ref Card - Mobile Only (shown at top) */}
+          {/* Web/Journey Ref Card - Mobile Only (shown at top) */}
           <WebRefCard
             refNumber={webRefNumber}
             phoneNumber={affiliatePhone}
             isMobile={true}
+            isJourneyRef={!!vyspaFolderNumber}
           />
 
           {/* Left Column - Forms */}
@@ -259,13 +260,13 @@ function BookingContent() {
             />
           </div>
 
-          {/* Right Sidebar */}
+          
           <div className="w-full lg:w-[30%] flex flex-col gap-4">
-            {/* Web Ref Card - Desktop Only */}
             <WebRefCard
               refNumber={webRefNumber}
               phoneNumber={affiliatePhone}
               isMobile={false}
+              isJourneyRef={!!vyspaFolderNumber}
             />
 
             {/* Price Summary */}

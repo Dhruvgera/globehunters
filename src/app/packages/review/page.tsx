@@ -24,25 +24,11 @@ import { formatFareLabel } from "@/lib/utils";
 import { resolvePackagePricing } from "@/lib/package/pricing";
 import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
 import { calculateNights } from "@/lib/hotels/nights";
-
-function formatDateLabel(value?: string) {
-  if (!value) return "—";
-  const date = new Date(`${value.slice(0, 10)}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function shiftIsoDateByDays(baseIso: string, days: number): string {
-  const date = new Date(`${String(baseIso || "").slice(0, 10)}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return "";
-  date.setDate(date.getDate() + Math.max(0, Math.trunc(days || 0)));
-  return date.toISOString().slice(0, 10);
-}
+import { formatMoneyFromSymbol } from "@/lib/currency/formatMoney";
+import { normalizePolicyCurrencyText } from "@/lib/currency/policyText";
+import { formatLongDate, shiftIsoDateByDays } from "@/lib/utils/dateFormat";
+import { buildDetailsFromDeeplinkView } from "@/lib/package/deeplinkDetails";
+import { buildChangeHotelHref } from "@/lib/package/changeLinks";
 
 function parseMoneyString(value?: string | null) {
   const raw = String(value || "").trim();
@@ -54,18 +40,6 @@ function parseMoneyString(value?: string | null) {
     amount: Number(match[2]),
     currency: String(leading || trailing || "").trim() || undefined,
   };
-}
-
-function formatMoney(currency: string | undefined, amount: number | undefined) {
-  if (amount == null || Number.isNaN(amount)) return "—";
-  const normalized = String(currency || "").trim();
-  if (normalized === "£" || normalized === "$" || normalized === "€") {
-    return `${normalized}${amount.toFixed(2)}`;
-  }
-  if (/^[A-Z]{3}$/.test(normalized)) {
-    return `${amount.toFixed(2)} ${normalized}`;
-  }
-  return amount.toFixed(2);
 }
 
 function getUniquePackageRooms<T>(rooms: T[] | undefined) {
@@ -86,69 +60,6 @@ function getUniquePackageRooms<T>(rooms: T[] | undefined) {
   return uniqueRooms;
 }
 
-function buildDetailsFromDeeplinkView(
-  viewData: HolidayPackageViewResponse
-): Awaited<ReturnType<typeof packageService.getPackageDetails>>["details"] {
-  const hotel = viewData.results.HotelDetails;
-  const roomOptions = Object.values(hotel.rooms || {})
-    .filter((entry): entry is HolidayPackageViewResponse["results"]["HotelDetails"]["rooms"][string] => Array.isArray(entry))
-    .flat();
-
-  const cancellationPolicies = roomOptions
-    .map((room, index) => ({
-      id: Number(room.id || index + 1),
-      roomName: room.room_name || "Room",
-      effectiveDate: room.CheckInDate,
-      endEffectiveDate: room.CheckOutDate,
-      policy: String(room.cancellation_policy || "").trim() || undefined,
-    }))
-    .filter((row) => row.policy);
-
-  const firstDirection = viewData.results.FlightDetails?.[0];
-  const firstLeg = firstDirection?.Flights?.[0];
-  const lastLeg = firstDirection?.Flights?.slice(-1)?.[0];
-
-  return {
-    quoteId: undefined,
-    packagePrice: undefined,
-    hotel: {
-      id: Number(viewData.results.HotelResultId || 0),
-      hotelId: Number(hotel.hotel_id || 0),
-      name: hotel.hotel_name,
-      description: hotel.quickDescription || undefined,
-      imageUrl: hotel.image_name || undefined,
-      starRating: Number(hotel.hotel_rating || 0) || undefined,
-      amenities: [],
-      checkOutDate: roomOptions[0]?.CheckOutDate,
-      rooms: roomOptions.map((room) => ({
-        id: Number(room.id || 0),
-        name: room.room_name || undefined,
-        nights: Number(room.days_spent || 0) || undefined,
-        checkIn: room.CheckInDate || undefined,
-        checkOut: room.CheckOutDate || undefined,
-        price: Number(room.cust_tot_sell_amt || room.net_price || 0) || undefined,
-        netPrice: Number(room.net_price || 0) || undefined,
-        mealCode: room.MealPlan || undefined,
-        mealName: room.meal_name || undefined,
-        currency: room.sell_currency_code || room.currency_code || undefined,
-        nonRefundable: Number(room.nonRef || 0) === 1,
-        remarks: room.cancellation_policy || undefined,
-      })),
-    },
-    cancellationPolicies,
-    flight: firstLeg
-      ? {
-          origin: String(firstLeg.departure_airport || ""),
-          destination: String(lastLeg?.arrival_airport || ""),
-          currency: String(hotel.SellCur || "GBP"),
-          validatingCarrier: String(firstDirection?.Majority_carrier || firstLeg.airline_name || ""),
-          refundable: Number(firstLeg.refundable || 0) === 1,
-        }
-      : undefined,
-    success: true,
-  };
-}
-
 function PackageReviewPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -167,6 +78,7 @@ function PackageReviewPageInner() {
   const storeSearchParams = useBookingStore((state) => state.searchParams);
   const packageSearch = useBookingStore((state) => state.packageSearch);
   const packageResults = useBookingStore((state) => state.packageResults);
+  const packageResultsMeta = useBookingStore((state) => state.packageResultsMeta);
   const deeplinkViewData = useBookingStore((state) => state.deeplinkViewData);
   const isFromDeeplink = useBookingStore((state) => state.isFromDeeplink);
   const selectedFareType = useBookingStore((state) => state.selectedFareType);
@@ -191,11 +103,16 @@ function PackageReviewPageInner() {
       ? (deeplinkViewData as HolidayPackageViewResponse)
       : null;
 
+  // Use deeplink view data only if user hasn't done a change selection.
+  // When selectedHotelRoomIds are populated, the user explicitly selected rooms
+  // (via change selection flow), so we should fetch fresh pricing from the API.
+  const useDeeplinkData = deeplinkPackageView && selectedHotelRoomIds.length === 0;
+
   useEffect(() => {
-    if (deeplinkPackageView) {
+    if (useDeeplinkData) {
       setDetailLoading(false);
       setDetailError(null);
-      setPackageDetails(buildDetailsFromDeeplinkView(deeplinkPackageView));
+      setPackageDetails(buildDetailsFromDeeplinkView(deeplinkPackageView!));
       return;
     }
 
@@ -227,7 +144,7 @@ function PackageReviewPageInner() {
     return () => {
       cancelled = true;
     };
-  }, [deeplinkPackageView, flightResultId, selectedHotelRoomIds]);
+  }, [useDeeplinkData, deeplinkPackageView, flightResultId, selectedHotelRoomIds]);
 
   const nights = useMemo(() => {
     const checkIn =
@@ -394,13 +311,23 @@ function PackageReviewPageInner() {
     };
   }, [hotelDetailsCache, packageDetails?.hotel, selectedHotel]);
 
+  const changeHotelHref = useMemo(
+    () => buildChangeHotelHref(hotelSearch, packageSearch, true),
+    [hotelSearch, packageSearch],
+  );
+
   const changeFlightHref = useMemo(() => {
     const params = new URLSearchParams();
     params.set("type", "package");
-    if (hotelId) params.set("hotelId", hotelId);
+    // The change-flights API requires the hotel *result* ID from the package
+    // search response, NOT the vendor hotel_id. In deeplink flows the route
+    // param (selectedHotel.hotelId) is the vendor hotel_id, while
+    // packageResultsMeta.hotelRequestId stores the correct HotelResultId.
+    const effectiveHotelId = String(packageResultsMeta?.hotelRequestId || hotelId || "");
+    if (effectiveHotelId) params.set("hotelId", effectiveHotelId);
     if (flightResultId) params.set("flightResultId", flightResultId);
     return `/search?${params.toString()}`;
-  }, [flightResultId, hotelId]);
+  }, [flightResultId, hotelId, packageResultsMeta?.hotelRequestId]);
 
   const handleContinue = () => {
     const params = new URLSearchParams(searchParams.toString());
@@ -424,6 +351,26 @@ function PackageReviewPageInner() {
     : 0;
   const totalPrice = pricing.packageTotal + baggageCost + protectionPlanCost;
   const totalPerPersonPrice = calculatePackagePerPersonPrice(totalPrice, packageSearch?.rooms);
+  const packagePriceIncrease = useMemo(() => {
+    if (parsedPackagePrice.amount == null || fallbackPackagePricing?.amount == null) return null;
+    const liveAmount = parsedPackagePrice.amount;
+    const baselineAmount = fallbackPackagePricing.amount;
+    const increase = liveAmount - baselineAmount;
+    if (!Number.isFinite(increase) || increase <= 0.01) return null;
+    const currency = parsedPackagePrice.currency || fallbackPackagePricing.currency || pricing.currency;
+    return {
+      liveAmount,
+      baselineAmount,
+      increase,
+      currency,
+    };
+  }, [
+    fallbackPackagePricing?.amount,
+    fallbackPackagePricing?.currency,
+    parsedPackagePrice.amount,
+    parsedPackagePrice.currency,
+    pricing.currency,
+  ]);
 
   if (!selectedFlight) {
     return (
@@ -441,7 +388,7 @@ function PackageReviewPageInner() {
         <PackageStepProgress currentStep="review" />
 
         <div className="mt-4">
-          <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={true} />
+          <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={true} isJourneyRef={!!vyspaFolderNumber} />
         </div>
 
         <div className="mt-4 sm:mt-6 bg-[#F5F7FF] border border-[#DFE0E4] rounded-xl p-3.5 sm:p-4 flex items-start gap-3">
@@ -450,13 +397,31 @@ function PackageReviewPageInner() {
             Please remember that it is your responsibility to have in your possession all the necessary travel documents.
           </p>
         </div>
+        {packagePriceIncrease && (
+          <div className="mt-4 sm:mt-5 bg-[#FFF5EA] border border-[#FFD699] rounded-xl p-3.5 sm:p-4">
+            <p className="text-sm font-semibold text-[#B45309]">Price update</p>
+            <p className="text-sm text-[#9A3412]">
+              The latest package check is {formatMoneyFromSymbol(packagePriceIncrease.currency, packagePriceIncrease.liveAmount)}, which is{" "}
+              {formatMoneyFromSymbol(packagePriceIncrease.currency, packagePriceIncrease.increase)} higher than the previously shown{" "}
+              {formatMoneyFromSymbol(packagePriceIncrease.currency, packagePriceIncrease.baselineAmount)}.
+            </p>
+          </div>
+        )}
 
         <div className="mt-6 sm:mt-8 flex flex-col lg:flex-row gap-6 lg:gap-8">
           <div className="flex-1 space-y-5 sm:space-y-6">
             <div className="bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden">
               <div className="px-4 sm:px-6 py-4 border-b border-[#DFE0E4] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <h2 className="text-xl font-semibold text-[#010D50]">Stay Details</h2>
-                <Link href="/hotels?type=package" className="text-[#3754ED] text-sm font-medium flex items-center gap-1 hover:underline">
+                <Link
+                  href={changeHotelHref}
+                  onClick={() => {
+                    if (isFromDeeplink) {
+                      useBookingStore.getState().setDeeplinkViewData(null);
+                    }
+                  }}
+                  className="text-[#3754ED] text-sm font-medium flex items-center gap-1 hover:underline"
+                >
                   <Edit2 className="w-4 h-4" />
                   Change selection
                 </Link>
@@ -478,6 +443,25 @@ function PackageReviewPageInner() {
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-[#010D50] mb-1">{hotelDisplay.name}</h3>
                     <p className="text-sm text-[#3A478A] mb-3">{hotelDisplay.distance}</p>
+                    <p className="text-sm text-[#3A478A] mb-3">
+                      Check-In: {formatLongDate(
+                        hotelSearch?.checkIn ||
+                        packageDetails?.hotel?.rooms?.[0]?.checkIn ||
+                        packageSearch?.checkIn ||
+                        searchParams.get("checkIn") ||
+                        searchParams.get("departureDate") ||
+                        ""
+                      )} | Check-Out: {formatLongDate(
+                        hotelSearch?.checkOut ||
+                        packageDetails?.hotel?.rooms?.[0]?.checkOut ||
+                        packageDetails?.hotel?.checkOutDate ||
+                        searchParams.get("checkOut") ||
+                        searchParams.get("returnDate") ||
+                        ((hotelSearch?.checkIn || packageSearch?.checkIn) && packageSearch?.nights
+                          ? shiftIsoDateByDays(hotelSearch?.checkIn || packageSearch?.checkIn || "", packageSearch.nights)
+                          : "")
+                      )}
+                    </p>
 
                     {hotelDisplay.rating ? (
                       <div className="flex items-center gap-2 mb-4">
@@ -510,7 +494,7 @@ function PackageReviewPageInner() {
                   <div>
                     <div className="text-sm text-[#3A478A] mb-1">Check-In</div>
                     <div className="text-lg font-semibold text-[#010D50]">
-                      {formatDateLabel(
+                      {formatLongDate(
                         hotelSearch?.checkIn ||
                         packageDetails?.hotel?.rooms?.[0]?.checkIn ||
                         packageSearch?.checkIn ||
@@ -523,7 +507,7 @@ function PackageReviewPageInner() {
                   <div>
                     <div className="text-sm text-[#3A478A] mb-1">Check-Out</div>
                     <div className="text-lg font-semibold text-[#010D50]">
-                      {formatDateLabel(
+                      {formatLongDate(
                         hotelSearch?.checkOut ||
                         packageDetails?.hotel?.rooms?.[0]?.checkOut ||
                         packageDetails?.hotel?.checkOutDate ||
@@ -605,14 +589,14 @@ function PackageReviewPageInner() {
                 {selectedCancellation ? (
                   <>
                     <p className="text-sm font-medium text-[#010D50]">
-                      Effective from {formatDateLabel(selectedCancellation.effectiveDate)}
+                      Effective from {formatLongDate(selectedCancellation.effectiveDate)}
                     </p>
                     <p className="text-sm text-[#3A478A]">
-                      {selectedCancellation.policy}
+                      {normalizePolicyCurrencyText(selectedCancellation.policy)}
                     </p>
                     {selectedCancellation.penalty != null && (
                       <p className="text-sm text-[#3A478A]">
-                        Penalty: {formatMoney(selectedCancellation.penaltyCurrency, selectedCancellation.penalty)}
+                        Penalty: {formatMoneyFromSymbol(selectedCancellation.penaltyCurrency, selectedCancellation.penalty)}
                       </p>
                     )}
                   </>
@@ -624,7 +608,7 @@ function PackageReviewPageInner() {
           </div>
 
           <div className="w-full lg:w-96 flex-shrink-0 flex flex-col gap-4">
-            <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={false} />
+            <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={false} isJourneyRef={!!vyspaFolderNumber} />
 
             <div className="bg-white border border-[#DFE0E4] rounded-xl lg:sticky lg:top-4">
               <div className="p-4 sm:p-6 space-y-4">
@@ -644,14 +628,14 @@ function PackageReviewPageInner() {
                       <span className="text-[#3A478A]">
                         Checked baggage ({addOns.additionalBaggage} bag{addOns.additionalBaggage !== 1 ? "s" : ""})
                       </span>
-                      <span className="font-medium text-[#010D50]">{formatMoney(pricing.currency, baggageCost)}</span>
+                      <span className="font-medium text-[#010D50]">{formatMoneyFromSymbol(pricing.currency, baggageCost)}</span>
                     </div>
                   )}
                   {addOns.protectionPlan && (
                     <div className="flex justify-between">
                       <span className="text-[#3A478A]">Protection plan</span>
                       <span className="font-medium text-[#010D50]">
-                        {formatMoney(pricing.currency, protectionPlanCost)}
+                        {formatMoneyFromSymbol(pricing.currency, protectionPlanCost)}
                       </span>
                     </div>
                   )}
@@ -662,10 +646,10 @@ function PackageReviewPageInner() {
                     <span className="font-semibold text-[#010D50]">Total</span>
                     <div className="text-right">
                       <div className="text-2xl font-bold text-[#3754ED]">
-                        {formatMoney(pricing.currency, totalPrice)}
+                        {formatMoneyFromSymbol(pricing.currency, totalPrice)}
                       </div>
                       <div className="text-xs text-[#3A478A]">
-                        {formatMoney(pricing.currency, totalPerPersonPrice)} per person
+                        {formatMoneyFromSymbol(pricing.currency, totalPerPersonPrice)} per person
                       </div>
                       <div className="text-xs text-[#3A478A]">Incl. all taxes & fees</div>
                     </div>

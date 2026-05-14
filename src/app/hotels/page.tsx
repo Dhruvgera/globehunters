@@ -31,7 +31,6 @@ import { getHotelProvider, parseHotelProvider, type HotelProvider } from "@/lib/
 import { fixStubaImageUrl } from "@/lib/hotels/imageUrl";
 import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
 import { calculateNights } from "@/lib/hotels/nights";
-import { usePackageDeeplink } from "@/hooks/usePackageDeeplink";
 
 const DEFAULT_FILTERS: HotelFiltersState = {
   propertyQuery: "",
@@ -330,11 +329,12 @@ function HotelsPageInner() {
   const hotelFiltersCache = useBookingStore((s) => s.hotelFiltersCache);
   const setHotelFiltersCache = useBookingStore((s) => s.setHotelFiltersCache);
   const savedHotelSearch = useBookingStore((s) => s.hotelSearch);
+  const savedPackageSearch = useBookingStore((s) => s.packageSearch);
 
   const [filters, setFilters] = useState<HotelFiltersState>(DEFAULT_FILTERS);
   const hasUserAdjustedPriceRef = useRef(false);
   const hydratedFiltersRef = useRef(false);
-  usePackageDeeplink();
+
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     popular: true,
     price: true,
@@ -363,7 +363,9 @@ function HotelsPageInner() {
   const [noResultsMessage, setNoResultsMessage] = useState<string | null>(null);
   const [hasAttemptedFetch, setHasAttemptedFetch] = useState(false);
   const [displayedHotelsCount, setDisplayedHotelsCount] = useState(12);
+  const [loadMorePending, setLoadMorePending] = useState(false);
   const [hiddenImageHotelIds, setHiddenImageHotelIds] = useState<Set<string>>(new Set());
+  const failedImageIdsRef = useRef<Set<string>>(new Set());
   const activeRequestSeq = useRef(0);
   const contentInflightRef = useRef<Set<string>>(new Set());
   const contentAttemptRef = useRef<Map<string, { attempts: number; lastAttemptAt: number; ok: boolean }>>(new Map());
@@ -573,24 +575,50 @@ function HotelsPageInner() {
     resolvedSearchRef.current = resolvedSearch;
   }, [resolvedSearch]);
 
-  const queryKey = useMemo(() => {
+  const serializedChildAges = useMemo(
+    () => serializeHotelChildAges(resolvedSearch.child_age, resolvedSearch.rooms, resolvedSearch.children),
+    [resolvedSearch.child_age, resolvedSearch.children, resolvedSearch.rooms]
+  );
+
+  const packageFromCode = useMemo(() => {
     const p = new URLSearchParams(urlParamsKey);
-    const location = p.get("location") || "London";
-    const today = new Date();
-    const defaultCheckIn = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 5);
-    const defaultCheckOut = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 8);
-    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    return String(p.get("fromCode") || savedPackageSearch?.departureCode || "LON")
+      .trim()
+      .toUpperCase();
+  }, [savedPackageSearch, urlParamsKey]);
+
+  const strictQueryKey = useMemo(() => {
     return JSON.stringify({
       providerOverride,
-      location,
-      checkIn: p.get("checkIn") || fmt(defaultCheckIn),
-      checkOut: p.get("checkOut") || fmt(defaultCheckOut),
-      adults: Math.max(1, Number(p.get("adults") || "2") || 2),
-      children: Math.max(0, Number(p.get("children") || "0") || 0),
-      rooms: Math.max(1, Number(p.get("rooms") || "1") || 1),
-      branches: p.get("branches") || "UK",
+      location: resolvedSearch.location,
+      checkIn: resolvedSearch.checkIn,
+      checkOut: resolvedSearch.checkOut,
+      adults: resolvedSearch.adults,
+      children: resolvedSearch.children,
+      child_age: serializedChildAges,
+      rooms: resolvedSearch.rooms,
+      hidden_id: resolvedSearch.hidden_id,
+      hidden_key: resolvedSearch.hidden_key,
+      branches: resolvedSearch.branches,
     });
-  }, [providerOverride, urlParamsKey]);
+  }, [providerOverride, resolvedSearch, serializedChildAges]);
+
+  const packageStableQueryKey = useMemo(() => {
+    return JSON.stringify({
+      mode: "package",
+      fromCode: packageFromCode,
+      location: resolvedSearch.location,
+      checkIn: resolvedSearch.checkIn,
+      checkOut: resolvedSearch.checkOut,
+      adults: resolvedSearch.adults,
+      children: resolvedSearch.children,
+      child_age: serializedChildAges,
+      rooms: resolvedSearch.rooms,
+      branches: resolvedSearch.branches,
+    });
+  }, [packageFromCode, resolvedSearch, serializedChildAges]);
+
+  const queryKey = isPackageMode ? packageStableQueryKey : strictQueryKey;
 
   // Hydrate filters for this queryKey (so opening a hotel and coming back doesn't reset price slider).
   useEffect(() => {
@@ -613,10 +641,8 @@ function HotelsPageInner() {
     setHotelFiltersCache({ queryKey, filters: sanitizeHiddenHotelFilters(DEFAULT_FILTERS) });
   }, [hotelFiltersCache, queryKey, setHotelFiltersCache]);
 
-  const effectCancelledRef = useRef(false);
-
   useEffect(() => {
-    effectCancelledRef.current = false;
+    let cancelled = false;
 
     async function load() {
       if (!hasHydrated) return;
@@ -624,23 +650,24 @@ function HotelsPageInner() {
 
       const requestSeq = ++activeRequestSeq.current;
 
+      setLoading(true);
+      setLoadingMoreHotels(false);
+      setError(null);
+      setNoResultsMessage(null);
+      // Clear stale results immediately on a new search (match flights UX).
+      setHotels([]);
+      setSelectedHotelKey("");
+      setDisplayedHotelsCount(12);
+      setHiddenImageHotelIds(new Set());
+      failedImageIdsRef.current = new Set();
+      setBreakfastByHotelId({});
+      setBreakfastEnriching(false);
+      setTrustYouEnriching(false);
+      trustYouInflightRef.current.clear();
+      trustYouAttemptRef.current.clear();
+
       if (isPackageMode) {
         // Use package search API for Flight+Hotel packages
-        // Clear stale results for a new package search (match flights UX).
-        setLoading(true);
-        setLoadingMoreHotels(false);
-        setError(null);
-        setNoResultsMessage(null);
-        setHotels([]);
-        setSelectedHotelKey("");
-        setDisplayedHotelsCount(12);
-        setHiddenImageHotelIds(new Set());
-        setBreakfastByHotelId({});
-        setBreakfastEnriching(false);
-        setTrustYouEnriching(false);
-        trustYouInflightRef.current.clear();
-        trustYouAttemptRef.current.clear();
-
         try {
           const search = resolvedSearchRef.current;
           const p = new URLSearchParams(urlParamsKey);
@@ -651,32 +678,51 @@ function HotelsPageInner() {
             search.child_age
           );
           
-          // Get package-specific params from URL
-          const fromCode = p.get("fromCode") || "LON";
-          const fromName = p.get("from") || "London";
-          let destinationHiddenValue = p.get("hidden_key") || search.hidden_key || "";
-          if (!destinationHiddenValue.includes(";") && search.location) {
-            try {
-              const destinationResponse = await fetch(
-                `/api/packages/destinations?location=${encodeURIComponent(search.location)}`
-              );
-              if (destinationResponse.ok) {
-                const destinations = await destinationResponse.json() as Array<{
-                  id?: string | number;
-                  name?: string;
-                  hiddenvalue?: string;
-                }>;
-                const normalizedLocation = search.location.trim().toLowerCase();
-                const normalizedHiddenId = String(p.get("hidden_id") || search.hidden_id || "");
-                const matchedDestination =
-                  destinations.find((destination) => String(destination.id || "") === normalizedHiddenId) ||
-                  destinations.find((destination) => String(destination.name || "").trim().toLowerCase() === normalizedLocation);
-                if (matchedDestination?.hiddenvalue) {
-                  destinationHiddenValue = matchedDestination.hiddenvalue;
+          // Get package-specific params from URL or saved package search
+          const fromCode = p.get("fromCode") || savedPackageSearch?.departureCode || "LON";
+          const fromName = p.get("from") || savedPackageSearch?.departureName || "London";
+          let destinationHiddenValue = p.get("hidden_key") || savedPackageSearch?.destinationHiddenValue || search.hidden_key || "";
+
+          // Resolve destination hidden value via API when:
+          // - No semicolons at all (not a valid hidden value)
+          // - Has semicolons but empty middle segment (deeplink-generated value like "DXB;;HotelName")
+          const hiddenValueParts = destinationHiddenValue.split(";");
+          const needsDestinationLookup = !destinationHiddenValue.includes(";") ||
+            (hiddenValueParts.length >= 3 && !hiddenValueParts[1]?.trim());
+
+          if (needsDestinationLookup) {
+            const destCode = hiddenValueParts[0]?.trim() || "";
+            // Try looking up by IATA code first (more reliable for deeplink flows), then by location name
+            const lookupTerms = [destCode, search.location].filter((t) => t && t.length >= 2);
+
+            for (const lookupTerm of lookupTerms) {
+              if (destinationHiddenValue.includes(";") && hiddenValueParts[1]?.trim()) break;
+              try {
+                const destinationResponse = await fetch(
+                  `/api/packages/destinations?location=${encodeURIComponent(lookupTerm)}`
+                );
+                if (destinationResponse.ok) {
+                  const destinations = await destinationResponse.json() as Array<{
+                    id?: string | number;
+                    name?: string;
+                    hiddenvalue?: string;
+                  }>;
+                  const normalizedHiddenId = String(p.get("hidden_id") || search.hidden_id || "");
+                  const matchedDestination =
+                    destinations.find((destination) => String(destination.id || "") === normalizedHiddenId) ||
+                    (destCode && destinations.find((destination) => {
+                      const hv = String(destination.hiddenvalue || "");
+                      return hv.split(";")[0]?.trim().toUpperCase() === destCode.toUpperCase();
+                    })) ||
+                    destinations.find((destination) => String(destination.name || "").trim().toLowerCase() === lookupTerm.trim().toLowerCase());
+                  if (matchedDestination?.hiddenvalue) {
+                    destinationHiddenValue = matchedDestination.hiddenvalue;
+                    break;
+                  }
                 }
+              } catch (destinationError) {
+                console.warn("[Hotels Page] Failed to resolve package destination hidden value", destinationError);
               }
-            } catch (destinationError) {
-              console.warn("[Hotels Page] Failed to resolve package destination hidden value", destinationError);
             }
           }
           if (!destinationHiddenValue.includes(";")) {
@@ -797,10 +843,11 @@ function HotelsPageInner() {
               setSearchRequestId(String(packageResponse.meta.requestId));
             }
 
-            if (!effectCancelledRef.current && requestSeq === activeRequestSeq.current) {
+            if (!cancelled && requestSeq === activeRequestSeq.current) {
               if (mappedHotels.length > 0) {
+                const selectedHotelKey = `${mappedHotels[0]?.id}-0`;
                 setHotels(mappedHotels);
-                setSelectedHotelKey(mappedHotels.length > 0 ? `${mappedHotels[0]?.id}-0` : "");
+                setSelectedHotelKey(selectedHotelKey);
                 setNoResultsMessage(null);
               } else {
                 setHotels([]);
@@ -821,7 +868,7 @@ function HotelsPageInner() {
 
           applyPackageResponse(packageResponse);
 
-          if (!effectCancelledRef.current && requestSeq === activeRequestSeq.current) {
+          if (!cancelled && requestSeq === activeRequestSeq.current) {
             setLoading(false);
             setHasAttemptedFetch(true);
           }
@@ -831,9 +878,9 @@ function HotelsPageInner() {
             let latestRequestId = packageResponse.meta.requestId;
 
             for (let attempt = 0; attempt < HYBRID_MAX_POLLS; attempt += 1) {
-              if (requestSeq !== activeRequestSeq.current) break;
+              if (cancelled || requestSeq !== activeRequestSeq.current) break;
               await new Promise((resolve) => setTimeout(resolve, HYBRID_POLL_INTERVAL_MS));
-              if (requestSeq !== activeRequestSeq.current) break;
+              if (cancelled || requestSeq !== activeRequestSeq.current) break;
 
               try {
                 const polledPackageResponse = await packageService.searchPackages({
@@ -859,13 +906,13 @@ function HotelsPageInner() {
             }
           }
 
-          if (requestSeq === activeRequestSeq.current) {
+          if (!cancelled && requestSeq === activeRequestSeq.current) {
             setLoadingMoreHotels(false);
             setHasAttemptedFetch(true);
           }
         } catch (err) {
           console.error('[Hotels Page] Package search error:', err);
-          if (requestSeq === activeRequestSeq.current) {
+          if (!cancelled && requestSeq === activeRequestSeq.current) {
             setError(null);
             setHotels([]);
             setSelectedHotelKey("");
@@ -900,20 +947,6 @@ function HotelsPageInner() {
         if (!pick?.id || !pick?.label || !pick?.loc) {
           throw new Error("No matching city/hotel found for the selected destination.");
         }
-
-        setLoading(true);
-        setLoadingMoreHotels(false);
-        setError(null);
-        setNoResultsMessage(null);
-        setHotels([]);
-        setSelectedHotelKey("");
-        setDisplayedHotelsCount(12);
-        setHiddenImageHotelIds(new Set());
-        setBreakfastByHotelId({});
-        setBreakfastEnriching(false);
-        setTrustYouEnriching(false);
-        trustYouInflightRef.current.clear();
-        trustYouAttemptRef.current.clear();
 
         const availability = await hotelService.searchAvailabilityV3({
           providerOverride: providerOverride || undefined,
@@ -1104,12 +1137,7 @@ function HotelsPageInner() {
         };
 
         const applyAvailabilityToState = (parsed: ParsedAvailability) => {
-          // Only check requestSeq — not cancelled. The requestSeq check is sufficient to
-          // prevent stale updates (a new effect run increments activeRequestSeq). The
-          // cancelled flag was causing a bug where effect cleanup (e.g. Strict Mode
-          // double-mount) would discard fresh API results from an in-flight request.
-          const isStale = requestSeq !== activeRequestSeq.current;
-          if (isStale) return;
+          if (cancelled || requestSeq !== activeRequestSeq.current) return;
 
           const { mapped, meta, results, criteriaId, criteriaProvider } = parsed;
 
@@ -1128,7 +1156,6 @@ function HotelsPageInner() {
             return next;
           });
           setSelectedHotelKey(mapped.length > 0 ? `${mapped[0]?.id}-0` : "");
-
           // If user hasn't interacted yet, set price slider bounds from real data (total).
           setFilters((prev) => {
             const isDefault =
@@ -1190,13 +1217,12 @@ function HotelsPageInner() {
         };
 
         const parsedInitial = mapAvailability(availability);
-        // Only check requestSeq — not cancelled (same rationale as applyAvailabilityToState).
-        if (requestSeq !== activeRequestSeq.current) return;
+        if (cancelled || requestSeq !== activeRequestSeq.current) return;
         applyAvailabilityToState(parsedInitial);
 
         // As soon as we have the first batch, enable result interactions (filters/sort/cards)
         // while background polling continues to append/refresh results.
-        if (requestSeq === activeRequestSeq.current) {
+        if (!cancelled && requestSeq === activeRequestSeq.current) {
           setLoading(false);
           setHasAttemptedFetch(true);
         }
@@ -1213,10 +1239,10 @@ function HotelsPageInner() {
           let latestCriteriaId: number | string | null = parsedInitial.criteriaId;
 
           for (let attempt = 0; attempt < HYBRID_MAX_POLLS; attempt += 1) {
-            if (requestSeq !== activeRequestSeq.current) break;
+            if (cancelled || requestSeq !== activeRequestSeq.current) break;
             const pollDelayMs = isVyspaSearchCriteriaId(latestCriteriaId) ? HYBRID_POLL_INTERVAL_MS : 750;
             await new Promise((resolve) => setTimeout(resolve, pollDelayMs));
-            if (requestSeq !== activeRequestSeq.current) break;
+            if (cancelled || requestSeq !== activeRequestSeq.current) break;
             try {
               const polledAvailability = await hotelService.searchAvailabilityV3({
                 providerOverride: providerOverride || undefined,
@@ -1235,7 +1261,7 @@ function HotelsPageInner() {
               });
 
               const parsedPoll = mapAvailability(polledAvailability);
-              if (requestSeq !== activeRequestSeq.current) break;
+              if (cancelled || requestSeq !== activeRequestSeq.current) break;
 
               applyAvailabilityToState(parsedPoll);
               if (isVyspaSearchCriteriaId(parsedPoll.criteriaId)) {
@@ -1247,12 +1273,12 @@ function HotelsPageInner() {
               break;
             }
           }
-          if (requestSeq === activeRequestSeq.current) {
+          if (!cancelled && requestSeq === activeRequestSeq.current) {
             setLoadingMoreHotels(false);
           }
         }
       } catch (e: any) {
-        if (requestSeq !== activeRequestSeq.current) return;
+        if (cancelled || requestSeq !== activeRequestSeq.current) return;
         setError(e?.message || "Failed to fetch hotels");
         setLoadingMoreHotels(false);
         let shouldResetSearchState = false;
@@ -1269,7 +1295,7 @@ function HotelsPageInner() {
           setBreakfastByHotelId({});
         }
       } finally {
-        if (requestSeq === activeRequestSeq.current) {
+        if (!cancelled && requestSeq === activeRequestSeq.current) {
           setLoading(false);
           setLoadingMoreHotels(false);
           setHasAttemptedFetch(true);
@@ -1279,11 +1305,12 @@ function HotelsPageInner() {
 
     load();
     return () => {
-      effectCancelledRef.current = true;
+      cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- resolvedSearch accessed via ref to avoid loop
   }, [
     queryKey,
+    strictQueryKey,
     setHotelResultsMeta,
     setHotelSearch,
     isPackageMode,
@@ -1560,17 +1587,56 @@ function HotelsPageInner() {
     return sorted;
   }, [filters, hotelsWithSelectedMealPricing, hybridSupplierFilter, providerMode, resolvedSearch.location, sortMode]);
 
+  const displayedHotels = useMemo(() => {
+    return filteredHotels.slice(0, displayedHotelsCount);
+  }, [displayedHotelsCount, filteredHotels]);
+
   const visibleResultCount = useMemo(() => {
     if (hiddenImageHotelIds.size === 0) return filteredHotels.length;
     return filteredHotels.filter((h) => !hiddenImageHotelIds.has(h.id)).length;
   }, [filteredHotels, hiddenImageHotelIds]);
 
-  const displayedHotels = useMemo(() => {
-    return filteredHotels.slice(0, displayedHotelsCount);
-  }, [displayedHotelsCount, filteredHotels]);
-
   const filteredHotelsRef = useRef(filteredHotels);
   filteredHotelsRef.current = filteredHotels;
+
+  const hasMoreHotels = displayedHotelsCount < filteredHotels.length;
+
+  const handleLoadMore = useCallback(async () => {
+    const BATCH = 12;
+    const nextSlice = filteredHotelsRef.current.slice(
+      displayedHotelsCount,
+      displayedHotelsCount + BATCH
+    );
+    if (nextSlice.length === 0) return;
+
+    setLoadMorePending(true);
+
+    await Promise.allSettled(
+      nextSlice.map(
+        (h) =>
+          new Promise<void>((resolve) => {
+            if (!h.imageSrc || failedImageIdsRef.current.has(h.id)) {
+              resolve();
+              return;
+            }
+            const img = new window.Image();
+            img.src = h.imageSrc;
+            const done = () => { img.onload = null; img.onerror = null; resolve(); };
+            img.onload = done;
+            img.onerror = () => {
+              failedImageIdsRef.current.add(h.id);
+              done();
+            };
+            setTimeout(done, 4000);
+          })
+      )
+    );
+
+    setDisplayedHotelsCount((prev) =>
+      Math.min(prev + BATCH, filteredHotelsRef.current.length)
+    );
+    setLoadMorePending(false);
+  }, [displayedHotelsCount]);
 
   const pendingImageErrorsRef = useRef<Set<string>>(new Set());
   const imageErrorFlushHandleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1600,7 +1666,14 @@ function HotelsPageInner() {
     }
   }, [flushImageErrors]);
 
-  const hasMoreHotels = displayedHotelsCount < filteredHotels.length;
+  useEffect(() => {
+    return () => {
+      if (imageErrorFlushHandleRef.current) {
+        clearTimeout(imageErrorFlushHandleRef.current);
+        imageErrorFlushHandleRef.current = null;
+      }
+    };
+  }, []);
 
   // TrustYou enrichment: fetch live review scores for visible hotels and merge into card ratings.
   useEffect(() => {
@@ -2072,7 +2145,7 @@ function HotelsPageInner() {
             {((loadingMoreHotels && hasAttemptedFetch ) || (hotels.length > 0 && (breakfastEnriching || contentEnriching || trustYouEnriching))) && (
               <div className="inline-flex items-center gap-2 text-xs text-[#3A478A]">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#3754ED] animate-pulse" />
-                {hotels.length > 0 ? "More hotels are being added…" : "Updating hotel details…"}
+                {loadingMoreHotels ? "More hotels are being added…" : "Updating hotel details…"}
               </div>
             )}
 
@@ -2091,12 +2164,12 @@ function HotelsPageInner() {
                     hotel={hotel}
                     view="grid"
                     selected={hotelKey === selectedHotelKey}
-                    onSelect={() => setSelectedHotelKey(hotelKey)}
-                    isPackageMode={isPackageMode}
-                    onImageError={() => handleHotelImageError(hotel.id)}
-                  />
-                    );
-                  })()
+                      onSelect={() => setSelectedHotelKey(hotelKey)}
+                      isPackageMode={isPackageMode}
+                      onImageError={handleHotelImageError}
+                    />
+                     );
+                   })()
                 ))}
               </div>
             ) : (
@@ -2114,26 +2187,26 @@ function HotelsPageInner() {
                       selected={hotelKey === selectedHotelKey}
                       onSelect={() => setSelectedHotelKey(hotelKey)}
                       isPackageMode={isPackageMode}
-                      onImageError={() => handleHotelImageError(hotel.id)}
+                      onImageError={handleHotelImageError}
                     />
                       );
                     })()
                   ))}
-                </div>
-                {/* On desktop, show list layout */}
-                <div className="hidden sm:flex flex-col gap-4">
-                  {displayedHotels.map((hotel, idx) => (
-                    (() => {
-                      const hotelKey = `${hotel.id}-${idx}`;
-                      return (
-                    <HotelResultCard
-                      key={hotelKey}
-                      hotel={hotel}
-                      view="list"
-                      selected={hotelKey === selectedHotelKey}
-                      onSelect={() => setSelectedHotelKey(hotelKey)}
-                      isPackageMode={isPackageMode}
-                      onImageError={() => handleHotelImageError(hotel.id)}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {displayedHotels.map((hotel, idx) => (
+                  (() => {
+                    const hotelKey = `${hotel.id}-${idx}`;
+                    return (
+                      <HotelResultCard
+                        key={hotelKey}
+                        hotel={hotel}
+                        view="list"
+                        selected={hotelKey === selectedHotelKey}
+                        onSelect={() => setSelectedHotelKey(hotelKey)}
+                        isPackageMode={isPackageMode}
+                        onImageError={handleHotelImageError}
                     />
                       );
                     })()
@@ -2146,13 +2219,22 @@ function HotelsPageInner() {
             {hasMoreHotels && (
               <div className="flex justify-center mt-4">
                 <Button
-                  onClick={() =>
-                    setDisplayedHotelsCount((prev) => Math.min(prev + 12, filteredHotels.length))
-                  }
+                  onClick={handleLoadMore}
+                  disabled={loadMorePending}
                   variant="outline"
-                  className="bg-white hover:bg-[#F5F7FF] text-[#3754ED] border-[#3754ED] rounded-full px-8 py-2 h-auto text-sm font-medium"
+                  className="bg-white hover:bg-[#F5F7FF] text-[#3754ED] border-[#3754ED] rounded-full px-8 py-2 h-auto text-sm font-medium disabled:opacity-60"
                 >
-                  Load more
+                  {loadMorePending ? (
+                    <span className="inline-flex items-center gap-2">
+                      <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Loading…
+                    </span>
+                  ) : (
+                    "Load more"
+                  )}
                 </Button>
               </div>
             )}

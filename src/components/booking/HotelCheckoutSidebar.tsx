@@ -14,15 +14,8 @@ import {
   formatMoneyFromCode,
   type ConvertedHotelLocalTaxRow,
 } from "@/lib/currency/localTaxDisplay";
-
-function formatMoney(currency: string | undefined, amount: number | undefined) {
-  const c = currency || "$";
-  const a = typeof amount === "number" ? amount : undefined;
-  if (a == null || Number.isNaN(a)) return "—";
-  if (c === "£" || c === "$" || c === "€")
-    return `${c}${a.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-  return c ? `${c} ${a.toFixed(2)}` : a.toFixed(2);
-}
+import { formatMoneyFromSymbol } from "@/lib/currency/formatMoney";
+import { normalizePolicyCurrencyText } from "@/lib/currency/policyText";
 
 import { calculateNights } from "@/lib/hotels/nights";
 
@@ -64,19 +57,21 @@ function sanitizePolicyText(value: unknown): string {
     deduped.push(line);
   }
 
-  return deduped.join("\n");
+  return normalizePolicyCurrencyText(deduped.join("\n"));
 }
 
 interface HotelCheckoutSidebarProps {
   webRef: string;
   phoneNumber: string;
   changeSelectionHref?: string;
+  isJourneyRef?: boolean;
 }
 
 export function HotelCheckoutSidebar({
   webRef,
   phoneNumber,
   changeSelectionHref,
+  isJourneyRef = false,
 }: HotelCheckoutSidebarProps) {
   const hotelSearch = useBookingStore((s) => s.hotelSearch);
   const selectedHotel = useBookingStore((s) => s.selectedHotel);
@@ -238,7 +233,7 @@ export function HotelCheckoutSidebar({
     const roomSummary = selectedHotelRoomSummary;
     const currency = roomSummary?.currency || "$";
     const total = roomSummary?.total;
-    const nightly = roomSummary?.nightly;
+    const rawNightly = roomSummary?.nightly;
     const roomName = roomSummary?.roomName || "Selected Room";
     const isRefundable = roomSummary?.isRefundable;
 
@@ -246,6 +241,14 @@ export function HotelCheckoutSidebar({
     const rooms = hotelSearch?.rooms || 1;
     const adults = hotelSearch?.adults || 1;
     const children = hotelSearch?.children || 0;
+
+    // Derive nightly from the API total so the breakdown always matches the total.
+    // rawNightly was computed as total/nights at selection time — if dates changed
+    // since then, multiplying rawNightly × new_nights would diverge from total.
+    const nightly =
+      total != null && nights > 0 && rooms > 0
+        ? total / (nights * rooms)
+        : rawNightly;
 
     const roomNames: string[] = [];
     if (Array.isArray(cached?.rooms) && selectedHotelRoomIds.length > 0) {
@@ -290,10 +293,10 @@ export function HotelCheckoutSidebar({
 
   return (
     <aside className="w-full lg:w-[482px] flex flex-col gap-4">
-      {/* WEB REF Card */}
+      {/* Reference Card */}
       <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
         <span className="text-base font-semibold text-[#3754ED]">
-          WEB REF: {webRef}
+          {isJourneyRef ? "ORDER ID" : "WEB REF"}: {webRef}
         </span>
         <p className="text-sm text-[#3A478A]">
           If you would like to speak to one of our travel consultants please call us on the given number below.
@@ -436,8 +439,8 @@ export function HotelCheckoutSidebar({
         <div className="flex flex-col gap-3">
           {display.nightly != null && (
             <div className="flex items-center justify-between text-sm font-medium text-[#010D50]">
-              <span>{display.nights} nights x {display.rooms} room x {formatMoney(display.currency, display.nightly)}</span>
-              <span>{formatMoney(display.currency, display.baseTotal)}</span>
+              <span>{display.nights} nights x {display.rooms} room x {formatMoneyFromSymbol(display.currency, display.nightly)}</span>
+              <span>{formatMoneyFromSymbol(display.currency, display.baseTotal)}</span>
             </div>
           )}
 
@@ -446,14 +449,14 @@ export function HotelCheckoutSidebar({
               {display.includedTaxTotal > 0 && (
                 <div className="flex items-center justify-between text-sm font-medium text-[#010D50]">
                   <span>Taxes &amp; fees (included)</span>
-                  <span>{formatMoney(display.currency, display.includedTaxTotal)}</span>
+                  <span>{formatMoneyFromSymbol(display.currency, display.includedTaxTotal)}</span>
                 </div>
               )}
             </>
           ) : display.taxes != null && display.taxes > 0 ? (
             <div className="flex items-center justify-between text-sm font-medium text-[#010D50]">
               <span>Taxes</span>
-              <span>{formatMoney(display.currency, display.taxes)}</span>
+              <span>{formatMoneyFromSymbol(display.currency, display.taxes)}</span>
             </div>
           ) : null}
 
@@ -462,9 +465,9 @@ export function HotelCheckoutSidebar({
           <div className="flex items-center justify-between">
             <span className="text-sm font-semibold text-[#010D50]">Total</span>
             <span className="text-sm font-semibold text-[#010D50]">
-              {formatMoney(
+              {formatMoneyFromSymbol(
                 display.currency,
-                (display.total || 0) +
+                ((display.total ?? display.baseTotal) || 0) +
                   (convertedLocalTaxRows.length > 0
                     ? convertedLocalTaxRows.reduce((sum, row) => sum + Number(row.amount || 0), 0)
                     : 0)
@@ -500,7 +503,7 @@ export function HotelCheckoutSidebar({
                 <div className="flex items-center justify-between text-xs font-semibold text-[#8B5E20] border-t border-[#F5D9B3] pt-1.5">
                   <span>Total local taxes</span>
                   <span>
-                    {convertedLocalTaxTotal || formatMoney(display.localTaxCurrency, display.localTaxTotal)}
+                    {convertedLocalTaxTotal || formatMoneyFromSymbol(display.localTaxCurrency, display.localTaxTotal)}
                   </span>
                 </div>
               )}

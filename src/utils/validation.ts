@@ -23,14 +23,11 @@ export function validateEmail(email: string): boolean {
  * Not checking for empty numbers as required check is seperate
  */
 export function validatePhone(phone: string): boolean {
-  if (phone === '') {
-    return true;
-  }
-  // Remove spaces, dashes, and parentheses
   const cleaned = phone.replace(/[\s\-()]/g, '');
-  // Check if it's 10-15 digits and optionally starts with +
-  const phoneRegex = /^\+?[0-9]{10,15}$/;
-  return phoneRegex.test(cleaned);
+  const digits = cleaned.replace(/\D/g, '');
+  if (!/^\d{10}$/.test(digits)) return false;
+  if (digits.startsWith('0')) return false;
+  return true;
 }
 
 /**
@@ -328,10 +325,12 @@ export function validatePostalCode(postalCode: string, country?: string): boolea
  * @param passengerType - Optional passenger type for age validation (adult, child, infant)
  */
 export function validatePassenger(
-  passenger: Passenger,
-  passengerType?: 'adult' | 'child' | 'infant'
+  passenger: Passenger, 
+  passengerType?: 'adult' | 'child' | 'infant',
+  options: { requireContactInfo?: boolean } = {}
 ): PassengerFormErrors {
   const errors: PassengerFormErrors = {};
+  const requireContactInfo = options.requireContactInfo ?? true;
 
   if (!validateName(passenger.firstName)) {
     errors.firstName = 'Please enter a valid first name';
@@ -348,12 +347,12 @@ export function validatePassenger(
     errors.dateOfBirth = dobValidation.error || 'Please enter a valid date of birth';
   }
 
-  if (!validateEmail(passenger.email)) {
+  if ((requireContactInfo || passenger.email) && !validateEmail(passenger.email)) {
     errors.email = 'Please enter a valid email address';
   }
 
-  if (!validatePhone(passenger.phone)) {
-    errors.phone = 'Please enter a valid phone number';
+  if ((requireContactInfo || passenger.phone) && !validatePhone(passenger.phone)) {
+    errors.phone = 'Enter exactly 10 digits without leading zero (e.g. 7678452537)';
   }
 
   if (passenger.passportNumber && !validatePassport(passenger.passportNumber)) {

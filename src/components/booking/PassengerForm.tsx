@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Passenger, PassengerFormErrors } from "@/types/booking";
+import { Passenger } from "@/types/booking";
 import { validatePassenger, hasErrors, validateDateOfBirthForType } from "@/utils/validation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -13,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useTranslations } from "next-intl";
+import { countryCodes } from "@/lib/utils/countryCodes";
 import { CountryCodeSelector } from "./CountryCodeSelector";
 
 
@@ -25,6 +27,7 @@ interface PassengerFormProps {
   disabled?: boolean;
   /** Passenger type for age validation: adult (12+), child (2-11), infant (0-23 months) */
   passengerType?: 'adult' | 'child' | 'infant';
+  requireContactInfo?: boolean;
 }
 
 export function PassengerForm({
@@ -35,6 +38,7 @@ export function PassengerForm({
   showPassportFields = false,
   disabled = false,
   passengerType = 'adult',
+  requireContactInfo = true,
 }: PassengerFormProps) {
   const t = useTranslations('booking.passengerDetails');
 
@@ -66,6 +70,7 @@ export function PassengerForm({
   const handleChange = (field: keyof Passenger, value: string) => {
     const newFormData = { ...formData, [field]: value };
     setFormData(newFormData);
+
     // Real-time validation for date of birth
     if (field === 'dateOfBirth' && value) {
       const dobValidation = validateDateOfBirthForType(value, passengerType);
@@ -75,33 +80,69 @@ export function PassengerForm({
       }
     }
 
+    // Real-time validation for phone: must be exactly 10 digits, no leading zero
+    if (field === 'phone' && value) {
+      const digits = value.replace(/\D/g, '');
+      if (digits.length > 0 && (digits.startsWith('0') || digits.length > 10)) {
+        setErrors((prev) => ({ ...prev, phone: 'Enter exactly 10 digits without leading zero (e.g. 7678452537)' }));
+        return;
+      }
+      if (digits.length === 10 && !digits.startsWith('0')) {
+        setErrors((prev) => ({ ...prev, phone: undefined }));
+      }
+    }
+
     // Clear error for this field when user starts typing
     if (errors[field]) {
       setErrors((prev) => ({ ...prev, [field]: undefined }));
     }
 
     // Auto-save silently when all required fields are filled (no UI lock)
-    const requiredFields = ['title', 'firstName', 'lastName', 'dateOfBirth'];
+    const requiredFields: Array<keyof Passenger> = requireContactInfo
+      ? ['title', 'firstName', 'lastName', 'dateOfBirth', 'email', 'phone']
+      : ['title', 'firstName', 'lastName', 'dateOfBirth'];
     const allFieldsFilled = requiredFields.every(f => {
-      const val = f === field ? value : (formData as any)[f];
+      const val = f === field ? value : formData[f];
       return val && String(val).trim() !== '';
     });
 
-    // Validate and save to store (but keep form editable)
     if (allFieldsFilled) {
-      const validationErrors = validatePassenger(newFormData as Passenger, passengerType);
+      // Validate and save to store (but keep form editable)
+      const validationErrors = validatePassenger(newFormData as Passenger, passengerType, { requireContactInfo });
       if (!hasErrors(validationErrors)) {
         onSave(newFormData as Passenger);
-      } else {
-        setErrors(validationErrors as Record<string, string | undefined>);
       }
     }
   };
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
 
+    // Validate form data with passenger type for age validation
+    const validationErrors = validatePassenger(formData as Passenger, passengerType, { requireContactInfo });
+
+    // console.log('[PassengerForm] Validation:', {
+    //   passengerType,
+    //   dateOfBirth: formData.dateOfBirth,
+    //   errors: validationErrors,
+    //   hasErrors: hasErrors(validationErrors),
+    // });
+
+    if (hasErrors(validationErrors)) {
+      setErrors(validationErrors as Record<string, string | undefined>);
+      return;
+    }
+
+    // Save passenger data
+    onSave(formData as Passenger);
+  };
+
+  const handleEdit = () => {
+    onCancel?.();
+  };
 
   return (
-    <form className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
       <div className="bg-white border border-[#DFE0E4] rounded-xl p-6">
         <h3 className="text-lg font-semibold text-[#010D50] mb-4">
           {t('passenger')} {passengerIndex + 1}
@@ -185,7 +226,9 @@ export function PassengerForm({
 
           {/* Email */}
           <div className="space-y-2">
-            <Label htmlFor={`email-${passengerIndex}`}>{t('email')} {passengerIndex === 0 ? t('required') : ""}</Label>
+            <Label htmlFor={`email-${passengerIndex}`}>
+              {t('email')} {requireContactInfo ? t('required') : "(Optional)"}
+            </Label>
             <Input
               id={`email-${passengerIndex}`}
               type="email"
@@ -202,7 +245,9 @@ export function PassengerForm({
 
           {/* Phone with Country Code */}
           <div className="space-y-2 md:col-span-2">
-            <Label htmlFor={`phone-${passengerIndex}`}>{t('phone')} {passengerIndex === 0 ? t('required') : ""}</Label>
+            <Label htmlFor={`phone-${passengerIndex}`}>
+              {t('phone')} {requireContactInfo ? t('required') : "(Optional)"}
+            </Label>
             <div className="flex gap-2">
               {/* Country Code Selector */}
               <CountryCodeSelector
