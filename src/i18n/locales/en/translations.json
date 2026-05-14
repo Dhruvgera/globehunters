@@ -287,7 +287,8 @@
       "nationality": "Nationality",
       "required": "Required",
       "save": "Save",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "passportNameWarning": "Please enter passenger name(s) and date(s) of birth EXACTLY as shown on the passport or other government-issued ID that will be used for this trip."
     },
     "terms": {
       "title": "Terms & Conditions",
