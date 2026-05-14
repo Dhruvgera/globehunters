@@ -383,7 +383,13 @@
         "refundDeathFull": "100% refund in the event of passenger's death",
         "refundAirlineFull": "100% refund in case of cancellations by airlines",
         "refundLockdownFull": "Refund in case of State lockdown, travel ban, or mechanical failure",
-        "baggageCompensationFull": "Compensation per mishandled checked-in bag"
+        "baggageCompensationFull": "Compensation per mishandled checked-in bag",
+        "premium247Support": "Premium 24/7 Customer Support",
+        "24hCancellationFree": "24-hour free cancellation",
+        "carryOnBagPersonalItem": "Carry-on Bag and Personal Item Included",
+        "upgrade24hrs": "Upgrade your booking within 24 hours",
+        "fareFlexibility": "Flexibility to make changes with Administration Fees and Fare/Tax Adjustments",
+        "priceMatchGuarentee": "Price Match Guarantee on same day of booking"
       }
     },
     "form": {
