@@ -804,7 +804,7 @@ export default function FlightInfoModal({
           {/* Fare Details Section (Dynamic from Price Check or Flight data fallback) */}
           {/* Show either when we have upgrade options OR when price check has loaded (even with fallback data) */}
           {!isPackageMode && ((priceCheck && priceCheck.priceOptions.length > 0 && selectedUpgradeOption) || (!isLoading && priceCheck)) && (
-            <div className="flex flex-col gap-5 sm:gap-6">
+            <div className="flex flex-col gap-5 sm:gap-6 hidden">
               {/* Only show fare option chips if there are multiple options */}
               {priceCheck && priceCheck.priceOptions.length > 1 && (
                 <div className="flex flex-wrap items-center gap-2 py-1">

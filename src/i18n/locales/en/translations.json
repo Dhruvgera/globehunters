@@ -293,7 +293,7 @@
     },
     "terms": {
       "title": "Terms & Conditions",
-      "acceptTerms": "By clicking this checkbox, I acknowledge that I have read and accepted Globehunters Terms & Conditions and Privacy Policy",
+      "acceptTerms": "By clicking this checkbox, I acknowledge that I have read and accepted Globehunters <termsLink>Terms & Conditions</termsLink> and <privacyLink>Privacy Policy</privacyLink>",
       "acceptMarketing": "By clicking this checkbox, I consent to receive marketing messages via calls, texts, and emails from Globehunters at the provided contact. I understand that my consent is not a condition of purchase.",
       "upgradeOptions": "Upgrade options",
       "book": "Book"
@@ -323,6 +323,11 @@
     "viewDetails": "View Details",
     "economy": "Economy",
     "adult": "Adult",
+    "adults": "Adults",
+    "child": "Child",
+    "children": "Children",
+    "infant": "Infant",
+    "infants": "Infants",
     "tollFree": "24/7 Toll-Free",
     "webRefMessage": "If you would like to speak to one of our travel consultants please call us on the given number below.",
     "priceSummary": "Price Summary",
@@ -385,7 +390,13 @@
         "refundDeathFull": "100% refund in the event of passenger's death",
         "refundAirlineFull": "100% refund in case of cancellations by airlines",
         "refundLockdownFull": "Refund in case of State lockdown, travel ban, or mechanical failure",
-        "baggageCompensationFull": "Compensation per mishandled checked-in bag"
+        "baggageCompensationFull": "Compensation per mishandled checked-in bag",
+        "premium247Support": "Premium 24/7 Customer Support",
+        "24hCancellationFree": "24-hour free cancellation",
+        "carryOnBagPersonalItem": "Carry-on Bag and Personal Item Included",
+        "upgrade24hrs": "Upgrade your booking within 24 hours",
+        "fareFlexibility": "Flexibility to make changes with Administration Fees and Fare/Tax Adjustments",
+        "priceMatchGuarentee": "Price Match Guarantee on same day of booking"
       }
     },
     "form": {
@@ -559,5 +570,32 @@
     "perPerson": "per person",
     "features": "Features",
     "select": "Select"
+  },
+  "costSummary": {
+    "title": "Price Summary",
+    "showDetails": "Show Details",
+    "hideDetails": "Hide Details",
+    "tripTotal": "Trip Total",
+    "traveler": "Traveler",
+    "adult": "Adult",
+    "adults": "Adults",
+    "child": "Child",
+    "children": "Children",
+    "infant": "Infant",
+    "infants": "Infants",
+    "additionalBaggage": "Additional Baggage",
+    "bags": "bags",
+    "discountCode": "Discount code",
+    "guest": "guest",
+    "guests": "guests",
+    "hotel": "Hotel",
+    "nights": "nights",
+    "flightsPerBooking": "Flights (per booking)",
+    "included": "Included",
+    "protectionPlan": "Protection plan",
+    "checkedBaggage": "Checked baggage",
+    "bag": "bag",
+    "bagsPlural": "bags",
+    "iassureProtectionPlan": "iAssure Protection Plan"
   }
 }

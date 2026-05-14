@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import { useBookingStore } from "@/store/bookingStore";
 import { SearchParams } from "@/types/flight";
 import { serializeHotelChildAges } from "@/lib/hotels/childAges";
+import { convertDatetoDateString } from "@/lib/vyspa/utils";
 
 interface BookingHeaderProps {
   currentStep?: number;
@@ -42,7 +43,7 @@ function buildSearchUrl(
     // Format date as YYYY-MM-DD
     const formatDate = (date: Date | string) => {
       const d = date instanceof Date ? date : new Date(date);
-      return d.toISOString().split("T")[0];
+      return convertDatetoDateString(d);
     };
 
     params.set("departureDate", formatDate(searchParams.departureDate));
@@ -161,8 +162,8 @@ export function BookingHeader({ currentStep = 1, isHotel = false, backHref }: Bo
           <div key={step.number} className="flex items-center gap-1.5 lg:gap-2">
             <div
               className={`w-5 h-5 lg:w-6 lg:h-6 rounded-full flex items-center justify-center ${step.number <= currentStep
-                  ? "bg-[#010D50] border border-[#010D50]"
-                  : "border border-[#010D50]"
+                ? "bg-[#010D50] border border-[#010D50]"
+                : "border border-[#010D50]"
                 }`}
             >
               <span

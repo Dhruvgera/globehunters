@@ -12,6 +12,8 @@ import { ErrorMessage } from "@/components/ui/error-message";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
 import { formatFareLabel } from "@/lib/utils";
+import { formatPassengerLabel } from "@/lib/utils/passengerLabel";
+import { buildSummaryRows } from "@/lib/utils/buildSummaryRows";
 import { useAirportNames } from "@/hooks/useAirportNames";
 import { getJourneySegments } from "@/lib/flight/segments";
 
@@ -21,7 +23,7 @@ import { AlertBanner } from "@/components/booking/AlertBanner";
 import { FlightSummaryCard } from "@/components/booking/FlightSummaryCard";
 import PassengerFormsSection from "@/components/booking/PassengerFormsSection";
 import { TermsAndConditions } from "@/components/booking/TermsAndConditions";
-import { PriceSummaryCard } from "@/components/booking/PriceSummaryCard";
+import { CostSummaryCard } from "@/components/shared/CostSummaryCard";
 import { CustomerReviewsCard } from "@/components/booking/CustomerReviewsCard";
 import { WebRefCard } from "@/components/booking/WebRefCard";
 import UpgradeOptionsModal from "@/components/flights/modals/UpgradeOptionsModal";
@@ -31,6 +33,7 @@ import { useReviews } from "@/hooks/useReviews";
 
 function BookingContent() {
   const t = useTranslations('booking');
+  const tCost = useTranslations('costSummary');
   const router = useRouter();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [showFlightInfo, setShowFlightInfo] = useState(false);
@@ -157,25 +160,28 @@ function BookingContent() {
     airlineCode: seg.carrierCode || flight.airline.code,
   }));
 
-  const passengerLabel = (() => {
-    // Prefer selected upgrade breakdown; fallback to searched passengers
-    if (selectedUpgrade?.passengerBreakdown?.length) {
-      const adt = selectedUpgrade.passengerBreakdown.find(p => p.type === 'ADT')?.count || 0;
-      const chd = selectedUpgrade.passengerBreakdown.find(p => p.type === 'CHD')?.count || 0;
-      const inf = selectedUpgrade.passengerBreakdown.find(p => p.type === 'INF')?.count || 0;
-      const parts = [];
-      if (adt) parts.push(`${adt} Adult${adt > 1 ? 's' : ''}`);
-      if (chd) parts.push(`${chd} Child${chd > 1 ? 'ren' : ''}`);
-      if (inf) parts.push(`${inf} Infant${inf > 1 ? 's' : ''}`);
-      return parts.join(", ");
-    }
-    const counts = storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 };
-    const parts = [];
-    if (counts.adults) parts.push(`${counts.adults} Adult${counts.adults > 1 ? 's' : ''}`);
-    if (counts.children) parts.push(`${counts.children} Child${counts.children > 1 ? 'ren' : ''}`);
-    if (counts.infants) parts.push(`${counts.infants} Infant${counts.infants > 1 ? 's' : ''}`);
-    return parts.join(", ");
-  })();
+  const passengerLabel = formatPassengerLabel({
+    breakdown: selectedUpgrade?.passengerBreakdown,
+    counts: storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 },
+    t: tCost,
+  });
+
+  const bookingCurrency = selectedUpgrade ? selectedUpgrade.currency : flight.currency;
+  const bookingTotal = selectedUpgrade ? selectedUpgrade.totalPrice : flight.price;
+
+  const bookingSummaryRows = useMemo(
+    () =>
+      buildSummaryRows({
+        mode: "flight",
+        baseFare: bookingTotal,
+        passengerBreakdown: passengerBreakdownForSummary,
+        searchPassengers: storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 },
+        currency: bookingCurrency,
+        t: tCost,
+      }),
+    [bookingTotal, bookingCurrency, passengerBreakdownForSummary, storeSearchParams?.passengers, tCost]
+  );
+
   const cabinLabel = formatFareLabel(selectedUpgrade?.cabinClassDisplay || selectedFareType);
 
   return (
@@ -198,19 +204,8 @@ function BookingContent() {
           />
 
           {/* Left Column - Forms */}
-          <div className="flex-1 flex flex-col gap-3">
+          <div className="w-full lg:w-[70%] flex flex-col gap-3">
             {/* Travel Documents Alert */}
-            <AlertBanner type="success">
-              <p className="font-medium">
-                {t('alerts.travelDocuments.line1')}
-              </p>
-              <p>
-                {t('alerts.travelDocuments.line2')}
-              </p>
-              <p>
-                {t('alerts.travelDocuments.line3')}
-              </p>
-            </AlertBanner>
 
             {/* Price Change Alert - Temporarily hidden */}
             {/* <AlertBanner type="info" title={t('alerts.priceChange.title')}>
@@ -220,13 +215,13 @@ function BookingContent() {
             </AlertBanner> */}
 
             {/* Baggage Alert - Only show when flights have stopovers */}
-            {journeySegments.some(seg => seg.stops > 0) && (
+            {/* {journeySegments.some(seg => seg.stops > 0) && (
               <AlertBanner type="error" title={t('alerts.baggageAlert.title')}>
                 <p>
                   {t('alerts.baggageAlert.message')}
                 </p>
               </AlertBanner>
-            )}
+            )} */}
 
             {/* Flight Summary Cards */}
             <div className="flex flex-col gap-3">
@@ -244,18 +239,29 @@ function BookingContent() {
             {/* Passenger Details Form */}
             <PassengerFormsSection />
 
+            <AlertBanner type="success">
+              <p className="font-medium">
+                {t('alerts.travelDocuments.line1')}
+              </p>
+              <p>
+                {t('alerts.travelDocuments.line2')}
+              </p>
+              <p>
+                {t('alerts.travelDocuments.line3')}
+              </p>
+            </AlertBanner>
+
             {/* Terms & Conditions */}
             <TermsAndConditions
               onUpgradeClick={() => setShowUpgradeModal(true)}
-              hasUpgradeOptions={priceCheckData?.priceOptions && priceCheckData.priceOptions.length > 1}
+              hasUpgradeOptions={false}
               isCreatingFolder={isCreatingFolder}
               setIsCreatingFolder={setIsCreatingFolder}
             />
           </div>
 
-          {/* Right Sidebar */}
-          <div className="w-full lg:w-[482px] flex flex-col gap-4">
-            {/* Web/Journey Ref Card - Desktop Only */}
+          
+          <div className="w-full lg:w-[30%] flex flex-col gap-4">
             <WebRefCard
               refNumber={webRefNumber}
               phoneNumber={affiliatePhone}
@@ -264,12 +270,11 @@ function BookingContent() {
             />
 
             {/* Price Summary */}
-            <PriceSummaryCard
-              baseTripTotal={selectedUpgrade ? selectedUpgrade.totalPrice : flight.price}
-              selectedUpgrade={selectedUpgrade}
-              passengerBreakdown={passengerBreakdownForSummary}
+            <CostSummaryCard
+              rows={bookingSummaryRows}
+              total={bookingTotal}
+              currency={bookingCurrency}
               isSticky={true}
-              currency={selectedUpgrade ? selectedUpgrade.currency : flight.currency}
             />
 
             {/* Customer Reviews */}

@@ -10,7 +10,7 @@ interface UsePriceCheckReturn {
   priceCheck: PriceCheckResult | null;
   isLoading: boolean;
   error: PriceCheckError | null;
-  checkPrice: (segmentId: string, flightKey?: string) => Promise<void>;
+  checkPrice: (segmentId: string, flightKey?: string) => Promise<PriceCheckResult | null>;
   clearCache: () => void;
   clearError: () => void;
 }
@@ -106,14 +106,14 @@ export function usePriceCheck(): UsePriceCheckReturn {
    * @param segmentId - Result_id from flight search (V1 numeric fallback)
    * @param flightKey - Optional: Base64 flight key from Deep_link - used directly with price check API
    */
-  const checkPrice = useCallback(async (segmentId: string, flightKey?: string) => {
+  const checkPrice = useCallback(async (segmentId: string, flightKey?: string): Promise<PriceCheckResult | null> => {
     // Use flightKey as cache key if available, otherwise segmentId
     const cacheKey = flightKey || segmentId;
 
     // Don't make duplicate requests
-    if (currentRequestRef.current === cacheKey && isLoading) {
+    if (currentRequestRef.current === cacheKey) {
       console.log('⏩ Price check already in progress for', cacheKey);
-      return;
+      return null;
     }
 
     const cachedFailure = getCachedPriceCheckFailure(cacheKey);
@@ -121,7 +121,7 @@ export function usePriceCheck(): UsePriceCheckReturn {
       console.log('⏩ Skipping price check due to cached failure for', cacheKey);
       setError(cachedFailure);
       setPriceCheck(null);
-      return;
+      return null;
     }
 
     // Check cache first
@@ -130,7 +130,7 @@ export function usePriceCheck(): UsePriceCheckReturn {
       console.log('✅ Using cached price check for', cacheKey);
       setPriceCheck(cached);
       setError(null);
-      return;
+      return cached;
     }
 
     // Start loading
@@ -165,6 +165,7 @@ export function usePriceCheck(): UsePriceCheckReturn {
         setPriceCheck(result);
         setCachedPriceCheck(cacheKey, result);
         console.log('✅ Price check successful for', cacheKey);
+        return result;
       }
     } catch (err: any) {
       // Only update if this is still the current request
@@ -197,15 +198,17 @@ export function usePriceCheck(): UsePriceCheckReturn {
             originalError: err,
           });
         }
+
+        return null;
       }
     } finally {
-      // Only update loading state if this is still the current request
       if (currentRequestRef.current === cacheKey) {
         setIsLoading(false);
         currentRequestRef.current = null;
       }
     }
-  }, [isLoading]);
+    return null;
+  }, []);
 
   /**
    * Clear cache

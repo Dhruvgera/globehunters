@@ -29,7 +29,27 @@ export function convertDateFormat(dateStr: string): string {
     return dateStr; // Return as-is if conversion fails
   }
 }
+const isDateValid = (date: Date) => {
+  return date instanceof Date && !Number.isNaN(date.getTime());
+};
 
+/**
+ * Convert date to YYYY-MM-DD format
+ * @param date Date 
+ * @returns Date string in YYYY-MM-DD format
+ */
+export function convertDatetoDateString(date: Date): string {
+  try {
+    // Check if date is valid
+    if (isDateValid(date)) {
+      return '';
+    }
+    return `${date.getFullYear}-${date.getMonth}-${date.getDate}`;
+  } catch (error) {
+    console.error('Date conversion error:', error);
+    return ''// Return as-is if conversion fails
+  }
+}
 /**
  * Generate child ages array (default to 9 years for all children)
  * @param numChildren Number of children

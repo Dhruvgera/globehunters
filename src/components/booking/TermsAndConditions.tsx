@@ -347,7 +347,18 @@ export function TermsAndConditions({
           className="mt-1"
         />
         <p className="text-xs leading-relaxed text-[#010D50]">
-          {t('acceptTerms')}
+          {t.rich('acceptTerms', {
+            termsLink: (chunks) => (
+              <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-[#3754ED] hover:underline font-medium">
+                {chunks}
+              </a>
+            ),
+            privacyLink: (chunks) => (
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-[#3754ED] hover:underline font-medium">
+                {chunks}
+              </a>
+            ),
+          })}
         </p>
       </div>
       <div className="flex items-start gap-2">
