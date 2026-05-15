@@ -434,12 +434,12 @@ function PaymentContent() {
     isHotelMode
       ? "Refund Shield"
       : normalizedProtectionPlan === "basic"
-      ? "Basic"
-      : normalizedProtectionPlan === "premium"
-        ? "Premium"
-        : normalizedProtectionPlan === "all"
-          ? "All Included"
-          : "None";
+        ? "Basic"
+        : normalizedProtectionPlan === "premium"
+          ? "Premium"
+          : normalizedProtectionPlan === "all"
+            ? "All Included"
+            : "None";
 
   const paymentSummaryRows = useMemo(() => {
     if (isHotelMode) {
@@ -624,11 +624,12 @@ function PaymentContent() {
 
         {/* Main Layout */}
         <div className="flex flex-col lg:flex-row gap-4">
-          {/* Web Ref Card - Mobile Only */}
+          {/* Web/Journey Ref Card - Mobile Only */}
           <WebRefCard
             refNumber={refNumber}
             phoneNumber={affiliatePhone}
             isMobile={true}
+            isJourneyRef={!!vyspaFolderNumber}
           />
 
           {/* Left Column */}
@@ -875,69 +876,69 @@ function PaymentContent() {
                       console.warn('⚠️ Skipping extras sync because folder number is unavailable');
                     } else {
 
-                    console.log('📤 Syncing extras to Vyspa folder', {
-                      folderNumber: folderNumberForExtras,
-                      extras,
-                      currency: extrasCurrency,
-                      startDate,
-                      endDate,
-                      mode: isHotelMode ? "hotel" : (isPackageMode ? "package" : "flight"),
-                    });
-
-                    try {
-                      const extrasResponse = await fetch('/api/vyspa/add-extras', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          folderNumber: folderNumberForExtras,
-                          currency: extrasCurrency,
-                          startDate,
-                          endDate,
-                          extras,
-                        }),
-                      });
-
-                      const extrasResult = await extrasResponse.json();
-
-                      // Enhanced logging for debugging
-                      console.log('📦 Vyspa add-extras response', {
-                        status: extrasResponse.status,
-                        ok: extrasResponse.ok,
-                        success: extrasResult?.success,
+                      console.log('📤 Syncing extras to Vyspa folder', {
                         folderNumber: folderNumberForExtras,
-                        results: extrasResult?.results,
+                        extras,
+                        currency: extrasCurrency,
+                        startDate,
+                        endDate,
+                        mode: isHotelMode ? "hotel" : (isPackageMode ? "package" : "flight"),
                       });
 
-                      // Print folder data prominently for debugging
-                      if (extrasResult?.folderDetails) {
-                        console.log('📁 FOLDER DATA AFTER EXTRAS SYNC:');
-                        console.log(JSON.stringify(extrasResult.folderDetails, null, 2));
-                      }
-
-                      const insuranceFailed = Array.isArray(extrasResult?.results)
-                        ? extrasResult.results.some((row: any) => row?.type === 'insurance' && !row?.success)
-                        : false;
-
-                      if (extrasResponse.ok && extrasResult.success) {
-                        console.log('✅ Extras synced to folder successfully');
-                      } else {
-                        console.error('❌ Failed to sync extras to folder', {
-                          error: extrasResult?.error,
-                          message: extrasResult?.message,
-                          insuranceFailed,
+                      try {
+                        const extrasResponse = await fetch('/api/vyspa/add-extras', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            folderNumber: folderNumberForExtras,
+                            currency: extrasCurrency,
+                            startDate,
+                            endDate,
+                            extras,
+                          }),
                         });
-                        if (hasInsuranceExtra || insuranceFailed) {
-                          throw new Error(`Could not add ${isHotelMode ? 'Refund Shield' : 'iAssure'} to booking in CMS. Payment not started. Please retry.`);
+
+                        const extrasResult = await extrasResponse.json();
+
+                        // Enhanced logging for debugging
+                        console.log('📦 Vyspa add-extras response', {
+                          status: extrasResponse.status,
+                          ok: extrasResponse.ok,
+                          success: extrasResult?.success,
+                          folderNumber: folderNumberForExtras,
+                          results: extrasResult?.results,
+                        });
+
+                        // Print folder data prominently for debugging
+                        if (extrasResult?.folderDetails) {
+                          console.log('📁 FOLDER DATA AFTER EXTRAS SYNC:');
+                          console.log(JSON.stringify(extrasResult.folderDetails, null, 2));
+                        }
+
+                        const insuranceFailed = Array.isArray(extrasResult?.results)
+                          ? extrasResult.results.some((row: any) => row?.type === 'insurance' && !row?.success)
+                          : false;
+
+                        if (extrasResponse.ok && extrasResult.success) {
+                          console.log('✅ Extras synced to folder successfully');
+                        } else {
+                          console.error('❌ Failed to sync extras to folder', {
+                            error: extrasResult?.error,
+                            message: extrasResult?.message,
+                            insuranceFailed,
+                          });
+                          if (hasInsuranceExtra || insuranceFailed) {
+                            throw new Error(`Could not add ${isHotelMode ? 'Refund Shield' : 'iAssure'} to booking in CMS. Payment not started. Please retry.`);
+                          }
+                          // Continue for non-insurance extras failures
+                        }
+                      } catch (syncError) {
+                        console.error('❌ Error syncing extras to folder:', syncError);
+                        if (hasInsuranceExtra) {
+                          throw syncError;
                         }
                         // Continue for non-insurance extras failures
                       }
-                    } catch (syncError) {
-                      console.error('❌ Error syncing extras to folder:', syncError);
-                      if (hasInsuranceExtra) {
-                        throw syncError;
-                      }
-                      // Continue for non-insurance extras failures
-                    }
                     }
                   }
                 }
@@ -1042,15 +1043,15 @@ function PaymentContent() {
                       hotelSummary: selectedHotel,
                       hotelDetailsSnapshot: hotelCacheEntry
                         ? {
-                            hotelId: hotelCacheEntry.hotelId,
-                            hotelName: hotelCacheEntry.hotelName,
-                            hotelRating: hotelCacheEntry.hotelRating,
-                            mainImage: hotelCacheEntry.mainImage,
-                            address: hotelCacheEntry.address,
-                            rooms: hotelCacheEntry.rooms,
-                            cancellationText: hotelCacheEntry.cancellationText,
-                            amenities: hotelCacheEntry.amenities,
-                          }
+                          hotelId: hotelCacheEntry.hotelId,
+                          hotelName: hotelCacheEntry.hotelName,
+                          hotelRating: hotelCacheEntry.hotelRating,
+                          mainImage: hotelCacheEntry.mainImage,
+                          address: hotelCacheEntry.address,
+                          rooms: hotelCacheEntry.rooms,
+                          cancellationText: hotelCacheEntry.cancellationText,
+                          amenities: hotelCacheEntry.amenities,
+                        }
                         : null,
                       hotelRoomSummary,
                       hotelSearch,

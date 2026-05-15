@@ -696,6 +696,7 @@ export const useBookingStore = create<BookingState & HydrationState>()(
       storage: createJSONStorage(() => createQuotaSafeStateStorage(sessionStorage)), // Use sessionStorage instead of localStorage
       // Only persist certain fields
       partialize: (state) => ({
+        // Remove heavy raw payloads before persisting to avoid storage quota issues.
         hotelResultsMeta: Object.fromEntries(
           Object.entries(state.hotelResultsMeta).map(([hotelId, meta]) => [
             hotelId,

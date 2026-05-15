@@ -25,22 +25,15 @@ import { packageService } from "@/services/api/packageService";
 import { resolvePackagePricing } from "@/lib/package/pricing";
 import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
 import { hasErrors, validatePassenger } from "@/utils/validation";
-
-function formatDateLabel(value?: string) {
-  if (!value) return "—";
-  const date = new Date(`${value.slice(0, 10)}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
+import type { HolidayPackageViewResponse } from "@/types/holidayPackage";
+import { formatMoneyFromSymbol } from "@/lib/currency/formatMoney";
+import { formatLongDate } from "@/lib/utils/dateFormat";
+import { buildDetailsFromDeeplinkView } from "@/lib/package/deeplinkDetails";
+import { buildChangeHotelHref } from "@/lib/package/changeLinks";
 
 function parseMoneyString(value?: string | null) {
   const raw = String(value || "").trim();
-  const match = raw.match(/^([A-Z]{3}|Â£|\$|â‚¬)?\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Z]{3}|Â£|\$|â‚¬)?$/i);
+  const match = raw.match(/^([A-Z]{3}|£|\$|€)?\s*([0-9]+(?:\.[0-9]+)?)\s*([A-Z]{3}|£|\$|€)?$/i);
   if (!match) return { amount: undefined, currency: undefined as string | undefined };
   const leading = match[1];
   const trailing = match[3];
@@ -48,18 +41,6 @@ function parseMoneyString(value?: string | null) {
     amount: Number(match[2]),
     currency: String(leading || trailing || "").trim() || undefined,
   };
-}
-
-function formatMoney(currency: string | undefined, amount: number | undefined) {
-  if (amount == null || Number.isNaN(amount)) return "â€”";
-  const normalized = String(currency || "").trim();
-  if (normalized === "Â£" || normalized === "$" || normalized === "â‚¬") {
-    return `${normalized}${amount.toFixed(2)}`;
-  }
-  if (/^[A-Z]{3}$/.test(normalized)) {
-    return `${amount.toFixed(2)} ${normalized}`;
-  }
-  return amount.toFixed(2);
 }
 
 function toIsoCurrency(currency: string | undefined) {
@@ -221,6 +202,7 @@ function PackageTravellerDetailsInner() {
   const setSearchParams = useBookingStore((s) => s.setSearchParams);
   const storeSearchParams = useBookingStore((s) => s.searchParams);
   const packageSearch = useBookingStore((s) => s.packageSearch);
+  const packageResultsMeta = useBookingStore((s) => s.packageResultsMeta);
   const hotelSearch = useBookingStore((s) => s.hotelSearch);
   const selectedHotel = useBookingStore((s) => s.selectedHotel);
   const hotelDetailsCache = useBookingStore((s) => s.hotelDetailsCache);
@@ -231,6 +213,8 @@ function PackageTravellerDetailsInner() {
   const vyspaFolderNumber = useBookingStore((s) => s.vyspaFolderNumber);
   const setVyspaFolderInfo = useBookingStore((s) => s.setVyspaFolderInfo);
   const setContactInfo = useBookingStore((s) => s.setContactInfo);
+  const deeplinkViewData = useBookingStore((s) => s.deeplinkViewData);
+  const isFromDeeplink = useBookingStore((s) => s.isFromDeeplink);
 
   const { phoneNumber: affiliatePhone } = useAffiliatePhone();
 
@@ -295,7 +279,22 @@ function PackageTravellerDetailsInner() {
     load();
   }, [flight]);
 
+  const deeplinkPackageView =
+    isFromDeeplink &&
+    deeplinkViewData?.success &&
+    "FlightResultId" in deeplinkViewData.results
+      ? (deeplinkViewData as HolidayPackageViewResponse)
+      : null;
+
+  // Use deeplink view data only when user hasn't done a change selection
+  const useDeeplinkData = deeplinkPackageView && selectedHotelRoomIds.length === 0;
+
   useEffect(() => {
+    if (useDeeplinkData) {
+      setPackageDetails(buildDetailsFromDeeplinkView(deeplinkPackageView!));
+      return;
+    }
+
     if (!flight || selectedHotelRoomIds.length === 0) return;
     let cancelled = false;
 
@@ -320,7 +319,7 @@ function PackageTravellerDetailsInner() {
     return () => {
       cancelled = true;
     };
-  }, [flight, selectedHotelRoomIds]);
+  }, [useDeeplinkData, deeplinkPackageView, flight, selectedHotelRoomIds]);
 
   const getAirportName = (code: string, flightName: string, city: string) => {
     const cached = airportNameCache[code];
@@ -380,7 +379,7 @@ function PackageTravellerDetailsInner() {
       selectedFlightDelta,
       selectedFlightCurrency: selectedUpgrade?.currency || flight?.currency,
     });
-    return formatMoney(resolved.currency, resolved.amount);
+    return formatMoneyFromSymbol(resolved.currency, resolved.amount);
   }, [
     flight?.currency,
     flight?.packagePriceDeltaTotal,
@@ -409,7 +408,7 @@ function PackageTravellerDetailsInner() {
       selectedFlightDelta,
       selectedFlightCurrency: selectedUpgrade?.currency || flight?.currency,
     });
-    return formatMoney(
+    return formatMoneyFromSymbol(
       resolved.currency,
       calculatePackagePerPersonPrice(resolved.amount, packageSearch?.rooms)
     );
@@ -439,15 +438,21 @@ function PackageTravellerDetailsInner() {
     };
   }, [hotelDetailsCache, packageDetails?.hotel, selectedHotel]);
 
+  const changeHotelHref = useMemo(
+    () => buildChangeHotelHref(hotelSearch, packageSearch),
+    [hotelSearch, packageSearch],
+  );
+
   const changeFlightHref = useMemo(() => {
     const params = new URLSearchParams();
     params.set("type", "package");
-    if (selectedHotel?.hotelId) params.set("hotelId", selectedHotel.hotelId);
+    const effectiveHotelId = String(packageResultsMeta?.hotelRequestId || selectedHotel?.hotelId || "");
+    if (effectiveHotelId) params.set("hotelId", effectiveHotelId);
     if (flight?.segmentResultId || flight?.id) {
       params.set("flightResultId", flight?.segmentResultId || flight?.id || "");
     }
     return `/search?${params.toString()}`;
-  }, [flight?.id, flight?.segmentResultId, selectedHotel?.hotelId]);
+  }, [flight?.id, flight?.segmentResultId, selectedHotel?.hotelId, packageResultsMeta?.hotelRequestId]);
 
   const stayDetails = useMemo(() => {
     const checkIn =
@@ -506,7 +511,7 @@ function PackageTravellerDetailsInner() {
         return;
       }
 
-      const validationErrors = validatePassenger(passenger, passenger.type);
+      const validationErrors = validatePassenger(passenger, passenger.type, { requireContactInfo: i === 0 });
       if (hasErrors(validationErrors)) {
         alert(formatPassengerValidationMessage(i, validationErrors));
         return;
@@ -653,7 +658,7 @@ function PackageTravellerDetailsInner() {
           <PackageStepProgress currentStep="details" />
 
         <div className="mt-4">
-          <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={true} />
+          <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={true} isJourneyRef={!!vyspaFolderNumber} />
           <div className="mt-4 lg:hidden bg-white border border-[#DFE0E4] rounded-xl p-4">
             <div className="text-xs uppercase tracking-[0.12em] text-[#3A478A]">Total package price</div>
             <div className="mt-1 text-2xl font-semibold text-[#010D50]">{packageTotalLabel}</div>
@@ -664,7 +669,13 @@ function PackageTravellerDetailsInner() {
         <div className="mt-5 sm:mt-6 flex flex-col lg:flex-row gap-5 sm:gap-6">
           <div className="flex-1 flex flex-col gap-4">
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 sm:p-5 flex flex-col gap-4">
-              <div className="text-sm font-semibold text-[#010D50]">Your hotel</div>
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-semibold text-[#010D50]">Your hotel</div>
+                <Link href={changeHotelHref} className="text-[#3754ED] text-sm font-medium flex items-center gap-1 hover:underline">
+                  <Edit2 className="w-3.5 h-3.5" />
+                  Change selection
+                </Link>
+              </div>
               <div className="flex gap-3">
                 <div className="relative w-[96px] h-[72px] rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
                   <img
@@ -682,6 +693,9 @@ function PackageTravellerDetailsInner() {
                   {hotelDisplay.distance ? (
                     <div className="text-xs text-[#3A478A] truncate">{hotelDisplay.distance}</div>
                   ) : null}
+                  <div className="text-xs text-[#3A478A] mt-1">
+                    Check-In: {formatLongDate(stayDetails.checkIn)} | Check-Out: {formatLongDate(stayDetails.checkOut)}
+                  </div>
                   {hotelDisplay.rating ? (
                     <div className="mt-1 flex items-center gap-2">
                       <span className="bg-[#3754ED] text-white text-xs font-semibold px-2 py-0.5 rounded">
@@ -708,13 +722,13 @@ function PackageTravellerDetailsInner() {
                 <div>
                   <div className="text-sm text-[#3A478A] mb-1">Check-In</div>
                   <div className="text-lg font-semibold text-[#010D50]">
-                    {formatDateLabel(stayDetails.checkIn)}
+                    {formatLongDate(stayDetails.checkIn)}
                   </div>
                 </div>
                 <div>
                   <div className="text-sm text-[#3A478A] mb-1">Check-Out</div>
                   <div className="text-lg font-semibold text-[#010D50]">
-                    {formatDateLabel(stayDetails.checkOut)}
+                    {formatLongDate(stayDetails.checkOut)}
                   </div>
                 </div>
               </div>
@@ -755,7 +769,7 @@ function PackageTravellerDetailsInner() {
               </div>
             </div>
 
-            <PassengerFormsSection />
+            <PassengerFormsSection requireContactInfoForAll={false} />
 
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 sm:p-5 flex flex-col gap-4">
               <div className="flex items-start gap-3">
@@ -802,7 +816,7 @@ function PackageTravellerDetailsInner() {
           </div>
 
           <div className="w-full lg:w-[482px] flex flex-col gap-4">
-            <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={false} />
+            <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={false} isJourneyRef={!!vyspaFolderNumber} />
 
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 sm:p-5">
               <div className="text-xs uppercase tracking-[0.12em] text-[#3A478A]">Total package price</div>

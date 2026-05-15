@@ -10,11 +10,13 @@ import { AlertBanner } from "./AlertBanner";
 interface PassengerFormsSectionProps {
   showPassportFields?: boolean;
   requireOnlyLead?: boolean;
+  requireContactInfoForAll?: boolean;
 }
 
 export default function PassengerFormsSection({
   showPassportFields = false,
   requireOnlyLead = false,
+  requireContactInfoForAll = true,
 }: PassengerFormsSectionProps) {
   const t = useTranslations("booking.passengerDetails");
   const searchParams = useBookingStore((s) => s.searchParams);
@@ -68,11 +70,14 @@ export default function PassengerFormsSection({
   useEffect(() => {
     const isCompletePassenger = (idx: number) => {
       const p = passengers[idx];
-      if (idx === 0) {
-        return !!(p && p.firstName && p.lastName && p.dateOfBirth && p.email && p.phone);
-      } else {
-        return !!(p && p.firstName && p.lastName && p.dateOfBirth);
-      }
+      const requiresContact = requireContactInfoForAll || idx === 0;
+      return !!(
+        p &&
+        p.firstName &&
+        p.lastName &&
+        p.dateOfBirth &&
+        (!requiresContact || (p.email && p.phone))
+      );
     };
 
     const allComplete = requireOnlyLead
@@ -80,7 +85,7 @@ export default function PassengerFormsSection({
       : requiredPassengers.length > 0 && requiredPassengers.every((_, idx) => isCompletePassenger(idx));
 
     setPassengersSaved(allComplete);
-  }, [passengers, requiredPassengers, requireOnlyLead, setPassengersSaved]);
+  }, [passengers, requiredPassengers, requireContactInfoForAll, requireOnlyLead, setPassengersSaved]);
 
   return (
     <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-6">
@@ -150,6 +155,7 @@ export default function PassengerFormsSection({
                   onSave={(p) => handleSave(idx, slot.type, p)}
                   showPassportFields={showPassportFields}
                   passengerType={slot.type}
+                  requireContactInfo={requireContactInfoForAll || idx === 0}
                 />
               ) : (
                 <div className="rounded-xl border border-[#DFE0E4] p-4 text-sm text-[#3A478A]">

@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { Building2, Calendar, Users, Moon, CheckCircle2, ReceiptText } from "lucide-react";
 import { getChargeablePassengerCount } from "@/lib/package/passengers";
+import { formatPrice } from "@/lib/currency";
 
 interface PackageStaySummaryProps {
   hotelName: string;
@@ -58,17 +59,7 @@ export function PackageStaySummary({
 
   const formattedPrice = useMemo(() => {
     if (price == null || Number.isNaN(price)) return "";
-    const normalizedCurrency = String(currency || "").trim();
-    const formattedAmount = price.toLocaleString("en-GB", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    });
-
-    if (normalizedCurrency === "£" || normalizedCurrency === "$" || normalizedCurrency === "€") {
-      return `${normalizedCurrency}${formattedAmount}`;
-    }
-
-    return normalizedCurrency ? `${formattedAmount} ${normalizedCurrency}` : formattedAmount;
+    return formatPrice(price, currency || "GBP");
   }, [currency, price]);
 
   const formattedPerPersonPrice = useMemo(() => {
@@ -82,17 +73,7 @@ export function PackageStaySummary({
       },
     ]);
     const perPersonPrice = Math.round((price / chargeableGuests) * 100) / 100;
-    const normalizedCurrency = String(currency || "").trim();
-    const formattedAmount = perPersonPrice.toLocaleString("en-GB", {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    });
-
-    if (normalizedCurrency === "Â£" || normalizedCurrency === "$" || normalizedCurrency === "â‚¬") {
-      return `${normalizedCurrency}${formattedAmount}`;
-    }
-
-    return normalizedCurrency ? `${formattedAmount} ${normalizedCurrency}` : formattedAmount;
+    return formatPrice(perPersonPrice, currency || "GBP");
   }, [adults, children, currency, guests, infants, price]);
 
   return (
