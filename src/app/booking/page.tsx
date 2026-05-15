@@ -49,6 +49,8 @@ function BookingContent() {
   const priceCheckData = usePriceCheckData();
   const storeSearchParams = useBookingStore((s) => s.searchParams);
   const setPriceCheckData = useBookingStore((s) => s.setPriceCheckData);
+  const setPriceDifference = useBookingStore((s) => s.setPriceDifference);
+  const priceDifference = useBookingStore((s) => s.priceDifference);
   const vyspaFolderNumber = useBookingStore((s) => s.vyspaFolderNumber);
   const searchRequestId = useBookingStore((s) => s.searchRequestId);
   const selectedFareType = useBookingStore((s) => s.selectedFareType);
@@ -82,6 +84,26 @@ function BookingContent() {
       setPriceCheckData(priceCheck);
     }
   }, [priceCheck, setPriceCheckData]);
+
+  useEffect(() => {
+    if (!priceCheckData || !flight || selectedUpgrade) {
+      if (!selectedUpgrade && priceDifference !== null) {
+        setPriceDifference(null);
+      }
+      return;
+    }
+    const priceCheckPrice = priceCheckData.priceOptions?.[0]?.totalPrice;
+    if (typeof priceCheckPrice !== 'number' || typeof flight.price !== 'number') return;
+    const priceCheckCurrency = (priceCheckData.priceOptions?.[0]?.currency || '').toUpperCase();
+    const searchCurrency = (flight.currency || '').toUpperCase();
+    if (priceCheckCurrency && searchCurrency && priceCheckCurrency !== searchCurrency) return;
+    const diff = priceCheckPrice - flight.price;
+    if (diff > 0.01) {
+      setPriceDifference(diff);
+    } else {
+      setPriceDifference(null);
+    }
+  }, [priceCheckData, flight, selectedUpgrade, priceDifference, setPriceDifference]);
 
   // Inactivity: 20 minutes on passenger page
   useIdleTimer({
@@ -173,13 +195,17 @@ function BookingContent() {
     () =>
       buildSummaryRows({
         mode: "flight",
-        baseFare: bookingTotal,
+        baseFare: selectedUpgrade
+          ? selectedUpgrade.totalPrice
+          : (priceDifference ? priceCheckData!.priceOptions[0].totalPrice : flight.price),
         passengerBreakdown: passengerBreakdownForSummary,
         searchPassengers: storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 },
         currency: bookingCurrency,
         t: tCost,
+        discountAmount: !selectedUpgrade && priceDifference ? priceDifference : undefined,
+        discountLabel: !selectedUpgrade && priceDifference ? tCost('fareAdjustment') : undefined,
       }),
-    [bookingTotal, bookingCurrency, passengerBreakdownForSummary, storeSearchParams?.passengers, tCost]
+    [selectedUpgrade, flight.price, priceDifference, bookingCurrency, passengerBreakdownForSummary, storeSearchParams?.passengers, tCost, priceCheckData]
   );
 
   const cabinLabel = formatFareLabel(selectedUpgrade?.cabinClassDisplay || selectedFareType);

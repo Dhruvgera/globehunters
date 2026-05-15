@@ -90,6 +90,7 @@ function PaymentContent() {
   const flight = useSelectedFlight();
   const selectedUpgrade = useBookingStore((state) => state.selectedUpgradeOption);
   const priceCheckData = useBookingStore((state) => state.priceCheckData);
+  const priceDifference = useBookingStore((state) => state.priceDifference);
   const storeSearchParams = useBookingStore((state) => state.searchParams);
 
   // Get and set protection plan and baggage from/to Zustand store
@@ -308,7 +309,7 @@ function PaymentContent() {
     ? (packageTotalOverride?.amount || fallbackPackagePricing?.amount || selectedUpgrade?.totalPrice || 0)
     : isHotelMode
       ? (hotelRoomSummary?.total || 0)
-      : (selectedUpgrade ? selectedUpgrade.totalPrice : (flight?.price || 0));
+      : (selectedUpgrade ? selectedUpgrade.totalPrice : (priceDifference ? (priceCheckData?.priceOptions?.[0]?.totalPrice || flight?.price || 0) : (flight?.price || 0)));
 
   // Determine region (UK vs Global) and pick appropriate iAssure pricing
   const region = getRegion();
@@ -395,7 +396,8 @@ function PaymentContent() {
   // Baggage is charged per person per way (e.g., £90 per way means £180 for round-trip)
   const baggageCost = additionalBaggage * baggagePrice * numberOfWays;
   const subtotal = baseFare + protectionPlanCost + baggageCost;
-  const discountAmount = subtotal * discountPercent;
+  const fareAdjustmentDiscount = (!selectedUpgrade && priceDifference && !isPackageMode && !isHotelMode) ? priceDifference : 0;
+  const discountAmount = subtotal * discountPercent + fareAdjustmentDiscount;
   const tripTotal = subtotal - discountAmount;
   const localPayableTaxesForBilling = convertedLocalTaxRowsForBilling;
   const tripTotalForDisplay = tripTotal + convertedLocalTaxTotalForDisplay;
@@ -465,8 +467,8 @@ function PaymentContent() {
         protectionPlanName,
         baggageCost,
         baggageCount: additionalBaggage,
-        discountAmount,
-        discountPercent,
+        discountAmount: fareAdjustmentDiscount > 0 ? fareAdjustmentDiscount : undefined,
+        discountLabel: fareAdjustmentDiscount > 0 ? tCost('fareAdjustment') : undefined,
         currency: currency || "GBP",
         t: tCost,
       });
@@ -500,8 +502,7 @@ function PaymentContent() {
     packageSearch?.nights,
     selectedUpgrade?.passengerBreakdown,
     storeSearchParams?.passengers,
-    discountAmount,
-    discountPercent,
+    fareAdjustmentDiscount,
     tCost,
   ]);
   const paymentTotalSubtext = useMemo(() => {

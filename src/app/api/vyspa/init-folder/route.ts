@@ -72,6 +72,7 @@ interface InitFolderRequestBody {
   chooseSupplier?: string;    // Supplier code from price check (e.g. "GALNEW")
   // Per-passenger pricing from price check (for separate TKT segments per passenger)
   passengerPricing?: PassengerPricing[];
+  priceDifference?: number | null;
 }
 
 function mapPassengerType(type: string): 'ADT' | 'CHD' | 'INF' {
@@ -209,7 +210,8 @@ export async function POST(req: Request) {
       markupIds, moduleId, cabinClassCode, selectedBrandName, baggageInfo, refundableInfo, baseFare, taxes,
       galileoNotes,
       gds,
-      chooseSupplier
+      chooseSupplier,
+      priceDifference
     } = body;
 
     if (!Array.isArray(passengers) || passengers.length === 0) {
@@ -515,6 +517,9 @@ export async function POST(req: Request) {
     }
     if (refundableInfo) {
       bookingComments.push(`Cancellation: ${refundableInfo}`);
+    }
+    if (priceDifference && priceDifference > 0) {
+      bookingComments.push(`Price Adjustment: Fare discount applied (${currency}${priceDifference.toFixed(2)}). Customer charged original search price.`);
     }
     if (ccClassCode) {
       bookingComments.push(`Booking Class: ${ccClassCode}`);

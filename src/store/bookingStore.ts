@@ -101,6 +101,7 @@ function buildPersistedStateFallbacks(value: string): string[] {
         draft.selectedFlight = null;
         draft.selectedUpgradeOption = null;
         draft.priceCheckData = null;
+        draft.priceDifference = null;
       }),
       createFallback((draft) => {
         draft.hotelSearch = null;
@@ -121,6 +122,7 @@ function buildPersistedStateFallbacks(value: string): string[] {
         draft.selectedFlight = null;
         draft.selectedUpgradeOption = null;
         draft.priceCheckData = null;
+        draft.priceDifference = null;
         draft.booking = null;
         draft.vyspaFolderNumber = null;
         draft.vyspaCustomerId = null;
@@ -313,9 +315,11 @@ interface BookingState {
   selectedFareType: string;
   selectedUpgradeOption: TransformedPriceOption | null;
   priceCheckData: PriceCheckResult | null;
+  priceDifference: number | null;
   setSelectedFlight: (flight: Flight, fareType?: string) => void;
   setSelectedUpgrade: (option: TransformedPriceOption) => void;
   setPriceCheckData: (data: PriceCheckResult | null) => void;
+  setPriceDifference: (diff: number | null) => void;
   clearSelectedFlight: () => void;
 
   // Passengers
@@ -393,6 +397,7 @@ const initialState = {
   selectedFareType: 'Economy',
   selectedUpgradeOption: null,
   priceCheckData: null,
+  priceDifference: null,
   passengers: [],
   passengersSaved: false,
   contactEmail: '',
@@ -562,12 +567,16 @@ export const useBookingStore = create<BookingState & HydrationState>()(
       setPriceCheckData: (data) =>
         set({ priceCheckData: data }),
 
+      setPriceDifference: (diff) =>
+        set({ priceDifference: diff }),
+
       clearSelectedFlight: () =>
         set({
           selectedFlight: null,
           selectedFareType: 'Economy',
           selectedUpgradeOption: null,
           priceCheckData: null,
+          priceDifference: null,
           vyspaFolderNumber: null,
           vyspaCustomerId: null,
           vyspaEmailAddress: null,
@@ -658,6 +667,7 @@ export const useBookingStore = create<BookingState & HydrationState>()(
           selectedFareType: 'Economy',
           selectedUpgradeOption: null,
           priceCheckData: null,
+          priceDifference: null,
           vyspaFolderNumber: null,
           vyspaCustomerId: null,
           vyspaEmailAddress: null,
@@ -745,6 +755,7 @@ export const useBookingStore = create<BookingState & HydrationState>()(
         selectedFareType: state.selectedFareType,
         selectedUpgradeOption: state.selectedUpgradeOption,
         priceCheckData: state.priceCheckData,
+        priceDifference: state.priceDifference,
         passengers: state.passengers,
         passengersSaved: state.passengersSaved,
         contactEmail: state.contactEmail,

@@ -33,6 +33,7 @@ export function TermsAndConditions({
   const setVyspaFolderInfo = useBookingStore((s) => s.setVyspaFolderInfo);
   const passengersSaved = useBookingStore((s) => s.passengersSaved);
   const vyspaFolderNumber = useBookingStore((s) => s.vyspaFolderNumber);
+  const priceDifference = useBookingStore((s) => s.priceDifference);
 
   const canProceedToPayment = (): boolean => {
     const counts = searchParams?.passengers || { adults: 1, children: 0, infants: 0 };
@@ -86,7 +87,6 @@ export function TermsAndConditions({
         selectedFlight.outbound.arrivalAirport.code;
       const departureDate = selectedFlight.outbound.date;
       const fareSelectedPrice = selectedUpgradeOption ? selectedUpgradeOption.totalPrice : selectedFlight.price;
-
       // Build flight segments array for Portal API
       const flightSegments = [];
       const allSegments = selectedFlight.segments || [selectedFlight.outbound, selectedFlight.inbound].filter(Boolean);
@@ -263,13 +263,25 @@ export function TermsAndConditions({
       const passengerPricing: { paxType: 'ADT' | 'CHD' | 'INF'; count: number; baseFare: number; taxes: number; totalFare: number }[] = [];
       const selectedOption = selectedUpgradeOption || priceCheckData?.priceOptions?.[0];
       if (selectedOption?.passengerBreakdown && selectedOption.passengerBreakdown.length > 0) {
-        for (const breakdown of selectedOption.passengerBreakdown) {
+        const paxBreakdown = selectedOption.passengerBreakdown;
+        const hasPriceDiff = !selectedUpgradeOption && priceDifference && priceDifference > 0;
+        const breakdownTotal = paxBreakdown.reduce((sum, pax) => sum + (pax.totalPrice || 0), 0);
+        for (const breakdown of paxBreakdown) {
+          let paxTotalFare = breakdown.totalPrice;
+          let paxBaseFare = breakdown.basePrice;
+          let paxTaxes = breakdown.taxesPerPerson;
+          if (hasPriceDiff && breakdownTotal > 0) {
+            const scaleFactor = (breakdownTotal - priceDifference) / breakdownTotal;
+            paxTotalFare = breakdown.totalPrice * scaleFactor;
+            paxBaseFare = breakdown.basePrice * scaleFactor;
+            paxTaxes = paxTotalFare - paxBaseFare;
+          }
           passengerPricing.push({
             paxType: breakdown.type as 'ADT' | 'CHD' | 'INF',
             count: breakdown.count,
-            baseFare: breakdown.basePrice,
-            taxes: breakdown.taxesPerPerson,
-            totalFare: breakdown.totalPrice,
+            baseFare: paxBaseFare,
+            taxes: paxTaxes,
+            totalFare: paxTotalFare,
           });
         }
       }
@@ -314,6 +326,7 @@ export function TermsAndConditions({
           gds: supplierGds,
           chooseSupplier: supplierChoose,
           passengerPricing,           // Per-passenger pricing for separate TKT segments
+          priceDifference: !selectedUpgradeOption ? priceDifference : null,
         }),
       });
 

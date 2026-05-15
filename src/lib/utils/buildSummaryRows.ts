@@ -33,6 +33,7 @@ interface FlightRowsParams extends BaseBuildParams {
   baggageCount?: number;
   discountAmount?: number;
   discountPercent?: number;
+  discountLabel?: string;
 }
 
 interface HotelRowsParams extends BaseBuildParams {
@@ -79,6 +80,7 @@ function buildFlightRows(params: FlightRowsParams): SummaryRow[] {
     baggageCount,
     discountAmount,
     discountPercent,
+    discountLabel,
     currency,
     t,
   } = params;
@@ -125,9 +127,10 @@ function buildFlightRows(params: FlightRowsParams): SummaryRow[] {
     });
   }
 
-  if (discountAmount && discountAmount > 0 && discountPercent) {
+  if (discountAmount && discountAmount > 0) {
+    const label = discountLabel || (discountPercent ? `${t("discountCode")} (-${discountPercent * 100}%)` : t("discountCode"));
     rows.push({
-      label: `${t("discountCode")} (-${discountPercent * 100}%)`,
+      label,
       value: `-${formatPrice(discountAmount, currency)}`,
     });
   }
