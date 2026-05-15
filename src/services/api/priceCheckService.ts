@@ -488,8 +488,17 @@ function transformPriceOption(
     'Y';
   
   // Use brand name (e.g., "ECONOMY LIGHT") for display, fallback to cabin name
-  const cabinClassDisplay = brandName || 
-    option.BrandInfo?.[0]?.CabinName || 
+  // Filter out non-informative values like "Not Specified" so the chain falls
+  // through to cabinCodeToDisplayName which correctly maps letter codes.
+  const isInformative = (v: string | undefined | null): string | null => {
+    if (!v) return null;
+    const t = v.toString().trim();
+    if (!t || /^not\s*specified$/i.test(t)) return null;
+    return t;
+  };
+
+  const cabinClassDisplay = isInformative(brandName) ||
+    isInformative(option.BrandInfo?.[0]?.CabinName) ||
     cabinCodeToDisplayName(cabinClassCode);
   
   // Get booking code - prefer explicit fields, do NOT override with brand name

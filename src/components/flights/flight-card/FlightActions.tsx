@@ -73,13 +73,7 @@ export function FlightActions({
             )}
           </Button>
         ) : null}
-        <Button
-          className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-full px-5 sm:px-6 py-2 sm:py-2.5 h-auto text-xs sm:text-sm font-bold shadow-[0_2px_8px_rgba(55,84,237,0.35)] hover:shadow-[0_4px_12px_rgba(55,84,237,0.45)] transition-shadow whitespace-nowrap"
-          onClick={onBook}
-          onMouseEnter={onPrefetchOptions}
-        >
-          {t('book')}
-        </Button>
+
       </div>
     </div>
   );

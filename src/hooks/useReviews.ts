@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import useSWR from 'swr';
 
 export interface Review {
   name: string;
@@ -15,44 +15,28 @@ interface UseReviewsResult {
   error: string | null;
 }
 
-export function useReviews() {
-  const [data, setData] = useState<UseReviewsResult>({
-    reviews: [],
-    totalReviews: 0,
-    averageRating: 0,
-    isLoading: true,
-    error: null
+const fetcher = (url: string) =>
+  fetch(url).then((res) => {
+    if (!res.ok) throw new Error('Failed to fetch reviews');
+    return res.json();
   });
 
-  useEffect(() => {
-    async function fetchReviews() {
-      try {
-        const response = await fetch('/api/reviews');
-        if (!response.ok) {
-          throw new Error('Failed to fetch reviews');
-        }
-        const result = await response.json();
-        
-        setData({
-          reviews: result.reviews || [],
-          totalReviews: result.totalReviews || 0,
-          averageRating: result.averageRating || 0,
-          isLoading: false,
-          error: null
-        });
-      } catch (err) {
-        console.error('Error fetching reviews:', err);
-        setData(prev => ({
-          ...prev,
-          isLoading: false,
-          error: 'Failed to load reviews'
-        }));
-      }
+export function useReviews(): UseReviewsResult {
+  const { data, error, isLoading } = useSWR(
+    '/api/reviews',
+    fetcher,
+    {
+      dedupingInterval: 60 * 60 * 1000,
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
     }
+  );
 
-    fetchReviews();
-  }, []);
-
-  return data;
+  return {
+    reviews: data?.reviews || [],
+    totalReviews: data?.totalReviews || 0,
+    averageRating: data?.averageRating || 0,
+    isLoading,
+    error: error?.message || null,
+  };
 }
-

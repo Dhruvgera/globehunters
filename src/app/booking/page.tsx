@@ -260,22 +260,24 @@ function BookingContent() {
             />
           </div>
 
-          
-          <div className="w-full lg:w-[30%] flex flex-col gap-4">
-            <WebRefCard
-              refNumber={webRefNumber}
-              phoneNumber={affiliatePhone}
-              isMobile={false}
-              isJourneyRef={!!vyspaFolderNumber}
-            />
 
-            {/* Price Summary */}
-            <CostSummaryCard
-              rows={bookingSummaryRows}
-              total={bookingTotal}
-              currency={bookingCurrency}
-              isSticky={true}
-            />
+          <div className="w-full lg:w-[30%] flex flex-col gap-4">
+            <div className="lg:sticky lg:top-24 z-10 flex flex-col gap-4">
+              {/* Web Ref Card - Desktop Only */}
+              <WebRefCard
+                refNumber={webRefNumber}
+                phoneNumber={affiliatePhone}
+                isMobile={false}
+              />
+
+              {/* Price Summary */}
+              <CostSummaryCard
+                rows={bookingSummaryRows}
+                total={bookingTotal}
+                currency={bookingCurrency}
+                isSticky={false}
+              />
+            </div>
 
             {/* Customer Reviews */}
             <CustomerReviewsCard

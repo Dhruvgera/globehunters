@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { PassengerForm } from "./PassengerForm";
 import { useBookingStore } from "@/store/bookingStore";
 import type { Passenger, PassengerType } from "@/types/booking";
+import { AlertBanner } from "./AlertBanner";
 
 interface PassengerFormsSectionProps {
   showPassportFields?: boolean;
@@ -93,6 +94,12 @@ export default function PassengerFormsSection({
           {t("heading")}
         </span>
       </div>
+
+      <AlertBanner type="warning">
+        <p className="font-medium">
+          {t('passportNameWarning')}
+        </p>
+      </AlertBanner>
 
       <div className="flex flex-col gap-8">
         {requiredPassengers.map((slot, idx) => {

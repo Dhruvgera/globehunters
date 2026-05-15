@@ -68,7 +68,7 @@ export function FlightSummaryCard({
         </div>
         {/* Desktop: passengers and cabin */}
         <div className="hidden lg:flex items-center gap-3 text-sm text-[#010D50]">
-          <span>{cabinLabel || t('economy')}</span>
+          <span>{cabinLabel}</span>
           <div className="w-1 h-1 rounded-full bg-[#010D50]" />
           <span>{passengers}</span>
           <div className="w-1 h-1 rounded-full bg-[#010D50]" />

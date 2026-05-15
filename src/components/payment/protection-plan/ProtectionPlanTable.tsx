@@ -34,11 +34,11 @@ export function ProtectionPlanTable({
   const features = GetInclusions();
   const region = getRegion();
   return (
-    <div className="hidden lg:flex flex-col border-1 border-[#ddc] rounded-lg">
+    <div className="hidden lg:flex flex-col border-1 border-[#ddc] rounded-lg overflow-visible">
       {/* Price Row */}
       <div className="flex items-center flex-row bg-[#F5F7FF] rounded-lg justify-between">
-        <div className="flex flex-col p-3">
-          <div className="w-[524px] text-sm font-medium text-[#010D50]">
+        <div className="flex flex-col p-3 flex-1 min-w-0">
+          <div className="flex-1 min-w-0 text-sm font-medium text-[#010D50]">
             Choose your own bundle
           </div>
         </div>
@@ -58,8 +58,8 @@ export function ProtectionPlanTable({
             </span>
           </div>
         </div>
-        <div className={`flex flex-col border-l border-r border-t border-[#008234] p-3 box-shadow shadow-sm
-        bg-[#e1f1e1] cursor-pointer `}
+        <div className={`flex flex-col border-l border-r border-t border-success p-3 box-shadow shadow-sm
+        bg-success-light cursor-pointer `}
           role="button"
           onClick={() => onSelectPlan("premium")}
 
@@ -93,14 +93,14 @@ export function ProtectionPlanTable({
       {/* plans feature listing */}
 
       <div className="flex flex-row">
-        <div className="flex flex-col">
+        <div className="flex flex-col flex-1 min-w-0">
           {/* Features */}
           {features.allIncluded.map((feature, i) => (
             <div
               key={i}
               className="flex items-center justify-between p-3 border-b border-[#ddc]  h-10"
             >
-              <span className="w-[524px] text-sm font-medium text-[#010D50]">
+              <span className="flex-1 min-w-0 text-sm font-medium text-[#010D50]">
                 {feature}
               </span>
             </div>
@@ -118,20 +118,20 @@ export function ProtectionPlanTable({
 
               <div className="w-[109px] flex items-center justify-center">
                 {features.basic.includes(feature) ? (
-                  <Check className="w-4 h-4 text-[#008234]" />
+                  <Check className="w-4 h-4 text-success" />
                 ) : <Cross1Icon className="w-4 h-4 text-[#888]" />}
-              </div>
+               </div>
             </div>))}
         </div>
-        <div className={'flex flex-col border-[#008234] shadow-sm  bg-[#e1f1e1] cursor-pointer'} role="button"
+        <div className={'flex flex-col border-success shadow-sm  bg-success-light cursor-pointer'} role="button"
           onClick={() => onSelectPlan("premium")}>
           {features.allIncluded.map((feature, i) => (
-            <div className="flex items-center justify-between p-3 border-l border-r border-[#008234]  h-10">
+            <div className="flex items-center justify-between p-3 border-l border-r border-success  h-10">
 
               <div className="w-[109px] flex items-center justify-center ">
 
                 {features.premium.includes(feature) ? (
-                  <Check className="w-4 h-4 text-[#008234]" />) : <Cross1Icon className="w-4 h-4 text-[#888]" />}
+                  <Check className="w-4 h-4 text-success" />) : <Cross1Icon className="w-4 h-4 text-[#888]" />}
               </div>
             </div>
           ))}</div>
@@ -143,7 +143,7 @@ export function ProtectionPlanTable({
 
               <div className="w-[109px] flex items-center justify-center">
                 {features.allIncluded.includes(feature) && (
-                  <Check className="w-4 h-4 text-[#008234]" />
+                  <Check className="w-4 h-4 text-success" />
                 )}
               </div>
             </div>))}</div>
@@ -152,23 +152,23 @@ export function ProtectionPlanTable({
       <div className="flex flex-row justify-between"
 
       >
-        <div className="flex flex-col p-3">
-          <span className="w-[524px] opacity-0">Select</span>
+        <div className="flex flex-col p-3 flex-1 min-w-0">
+          <span className="flex-1 min-w-0 opacity-0">Select</span>
         </div>
         <div className="flex items-center gap-0 flex-col p-3 border-l  border-[#ddc]">
           <div
             role="button"
             onClick={() => onSelectPlan("basic")}
 
-            className="w-[109px] flex flex-col items-center  justify-center gap-1 py-0.5 cursor-pointer"
+            className="w-[109px] flex flex-col items-center justify-center gap-1 py-0.5 cursor-pointer"
           >
             <Checkbox checked={selectedPlan === "basic"} />
-            <span className="text-xs font-medium text-[#010D50]">
-              add
+            <span className="text-xs font-bold text-white bg-primary rounded-full px-4 py-1 hover:bg-primary-hover transition-colors">
+              Add
             </span>
           </div>
         </div>
-        <div className="flex flex-col border-l border-r border-[#008234] p-3 bg-[#e1f1e1] border-b">
+        <div className="flex flex-col border-l border-r border-success p-3 bg-success-light border-b">
           <div
             role="button"
             tabIndex={0}
@@ -182,8 +182,8 @@ export function ProtectionPlanTable({
             className="w-[109px] flex flex-col  items-center justify-center gap-1 py-0.5 cursor-pointer"
           >
             <Checkbox checked={selectedPlan === "premium"} />
-            <span className="text-xs font-medium text-[#010D50]">
-              add
+            <span className="text-xs font-bold text-white bg-success rounded-full px-4 py-1 hover:bg-success-hover transition-colors">
+              Add
             </span>
           </div>
         </div>
@@ -201,8 +201,8 @@ export function ProtectionPlanTable({
             className="w-[109px] flex flex-col items-center justify-center gap-1 py-0.5 cursor-pointer"
           >
             <Checkbox checked={selectedPlan === "all"} />
-            <span className="text-xs font-medium text-[#010D50]">
-              add
+            <span className="text-xs font-bold text-white bg-primary rounded-full px-4 py-1 hover:bg-primary-hover transition-colors">
+              Add
             </span>
           </div>
         </div>
