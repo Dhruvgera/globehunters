@@ -64,7 +64,7 @@ export const IASSURE_PRICING = {
     // Percentages of base fare
     basic: 0.08, // 8%
     premium: 0.10, // 10%
-    all: 0.12, // 12%
+    all: 0.15, // 15%
   },
   // UK-specific configuration with slabs by booking amount
   uk: {
