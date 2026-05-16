@@ -98,8 +98,8 @@ function PackageReviewPageInner() {
     "";
   const deeplinkPackageView =
     isFromDeeplink &&
-    deeplinkViewData?.success &&
-    "FlightResultId" in deeplinkViewData.results
+      deeplinkViewData?.success &&
+      "FlightResultId" in deeplinkViewData.results
       ? (deeplinkViewData as HolidayPackageViewResponse)
       : null;
 
@@ -209,11 +209,7 @@ function PackageReviewPageInner() {
 
   const region = getRegion();
   const baseFare = selectedUpgrade?.totalPrice || selectedFlight?.price || 0;
-  const protectionPlanPercentages = !baseFare
-    ? IASSURE_PRICING.global
-    : region === "UK"
-      ? IASSURE_PRICING.uk.slabs.find((slab) => baseFare <= slab.max) || IASSURE_PRICING.uk.slabs[IASSURE_PRICING.uk.slabs.length - 1]
-      : IASSURE_PRICING.global;
+  const protectionPlanPercentages = IASSURE_PRICING.global;
   const protectionPlanPrices = {
     basic: baseFare * protectionPlanPercentages.basic,
     premium: baseFare * protectionPlanPercentages.premium,
