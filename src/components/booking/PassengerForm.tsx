@@ -148,114 +148,113 @@ export function PassengerForm({
           {t('passenger')} {passengerIndex + 1}
         </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Title */}
-          <div className="space-y-2">
-            <Label htmlFor={`title-${passengerIndex}`}>{t('titleLabel')} {t('required')}</Label>
-            <Select
-              value={formData.title}
-              onValueChange={(value) => handleChange("title", value)}
-              disabled={disabled}
-            >
-              <SelectTrigger id={`title-${passengerIndex}`}>
-                <SelectValue placeholder={t('selectTitle')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Mr">{t('mr')}</SelectItem>
-                <SelectItem value="Mrs">{t('mrs')}</SelectItem>
-                <SelectItem value="Miss">{t('miss')}</SelectItem>
-                <SelectItem value="Ms">{t('ms')}</SelectItem>
-                <SelectItem value="Dr">{t('dr')}</SelectItem>
-              </SelectContent>
-            </Select>
-            {errors.title && (
-              <p className="text-xs text-red-600">{errors.title}</p>
-            )}
+        <div className="space-y-4">
+          {/* Title + First Name + Last Name */}
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="space-y-2 md:w-28 shrink-0">
+              <Label htmlFor={`title-${passengerIndex}`}>{t('titleLabel')} ({t('required')})</Label>
+              <Select
+                value={formData.title}
+                onValueChange={(value) => handleChange("title", value)}
+                disabled={disabled}
+              >
+                <SelectTrigger id={`title-${passengerIndex}`}>
+                  <SelectValue placeholder={t('selectTitle')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Mr">{t('mr')}</SelectItem>
+                  <SelectItem value="Mrs">{t('mrs')}</SelectItem>
+                  <SelectItem value="Miss">{t('miss')}</SelectItem>
+                  <SelectItem value="Ms">{t('ms')}</SelectItem>
+                  <SelectItem value="Dr">{t('dr')}</SelectItem>
+                </SelectContent>
+              </Select>
+              {errors.title && (
+                <p className="text-xs text-red-600">{errors.title}</p>
+              )}
+            </div>
+
+            <div className="space-y-2 flex-1 min-w-0">
+              <Label htmlFor={`firstName-${passengerIndex}`}>{t('firstName')} ({t('required')})</Label>
+              <Input
+                id={`firstName-${passengerIndex}`}
+                type="text"
+                value={formData.firstName}
+                onChange={(e) => handleChange("firstName", e.target.value)}
+                placeholder={t('firstName')}
+                className={errors.firstName ? "border-red-500" : ""}
+                disabled={disabled}
+              />
+              {errors.firstName && (
+                <p className="text-xs text-red-600">{errors.firstName}</p>
+              )}
+            </div>
+
+            <div className="space-y-2 flex-1 min-w-0">
+              <Label htmlFor={`lastName-${passengerIndex}`}>{t('lastName')} ({t('required')})</Label>
+              <Input
+                id={`lastName-${passengerIndex}`}
+                type="text"
+                value={formData.lastName}
+                onChange={(e) => handleChange("lastName", e.target.value)}
+                placeholder={t('lastName')}
+                className={errors.lastName ? "border-red-500" : ""}
+                disabled={disabled}
+              />
+              {errors.lastName && (
+                <p className="text-xs text-red-600">{errors.lastName}</p>
+              )}
+            </div>
           </div>
 
-          {/* First Name */}
-          <div className="space-y-2">
-            <Label htmlFor={`firstName-${passengerIndex}`}>{t('firstName')} {t('required')}</Label>
-            <Input
-              id={`firstName-${passengerIndex}`}
-              type="text"
-              value={formData.firstName}
-              onChange={(e) => handleChange("firstName", e.target.value)}
-              placeholder={t('firstName')}
-              className={errors.firstName ? "border-red-500" : ""}
-              disabled={disabled}
-            />
-            {errors.firstName && (
-              <p className="text-xs text-red-600">{errors.firstName}</p>
-            )}
-          </div>
+          {/* Email + Date of Birth */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor={`email-${passengerIndex}`}>
+                {t('email')} {requireContactInfo ? t('required') : "(Optional)"}
+              </Label>
+              <Input
+                id={`email-${passengerIndex}`}
+                type="email"
+                value={formData.email}
+                onChange={(e) => handleChange("email", e.target.value)}
+                placeholder={t('emailPlaceholder')}
+                className={errors.email ? "border-red-500" : ""}
+                disabled={disabled}
+              />
+              {errors.email && (
+                <p className="text-xs text-red-600">{errors.email}</p>
+              )}
+            </div>
 
-          {/* Last Name */}
-          <div className="space-y-2">
-            <Label htmlFor={`lastName-${passengerIndex}`}>{t('lastName')} {t('required')}</Label>
-            <Input
-              id={`lastName-${passengerIndex}`}
-              type="text"
-              value={formData.lastName}
-              onChange={(e) => handleChange("lastName", e.target.value)}
-              placeholder={t('lastName')}
-              className={errors.lastName ? "border-red-500" : ""}
-              disabled={disabled}
-            />
-            {errors.lastName && (
-              <p className="text-xs text-red-600">{errors.lastName}</p>
-            )}
-          </div>
-
-          {/* Date of Birth */}
-          <div className="space-y-2">
-            <Label htmlFor={`dob-${passengerIndex}`}>{t('dateOfBirth')} {t('required')}</Label>
-            <Input
-              id={`dob-${passengerIndex}`}
-              type="date"
-              value={formData.dateOfBirth}
-              onChange={(e) => handleChange("dateOfBirth", e.target.value)}
-              max={new Date().toISOString().split('T')[0]}
-              className={errors.dateOfBirth ? "border-red-500" : ""}
-              disabled={disabled}
-            />
-            {errors.dateOfBirth && (
-              <p className="text-xs text-red-600">{errors.dateOfBirth}</p>
-            )}
-          </div>
-
-          {/* Email */}
-          <div className="space-y-2">
-            <Label htmlFor={`email-${passengerIndex}`}>
-              {t('email')} {requireContactInfo ? t('required') : "(Optional)"}
-            </Label>
-            <Input
-              id={`email-${passengerIndex}`}
-              type="email"
-              value={formData.email}
-              onChange={(e) => handleChange("email", e.target.value)}
-              placeholder={t('emailPlaceholder')}
-              className={errors.email ? "border-red-500" : ""}
-              disabled={disabled}
-            />
-            {errors.email && (
-              <p className="text-xs text-red-600">{errors.email}</p>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor={`dob-${passengerIndex}`}>{t('dateOfBirth')} ({t('required')})</Label>
+              <Input
+                id={`dob-${passengerIndex}`}
+                type="date"
+                value={formData.dateOfBirth}
+                onChange={(e) => handleChange("dateOfBirth", e.target.value)}
+                max={new Date().toISOString().split('T')[0]}
+                className={errors.dateOfBirth ? "border-red-500" : ""}
+                disabled={disabled}
+              />
+              {errors.dateOfBirth && (
+                <p className="text-xs text-red-600">{errors.dateOfBirth}</p>
+              )}
+            </div>
           </div>
 
           {/* Phone with Country Code */}
-          <div className="space-y-2 md:col-span-2">
+          <div className="space-y-2">
             <Label htmlFor={`phone-${passengerIndex}`}>
               {t('phone')} {requireContactInfo ? t('required') : "(Optional)"}
             </Label>
             <div className="flex gap-2">
-              {/* Country Code Selector */}
               <CountryCodeSelector
                 value={formData.countryCode || "+44"}
                 onChange={(val: string) => handleChange("countryCode", val)}
                 disabled={disabled}
               />
-              {/* Phone Number Input */}
               <Input
                 id={`phone-${passengerIndex}`}
                 type="tel"
