@@ -19,15 +19,20 @@ const DOMAIN_CONFIG_MAP: Record<string, DomainConfig> = {
     currency: 'GBP',
     region: 'UK',
   },
-  // US domain - returns prices in USD
   'globehunters.com': {
+    username: 'FlightsUK',
+    currency: 'GBP',
+    region: 'UK',
+  },
+  // US domain - returns prices in USD
+  'globehunters.us': {
     username: 'FlightsUS',
     currency: 'USD',
     region: 'US',
   },
   // AU domain - returns prices in AUD
   'globehunters.com.au': {
-    username: 'FlightsAU', // Assuming this based on pattern
+    username: 'FlightsAU',
     currency: 'AUD',
     region: 'AU',
   },
