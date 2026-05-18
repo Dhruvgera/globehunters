@@ -5,6 +5,7 @@ export interface Review {
   rating: number;
   text: string;
   title?: string;
+  date?: string;
 }
 
 interface UseReviewsResult {

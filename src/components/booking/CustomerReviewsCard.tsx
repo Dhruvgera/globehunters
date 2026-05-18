@@ -9,6 +9,7 @@ interface Review {
   name: string;
   rating: number;
   text: string;
+  date?: string;
 }
 
 interface CustomerReviewsCardProps {
@@ -82,7 +83,7 @@ export function CustomerReviewsCard({
               <div className="w-10 h-10 rounded-full bg-[#3754ED]/10 flex items-center justify-center text-sm font-bold text-[#3754ED]">
                 {currentReview.name.charAt(0)}
               </div>
-              <div className="flex flex-col">
+              <div className="flex flex-col flex-1 min-w-0">
                 <span className="text-sm font-bold text-[#010D50]">
                   {currentReview.name}
                 </span>
@@ -99,6 +100,15 @@ export function CustomerReviewsCard({
                   ))}
                 </div>
               </div>
+              {currentReview.date && (
+                <span className="text-xs text-[#6B7280] shrink-0 self-center">
+                  {new Date(currentReview.date).toLocaleDateString(undefined, {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </span>
+              )}
             </div>
             
             <div className="bg-[#F5F7FF] rounded-lg p-3">
