@@ -5,7 +5,7 @@
 
 export const CONTACT_INFO = {
   phone: process.env.NEXT_PUBLIC_CONTACT_PHONE || '020 4502 2984',
-  email: 'service@globehunters.co.uk',
+  email: 'info@globehunters.co.uk',
   supportHours: 'Mon-Fri 9:00 AM - 6:00 PM GMT',
 };
 
