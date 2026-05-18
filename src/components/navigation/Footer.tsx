@@ -109,7 +109,7 @@ export default function Footer() {
               Australia
             </Link>
             <Link 
-              href="https://globehunters.co.uk" 
+              href="https://globehunters.com" 
               className="flex items-center gap-2 bg-gray-100 hover:bg-gray-200 rounded-full px-4 py-2 text-sm font-medium text-gray-800 transition-colors"
             >
               <span className="fi fi-gb"></span>

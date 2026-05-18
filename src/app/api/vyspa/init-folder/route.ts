@@ -235,7 +235,7 @@ export async function POST(req: Request) {
     const portalDateFormat = formatDateToPortal(vyspaDepartureDate);
     
     // Determine region from request host
-    const host = req.headers.get('host') || 'globehunters.co.uk';
+    const host = req.headers.get('host') || 'globehunters.com';
     const region = getRegionFromHost(host);
     const regionConfig = getPortalRegionConfig(region);
     const regionCode = regionConfig.branchCode === 'UK' ? 'UK' : regionConfig.branchCode;
