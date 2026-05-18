@@ -344,28 +344,13 @@ function PaymentContent() {
     return byIncludes?.code || "";
   };
 
-  const protectionPlanPercentages = (() => {
-    if (isHotelMode) {
-      return {
+  const protectionPlanPercentages = isHotelMode
+    ? {
         basic: REFUND_SHIELD_PRICING.rate,
         premium: REFUND_SHIELD_PRICING.rate,
         all: REFUND_SHIELD_PRICING.rate,
-      };
-    }
-
-    // Fallback to global config if base fare is not available
-    if (!baseFare) {
-      return IASSURE_PRICING.global;
-    }
-
-    if (isUK) {
-      const slabs = IASSURE_PRICING.uk.slabs;
-      const matchingSlab = slabs.find((slab) => baseFare <= slab.max) || slabs[slabs.length - 1];
-      return matchingSlab;
-    }
-
-    return IASSURE_PRICING.global;
-  })();
+      }
+    : IASSURE_PRICING.global;
 
   const protectionPlanPrices = {
     basic: baseFare * protectionPlanPercentages.basic,

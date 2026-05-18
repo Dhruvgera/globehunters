@@ -5,7 +5,7 @@
 
 export const CONTACT_INFO = {
   phone: process.env.NEXT_PUBLIC_CONTACT_PHONE || '020 4502 2984',
-  email: 'service@globehunters.co.uk',
+  email: 'info@globehunters.co.uk',
   supportHours: 'Mon-Fri 9:00 AM - 6:00 PM GMT',
 };
 
@@ -59,25 +59,10 @@ export const PRICING_CONFIG = {
 
 // iAssure protection plan pricing configuration
 export const IASSURE_PRICING = {
-  // Global configuration (FlightsUS and other non-UK regions)
   global: {
-    // Percentages of base fare
-    basic: 0.08, // 8%
-    premium: 0.10, // 10%
-    all: 0.15, // 15%
-  },
-  // UK-specific configuration with slabs by booking amount
-  uk: {
-    slabs: [
-      // 0 - 650
-      { max: 650, basic: 0.07, premium: 0.12, all: 0.22 },
-      // 651 - 999
-      { max: 999, basic: 0.06, premium: 0.11, all: 0.21 },
-      // 1000 - 1499
-      { max: 1499, basic: 0.05, premium: 0.09, all: 0.20 },
-      // 1500+
-      { max: Number.POSITIVE_INFINITY, basic: 0.04, premium: 0.08, all: 0.18 },
-    ],
+    basic: 0.08,
+    premium: 0.10,
+    all: 0.15,
   },
 } as const;
 
