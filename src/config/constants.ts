@@ -64,11 +64,26 @@ export const IASSURE_PRICING = {
     premium: 0.10,
     all: 0.15,
   },
+  uk: {
+    slabs: [
+      // 0 - 650
+      { max: 650, basic: 0.07, premium: 0.12, all: 0.22 },
+      // 651 - 999
+      { max: 999, basic: 0.06, premium: 0.11, all: 0.21 },
+      // 1000 - 1499
+      { max: 1499, basic: 0.05, premium: 0.09, all: 0.20 },
+      // 1500+
+      { max: Number.POSITIVE_INFINITY, basic: 0.04, premium: 0.08, all: 0.18 },
+    ],
+  },
 } as const;
+
 
 export const REFUND_SHIELD_PRICING = {
   rate: 0.1,
 } as const;
+
+
 
 // Filter constraints
 export const FILTER_CONSTRAINTS = {

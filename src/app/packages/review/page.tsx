@@ -573,7 +573,7 @@ function PackageReviewPageInner() {
             <ProtectionPlanSection
               selectedPlan={addOns.protectionPlan}
               onSelectPlan={setProtectionPlan}
-              planPrices={protectionPlanPrices}
+              baseFare={baseFare}
               currency={baggageCurrency}
             />
 

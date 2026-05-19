@@ -346,10 +346,10 @@ function PaymentContent() {
 
   const protectionPlanPercentages = isHotelMode
     ? {
-        basic: REFUND_SHIELD_PRICING.rate,
-        premium: REFUND_SHIELD_PRICING.rate,
-        all: REFUND_SHIELD_PRICING.rate,
-      }
+      basic: REFUND_SHIELD_PRICING.rate,
+      premium: REFUND_SHIELD_PRICING.rate,
+      all: REFUND_SHIELD_PRICING.rate,
+    }
     : IASSURE_PRICING.global;
 
   const protectionPlanPrices = {
@@ -759,7 +759,7 @@ function PaymentContent() {
               <ProtectionPlanSection
                 selectedPlan={normalizedProtectionPlan}
                 onSelectPlan={setProtectionPlan}
-                planPrices={protectionPlanPrices}
+                baseFare={baseFare}
                 currency={currency || 'GBP'}
               />
             ) : (

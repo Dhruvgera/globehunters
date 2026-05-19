@@ -6,23 +6,19 @@ import { useTranslations } from "next-intl";
 import { formatPrice } from "@/lib/currency";
 import { ProtectionPlanCard } from "./protection-plan/ProtectionPlanCard";
 import { ProtectionPlanTable } from "./protection-plan/ProtectionPlanTable";
-import { GetInclusions } from "./protection-plan/ProtectionPlans";
+import { GetInclusions, getPlanPrices } from "./protection-plan/ProtectionPlans";
 
 interface ProtectionPlanSectionProps {
   selectedPlan?: "basic" | "premium" | "all";
   onSelectPlan: (plan: "basic" | "premium" | "all" | undefined) => void;
-  planPrices: {
-    basic: number;
-    premium: number;
-    all: number;
-  };
+  baseFare: number;
   currency: string;
 }
 
 export function ProtectionPlanSection({
   selectedPlan,
   onSelectPlan,
-  planPrices,
+  baseFare,
   currency,
 }: ProtectionPlanSectionProps) {
   const t = useTranslations('payment.iAssure');
@@ -36,6 +32,7 @@ export function ProtectionPlanSection({
       onSelectPlan(plan);
     }
   };
+  const planPrices = getPlanPrices(baseFare);
   return (
     <div className="bg-white border-2 border-[#3754ED] rounded-xl p-3 flex flex-col gap-3">
       <div className="flex items-center justify-between">
