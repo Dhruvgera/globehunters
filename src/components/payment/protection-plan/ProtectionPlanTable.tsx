@@ -4,9 +4,10 @@ import { Check } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useTranslations } from "next-intl";
 import styles from './ProtectionPlanTable.module.css';
-import { Cross1Icon } from "@radix-ui/react-icons";
+import { Cross1Icon, InfoCircledIcon, QuestionMarkCircledIcon } from "@radix-ui/react-icons";
 import { GetInclusions } from "./ProtectionPlans";
 import { getRegion } from "@/lib/utils/domainMapping";
+import { Tooltip } from "@/components/ui/tooltip";
 interface ProtectionPlanTableProps {
   basicPrice: string;
   premiumPrice: string;
@@ -98,10 +99,15 @@ export function ProtectionPlanTable({
           {features.allIncluded.map((feature, i) => (
             <div
               key={i}
-              className="flex items-center justify-between p-3 border-b border-[#ddc]  h-10"
+              className="flex items-center justify-between p-3 border-b border-[#ddc]  h-11"
             >
-              <span className="flex-1 min-w-0 text-sm font-medium text-[#010D50]">
-                {feature}
+              <span className="flex-1 min-w-0 text-sm font-medium text-[#010D50] flex items-center">
+                {feature.label}
+                {feature.tooltip &&
+                  <Tooltip content={
+                    <span className="text-sm font-medium">{feature.tooltip}</span>
+                  }
+                    icon={<InfoCircledIcon className="ml-3" />} />}
               </span>
             </div>
           ))}
@@ -114,23 +120,23 @@ export function ProtectionPlanTable({
 
           {features.allIncluded.map((feature, i) => (
 
-            <div className="flex items-center justify-between p-3 border-b border-l border-[#F5F7FF] border-[#ddc] h-10">
+            <div className="flex items-center justify-between p-3 border-b border-l border-[#F5F7FF] border-[#ddc] h-11">
 
               <div className="w-[109px] flex items-center justify-center">
-                {features.basic.includes(feature) ? (
+                {features.basic.find(el => el.label === feature.label) ? (
                   <Check className="w-4 h-4 text-success" />
                 ) : <Cross1Icon className="w-4 h-4 text-[#888]" />}
-               </div>
+              </div>
             </div>))}
         </div>
         <div className={'flex flex-col border-success shadow-sm  bg-success-light cursor-pointer'} role="button"
           onClick={() => onSelectPlan("premium")}>
           {features.allIncluded.map((feature, i) => (
-            <div className="flex items-center justify-between p-3 border-l border-r border-success  h-10">
+            <div className="flex items-center justify-between p-3 border-l border-r border-success  h-11">
 
               <div className="w-[109px] flex items-center justify-center ">
 
-                {features.premium.includes(feature) ? (
+                {features.premium.find(el => el.label === feature.label) ? (
                   <Check className="w-4 h-4 text-success" />) : <Cross1Icon className="w-4 h-4 text-[#888]" />}
               </div>
             </div>
@@ -139,10 +145,10 @@ export function ProtectionPlanTable({
           onClick={() => onSelectPlan("all")} >
 
           {features.allIncluded.map((feature, i) => (
-            <div className="flex items-center justify-between p-3 border-b  border-[#ddc] h-10">
+            <div className="flex items-center justify-between p-3 border-b  border-[#ddc] h-11">
 
               <div className="w-[109px] flex items-center justify-center">
-                {features.allIncluded.includes(feature) && (
+                {features.allIncluded.find(el => el.label === feature.label) && (
                   <Check className="w-4 h-4 text-success" />
                 )}
               </div>

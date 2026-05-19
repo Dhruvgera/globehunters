@@ -1,3 +1,4 @@
+import { IASSURE_PRICING, PROTECTION_PLANS } from "@/config/constants";
 import { getRegion } from "@/lib/utils/domainMapping";
 import { useTranslations } from "next-intl";
 
@@ -9,27 +10,27 @@ export function GetInclusions(type) {
 
     return {
       basic: [
-        t('features.premium247Support'),
-        t('features.24hCancellationFree'),
-        t('features.carryOnBagPersonalItem'),
+        { label: t('features.premium247Support') },
+        { label: t('features.24hCancellationFree') },
+        { label: t('features.carryOnBagPersonalItem') },
       ],
 
       premium: [
-        t('features.premium247Support'),
-        t('features.24hCancellationFree'),
-        t('features.carryOnBagPersonalItem'),
-        t('features.refundAirlineFull'),
-        t('features.upgrade24hrs'),
+        { label: t('features.premium247Support') },
+        { label: t('features.24hCancellationFree') },
+        { label: t('features.carryOnBagPersonalItem') },
+        { label: t('features.fullRefundAirlines') },
+        { label: t('features.upgrade24hrs') },
       ],
 
       allIncluded: [
-        t('features.premium247Support'),
-        t('features.24hCancellationFree'),
-        t('features.carryOnBagPersonalItem'),
-        t('features.refundAirlineFull'),
-        t('features.upgrade24hrs'),
-        t('features.fareFlexibility'),
-        t('features.priceMatchGuarentee'),
+        { label: t('features.premium247Support') },
+        { label: t('features.24hCancellationFree'), tooltip: t('features.24hfreeCancelTooltip') },
+        { label: t('features.carryOnBagPersonalItem') },
+        { label: t('features.fullRefundAirlines') },
+        { label: t('features.upgrade24hrs'), tooltip: t('features.upgrade24hrsTooltip') },
+        { label: t('features.fareFlexibility') },
+        { label: t('features.priceMatchGuarentee') },
       ]
     };
   }
@@ -38,62 +39,79 @@ export function GetInclusions(type) {
   if (type === 'Mobile') {
     return {
       basic: [
-        t('features.support247'),
-        t('features.freeChanges24h'),
-        t('features.refundDeath'),
-        t('features.refundAirline'),
+        { label: t('features.support247') },
+        { label: t('features.freeChanges24h') },
+        { label: t('features.refundDeath') },
+        { label: t('features.refundAirline') },
       ],
 
       premium: [
-        t('features.allBasic'),
-        t('features.freeChangesAnytime'),
-        t('features.refundLockdown'),
-        t('features.baggageCompensation'),
-        t('features.flightDelay'),
+        { label: t('features.allBasic') },
+        { label: t('features.freeChangesAnytime') },
+        { label: t('features.refundLockdown') },
+        { label: t('features.baggageCompensation') },
+        { label: t('features.flightDelay') },
       ],
 
       allIncluded: [
-        t('features.allPremium'),
-        t('features.priceMatch'),
-        t('features.futureCredit'),
-        t('features.priorityService'),
+        { label: t('features.allPremium') },
+        { label: t('features.priceMatch') },
+        { label: t('features.futureCredit') },
+        { label: t('features.priorityService') },
       ]
     };
 
   } else {
     return {
       basic: [
-        t('features.support247Full'),
-        t('features.rebookRename'),
-        t('features.refundDeathFull'),
-        t('features.refundAirlineFull'),
+        { label: t('features.support247Full') },
+        { label: t('features.rebookRename') },
+        { label: t('features.refundDeathFull') },
+        { label: t('features.refundAirlineFull') },
       ],
 
       premium: [
-        t('features.support247Full'),
-        t('features.rebookRename'),
-        t('features.refundDeathFull'),
-        t('features.freeChangesAnytime'),
-        t('features.refundAirlineFull'),
-        t('features.refundLockdownFull'),
-        t('features.baggageCompensationFull'),
-        t('features.flightDelay'),
+        { label: t('features.support247Full') },
+        { label: t('features.rebookRename') },
+        { label: t('features.refundDeathFull') },
+        { label: t('features.freeChangesAnytime') },
+        { label: t('features.refundAirlineFull') },
+        { label: t('features.refundLockdownFull') },
+        { label: t('features.baggageCompensationFull') },
+        { label: t('features.flightDelay') },
       ],
 
       allIncluded: [
-        t('features.support247Full'),
-        t('features.rebookRename'),
-        t('features.refundDeathFull'),
-        t('features.freeChangesAnytime'),
-        t('features.refundAirlineFull'),
-        t('features.refundLockdownFull'),
-        t('features.baggageCompensationFull'),
-        t('features.flightDelay'),
-        t('features.priceMatch'),
-        t('features.futureCredit'),
+        { label: t('features.support247Full') },
+        { label: t('features.rebookRename') },
+        { label: t('features.refundDeathFull') },
+        { label: t('features.freeChangesAnytime') },
+        { label: t('features.refundAirlineFull') },
+        { label: t('features.refundLockdownFull') },
+        { label: t('features.baggageCompensationFull') },
+        { label: t('features.flightDelay') },
+        { label: t('features.priceMatch') },
+        { label: t('features.futureCredit') },
       ]
     }
   }
 
 
+}
+
+export function getPlanPrices(baseFare) {
+  const region = getRegion();
+  if (region === 'UK') {
+    let slabIndex = IASSURE_PRICING.uk.slabs.findIndex(s => baseFare <= s.max);
+    return {
+      basic: baseFare * IASSURE_PRICING.uk.slabs[slabIndex].basic,
+      premium: baseFare * IASSURE_PRICING.uk.slabs[slabIndex].premium,
+      all: baseFare * IASSURE_PRICING.uk.slabs[slabIndex].all,
+    };
+  }
+  return {
+    basic: baseFare * IASSURE_PRICING.global.basic,
+    premium: baseFare * IASSURE_PRICING.global.premium,
+    all: baseFare * IASSURE_PRICING.global.all,
+  };
 }

@@ -397,7 +397,10 @@
         "carryOnBagPersonalItem": "Carry-on Bag and Personal Item Included",
         "upgrade24hrs": "Upgrade your booking within 24 hours",
         "fareFlexibility": "Flexibility to make changes with Administration Fees and Fare/Tax Adjustments",
-        "priceMatchGuarentee": "Price Match Guarantee on same day of booking"
+        "priceMatchGuarentee": "Price Match Guarantee on same day of booking",
+        "fullRefundAirlines": "Get a full refund in Case of Airline-Initiated Flight Cancellations",
+        "24hfreeCancelTooltip": "iAssure is Non Refundable",
+        "upgrade24hrsTooltip": "Airline conditions and fare difference may be applicable.Please note that certain tickets are non-changeable and non-refundable"
       }
     },
     "form": {
