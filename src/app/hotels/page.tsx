@@ -31,7 +31,7 @@ import { getHotelProvider, parseHotelProvider, type HotelProvider } from "@/lib/
 import { fixStubaImageUrl } from "@/lib/hotels/imageUrl";
 import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
 import { calculateNights } from "@/lib/hotels/nights";
-import { buildPackageRoomConfigurations, clampStar, currencySymbol, DEFAULT_FILTERS, ENABLE_TRUSTYOU_ENRICHMENT, HOTEL_PROVIDER_OVERRIDE_STORAGE_KEY, HOTEL_PROVIDER_TOGGLE_ENABLED, HYBRID_MAX_POLLS, HYBRID_POLL_INTERVAL_MS, HYBRID_SUPPLIER_FILTER_ENABLED, includesBreakfast, isVyspaSearchCriteriaId, mapAvailability, mealPlanFieldCandidates, mealPlanKey, normalizeMealPlanLabel, normalizeNeighborhoodValue, ParsedAvailability, parsePositivePriceCandidate, sanitizeHiddenHotelFilters, SHOW_HYBRID_PROVIDER_IN_RESULTS, toPositiveNumericId, VYSPA_SEARCH_TIMEOUT_SEC } from "./hotelUtils";
+import { buildPackageRoomConfigurations, clampStar, currencySymbol, DEFAULT_FILTERS, ENABLE_TRUSTYOU_ENRICHMENT, HOTEL_PROVIDER_OVERRIDE_STORAGE_KEY, HOTEL_PROVIDER_TOGGLE_ENABLED, HYBRID_MAX_POLLS, HYBRID_POLL_INTERVAL_MS, HYBRID_SUPPLIER_FILTER_ENABLED, includesBreakfast, isVyspaSearchCriteriaId, mapAvailability, mealPlanFieldCandidates, mealPlanKey, normalizeMealPlanLabel, normalizeNeighborhoodValue, ParsedAvailability, parsePositivePriceCandidate, sanitizeHiddenHotelFilters, shortWebRefFromToken, SHOW_HYBRID_PROVIDER_IN_RESULTS, toPositiveNumericId, VYSPA_SEARCH_TIMEOUT_SEC } from "./hotelUtils";
 
 
 
@@ -204,15 +204,7 @@ function HotelsPageInner() {
 
 
 
-  function shortWebRefFromToken(token: string): string {
-    // Small, deterministic hash for display only (avoid leaking long opaque tokens in UI).
-    let h = 2166136261;
-    for (let i = 0; i < token.length; i += 1) {
-      h ^= token.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    return `HB-${(h >>> 0).toString(16).padStart(8, "0").slice(0, 8).toUpperCase()}`;
-  }
+
 
 
 

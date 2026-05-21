@@ -305,7 +305,7 @@ function resolveHotelResultId(r: any, fallbackIdx?: number): string {
 
 
 
-function shortWebRefFromToken(token: string): string {
+export function shortWebRefFromToken(token: string): string {
     // Small, deterministic hash for display only (avoid leaking long opaque tokens in UI).
     let h = 2166136261;
     for (let i = 0; i < token.length; i += 1) {
