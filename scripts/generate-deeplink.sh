@@ -1,17 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
-if [ -f "$(dirname "$0")/../.env" ]; then
-  # shellcheck disable=SC1091
-  source "$(dirname "$0")/../.env"
-fi
+AUTH='UmVtQm9vazpHSFIzbVBhNTU='
+VYSPA_API_VERSION=2
+VYSPA_API_URL='https://a1.stagev4.vyspa.net'
 
-: "${VYSPA_USERNAME:?VYSPA_USERNAME is not set}"
-: "${VYSPA_PASSWORD:?VYSPA_PASSWORD is not set}"
-
-AUTH=$(printf '%s:%s' "$VYSPA_USERNAME" "$VYSPA_PASSWORD" | base64)
-
-RESPONSE=$(curl --silent --location 'https://a1.stagev4.vyspa.net/rest/v4/accommodationAvailabilityV3/' \
+RESPONSE=$(curl --silent --location "${VYSPA_API_URL}/rest/v4/accommodationAvailabilityV3/" \
 --header 'Content-Type: application/json' \
 --header "Authorization: Basic $AUTH" \
 --data '[
@@ -26,8 +20,8 @@ RESPONSE=$(curl --silent --location 'https://a1.stagev4.vyspa.net/rest/v4/accomm
         "children": 0,
         "adult_room": [2],
         "children_room": [0],
-        "arrivalDate": "2026-05-07",
-        "departureDate": "2026-05-09",
+        "arrivalDate": "2026-07-07",
+        "departureDate": "2026-07-09",
         "internal_rates": 1,
         "live_rates": 1,
         "optionsRadios": "hotels",
@@ -40,4 +34,7 @@ RESPONSE=$(curl --silent --location 'https://a1.stagev4.vyspa.net/rest/v4/accomm
     }
 ]')
 
-echo "$RESPONSE" | jq -r '.Results[:5][] | "\(.hotel_name)\n  Deeplink: \(.DeepLink)&key=\(.mainKey)\n  Stars: \(.hotel_rating) | Min Price: £\(.minPrice)\n"'
+echo "$RESPONSE" | jq -r '.Results[:5][] | "\(.hotel_name)\n  Deeplink BB: \(.DeepLink)\(.keys.BB)\n Deeplink RO: \(.DeepLink)\(.keys.RO)\n  Stars: \(.hotel_rating) | Min Price: £\(.minPrice)\n"'
+
+# echo "--- Pretty print Results[0:2] ---"
+# echo "$RESPONSE" | jq '.Results[:2]'
