@@ -1507,29 +1507,29 @@ export default function HotelRoomsPage() {
 
     const roomConfigs = packageSearch.rooms.length > 0
       ? packageSearch.rooms.map((room, idx) => ({
-          ...room,
-          adults: idx === 0 ? Math.max(1, next.adults - (next.rooms - 1)) : 1,
-          children: idx === 0 ? next.children : 0,
-          childAges: idx === 0 ? next.childAges : [],
-        }))
+        ...room,
+        adults: idx === 0 ? Math.max(1, next.adults - (next.rooms - 1)) : 1,
+        children: idx === 0 ? next.children : 0,
+        childAges: idx === 0 ? next.childAges : [],
+      }))
       : Array.from({ length: next.rooms }, (_, idx) => ({
-          adults: idx === 0 ? Math.max(1, next.adults - (next.rooms - 1)) : 1,
-          children: idx === 0 ? next.children : 0,
-          childAges: idx === 0 ? next.childAges : [],
-          infants: 0,
-        }));
+        adults: idx === 0 ? Math.max(1, next.adults - (next.rooms - 1)) : 1,
+        children: idx === 0 ? next.children : 0,
+        childAges: idx === 0 ? next.childAges : [],
+        infants: 0,
+      }));
 
     const adjustedRoomConfigs = next.rooms !== roomConfigs.length
       ? Array.from({ length: next.rooms }, (_, idx) => {
-          const baseAdults = Math.floor(next.adults / next.rooms);
-          const extraAdult = idx < (next.adults % next.rooms) ? 1 : 0;
-          return {
-            adults: Math.max(1, baseAdults + extraAdult),
-            children: idx === 0 ? next.children : 0,
-            childAges: idx === 0 ? next.childAges : [],
-            infants: 0,
-          };
-        })
+        const baseAdults = Math.floor(next.adults / next.rooms);
+        const extraAdult = idx < (next.adults % next.rooms) ? 1 : 0;
+        return {
+          adults: Math.max(1, baseAdults + extraAdult),
+          children: idx === 0 ? next.children : 0,
+          childAges: idx === 0 ? next.childAges : [],
+          infants: 0,
+        };
+      })
       : roomConfigs;
 
     let destinationHiddenValue = packageSearch.destinationHiddenValue;
@@ -3189,6 +3189,61 @@ export default function HotelRoomsPage() {
     };
     refs[section]?.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
+  function handlePackageRoomContinue() {
+
+    let selectedRooms = [...selectedRoomIds,]
+    const firstRoom = remoteRooms.find(room => room.id == selectedRoomIds[0]);
+    if (!firstRoom) return;
+    const rid = firstRoom.id;
+    const chosenRaw = firstRoom._raw as Record<string, unknown>;
+    const chosenTaxes = (chosenRaw.hotelBedsTaxes ?? (chosenRaw._hotelbeds as any)?.taxes) as
+      import('@/types/hotel').HotelTaxBreakdown | null | undefined;
+    setSelectedHotelRoomIds(selectedRoomIds);
+    setSelectedHotelRoomSummary(
+      buildSelectedRoomSummary(hotelId, selectedRoomIds, remoteRooms)
+    );
+    const params = new URLSearchParams();
+    params.set("type", "package");
+    // After a date re-search the hotel result ID changes; use the override if set.
+    // In deeplink flow the route param is the vendor hotel_id, so fall back to meta.
+    // In normal flow the route param IS the result ID.
+    const effectiveHotelId = packageHotelResultIdRef.current
+      ? String(packageHotelResultIdRef.current)
+      : (isFromDeeplink && packageResultsMeta?.hotelRequestId)
+        ? String(packageResultsMeta.hotelRequestId)
+        : hotelId;
+    params.set("hotelId", effectiveHotelId);
+    params.set("hotelName", hotel.name);
+    params.set("roomId", String(rid));
+    if (packageResultsMeta?.selectedFlightResultId) {
+      params.set("flightResultId", packageResultsMeta.selectedFlightResultId);
+    }
+    const checkIn = searchParams.get("checkIn") || hotelSearch?.checkIn || packageSearch?.checkIn || "";
+    const nights = Number(packageSearch?.nights || 0);
+    const checkOut = searchParams.get("checkOut") || hotelSearch?.checkOut || (checkIn && nights > 0 ? shiftIsoDateByDays(checkIn, nights) : "");
+    const adults = searchParams.get("adults") || String(hotelSearch?.adults || packageSearch?.rooms?.reduce((sum, room) => sum + room.adults, 0) || 2);
+    const children = searchParams.get("children") || String(hotelSearch?.children || packageSearch?.rooms?.reduce((sum, room) => sum + room.children, 0) || 0);
+    const guests = String(Math.max(1, Number(adults || "0")) + Math.max(0, Number(children || "0")));
+    const rooms = searchParams.get("rooms") || String(hotelSearch?.rooms || packageSearch?.rooms?.length || 1);
+    if (checkIn) {
+      params.set("departureDate", checkIn);
+      params.set("checkIn", checkIn);
+    }
+    if (checkOut) {
+      params.set("returnDate", checkOut);
+      params.set("checkOut", checkOut);
+    }
+    params.set("guests", guests);
+    params.set("rooms", rooms);
+    if (packageSearch?.departureCode) params.set("from", packageSearch.departureCode);
+    if (packageSearch?.destinationCode) params.set("to", packageSearch.destinationCode);
+    if (packageSearch?.departureName) params.set("fromName", packageSearch.departureName);
+    if (packageSearch?.destinationName) params.set("toName", packageSearch.destinationName);
+    params.set("adults", adults);
+    params.set("children", children);
+    params.set("tripType", "round-trip");
+    router.push(`/search?${params.toString()}`);
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -3959,7 +4014,7 @@ export default function HotelRoomsPage() {
                 {roomsLoading && (
                   <div className="lg:col-span-3 text-sm text-[#3A478A]">Loading room options…</div>
                 )}
-                {!isPackageMode && requiredRoomCount > 1 && (
+                {requiredRoomCount > 1 && (
                   <div className="lg:col-span-3 border border-[#DFE0E4] rounded-2xl p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <div className="text-sm text-[#010D50]">
                       Select {requiredRoomCount} room{requiredRoomCount === 1 ? "" : "s"}: {selectedRoomCount}/{requiredRoomCount} selected
@@ -3967,7 +4022,7 @@ export default function HotelRoomsPage() {
                     <Button
                       className="rounded-full px-6 py-3 h-auto gap-2 bg-[#3754ED] hover:bg-[#2A3FB8] text-white font-bold disabled:bg-[#A8B3F5]"
                       disabled={!canProceedWithRooms}
-                      onClick={() => router.push("/hotels/checkout")}
+                      onClick={isPackageMode ? () => handlePackageRoomContinue() : () => router.push("/hotels/checkout")}
                     >
                       Continue
                       <ChevronRight className="w-5 h-5" />
@@ -3977,7 +4032,7 @@ export default function HotelRoomsPage() {
                 {rooms.map((room) => {
                   const roomSelectionCount = Math.max(0, Number(selectedRoomCounts[room.id] || 0));
                   const roomIsSelected = roomSelectionCount > 0;
-                  const isMultiRoomSelectionMode = !isPackageMode && requiredRoomCount > 1;
+                  const isMultiRoomSelectionMode = requiredRoomCount > 1;
                   const isActiveRoomCard = isPackageMode
                     ? String(activeRoomCardId || "") === String(room.id)
                     : isMultiRoomSelectionMode
@@ -4021,68 +4076,6 @@ export default function HotelRoomsPage() {
                   const expanded = !!expandedRoomInfoById[room.id];
                   const handlePackageRoomActivate = () => {
                     setActiveRoomCardId(String(room.id));
-                  };
-                  const handlePackageRoomContinue = () => {
-                    setActiveRoomCardId(String(room.id));
-                    const chosenRoom = room;
-                    const rid = chosenRoom.id;
-                    const chosenRaw = chosenRoom._raw as Record<string, unknown>;
-                    const chosenTaxes = (chosenRaw.hotelBedsTaxes ?? (chosenRaw._hotelbeds as any)?.taxes) as
-                      import('@/types/hotel').HotelTaxBreakdown | null | undefined;
-                    setSelectedHotelRoomIds([String(rid)]);
-                    setSelectedHotelRoomSummary({
-                      hotelId,
-                      roomId: String(rid),
-                      roomName: chosenRoom?.name,
-                      mealName: chosenRoom?.bedType,
-                      isRefundable: chosenRoom?.isRefundable,
-                      currency: chosenRoom?.price?.currency,
-                      total: chosenRoom?.price?.total,
-                      nightly: chosenRoom?.price?.nightly,
-                      hotelbedsRateKey: (chosenRoom as any)?._raw?.rateKey,
-                      hotelBedsTaxes: chosenTaxes ?? null,
-                    });
-                    const params = new URLSearchParams();
-                    params.set("type", "package");
-                    // After a date re-search the hotel result ID changes; use the override if set.
-                    // In deeplink flow the route param is the vendor hotel_id, so fall back to meta.
-                    // In normal flow the route param IS the result ID.
-                    const effectiveHotelId = packageHotelResultIdRef.current
-                      ? String(packageHotelResultIdRef.current)
-                      : (isFromDeeplink && packageResultsMeta?.hotelRequestId)
-                        ? String(packageResultsMeta.hotelRequestId)
-                        : hotelId;
-                    params.set("hotelId", effectiveHotelId);
-                    params.set("hotelName", hotel.name);
-                    params.set("roomId", String(rid));
-                    if (packageResultsMeta?.selectedFlightResultId) {
-                      params.set("flightResultId", packageResultsMeta.selectedFlightResultId);
-                    }
-                    const checkIn = searchParams.get("checkIn") || hotelSearch?.checkIn || packageSearch?.checkIn || "";
-                    const nights = Number(packageSearch?.nights || 0);
-                    const checkOut = searchParams.get("checkOut") || hotelSearch?.checkOut || (checkIn && nights > 0 ? shiftIsoDateByDays(checkIn, nights) : "");
-                    const adults = searchParams.get("adults") || String(hotelSearch?.adults || packageSearch?.rooms?.reduce((sum, room) => sum + room.adults, 0) || 2);
-                    const children = searchParams.get("children") || String(hotelSearch?.children || packageSearch?.rooms?.reduce((sum, room) => sum + room.children, 0) || 0);
-                    const guests = String(Math.max(1, Number(adults || "0")) + Math.max(0, Number(children || "0")));
-                    const rooms = searchParams.get("rooms") || String(hotelSearch?.rooms || packageSearch?.rooms?.length || 1);
-                    if (checkIn) {
-                      params.set("departureDate", checkIn);
-                      params.set("checkIn", checkIn);
-                    }
-                    if (checkOut) {
-                      params.set("returnDate", checkOut);
-                      params.set("checkOut", checkOut);
-                    }
-                    params.set("guests", guests);
-                    params.set("rooms", rooms);
-                    if (packageSearch?.departureCode) params.set("from", packageSearch.departureCode);
-                    if (packageSearch?.destinationCode) params.set("to", packageSearch.destinationCode);
-                    if (packageSearch?.departureName) params.set("fromName", packageSearch.departureName);
-                    if (packageSearch?.destinationName) params.set("toName", packageSearch.destinationName);
-                    params.set("adults", adults);
-                    params.set("children", children);
-                    params.set("tripType", "round-trip");
-                    router.push(`/search?${params.toString()}`);
                   };
                   const handleMultiRoomCardSelect = () => {
                     setActiveRoomCardId(String(room.id));
@@ -4304,12 +4297,15 @@ export default function HotelRoomsPage() {
                             })()}
                           </div>
 
-                          {isPackageMode ? (
+                          {isPackageMode && requiredRoomCount === 1 ? (
                             <Button
                               className="w-full rounded-full py-3 h-auto gap-2 bg-[#3754ED] hover:bg-[#2A3FB8] text-white font-bold"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handlePackageRoomContinue();
+                                handleSingleRoomCardSelect();
+                                if (isPackageMode) {
+                                  handlePackageRoomContinue();
+                                }
                               }}
                             >
                               Continue Booking
