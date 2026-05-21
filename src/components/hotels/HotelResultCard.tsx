@@ -79,6 +79,7 @@ export function HotelResultCard({
   const isGrid = view === "grid";
   const showNightlyPrice = !isPackageMode;
   const hotelSearch = useBookingStore((state) => state.hotelSearch);
+  const packageResultsMeta = useBookingStore((state) => state.packageResultsMeta);
   const raw = (hotel.rawSearchResult ?? null) as Record<string, unknown> | null;
   const detailParams = new URLSearchParams();
   const criteriaId = raw?.searchCriteriaId;
@@ -96,7 +97,11 @@ export function HotelResultCard({
     });
     if (encoded) detailParams.set("ctx", encoded);
   }
-  if (isPackageMode) detailParams.set("type", "package");
+  if (isPackageMode) {
+    detailParams.set("type", "package");
+    if (packageResultsMeta?.requestId) detailParams.set("pkgRequestId", String(packageResultsMeta.requestId));
+    if (packageResultsMeta?.selectedFlightResultId) detailParams.set("pkgFlightResultId", String(packageResultsMeta.selectedFlightResultId));
+  }
   const hotelDetailUrl = detailParams.toString()
     ? `/hotels/${hotel.id}?${detailParams.toString()}`
     : `/hotels/${hotel.id}`;
