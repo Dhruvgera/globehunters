@@ -1978,12 +1978,20 @@ export default function HotelRoomsPage() {
   );
   const rooms = useMemo(() => {
     const q = filterBoardQuery.trim().toLowerCase();
-    return remoteRooms.filter((room) => {
+    const filtered = remoteRooms.filter((room) => {
       if (filterRefundableOnly && !room.isRefundable) return false;
       if (q) {
         const s = `${room.name || ""} ${room.bedType || ""}`.toLowerCase();
         if (!s.includes(q)) return false;
       }
+      return true;
+    });
+    const seen = new Set<string>();
+    return filtered.filter((room) => {
+      const code = String(room._raw?.room_code ?? room._raw?.roomCode ?? "").trim();
+      if (!code) return true;
+      if (seen.has(code)) return false;
+      seen.add(code);
       return true;
     });
   }, [filterBoardQuery, filterRefundableOnly, remoteRooms]);
@@ -2290,7 +2298,7 @@ export default function HotelRoomsPage() {
 
             flattenedRooms.sort((a, b) => (a.price.total || 0) - (b.price.total || 0));
 
-            const headerImage = fixStubaImageUrl(viewHotel.image_name) || "";
+            const headerImage = ensureGiataImageUrl(fixStubaImageUrl(viewHotel.image_name) || "", 'original') as string;
             const headerAddress = [viewHotel.address1, viewHotel.address2].filter(Boolean).join(", ");
             const roomImageCandidates = roomGroups
               .flat()
@@ -2363,7 +2371,7 @@ export default function HotelRoomsPage() {
                     vyspaMedia.hotelImages || [],
                     flattenRoomImages(vyspaMedia.roomImages),
                     deeplinkGallery
-                  ).slice(0, 24);
+                  ).map((u) => ensureGiataImageUrl(u, 'original') as string).slice(0, 24);
 
                   if (nextGallery.length > 0) {
                     setGalleryImages(nextGallery);
@@ -2529,7 +2537,7 @@ export default function HotelRoomsPage() {
             return next;
           })();
 
-          const headerImage = fixStubaImageUrl(roomHotel.image_name) || packageHotel?.imageUrl || "";
+          const headerImage = ensureGiataImageUrl(fixStubaImageUrl(roomHotel.image_name) || packageHotel?.imageUrl || "", 'original') as string;
           const headerAddress = [roomHotel.address1, roomHotel.address2, packageHotel?.address?.street1]
             .filter(Boolean)
             .join(", ");
