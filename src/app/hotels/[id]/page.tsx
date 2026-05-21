@@ -57,6 +57,7 @@ import { decodeHotelSearchContext } from "@/lib/hotels/searchContextCodec";
 import { convertHotelLocalTaxTotal, formatMoneyFromCode, normalizeCurrencyCode } from "@/lib/currency/localTaxDisplay";
 import { parsePackageHotelContent, type PackageHotelNearbyPlace } from "@/lib/package/hotelContent";
 import { usePackageDeeplink } from "@/hooks/usePackageDeeplink";
+import { shortWebRefFromToken, toPositiveNumericId } from "../hotelUtils";
 
 function LoadingBlock({ className }: { className: string }) {
   return <div className={`animate-pulse bg-gray-200/70 rounded-xl ${className}`} />;
@@ -991,13 +992,6 @@ function extractVyspaGetHotelDetailsData(payload: unknown): {
   };
 }
 
-function toPositiveNumericId(value: unknown): string | null {
-  const s = String(value ?? "").trim();
-  if (!/^\d+$/.test(s)) return null;
-  const n = Number(s);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return s;
-}
 
 function trustYouIdFromRecord(row: Record<string, unknown> | null | undefined): string | null {
   if (!row) return null;
@@ -1259,14 +1253,7 @@ export default function HotelRoomsPage() {
     };
   }, [remoteRooms]);
 
-  function shortWebRefFromToken(token: string): string {
-    let h = 2166136261;
-    for (let i = 0; i < token.length; i += 1) {
-      h ^= token.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    return `HB-${(h >>> 0).toString(16).padStart(8, "0").slice(0, 8).toUpperCase()}`;
-  }
+
 
   function parseVyspaHotelDetailsMedia(payload: unknown): {
     hotelImages: string[];
@@ -3189,18 +3176,14 @@ export default function HotelRoomsPage() {
     };
     refs[section]?.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
-  function handlePackageRoomContinue() {
-
-    let selectedRooms = [...selectedRoomIds,]
-    const firstRoom = remoteRooms.find(room => room.id == selectedRoomIds[0]);
+  function handlePackageRoomContinue(roomIds?: string[]) {
+    const ids = roomIds ?? selectedRoomIds;
+    const firstRoom = remoteRooms.find(room => room.id == ids[0]);
     if (!firstRoom) return;
     const rid = firstRoom.id;
-    const chosenRaw = firstRoom._raw as Record<string, unknown>;
-    const chosenTaxes = (chosenRaw.hotelBedsTaxes ?? (chosenRaw._hotelbeds as any)?.taxes) as
-      import('@/types/hotel').HotelTaxBreakdown | null | undefined;
-    setSelectedHotelRoomIds(selectedRoomIds);
+    setSelectedHotelRoomIds(ids);
     setSelectedHotelRoomSummary(
-      buildSelectedRoomSummary(hotelId, selectedRoomIds, remoteRooms)
+      buildSelectedRoomSummary(hotelId, ids, remoteRooms)
     );
     const params = new URLSearchParams();
     params.set("type", "package");
@@ -4302,10 +4285,10 @@ export default function HotelRoomsPage() {
                               className="w-full rounded-full py-3 h-auto gap-2 bg-[#3754ED] hover:bg-[#2A3FB8] text-white font-bold"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleSingleRoomCardSelect();
-                                if (isPackageMode) {
-                                  handlePackageRoomContinue();
-                                }
+                                const roomId = String(room.id);
+                                setActiveRoomCardId(roomId);
+                                setSelectedRoomCounts({ [roomId]: 1 });
+                                handlePackageRoomContinue([roomId]);
                               }}
                             >
                               Continue Booking
