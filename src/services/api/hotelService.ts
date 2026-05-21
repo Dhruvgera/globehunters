@@ -111,53 +111,53 @@ export class HotelService {
       criteria.providerOverride = params.providerOverride;
     }
 
-    if (params.children > 0) {
-      const rooms = Math.max(1, Number(params.rooms || 1));
-      const totalAdults = Math.max(1, Number(params.adults || 2));
-      const totalChildren = Math.max(0, Number(params.children || 0));
+    
+    const rooms = Math.max(1, Number(params.rooms || 1));
+    const totalAdults = Math.max(1, Number(params.adults || 2));
+    const totalChildren = Math.max(0, Number(params.children || 0));
 
-      const adultRoom = Array.isArray(params.adult_room) && params.adult_room.length === rooms
-        ? params.adult_room
-        : (() => {
-          const out = Array.from({ length: rooms }, () => 0);
-          let remaining = totalAdults;
-          for (let i = 0; i < rooms; i += 1) {
-            if (remaining <= 0) break;
-            const roomsLeft = rooms - i;
-            const allocation = Math.ceil(remaining / roomsLeft);
-            out[i] = allocation;
-            remaining -= allocation;
-          }
-          return out;
-        })();
+    const adultRoom = Array.isArray(params.adult_room) && params.adult_room.length === rooms
+      ? params.adult_room
+      : (() => {
+        const out = Array.from({ length: rooms }, () => 0);
+        let remaining = totalAdults;
+        for (let i = 0; i < rooms; i += 1) {
+          if (remaining <= 0) break;
+          const roomsLeft = rooms - i;
+          const allocation = Math.ceil(remaining / roomsLeft);
+          out[i] = allocation;
+          remaining -= allocation;
+        }
+        return out;
+      })();
 
-      const childrenRoom = Array.isArray(params.children_room) && params.children_room.length === rooms
-        ? params.children_room
-        : (() => {
-          const out = Array.from({ length: rooms }, () => 0);
-          let remaining = totalChildren;
-          for (let i = 0; i < rooms; i += 1) {
-            if (remaining <= 0) break;
-            const roomsLeft = rooms - i;
-            const allocation = Math.ceil(remaining / roomsLeft);
-            out[i] = allocation;
-            remaining -= allocation;
-          }
-          return out;
-        })();
+    const childrenRoom = Array.isArray(params.children_room) && params.children_room.length === rooms
+      ? params.children_room
+      : (() => {
+        const out = Array.from({ length: rooms }, () => 0);
+        let remaining = totalChildren;
+        for (let i = 0; i < rooms; i += 1) {
+          if (remaining <= 0) break;
+          const roomsLeft = rooms - i;
+          const allocation = Math.ceil(remaining / roomsLeft);
+          out[i] = allocation;
+          remaining -= allocation;
+        }
+        return out;
+      })();
 
-      const childAge = Array.isArray(params.child_age) && params.child_age.length === rooms
-        ? params.child_age
-        : childrenRoom.map((count) => {
-          const roomAges: Record<string, number> = {};
-          for (let index = 1; index <= count; index += 1) roomAges[String(index)] = 9;
-          return roomAges;
-        });
+    const childAge = Array.isArray(params.child_age) && params.child_age.length === rooms
+      ? params.child_age
+      : childrenRoom.map((count) => {
+        const roomAges: Record<string, number> = {};
+        for (let index = 1; index <= count; index += 1) roomAges[String(index)] = 9;
+        return roomAges;
+      });
 
-      criteria.adult_room = adultRoom;
-      criteria.children_room = childrenRoom;
-      criteria.child_age = childAge;
-    }
+    criteria.adult_room = adultRoom;
+    criteria.children_room = childrenRoom;
+    criteria.child_age = childAge;
+  
 
     return this.availabilityV3([criteria]);
   }
