@@ -57,7 +57,7 @@ import { decodeHotelSearchContext } from "@/lib/hotels/searchContextCodec";
 import { convertHotelLocalTaxTotal, formatMoneyFromCode, normalizeCurrencyCode } from "@/lib/currency/localTaxDisplay";
 import { parsePackageHotelContent, type PackageHotelNearbyPlace } from "@/lib/package/hotelContent";
 import { usePackageDeeplink } from "@/hooks/usePackageDeeplink";
-import { shortWebRefFromToken } from "../hotelUtils";
+import { shortWebRefFromToken, toPositiveNumericId } from "../hotelUtils";
 
 function LoadingBlock({ className }: { className: string }) {
   return <div className={`animate-pulse bg-gray-200/70 rounded-xl ${className}`} />;
@@ -992,13 +992,6 @@ function extractVyspaGetHotelDetailsData(payload: unknown): {
   };
 }
 
-function toPositiveNumericId(value: unknown): string | null {
-  const s = String(value ?? "").trim();
-  if (!/^\d+$/.test(s)) return null;
-  const n = Number(s);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return s;
-}
 
 function trustYouIdFromRecord(row: Record<string, unknown> | null | undefined): string | null {
   if (!row) return null;

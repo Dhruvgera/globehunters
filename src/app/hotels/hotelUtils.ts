@@ -24,9 +24,11 @@ export const DEFAULT_FILTERS: HotelFiltersState = {
     accessibility: [],
 };
 
-export const SHOW_HYBRID_PROVIDER_IN_RESULTS = ["1", "true", "yes", "on"].includes(
-    String(process.env.NEXT_PUBLIC_SHOW_HOTEL_PROVIDER_IN_RESULTS || "").trim().toLowerCase()
-);
+function isTruthyEnvVar(value: unknown): boolean {
+    return ["1", "true", "yes", "on"].includes(String(value || "").trim().toLowerCase());
+}
+
+export const SHOW_HYBRID_PROVIDER_IN_RESULTS = isTruthyEnvVar(process.env.NEXT_PUBLIC_SHOW_HOTEL_PROVIDER_IN_RESULTS);
 
 export const VYSPA_SEARCH_TIMEOUT_SEC = (() => {
     const raw = Number(process.env.NEXT_PUBLIC_VYSPA_HOTELS_TIMEOUT_SEC || 8);
@@ -47,12 +49,9 @@ export const HYBRID_MAX_POLLS = (() => {
 })();
 
 export const ENABLE_TRUSTYOU_ENRICHMENT = false;
-export const HOTEL_PROVIDER_TOGGLE_ENABLED = ["1", "true", "yes", "on"].includes(
-    String(process.env.NEXT_PUBLIC_ENABLE_HOTEL_PROVIDER_TOGGLE || "").trim().toLowerCase()
-);
+export const HOTEL_PROVIDER_TOGGLE_ENABLED = isTruthyEnvVar(process.env.NEXT_PUBLIC_ENABLE_HOTEL_PROVIDER_TOGGLE);
 export const HYBRID_SUPPLIER_FILTER_ENABLED =
-    SHOW_HYBRID_PROVIDER_IN_RESULTS ||
-    ["1", "true", "yes", "on"].includes(String(process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES || "").trim().toLowerCase());
+    SHOW_HYBRID_PROVIDER_IN_RESULTS || isTruthyEnvVar(process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES);
 export const HOTEL_PROVIDER_OVERRIDE_STORAGE_KEY = "gh-hotel-provider-override";
 
 
@@ -354,6 +353,10 @@ export type ParsedAvailability = {
     searchComplete: boolean | null;
 };
 
+function resolveRowProvider(r: any): "hotelbeds" | "vyspa" {
+    return String(r?.provider || "").trim().toLowerCase() === "hotelbeds" ? "hotelbeds" : "vyspa";
+}
+
 export const mapAvailability = (availabilityResponse: any, nights: number, rooms: number): ParsedAvailability => {
     const rawResults = availabilityResponse?.Results || [];
     const criteria = availabilityResponse?.Criteria;
@@ -375,9 +378,14 @@ export const mapAvailability = (availabilityResponse: any, nights: number, rooms
     console.log('[Hotels Page] Search Criteria ID:', criteriaId);
     console.log('[Hotels Page] Search Complete:', searchComplete);
 
-    const mapped: Hotel[] = results.map((r: any, idx: number) => {
+    const mapped: Hotel[] = [];
+    const meta: Record<string, any> = {};
+
+    for (let idx = 0; idx < results.length; idx++) {
+        const r: any = results[idx];
         const hotelId = resolveHotelResultId(r, idx);
-        const rowProvider = String(r?.provider || "").trim().toLowerCase() === "hotelbeds" ? "hotelbeds" : "vyspa";
+        const rowProvider = resolveRowProvider(r);
+        const hotelName = r?.hotel_name || r?.hotelName || "";
         const rawSearchResult = (r ?? null) as Record<string, unknown> | null;
         const total = parsePriceFromResult(r) ?? 0;
         const sellCur = r?.SellCur || r?.sellCur || r?.currency;
@@ -412,14 +420,14 @@ export const mapAvailability = (availabilityResponse: any, nights: number, rooms
         const resolvedTrustYouId =
             trustYouIdFromRawResult(rawSearchResult) ||
             resolveTrustYouHotelId({
-                hotelName: r?.hotel_name || r?.hotelName,
+                hotelName,
                 location: [r?.address1, r?.address2, cityName, countryName].filter(Boolean).join(", "),
             });
 
-        return {
+        mapped.push({
             id: hotelId,
             tyId: resolvedTrustYouId || undefined,
-            name: r?.hotel_name || r?.hotelName || `Hotel ${hotelId}`,
+            name: hotelName || `Hotel ${hotelId}`,
             distanceLabel:
                 r?.address1 || r?.address2
                     ? [r?.address1, r?.address2].filter(Boolean).join(", ")
@@ -464,14 +472,8 @@ export const mapAvailability = (availabilityResponse: any, nights: number, rooms
                 : undefined,
             deepLinkUrl: typeof r?.DeepLink === 'string' ? r.DeepLink : undefined,
             rawSearchResult,
-        };
-    });
+        });
 
-    const meta: Record<string, any> = {};
-    for (const r of results as any[]) {
-        const hid = resolveHotelResultId(r);
-        if (!hid) continue;
-        const rowProvider = String(r?.provider || "").trim().toLowerCase() === "hotelbeds" ? "hotelbeds" : "vyspa";
         const rowSearchCriteriaAny =
             rowProvider === "hotelbeds"
                 ? ((r as any)?.searchCriteriaId ?? (r as any)?._hotelbeds?.searchToken ?? criteriaId)
@@ -480,9 +482,10 @@ export const mapAvailability = (availabilityResponse: any, nights: number, rooms
             typeof rowSearchCriteriaAny === "string" || typeof rowSearchCriteriaAny === "number"
                 ? rowSearchCriteriaAny
                 : undefined;
-        meta[hid] = {
-            hotelId: hid,
-            hotelName: r?.hotel_name || r?.hotelName,
+
+        meta[hotelId] = {
+            hotelId,
+            hotelName: hotelName || undefined,
             provider: rowProvider,
             searchCriteriaId: rowSearchCriteriaId,
             searchResultId: r?.id ? String(r.id) : undefined,
@@ -493,13 +496,7 @@ export const mapAvailability = (availabilityResponse: any, nights: number, rooms
             address1: typeof r?.address1 === "string" ? r.address1 : undefined,
             address2: typeof r?.address2 === "string" ? r.address2 : undefined,
             hotelRating: Number.isFinite(Number(r?.hotel_rating)) ? Number(r.hotel_rating) : undefined,
-            trustyouId:
-                trustYouIdFromRawResult((r ?? null) as Record<string, unknown> | null) ||
-                resolveTrustYouHotelId({
-                    hotelName: r?.hotel_name || r?.hotelName,
-                    location: [r?.address1, r?.address2, r?.city_name, r?.country_name].filter(Boolean).join(", "),
-                }) ||
-                undefined,
+            trustyouId: resolvedTrustYouId || undefined,
             rawSearchResult: r,
         };
     }

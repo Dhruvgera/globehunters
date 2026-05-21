@@ -1,4 +1,5 @@
 import { decodeHtmlEntities } from '../utils/html';
+import { escapeRegExp } from '@/app/hotels/hotelUtils';
 
 export interface PackageHotelNearbyPlace {
   name: string;
@@ -196,9 +197,6 @@ function parseDistanceMatches(value: string, kind: "landmark" | "airport"): Pack
   return places;
 }
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 
 export function parsePackageHotelContent(value: unknown): ParsedPackageHotelContent {
   const raw = sanitizePackageHotelText(value);
