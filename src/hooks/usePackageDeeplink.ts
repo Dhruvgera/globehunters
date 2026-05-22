@@ -20,7 +20,7 @@
 "use client";
 
 import { useEffect, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { packageService } from "@/services/api/packageService";
 import { useBookingStore } from "@/store/bookingStore";
 import type {
@@ -183,6 +183,7 @@ function shiftIsoDateByDays(baseIso: string, days: number): string {
 export function usePackageDeeplink(): UsePackageDeeplinkReturn {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const setDeeplinkViewData = useBookingStore((s) => s.setDeeplinkViewData);
   const setIsFromDeeplink = useBookingStore((s) => s.setIsFromDeeplink);
   const setPackageSearch = useBookingStore((s) => s.setPackageSearch);
@@ -204,8 +205,7 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
     const existingViewData = useBookingStore.getState().deeplinkViewData;
     if (existingViewData?.success) {
       const existingHotelId = String(existingViewData.results?.HotelDetails?.hotel_id || "");
-      const isOnHotelPage = /^\/hotels\//.test(window.location.pathname);
-      const urlHotelId = isOnHotelPage ? window.location.pathname.split("/hotels/")[1]?.split(/[?#]/)[0] : "";
+      const urlHotelId = pathname.match(/\/hotels\/([^/?#]+)/)?.[1] || "";
       if (urlHotelId && existingHotelId === urlHotelId) return;
     }
 
@@ -360,7 +360,7 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
       console.error("[usePackageDeeplink] Failed to process deeplink:", err);
       return err instanceof Error ? err.message : "Failed to load package details";
     }
-  }, [searchParams, setDeeplinkViewData, setIsFromDeeplink, setPackageSearch, setHotelSearch, setPackageResults, setSearchParams, setSelectedFlight, setSearchRequestId, router]);
+  }, [searchParams, pathname, setDeeplinkViewData, setIsFromDeeplink, setPackageSearch, setHotelSearch, setPackageResults, setSearchParams, setSelectedFlight, setSearchRequestId, router]);
 
   // Auto-process on mount if key present
   useEffect(() => {
