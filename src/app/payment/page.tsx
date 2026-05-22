@@ -1150,7 +1150,6 @@ function PaymentContent() {
                 rows={paymentSummaryRows}
                 total={tripTotalForDisplay}
                 currency={currency || 'GBP'}
-                totalSubtext={paymentTotalSubtext}
                 isSticky={false}
               />
             </div>
