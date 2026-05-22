@@ -13,13 +13,14 @@
  *   1. Detect key param on page load
  *   2. Call view API → get full hotel+room details
  *   3. Store in bookingStore.deeplinkViewData + populate packageSearch/meta for downstream
- *   4. Redirect to /hotels/{hotelId}?type=package|deeplink
+ *   4. Redirect to /hotels/{hotelId}?type=package|deeplink&packageKey|hotelKey=...
+ *      Key is preserved in URL so page refreshes can re-fetch the view data.
  */
 
 "use client";
 
 import { useEffect, useCallback } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { packageService } from "@/services/api/packageService";
 import { useBookingStore } from "@/store/bookingStore";
 import type {
@@ -182,6 +183,7 @@ function shiftIsoDateByDays(baseIso: string, days: number): string {
 export function usePackageDeeplink(): UsePackageDeeplinkReturn {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const setDeeplinkViewData = useBookingStore((s) => s.setDeeplinkViewData);
   const setIsFromDeeplink = useBookingStore((s) => s.setIsFromDeeplink);
   const setPackageSearch = useBookingStore((s) => s.setPackageSearch);
@@ -199,6 +201,13 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
     const mode: DeeplinkMode | null = packageKey ? "package" : hotelKey ? "hotel" : null;
 
     if (!key?.trim() || !mode) return;
+
+    const existingViewData = useBookingStore.getState().deeplinkViewData;
+    if (existingViewData?.success) {
+      const existingHotelId = String(existingViewData.results?.HotelDetails?.hotel_id || "");
+      const urlHotelId = pathname.match(/\/hotels\/([^/?#]+)/)?.[1] || "";
+      if (urlHotelId && existingHotelId === urlHotelId) return;
+    }
 
     setIsFromDeeplink(true);
 
@@ -340,6 +349,8 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
       const passthrough = new URLSearchParams();
       passthrough.set("type", urlType);
       passthrough.set("mode", mode);
+      if (packageKey) passthrough.set("packageKey", packageKey.trim());
+      if (hotelKey) passthrough.set("hotelKey", hotelKey.trim());
       for (const keyName of ["aff", "utm_source", "utm_medium", "utm_campaign", "utm_id", "cnc"]) {
         const value = searchParams.get(keyName);
         if (value != null) passthrough.set(keyName, value);
@@ -349,7 +360,7 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
       console.error("[usePackageDeeplink] Failed to process deeplink:", err);
       return err instanceof Error ? err.message : "Failed to load package details";
     }
-  }, [searchParams, setDeeplinkViewData, setIsFromDeeplink, setPackageSearch, setHotelSearch, setPackageResults, setSearchParams, setSelectedFlight, setSearchRequestId, router]);
+  }, [searchParams, pathname, setDeeplinkViewData, setIsFromDeeplink, setPackageSearch, setHotelSearch, setPackageResults, setSearchParams, setSelectedFlight, setSearchRequestId, router]);
 
   // Auto-process on mount if key present
   useEffect(() => {
