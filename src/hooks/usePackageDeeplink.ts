@@ -13,7 +13,8 @@
  *   1. Detect key param on page load
  *   2. Call view API → get full hotel+room details
  *   3. Store in bookingStore.deeplinkViewData + populate packageSearch/meta for downstream
- *   4. Redirect to /hotels/{hotelId}?type=package|deeplink
+ *   4. Redirect to /hotels/{hotelId}?type=package|deeplink&packageKey|hotelKey=...
+ *      Key is preserved in URL so page refreshes can re-fetch the view data.
  */
 
 "use client";
@@ -200,6 +201,14 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
 
     if (!key?.trim() || !mode) return;
 
+    const existingViewData = useBookingStore.getState().deeplinkViewData;
+    if (existingViewData?.success) {
+      const existingHotelId = String(existingViewData.results?.HotelDetails?.hotel_id || "");
+      const isOnHotelPage = /^\/hotels\//.test(window.location.pathname);
+      const urlHotelId = isOnHotelPage ? window.location.pathname.split("/hotels/")[1]?.split(/[?#]/)[0] : "";
+      if (urlHotelId && existingHotelId === urlHotelId) return;
+    }
+
     setIsFromDeeplink(true);
 
     try {
@@ -340,6 +349,8 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
       const passthrough = new URLSearchParams();
       passthrough.set("type", urlType);
       passthrough.set("mode", mode);
+      if (packageKey) passthrough.set("packageKey", packageKey.trim());
+      if (hotelKey) passthrough.set("hotelKey", hotelKey.trim());
       for (const keyName of ["aff", "utm_source", "utm_medium", "utm_campaign", "utm_id", "cnc"]) {
         const value = searchParams.get(keyName);
         if (value != null) passthrough.set(keyName, value);

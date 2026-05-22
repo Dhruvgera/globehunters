@@ -37,7 +37,7 @@ export function FlightSummaryCard({
   const [imgError, setImgError] = useState(false);
   const logoUrl = leg.airlineCode ? `https://images.kiwi.com/airlines/64/${leg.airlineCode}.png` : undefined;
   return (
-    <div className="bg-[#F5F7FF] rounded-xl p-4 flex flex-col gap-4 overflow-hidden">
+    <div className="bg-[#F5F7FF] rounded-xl p-4 flex flex-col gap-1 overflow-hidden">
       {/* Airline header (mobile and desktop) with real logo */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -61,15 +61,15 @@ export function FlightSummaryCard({
             <span className="text-xs font-semibold text-[#010D50]">
               {leg.airline}
             </span>
-            <span className="text-xs text-[#3A478A] lg:hidden">
-              {leg.from} {t('to')} {leg.to}
-            </span>
+            <div className="text-xs text-[#3A478A] lg:hidden">
+              {leg.from} <span className="px-2">{t('to')}</span> {leg.to}
+            </div>
           </div>
         </div>
         {/* Desktop: passengers and cabin */}
         <div className="hidden lg:flex items-center gap-3 text-sm text-[#010D50]">
-          <span className="capitalize">{cabinLabel}</span>
-          <div className="w-1 h-1 rounded-full bg-[#010D50]" />
+          {cabinLabel && <span className="capitalize">{cabinLabel}</span>}
+          {cabinLabel && <div className="w-1 h-1 rounded-full bg-[#010D50]" />}
           <span>{passengers}</span>
           <div className="w-1 h-1 rounded-full bg-[#010D50]" />
           <Button
@@ -120,9 +120,9 @@ export function FlightSummaryCard({
       </Button>
 
       {/* Desktop: Full layout - stretch across full width */}
-      <div className="hidden lg:flex flex-col gap-6 w-full">
+      <div className="hidden lg:flex flex-col gap-3 w-full">
         <span className="text-sm font-semibold text-[#010D50]">
-          {leg.from} {t('to')} {leg.to}
+          {leg.from} <span className="px-2">{t('to')}</span> {leg.to}
         </span>
         <div className="flex items-center gap-3 flex-wrap w-full">
           <div className="flex items-center gap-3">

@@ -40,6 +40,7 @@ import { packageService } from "@/services/api/packageService";
 import { useBookingStore, useStoreHydration } from "@/store/bookingStore";
 import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
 import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
+import { FlightSummaryCard } from "@/components/booking/FlightSummaryCard";
 import type { Flight, FlightSegment } from "@/types/flight";
 import { resolveTrustYouHotelId } from "@/lib/trustyou/hotelMapping";
 import type { TrustYouHotelReviewSummary } from "@/types/trustyou";
@@ -59,6 +60,7 @@ import { parsePackageHotelContent, type PackageHotelNearbyPlace } from "@/lib/pa
 import { usePackageDeeplink } from "@/hooks/usePackageDeeplink";
 import { shortWebRefFromToken, toPositiveNumericId } from "../hotelUtils";
 import { HotelRoomCard } from "@/components/hotels/HotelRoomCard";
+import { airportCache } from "@/lib/cache/airportCache";
 
 function LoadingBlock({ className }: { className: string }) {
   return <div className={`animate-pulse bg-gray-200/70 rounded-xl ${className}`} />;
@@ -3347,122 +3349,83 @@ export default function HotelRoomsPage() {
                 </div>
               </div>
 
-              {/* Flight summary — only shown for package deeplink with flight data */}
-              {deeplinkViewData?.success && "FlightResultId" in deeplinkViewData.results && (() => {
-                const flights = (deeplinkViewData as HolidayPackageViewResponse).results.FlightDetails;
-                if (flights?.length > 0) {
-                  return (
-                    <div className="mt-4 bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden">
-                      <div className="px-4 sm:px-6 py-4 border-b border-[#DFE0E4] flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <Plane className="w-4 h-4 text-[#3754ED]" />
-                          <h2 className="text-xl font-semibold text-[#010D50]">Flight Details</h2>
-                        </div>
-                        {flightForInfoModal ? (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-8 px-3 text-xs sm:text-sm border-[#3754ED] text-[#3754ED] hover:bg-[#EEF2FF]"
-                            onClick={() => setFlightInfoModalOpen(true)}
-                          >
-                            View flight info
-                          </Button>
-                        ) : null}
-                      </div>
-                      <div className="p-4 sm:p-6 flex flex-col gap-3">
-                        {flights.map((seg, idx) => {
-                          const legs = seg.Flights || [];
-                          const firstLeg = legs[0];
-                          const lastLeg = legs[legs.length - 1];
-                          const airlineCode = String(firstLeg?.airline_code || "").trim().toUpperCase();
-                          const airlineLogo = airlineCode
-                            ? `https://images.kiwi.com/airlines/64/${airlineCode}.png`
-                            : null;
-                          const routeFrom = firstLeg?.departure_airport || "—";
-                          const routeTo = lastLeg?.arrival_airport || "—";
-                          const departureTime = formatFlightClock(firstLeg?.departure_time);
-                          const arrivalTime = formatFlightClock(lastLeg?.arrival_time);
-                          const duration = formatMinutesToDuration(seg.Total_travel_time || seg.Flying_time);
-                          const stopsLabel = Number(seg.Stops || 0) > 0
-                            ? `${seg.Stops} stop${Number(seg.Stops) > 1 ? "s" : ""}`
-                            : "Direct";
-                          const flightClass = firstLeg?.class_name || "Economy";
+              {/* Flight summary + Package cost card — shown in package mode */}
+              {(() => {
+                type SummaryLeg = {
+                  from: string;
+                  to: string;
+                  fromCode: string;
+                  toCode: string;
+                  departureTime: string;
+                  arrivalTime: string;
+                  date: string;
+                  duration: string;
+                  stops: string;
+                  airline: string;
+                  airlineCode?: string;
+                  cabinClass?: string;
+                };
 
-                          return (
-                            <div key={`${seg.Route}-${idx}`} className="bg-[#F5F7FF] rounded-xl p-4 flex flex-col gap-4">
-                              <div className="flex items-start justify-between gap-3">
-                                <div className="flex items-center gap-2 min-w-0">
-                                  {airlineLogo ? (
-                                    <img
-                                      src={airlineLogo}
-                                      alt={`${firstLeg?.airline_name || seg.Majority_carrier} logo`}
-                                      className="w-8 h-8 object-contain rounded"
-                                      loading="lazy"
-                                    />
-                                  ) : (
-                                    <div className="w-8 h-8 rounded bg-[#3754ED] text-white flex items-center justify-center">
-                                      <Plane className="w-4 h-4" />
-                                    </div>
-                                  )}
-                                  <div className="min-w-0">
-                                    <div className="text-sm font-semibold text-[#010D50] truncate">
-                                      {firstLeg?.airline_name || seg.Majority_carrier || "Selected airline"}
-                                    </div>
-                                    <div className="text-xs text-[#3A478A] truncate">
-                                      {idx === 0 ? "Outbound" : "Inbound"} · {routeFrom} to {routeTo}
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="text-xs text-[#010D50] font-medium whitespace-nowrap">
-                                  {flightClass}
-                                </div>
-                              </div>
+                const deeplinkFlights = deeplinkViewData?.success && "FlightResultId" in deeplinkViewData.results
+                  ? (deeplinkViewData as HolidayPackageViewResponse).results.FlightDetails
+                  : null;
+                const fallbackFlight = (!deeplinkViewData?.success || !("FlightResultId" in deeplinkViewData.results)) && selectedFlight
+                  ? selectedFlight
+                  : null;
 
-                              <div className="flex items-center gap-3 flex-wrap text-sm text-[#010D50]">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs text-[#3A478A]">{routeFrom}</span>
-                                  <span className="font-semibold">{departureTime}</span>
-                                </div>
-                                <svg width="60" height="5" viewBox="0 0 60 5" fill="none" aria-hidden="true">
-                                  <circle cx="20" cy="2.5" r="2.5" fill="#010D50" />
-                                  <line x1="0" y1="2.5" x2="60" y2="2.5" stroke="#010D50" strokeDasharray="4 4" />
-                                </svg>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-semibold">{arrivalTime}</span>
-                                  <span className="text-xs text-[#3A478A]">{routeTo}</span>
-                                </div>
-                              </div>
+                let summaryLegs: SummaryLeg[] = [];
 
-                              <div className="flex items-center gap-2 flex-wrap text-xs text-[#3A478A]">
-                                <span>{stopsLabel}</span>
-                                <span className="w-1 h-1 rounded-full bg-[#3A478A]" />
-                                <span>{duration}</span>
-                                {legs.length > 0 ? (
-                                  <>
-                                    <span className="w-1 h-1 rounded-full bg-[#3A478A]" />
-                                    <span>{legs.length} flight leg{legs.length > 1 ? "s" : ""}</span>
-                                  </>
-                                ) : null}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
+                if (deeplinkFlights && deeplinkFlights.length > 0) {
+                  summaryLegs = deeplinkFlights.map((seg) => {
+                    const legs = seg.Flights || [];
+                    const firstLeg = legs[0];
+                    const lastLeg = legs[legs.length - 1];
+                    return {
+                      from: airportCache.getAirportName(String(firstLeg?.departure_airport || "")),
+                      to: airportCache.getAirportName(String(lastLeg?.arrival_airport || "")),
+                      fromCode: String(firstLeg?.departure_airport || "—"),
+                      toCode: String(lastLeg?.arrival_airport || "—"),
+                      departureTime: formatFlightClock(firstLeg?.departure_time),
+                      arrivalTime: formatFlightClock(lastLeg?.arrival_time),
+                      date: String(firstLeg?.departure_date || ""),
+                      duration: formatMinutesToDuration(seg.Total_travel_time || seg.Flying_time),
+                      stops: Number(seg.Stops || 0) > 0
+                        ? `${seg.Stops} stop${Number(seg.Stops) > 1 ? "s" : ""}`
+                        : "Direct",
+                      airline: String(firstLeg?.airline_name || seg.Majority_carrier || "Selected airline"),
+                      airlineCode: String(firstLeg?.airline_code || "").trim().toUpperCase() || undefined,
+                      cabinClass: firstLeg?.class_name || "Economy",
+                    };
+                  });
+                } else if (fallbackFlight) {
+                  const fallbackSegments = fallbackFlight.segments && fallbackFlight.segments.length > 0
+                    ? fallbackFlight.segments
+                    : [fallbackFlight.outbound, ...(fallbackFlight.inbound ? [fallbackFlight.inbound] : [])];
+                  summaryLegs = fallbackSegments.map((seg): SummaryLeg => ({
+                    from: String(seg.departureAirport.name || seg.departureAirport.city || seg.departureAirport.code),
+                    to: String(seg.arrivalAirport.name || seg.arrivalAirport.city || seg.arrivalAirport.code),
+                    fromCode: seg.departureAirport.code,
+                    toCode: seg.arrivalAirport.code,
+                    departureTime: seg.departureTime || "",
+                    arrivalTime: seg.arrivalTime || "",
+                    date: seg.date || "",
+                    duration: seg.totalJourneyTime || seg.duration || "—",
+                    stops: seg.stopDetails || `${seg.stops || 0} stop${Number(seg.stops || 0) === 1 ? "" : "s"}`,
+                    airline: seg.carrierName || fallbackFlight.airline.name || "Selected airline",
+                    airlineCode: seg.carrierCode || undefined,
+                    cabinClass: seg.cabinClass || "Economy",
+                  }));
                 }
-                return null;
-              })()}
-              {(!deeplinkViewData?.success || !("FlightResultId" in deeplinkViewData.results)) &&
-                selectedFlight &&
-                (() => {
-                  const fallbackSegments =
-                    selectedFlight.segments && selectedFlight.segments.length > 0
-                      ? selectedFlight.segments
-                      : [selectedFlight.outbound, ...(selectedFlight.inbound ? [selectedFlight.inbound] : [])];
-                  if (fallbackSegments.length === 0) return null;
-                  return (
-                    <div className="mt-4 bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden">
+
+                if (summaryLegs.length === 0) return null;
+
+                const passengerCount = (stayAdults || 2) + (stayChildren || 0);
+                const passengerLabel = `${passengerCount} Passenger${passengerCount !== 1 ? "s" : ""}`;
+                const isPackageMode = deeplinkViewData?.success || resolvedPackagePrice?.amount;
+
+                return (
+                  <div className="mt-4 flex flex-col lg:flex-row gap-4">
+                    <div className={`${isPackageMode ? "w-full lg:w-[70%]" : "w-full"} bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden`}>
                       <div className="px-4 sm:px-6 py-4 border-b border-[#DFE0E4] flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2">
                           <Plane className="w-4 h-4 text-[#3754ED]" />
@@ -3480,40 +3443,101 @@ export default function HotelRoomsPage() {
                         ) : null}
                       </div>
                       <div className="p-4 sm:p-6 flex flex-col gap-3">
-                        {fallbackSegments.map((seg, idx) => (
-                          <div
-                            key={`${seg.departureAirport.code}-${seg.arrivalAirport.code}-${idx}`}
-                            className="bg-[#F5F7FF] rounded-xl p-4 flex flex-col gap-4"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div className="w-8 h-8 rounded bg-[#3754ED] text-white flex items-center justify-center">
-                                  <Plane className="w-4 h-4" />
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="text-sm font-semibold text-[#010D50] truncate">
-                                    {seg.carrierName || selectedFlight.airline.name || "Selected airline"}
-                                  </div>
-                                  <div className="text-xs text-[#3A478A] truncate">
-                                    {idx === 0 ? "Outbound" : "Inbound"} · {seg.departureAirport.code} to {seg.arrivalAirport.code}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="text-xs text-[#010D50] font-medium whitespace-nowrap">
-                                {seg.cabinClass || "Economy"}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 flex-wrap text-xs text-[#3A478A]">
-                              <span>{seg.stopDetails || `${seg.stops || 0} stop${Number(seg.stops || 0) === 1 ? "" : "s"}`}</span>
-                              <span className="w-1 h-1 rounded-full bg-[#3A478A]" />
-                              <span>{seg.totalJourneyTime || seg.duration || "—"}</span>
-                            </div>
-                          </div>
+                        {summaryLegs.map((leg, idx) => (
+                          <FlightSummaryCard
+                            key={`${leg.fromCode}-${leg.toCode}-${idx}`}
+                            leg={leg}
+                            passengers={passengerLabel}
+                            onViewDetails={() => setFlightInfoModalOpen(true)}
+                            cabinLabel={leg.cabinClass}
+                          />
                         ))}
                       </div>
                     </div>
-                  );
-                })()}
+
+                    {isPackageMode && (() => {
+                      let displayTotal: number | null = null;
+                      let displayCurrency = "GBP";
+                      if (resolvedPackagePrice?.amount) {
+                        displayTotal = resolvedPackagePrice.amount;
+                        displayCurrency = resolvedPackagePrice.currency || "GBP";
+                      } else if (deeplinkViewData?.success) {
+                        const viewHotel = (deeplinkViewData as HolidayPackageViewResponse).results.HotelDetails;
+                        const allRooms = Object.values(viewHotel?.rooms || {}).flat();
+                        const cheapest = allRooms
+                          .map((r) => Number(r.cust_tot_sell_amt ?? r.net_price ?? 0))
+                          .filter((p) => p > 0)
+                          .sort((a, b) => a - b)[0];
+                        if (cheapest) {
+                          displayTotal = cheapest;
+                          displayCurrency = String(
+                            allRooms[0]?.sell_currency_code
+                            || allRooms[0]?.currency_code
+                            || viewHotel?.SellCur
+                            || "GBP"
+                          ).toUpperCase();
+                        }
+                      }
+                      const totalLabel = displayTotal != null
+                        ? formatDisplayPrice(displayCurrency, displayTotal)
+                        : null;
+                      const ppLabel = displayTotal != null
+                        ? formatDisplayPrice(
+                            displayCurrency,
+                            calculatePackagePerPersonPrice(displayTotal, packageSearch?.rooms),
+                          )
+                        : null;
+                      return (
+                        <div className="w-full lg:w-[30%] bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden flex flex-col">
+                          <div className="px-4 sm:px-6 py-4 border-b border-[#DFE0E4] flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-[#3754ED]" />
+                            <h2 className="text-lg font-semibold text-[#010D50]">Package Summary</h2>
+                          </div>
+                          <div className="p-4 sm:p-6 flex flex-col gap-5 flex-1">
+                            {totalLabel && (
+                              <div>
+                                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#3A478A]">
+                                  Total Cost
+                                </span>
+                                <div className="text-2xl font-bold text-[#010D50] mt-1">{totalLabel}</div>
+                                {ppLabel && (
+                                  <span className="text-xs font-medium text-[#3A478A]">
+                                    {ppLabel} per person
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            <div>
+                              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#3A478A]">
+                                Guests
+                              </span>
+                              <div className="mt-1 text-sm font-medium text-[#010D50]">
+                                {stayAdults || 2} Adult{(stayAdults || 2) !== 1 ? "s" : ""}
+                                {stayChildren > 0 ? `, ${stayChildren} Child${stayChildren === 1 ? "" : "ren"}` : ""}
+                              </div>
+                            </div>
+                            {(stayCheckIn || stayCheckOut) && (
+                              <div>
+                                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#3A478A]">
+                                  Stay Dates
+                                </span>
+                                <div className="mt-1 text-sm font-medium text-[#010D50]">
+                                  {formatStayDate(stayCheckIn)} — {formatStayDate(stayCheckOut)}
+                                </div>
+                                {stayCheckIn && stayCheckOut && (
+                                  <span className="text-xs text-[#3A478A]">
+                                    {calculateStayNights(stayCheckIn, stayCheckOut)} night{calculateStayNights(stayCheckIn, stayCheckOut) !== 1 ? "s" : ""}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                );
+              })()}
               {flightForInfoModal ? (
                 <FlightInfoModal
                   flight={flightForInfoModal}
