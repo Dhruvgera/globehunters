@@ -49,7 +49,7 @@ function transformAlternateFlight(flight: HolidayAlternateFlight): TransformedAl
   return {
     resultId: flight.Result_id,
     priceDifference: Number(flight.holiday_diff ?? 0),
-    priceDifferencePerPerson: Number(flight.holiday_diff_per_person ?? 0) || undefined,
+    priceDifferencePerPerson: flight.holiday_diff_per_person != null ? Number(flight.holiday_diff_per_person) : undefined,
     totalFare: Number(flight.Total ?? 0),
     holidayPrice: Number(flight.holiday_price ?? 0) || undefined,
     holidayPricePerRoom: Number(flight.holiday_price_per_room ?? 0) || undefined,

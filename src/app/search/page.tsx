@@ -376,7 +376,19 @@ function SearchPageContent() {
           .map((flight) => mapPackageAlternateFlightToFlight(flight, searchRequestId || String(packageRequestId || "")))
           .filter((flight): flight is Flight => !!flight);
 
-        setPackageFlights(mappedFlights);
+        const includedFlight = mappedFlights.find(
+          (f) => f.id === effectiveFlightResultId || f.segmentResultId === effectiveFlightResultId
+        );
+        const baselinePrice = includedFlight?.price ?? 0;
+        const baselinePerPerson = includedFlight?.pricePerPerson ?? baselinePrice;
+
+        const adjustedFlights = mappedFlights.map((flight) => ({
+          ...flight,
+          packagePriceDeltaTotal: Math.round((flight.price - baselinePrice) * 100) / 100,
+          packagePriceDeltaPerPerson: Math.round((flight.pricePerPerson - baselinePerPerson) * 100) / 100,
+        }));
+
+        setPackageFlights(adjustedFlights);
         setHasAttemptedFetch(true);
       } catch (err) {
         if (cancelled) return;
@@ -790,9 +802,23 @@ function SearchPageContent() {
   // Prepare flights for instant render: default sort (price asc) and memoize
   // Also enrich airport names from cache when available
   const preparedFlights = useMemo(() => {
-    const sorted = sortFlights(effectiveFlights, 'price-asc');
+    let sorted: Flight[];
 
-    // If cache has loaded (indicated by resolvedAirportNames), enrich flight airport names
+    if (isPackageMode) {
+      const selectedId = packageFlightResultId || packageResultsMeta?.selectedFlightResultId || "";
+      sorted = [...effectiveFlights].sort((a, b) => {
+        const aIsSelected = a.id === selectedId || a.segmentResultId === selectedId;
+        const bIsSelected = b.id === selectedId || b.segmentResultId === selectedId;
+        if (aIsSelected && !bIsSelected) return -1;
+        if (!aIsSelected && bIsSelected) return 1;
+        const deltaA = a.packagePriceDeltaTotal ?? 0;
+        const deltaB = b.packagePriceDeltaTotal ?? 0;
+        return deltaA - deltaB;
+      });
+    } else {
+      sorted = sortFlights(effectiveFlights, 'price-asc');
+    }
+
     if (resolvedAirportNames.origin && resolvedAirportNames.origin !== effectiveSearchParams.from) {
       return sorted.map((flight) => ({
         ...flight,
@@ -824,7 +850,7 @@ function SearchPageContent() {
     }
 
     return sorted;
-  }, [effectiveFlights, resolvedAirportNames, effectiveSearchParams.from]);
+  }, [effectiveFlights, resolvedAirportNames, effectiveSearchParams.from, isPackageMode, packageFlightResultId, packageResultsMeta?.selectedFlightResultId]);
 
   // Compute available stops from flights filtered by all OTHER filters (excluding stops)
   // This makes the stop counts update when user selects airline or other filters

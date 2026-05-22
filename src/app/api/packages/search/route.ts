@@ -25,7 +25,7 @@ import type {
 function resolvePackageSearchTimeoutSec(criteria?: PackageSearchCriteria): number {
   const requested = Number(criteria?.timeout);
   if (Number.isFinite(requested) && requested > 0) {
-    return Math.max(3, Math.trunc(requested));
+    return Math.max(30, Math.trunc(requested));
   }
 
   const raw = Number(
@@ -50,7 +50,7 @@ function resolvePackageTransportTimeoutMs(criteria?: PackageSearchCriteria): num
 
   const timeoutSec = resolvePackageSearchTimeoutSec(criteria);
   const bufferSec = resolvePackageSearchTimeoutBufferSec();
-  return Math.max(15000, (timeoutSec + bufferSec) * 1000);
+  return Math.max(30000, (timeoutSec + bufferSec) * 1000);
 }
 
 function buildBasicAuthHeader(): string {

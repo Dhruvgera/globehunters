@@ -130,6 +130,7 @@ export function usePackageSearch(): UsePackageSearchReturn {
 
     try {
       // Save search criteria to store
+      criteria.timeout = 30;
       setPackageSearch(criteria);
 
       const response = await packageService.searchPackages(criteria);
@@ -219,7 +220,7 @@ export function usePackageSearch(): UsePackageSearchReturn {
     setSelectedPackage({
       ...selectedPackage,
       flightResultId: flight.resultId,
-      totalPrice: selectedPackage.totalPrice 
+      totalPrice: selectedPackage.totalPrice != null
         ? selectedPackage.totalPrice + flight.priceDifference 
         : flight.totalFare,
     });

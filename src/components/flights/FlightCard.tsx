@@ -16,11 +16,8 @@ import { formatPrice } from "@/lib/currency";
 
 function formatPackageDeltaLabel(amount?: number, currency?: string, perPerson = false): string {
   const delta = Number(amount || 0);
-  if (Math.abs(delta) < 0.01) {
-    const zeroLabel = formatPrice(0, currency || "GBP");
-    return perPerson ? `${zeroLabel} per person` : zeroLabel;
-  }
-  const prefix = `${delta > 0 ? "+" : "-"}${formatPrice(Math.abs(delta), currency || "GBP")}`;
+  const absLabel = formatPrice(Math.abs(delta), currency || "GBP");
+  const prefix = delta < 0 ? `-${absLabel}` : `+${absLabel}`;
   return perPerson ? `${prefix} per person` : prefix;
 }
 
@@ -152,6 +149,28 @@ export default function FlightCard({
               <span className="text-yellow-900">{flight.segmentResultId}</span>
             </div>
           )}
+          {flight.id && (
+            <div className="flex gap-2">
+              <span className="font-semibold text-yellow-800">flight.id:</span>
+              <span className="text-yellow-900">{flight.id}</span>
+            </div>
+          )}
+          <div className="flex gap-2">
+            <span className="font-semibold text-yellow-800">price:</span>
+            <span className="text-yellow-900">{flight.price}</span>
+          </div>
+          <div className="flex gap-2">
+            <span className="font-semibold text-yellow-800">deltaTotal:</span>
+            <span className="text-yellow-900">{flight.packagePriceDeltaTotal}</span>
+          </div>
+          <div className="flex gap-2">
+            <span className="font-semibold text-yellow-800">deltaPerPerson:</span>
+            <span className="text-yellow-900">{flight.packagePriceDeltaPerPerson}</span>
+          </div>
+          <div className="flex gap-2">
+            <span className="font-semibold text-yellow-800">primaryPriceLabel:</span>
+            <span className="text-yellow-900">{packagePrimaryPriceLabel}</span>
+          </div>
         </div>
       )}
 

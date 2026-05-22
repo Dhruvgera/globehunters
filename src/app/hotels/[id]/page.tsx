@@ -1063,7 +1063,6 @@ export default function HotelRoomsPage() {
   useEffect(() => {
     if (!hasHydrated) return;
     if (hotelSearch) return;
-    if (isPackageMode) return;
     if (deeplinkViewData?.success) return;
 
     const urlCtx = searchParams.get("ctx");
@@ -1080,6 +1079,8 @@ export default function HotelRoomsPage() {
       }
       return;
     }
+
+    if (isPackageMode) return;
 
     const urlLocation = searchParams.get("location");
     const urlHiddenId = searchParams.get("hidden_id");
@@ -1977,12 +1978,20 @@ export default function HotelRoomsPage() {
   );
   const rooms = useMemo(() => {
     const q = filterBoardQuery.trim().toLowerCase();
-    return remoteRooms.filter((room) => {
+    const filtered = remoteRooms.filter((room) => {
       if (filterRefundableOnly && !room.isRefundable) return false;
       if (q) {
         const s = `${room.name || ""} ${room.bedType || ""}`.toLowerCase();
         if (!s.includes(q)) return false;
       }
+      return true;
+    });
+    const seen = new Set<string>();
+    return filtered.filter((room) => {
+      const code = String(room._raw?.room_code ?? room._raw?.roomCode ?? "").trim();
+      if (!code) return true;
+      if (seen.has(code)) return false;
+      seen.add(code);
       return true;
     });
   }, [filterBoardQuery, filterRefundableOnly, remoteRooms]);
@@ -2289,7 +2298,7 @@ export default function HotelRoomsPage() {
 
             flattenedRooms.sort((a, b) => (a.price.total || 0) - (b.price.total || 0));
 
-            const headerImage = fixStubaImageUrl(viewHotel.image_name) || "";
+            const headerImage = ensureGiataImageUrl(fixStubaImageUrl(viewHotel.image_name) || "", 'original') as string;
             const headerAddress = [viewHotel.address1, viewHotel.address2].filter(Boolean).join(", ");
             const roomImageCandidates = roomGroups
               .flat()
@@ -2362,7 +2371,7 @@ export default function HotelRoomsPage() {
                     vyspaMedia.hotelImages || [],
                     flattenRoomImages(vyspaMedia.roomImages),
                     deeplinkGallery
-                  ).slice(0, 24);
+                  ).map((u) => ensureGiataImageUrl(u, 'original') as string).slice(0, 24);
 
                   if (nextGallery.length > 0) {
                     setGalleryImages(nextGallery);
@@ -2461,10 +2470,24 @@ export default function HotelRoomsPage() {
           const effectivePkgHotelId = packageHotelResultIdRef.current || Number(hotelId);
           const packageHotel = packageResults?.find((row) => String(row.id) === String(effectivePkgHotelId)) ||
             packageResults?.find((row) => String(row.id) === String(hotelId));
+          const urlPkgRequestId = searchParams.get("pkgRequestId");
+          const urlPkgFlightResultId = searchParams.get("pkgFlightResultId");
+          const effectiveRequestId = packageResultsMeta?.requestId ?? (urlPkgRequestId ? Number(urlPkgRequestId) || undefined : undefined);
+          const effectiveFlightResultId = packageResultsMeta?.selectedFlightResultId || urlPkgFlightResultId || undefined;
+
+          if (!packageResultsMeta && (urlPkgRequestId || urlPkgFlightResultId)) {
+            const { setPackageResults: storeSetPkgResults } = useBookingStore.getState();
+            storeSetPkgResults(packageResults || [], {
+              requestId: effectiveRequestId ?? 0,
+              selectedFlightResultId: effectiveFlightResultId || "",
+              completed: true,
+            });
+          }
+
           const roomResponse = await packageService.getPackageRooms({
             hotelResultId: effectivePkgHotelId,
-            requestId: packageResultsMeta?.requestId,
-            flightResultId: packageResultsMeta?.selectedFlightResultId || undefined,
+            requestId: effectiveRequestId,
+            flightResultId: effectiveFlightResultId,
           });
 
           const roomHotel =
@@ -2472,7 +2495,7 @@ export default function HotelRoomsPage() {
             roomResponse.results.find((row) => String(row.id) === String(hotelId)) ||
             roomResponse.results[0];
 
-          if (!packageHotel || !roomHotel) {
+          if (!roomHotel) {
             throw new Error("No live package rooms were returned for the selected hotel.");
           }
 
@@ -2514,13 +2537,13 @@ export default function HotelRoomsPage() {
             return next;
           })();
 
-          const headerImage = fixStubaImageUrl(roomHotel.image_name) || packageHotel.imageUrl || "";
-          const headerAddress = [roomHotel.address1, roomHotel.address2, packageHotel.address?.street1]
+          const headerImage = ensureGiataImageUrl(fixStubaImageUrl(roomHotel.image_name) || packageHotel?.imageUrl || "", 'original') as string;
+          const headerAddress = [roomHotel.address1, roomHotel.address2, packageHotel?.address?.street1]
             .filter(Boolean)
             .join(", ");
-          const parsedPackageContent = parsePackageHotelContent(packageHotel.description || roomHotel.quickDescription || "");
+          const parsedPackageContent = parsePackageHotelContent(packageHotel?.description || roomHotel.quickDescription || "");
           const packageDescription = sanitizeHotelText(
-            parsedPackageContent.description || packageHotel.description || roomHotel.quickDescription || ""
+            parsedPackageContent.description || packageHotel?.description || roomHotel.quickDescription || ""
           );
           const extractedPackageAmenities = Array.from(
             new Set([
@@ -2529,15 +2552,15 @@ export default function HotelRoomsPage() {
               ...flattenedRooms.flatMap((room) => room.amenities.map((amenity) => amenity.label)),
             ])
           ).slice(0, 24);
-          const latitude = Number(roomHotel.geo_loc_latitude ?? packageHotel.address?.latitude ?? 0);
-          const longitude = Number(roomHotel.geo_loc_longitude ?? packageHotel.address?.longitude ?? 0);
+          const latitude = Number(roomHotel.geo_loc_latitude ?? packageHotel?.address?.latitude ?? 0);
+          const longitude = Number(roomHotel.geo_loc_longitude ?? packageHotel?.address?.longitude ?? 0);
 
           if (!cancelled) {
             setRawGetRoomsV3Response(roomResponse);
             setRawAccommodationDetailsResponse(null);
             setRemoteHotelHeader({
-              name: roomHotel.hotel_name || packageHotel.hotelName,
-              rating: Number(roomHotel.hotel_rating || packageHotel.starRating || 0),
+              name: roomHotel.hotel_name || packageHotel?.hotelName || "",
+              rating: Number(roomHotel.hotel_rating || packageHotel?.starRating || 0),
               image: headerImage || undefined,
               address: headerAddress || undefined,
             });
@@ -2556,11 +2579,11 @@ export default function HotelRoomsPage() {
               setCoordinates({ lat: latitude, lng: longitude });
             }
             setRemoteRooms(flattenedRooms);
-            setSelectedHotel({ hotelId, hotelName: roomHotel.hotel_name || packageHotel.hotelName });
+            setSelectedHotel({ hotelId, hotelName: roomHotel.hotel_name || packageHotel?.hotelName });
             setHotelDetailsCache(hotelId, {
               hotelId,
-              hotelName: roomHotel.hotel_name || packageHotel.hotelName,
-              hotelRating: Number(roomHotel.hotel_rating || packageHotel.starRating || 0) || undefined,
+              hotelName: roomHotel.hotel_name || packageHotel?.hotelName,
+              hotelRating: Number(roomHotel.hotel_rating || packageHotel?.starRating || 0) || undefined,
               mainImage: headerImage || undefined,
               address: headerAddress || undefined,
               galleryImages: headerImage ? [headerImage] : [],
@@ -2575,7 +2598,7 @@ export default function HotelRoomsPage() {
             setActiveRoomCardId(flattenedRooms.length > 0 ? String(flattenedRooms[0].id) : null);
           }
 
-          const packageHotelDetailsId = Number(roomHotel.hotel_id ?? packageHotel.hotelId);
+          const packageHotelDetailsId = Number(roomHotel.hotel_id ?? packageHotel?.hotelId);
           if (packageHotelDetailsId > 0) {
             hotelService
               .hotelSearchDetails([String(packageHotelDetailsId)])
@@ -2624,8 +2647,8 @@ export default function HotelRoomsPage() {
 
                 setHotelDetailsCache(hotelId, {
                   hotelId,
-                  hotelName: roomHotel.hotel_name || packageHotel.hotelName,
-                  hotelRating: Number(roomHotel.hotel_rating || packageHotel.starRating || 0) || undefined,
+                  hotelName: roomHotel.hotel_name || packageHotel?.hotelName,
+                  hotelRating: Number(roomHotel.hotel_rating || packageHotel?.starRating || 0) || undefined,
                   mainImage: nextGallery[0] || headerImage || undefined,
                   address: headerAddress || undefined,
                   galleryImages: nextGallery.length > 0 ? nextGallery : (headerImage ? [headerImage] : []),
@@ -3198,8 +3221,8 @@ export default function HotelRoomsPage() {
     params.set("hotelId", effectiveHotelId);
     params.set("hotelName", hotel.name);
     params.set("roomId", String(rid));
-    if (packageResultsMeta?.selectedFlightResultId) {
-      params.set("flightResultId", packageResultsMeta.selectedFlightResultId);
+    if (packageResultsMeta?.selectedFlightResultId || searchParams.get("pkgFlightResultId")) {
+      params.set("flightResultId", packageResultsMeta?.selectedFlightResultId || searchParams.get("pkgFlightResultId") || "");
     }
     const checkIn = searchParams.get("checkIn") || hotelSearch?.checkIn || packageSearch?.checkIn || "";
     const nights = Number(packageSearch?.nights || 0);

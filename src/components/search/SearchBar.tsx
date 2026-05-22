@@ -32,6 +32,17 @@ import {
 } from "@/lib/hotels/childAges";
 import type { HolidayDestination } from "@/types/holidayPackage";
 
+export interface PackageSearchFormData {
+  from: { code: string; name: string; city: string; country: string; countryCode: string } | null;
+  destination: HolidayDestination | null;
+  checkIn: string;
+  checkOut: string;
+  adults: number;
+  children: number;
+  rooms: number;
+  childAges: number[];
+}
+
 interface SearchBarProps {
   compact?: boolean;
   /**
@@ -39,6 +50,10 @@ interface SearchBarProps {
    * Useful when the page provides its own container (e.g. hotel search header frame).
    */
   embedded?: boolean;
+  /** Pre-select product tab on mount */
+  defaultProduct?: "flight" | "hotel" | "package";
+  /** When provided, called instead of navigating for package searches */
+  onPackageSearch?: (data: PackageSearchFormData) => void;
 }
 
 type Product = "flight" | "hotel" | "package";
@@ -105,12 +120,13 @@ function ProductTab({
   );
 }
 
-export default function SearchBar({ compact = false, embedded = false }: SearchBarProps) {
+export default function SearchBar({ compact = false, embedded = false, defaultProduct, onPackageSearch }: SearchBarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const urlParams = useSearchParams();
 
   const productFromUrl: Product = useMemo(() => {
+    if (defaultProduct) return defaultProduct;
     if (pathname?.startsWith("/hotels")) {
       const typeParam = urlParams.get("type");
       if (typeParam === "package") {
@@ -125,7 +141,7 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
       if (hostname.startsWith("hotel")) return "hotel";
     }
     return "flight";
-  }, [pathname, urlParams]);
+  }, [pathname, urlParams, defaultProduct]);
 
   // Animated, in-place switching between flight/hotel forms.
   // We still navigate on search, but tab switches don't hard-navigate.
@@ -368,6 +384,19 @@ export default function SearchBar({ compact = false, embedded = false }: SearchB
       if (from?.name || from?.city) params.set("from", from?.name || from?.city || "");
       if (packageHiddenId) params.set("hidden_id", packageHiddenId);
       if (packageHiddenValue) params.set("hidden_key", packageHiddenValue);
+      if (onPackageSearch) {
+        onPackageSearch({
+          from: from ? { code: from.code, name: from.name || "", city: from.city, country: from.country || "", countryCode: from.countryCode || "" } : null,
+          destination: packageDestinationItem,
+          checkIn,
+          checkOut,
+          adults: Math.max(1, hotelGuests),
+          children: Math.max(0, hotelChildren),
+          rooms: Math.max(1, hotelRooms),
+          childAges: [...hotelChildAges],
+        });
+        return;
+      }
       if (packageDestinationItem) setPackageDestination(packageDestinationItem);
       router.push(`/hotels?${params.toString()}`);
       return;
