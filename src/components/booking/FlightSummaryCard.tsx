@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { useState } from "react";
 
-interface FlightLeg {
+export interface FlightLeg {
   from: string;
   to: string;
   fromCode: string;
@@ -18,6 +18,7 @@ interface FlightLeg {
   stops: string;
   airline: string;
   airlineCode?: string;
+  cabinClass?: string;
 }
 
 interface FlightSummaryCardProps {

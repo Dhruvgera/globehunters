@@ -40,7 +40,7 @@ import { packageService } from "@/services/api/packageService";
 import { useBookingStore, useStoreHydration } from "@/store/bookingStore";
 import { PackageStepProgress } from "@/components/packages/PackageStepProgress";
 import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
-import { FlightSummaryCard } from "@/components/booking/FlightSummaryCard";
+import { FlightSummaryCard, type FlightLeg } from "@/components/booking/FlightSummaryCard";
 import type { Flight, FlightSegment } from "@/types/flight";
 import { resolveTrustYouHotelId } from "@/lib/trustyou/hotelMapping";
 import type { TrustYouHotelReviewSummary } from "@/types/trustyou";
@@ -3351,21 +3351,6 @@ export default function HotelRoomsPage() {
 
               {/* Flight summary + Package cost card — shown in package mode */}
               {(() => {
-                type SummaryLeg = {
-                  from: string;
-                  to: string;
-                  fromCode: string;
-                  toCode: string;
-                  departureTime: string;
-                  arrivalTime: string;
-                  date: string;
-                  duration: string;
-                  stops: string;
-                  airline: string;
-                  airlineCode?: string;
-                  cabinClass?: string;
-                };
-
                 const deeplinkFlights = deeplinkViewData?.success && "FlightResultId" in deeplinkViewData.results
                   ? (deeplinkViewData as HolidayPackageViewResponse).results.FlightDetails
                   : null;
@@ -3373,7 +3358,7 @@ export default function HotelRoomsPage() {
                   ? selectedFlight
                   : null;
 
-                let summaryLegs: SummaryLeg[] = [];
+                let summaryLegs: FlightLeg[] = [];
 
                 if (deeplinkFlights && deeplinkFlights.length > 0) {
                   summaryLegs = deeplinkFlights.map((seg) => {
@@ -3401,7 +3386,7 @@ export default function HotelRoomsPage() {
                   const fallbackSegments = fallbackFlight.segments && fallbackFlight.segments.length > 0
                     ? fallbackFlight.segments
                     : [fallbackFlight.outbound, ...(fallbackFlight.inbound ? [fallbackFlight.inbound] : [])];
-                  summaryLegs = fallbackSegments.map((seg): SummaryLeg => ({
+                  summaryLegs = fallbackSegments.map((seg): FlightLeg => ({
                     from: String(seg.departureAirport.name || seg.departureAirport.city || seg.departureAirport.code),
                     to: String(seg.arrivalAirport.name || seg.arrivalAirport.city || seg.arrivalAirport.code),
                     fromCode: seg.departureAirport.code,
