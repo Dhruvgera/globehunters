@@ -1036,6 +1036,7 @@ export default function HotelRoomsPage() {
   const deeplinkViewData = useBookingStore((s) => s.deeplinkViewData);
   const setDeeplinkViewData = useBookingStore((s) => s.setDeeplinkViewData);
   const isFromDeeplink = useBookingStore((s) => s.isFromDeeplink);
+  const selectedHotelRoomSummary = useBookingStore((s) => s.selectedHotelRoomSummary);
 
   // Handle deeplink entry (packageKey/hotelKey URL params)
   usePackageDeeplink();
@@ -2066,6 +2067,18 @@ export default function HotelRoomsPage() {
   const resolvedPackagePrice = useMemo(() => {
     if (!isPackageMode) return null;
 
+    if (deeplinkViewData?.success) {
+      const selectedIds = selectedRoomIdsFromCounts(selectedRoomCounts);
+      const total = selectedIds.reduce((sum, rid) => {
+        const room = remoteRooms.find((r) => String(r.id) === String(rid));
+        return sum + (room?.price?.total || 0);
+      }, 0);
+      if (total > 0) {
+        const currency = remoteRooms.find((r) => r.price?.currency)?.price?.currency || "£";
+        return { amount: total, currency };
+      }
+    }
+
     if (activePackageRoom?.price?.total) {
       return {
         amount: activePackageRoom.price.total,
@@ -2089,11 +2102,14 @@ export default function HotelRoomsPage() {
   }, [
     activePackageRoom?.price?.currency,
     activePackageRoom?.price?.total,
+    deeplinkViewData?.success,
     isPackageMode,
     matchedPackageResult?.currency,
     matchedPackageResult?.startingPrice,
+    remoteRooms,
     selectedPackage?.hotel?.currency,
     selectedPackage?.totalPrice,
+    selectedRoomCounts,
   ]);
   const packagePriceLabel = resolvedPackagePrice
     ? formatDisplayPrice(resolvedPackagePrice.currency, resolvedPackagePrice.amount)
@@ -2314,6 +2330,14 @@ export default function HotelRoomsPage() {
 
             setRemoteRooms(flattenedRooms);
             setSelectedHotel({ hotelId, hotelName: viewHotel.hotel_name });
+
+            const deeplinkRoomCount = Math.max(1, Number(packageSearch?.rooms?.length || hotelSearch?.rooms || 1));
+            const deeplinkSelectedCounts: Record<string, number> = {};
+            if (flattenedRooms.length > 0) {
+              deeplinkSelectedCounts[flattenedRooms[0].id] = deeplinkRoomCount;
+            }
+            setSelectedRoomCounts(deeplinkSelectedCounts);
+            if (flattenedRooms.length > 0) setActiveRoomCardId(flattenedRooms[0].id);
             if (deeplinkGallery.length > 0) setGalleryImages(deeplinkGallery);
             if (hasCoordinates) setCoordinates({ lat: latitude, lng: longitude });
             setHotelDetailsCache(hotelId, {
@@ -3443,25 +3467,12 @@ export default function HotelRoomsPage() {
                     {isPackageMode && (() => {
                       let displayTotal: number | null = null;
                       let displayCurrency = "GBP";
-                      if (resolvedPackagePrice?.amount) {
+                      if (selectedHotelRoomSummary?.total) {
+                        displayTotal = selectedHotelRoomSummary.total;
+                        displayCurrency = selectedHotelRoomSummary.currency || "GBP";
+                      } else if (resolvedPackagePrice?.amount) {
                         displayTotal = resolvedPackagePrice.amount;
                         displayCurrency = resolvedPackagePrice.currency || "GBP";
-                      } else if (deeplinkViewData?.success) {
-                        const viewHotel = (deeplinkViewData as HolidayPackageViewResponse).results.HotelDetails;
-                        const allRooms = Object.values(viewHotel?.rooms || {}).flat();
-                        const cheapest = allRooms
-                          .map((r) => Number(r.cust_tot_sell_amt ?? r.net_price ?? 0))
-                          .filter((p) => p > 0)
-                          .sort((a, b) => a - b)[0];
-                        if (cheapest) {
-                          displayTotal = cheapest;
-                          displayCurrency = String(
-                            allRooms[0]?.sell_currency_code
-                            || allRooms[0]?.currency_code
-                            || viewHotel?.SellCur
-                            || "GBP"
-                          ).toUpperCase();
-                        }
                       }
                       const totalLabel = displayTotal != null
                         ? formatDisplayPrice(displayCurrency, displayTotal)
