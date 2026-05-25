@@ -130,7 +130,7 @@ export function usePackageSearch(): UsePackageSearchReturn {
 
     try {
       // Save search criteria to store
-      criteria.timeout = 30;
+      criteria.timeout = 60;
       setPackageSearch(criteria);
 
       const response = await packageService.searchPackages(criteria);

@@ -26,7 +26,11 @@ interface HotelRoomCardPropsType {
     convertedLocalTaxByRoomId: Record<string, string>
     handlePackageRoomContinue: (roomIds?: string[] | undefined) => void
     handleHotelRoomContinue: (roomIds?: string[] | undefined) => void
-
+    allDeeplinkRoomPricesSame?: boolean;
+    deeplinkRoomGroupKeys?: string[];
+    deeplinkSelectedSlots?: Record<string, string>;
+    deeplinkBaseSlotPrices?: Record<string, number>;
+    onDeeplinkSlotToggle?: (roomId: string, groupKey: string) => void;
 }
 
 function sanitizeHotelText(value: unknown): string {
@@ -61,6 +65,14 @@ function sanitizeRoomDisplayText(value: unknown): string {
         .replace(/\bOf\b/g, "of");
 }
 
+function extractSlotLabel(groupKey: string): string {
+    const match = groupKey.match(/(\d+)/);
+    return match ? `Room ${match[1]}` : groupKey;
+}
+
+function countSelectedRooms(counts: Record<string, number>): number {
+    return Object.values(counts).reduce((sum, count) => sum + Math.max(0, Number(count || 0)), 0);
+}
 
 export function HotelRoomCard({ room,
     isPackageMode,
@@ -74,7 +86,12 @@ export function HotelRoomCard({ room,
     isHotelDatesDebugMode,
     convertedLocalTaxByRoomId,
     handlePackageRoomContinue,
-    handleHotelRoomContinue
+    handleHotelRoomContinue,
+    allDeeplinkRoomPricesSame = true,
+    deeplinkRoomGroupKeys = [],
+    deeplinkSelectedSlots = {},
+    deeplinkBaseSlotPrices = {},
+    onDeeplinkSlotToggle,
 }: HotelRoomCardPropsType) {
     const [expandedRoomInfoById, setExpandedRoomInfoById] = useState<Record<string, boolean>>({});
 
@@ -124,9 +141,6 @@ export function HotelRoomCard({ room,
         (Array.isArray(room?.amenities) && room.amenities.length > 0);
     const expanded = !!expandedRoomInfoById[room.id];
     const selectedRoomCount = useMemo(() => countSelectedRooms(selectedRoomCounts), [selectedRoomCounts]);
-    function countSelectedRooms(counts: Record<string, number>): number {
-        return Object.values(counts).reduce((sum, count) => sum + Math.max(0, Number(count || 0)), 0);
-    }
     const handlePackageRoomActivate = () => {
         setActiveRoomCardId(String(room.id));
     };
@@ -140,29 +154,51 @@ export function HotelRoomCard({ room,
     };
     const isSingleRoomSelectionMode = !isPackageMode && requiredRoomCount === 1;
 
+    const useDeeplinkSlotMode = isPackageMode && !allDeeplinkRoomPricesSame && deeplinkRoomGroupKeys.length > 0;
+
+    const availableSlots = useMemo(() => {
+        if (!useDeeplinkSlotMode) return [];
+        const sources = room.roomGroupSources || {};
+        return deeplinkRoomGroupKeys.filter((key) => sources[key]);
+    }, [useDeeplinkSlotMode, deeplinkRoomGroupKeys, room.roomGroupSources]);
+
+    const slotPrices = useMemo(() => {
+        if (!useDeeplinkSlotMode || !room.roomGroupSources) return {};
+        const out: Record<string, { total: number; currency: string }> = {};
+        for (const groupKey of availableSlots) {
+            const src = room.roomGroupSources[groupKey];
+            if (!src) continue;
+            const total = Number(src.cust_tot_sell_amt ?? src.net_price ?? 0);
+            const currencyCode = String(src.sell_currency_code || src.currency_code || "GBP").toUpperCase();
+            const currency = currencyCode === "GBP" ? "£" : currencyCode;
+            out[groupKey] = { total, currency };
+        }
+        return out;
+    }, [useDeeplinkSlotMode, availableSlots, room.roomGroupSources]);
+
     return (
         <div
             key={room.id}
             className={[
                 "border rounded-[32px] bg-white overflow-hidden flex flex-col h-full transform-gpu transition-all duration-200",
                 isActiveRoomCard ? "border-[#3754ED] scale-[1.01] shadow-md" : "border-[#DFE0E4] scale-100",
-                isPackageMode || isMultiRoomSelectionMode || isSingleRoomSelectionMode
+                !useDeeplinkSlotMode && (isPackageMode || isMultiRoomSelectionMode || isSingleRoomSelectionMode)
                     ? "cursor-pointer hover:scale-[1.005] hover:shadow-md"
                     : "",
             ].join(" ")}
-            role={isPackageMode || isMultiRoomSelectionMode || isSingleRoomSelectionMode ? "button" : undefined}
-            tabIndex={isPackageMode || isMultiRoomSelectionMode || isSingleRoomSelectionMode ? 0 : undefined}
+            role={!useDeeplinkSlotMode && (isPackageMode || isMultiRoomSelectionMode || isSingleRoomSelectionMode) ? "button" : undefined}
+            tabIndex={!useDeeplinkSlotMode && (isPackageMode || isMultiRoomSelectionMode || isSingleRoomSelectionMode) ? 0 : undefined}
             onClick={
-                isPackageMode
+                !useDeeplinkSlotMode && isPackageMode
                     ? handlePackageRoomActivate
-                    : isMultiRoomSelectionMode
+                    : !useDeeplinkSlotMode && isMultiRoomSelectionMode
                         ? handleMultiRoomCardSelect
-                        : isSingleRoomSelectionMode
+                        : !useDeeplinkSlotMode && isSingleRoomSelectionMode
                             ? handleSingleRoomCardSelect
                             : undefined
             }
             onKeyDown={
-                isPackageMode || isMultiRoomSelectionMode || isSingleRoomSelectionMode
+                !useDeeplinkSlotMode && (isPackageMode || isMultiRoomSelectionMode || isSingleRoomSelectionMode)
                     ? (e) => {
                         if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
@@ -316,21 +352,62 @@ export function HotelRoomCard({ room,
                             </span>
                         )}
                         {isPackageMode ? (
-                            (() => {
-                                const delta = room.price.total - minRoomPrice;
-                                if (Math.abs(delta) < 0.01) {
+                            useDeeplinkSlotMode ? (
+                                <div className="w-full space-y-2 mt-1">
+                                    {availableSlots.map((groupKey) => {
+                                        const priceInfo = slotPrices[groupKey];
+                                        const isSelected = deeplinkSelectedSlots[groupKey] === room.id;
+                                        const basePrice = deeplinkBaseSlotPrices[groupKey] ?? 0;
+                                        const delta = priceInfo ? priceInfo.total - basePrice : 0;
+                                        return (
+                                            <div
+                                                key={groupKey}
+                                                className={`flex items-center justify-between gap-2 rounded-xl px-3 py-2 border ${isSelected ? "border-[#3754ED] bg-[#F5F7FF]" : "border-[#DFE0E4] bg-white"}`}
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isSelected}
+                                                        className="accent-[#3754ED] w-4 h-4 rounded border-[#DFE0E4]"
+                                                        onChange={() => {
+                                                            if (onDeeplinkSlotToggle) {
+                                                                onDeeplinkSlotToggle(room.id, groupKey);
+                                                            }
+                                                        }}
+                                                    />
+                                                    <span className="text-sm text-[#010D50] font-medium">
+                                                        {extractSlotLabel(groupKey)}
+                                                    </span>
+                                                </label>
+                                                {priceInfo && (
+                                                    <span className={`text-sm font-semibold ${isSelected ? "text-[#008234]" : "text-[#010D50]"}`}>
+                                                        {Math.abs(delta) < 0.01
+                                                            ? formatDisplayPrice(priceInfo.currency, 0)
+                                                            : `+${priceInfo.currency}${delta.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                (() => {
+                                    const delta = room.price.total - minRoomPrice;
+                                    if (Math.abs(delta) < 0.01) {
+                                        return (
+                                            <span className="text-xl font-semibold text-[#008234]">
+                                                {formatDisplayPrice(room.price.currency, 0)}
+                                            </span>
+                                        );
+                                    }
                                     return (
-                                        <span className="text-xl font-semibold text-[#008234]">
-                                            {formatDisplayPrice(room.price.currency, 0)}
+                                        <span className="text-xl font-semibold text-[#010D50]">
+                                            +{room.price.currency}{delta.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </span>
                                     );
-                                }
-                                return (
-                                    <span className="text-xl font-semibold text-[#010D50]">
-                                        +{room.price.currency}{delta.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                    </span>
-                                );
-                            })()
+                                })()
+                            )
                         ) : (
                             <>
                                 <span className="text-base text-[#010D50]">
@@ -358,7 +435,18 @@ export function HotelRoomCard({ room,
                         })()}
                     </div>
 
-                    {isPackageMode && requiredRoomCount === 1 ? (
+                    {useDeeplinkSlotMode ? (
+                        <Button
+                            className="w-full rounded-full py-3 h-auto gap-2 bg-[#3754ED] hover:bg-[#2A3FB8] text-white font-bold"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handlePackageRoomContinue();
+                            }}
+                        >
+                            Continue Booking
+                            <ChevronRight className="w-5 h-5" />
+                        </Button>
+                    ) : isPackageMode && requiredRoomCount === 1 ? (
                         <Button
                             className="w-full rounded-full py-3 h-auto gap-2 bg-[#3754ED] hover:bg-[#2A3FB8] text-white font-bold"
                             onClick={(e) => {
