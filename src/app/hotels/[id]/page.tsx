@@ -4173,7 +4173,6 @@ export default function HotelRoomsPage() {
                     setSelectedRoomCounts={setSelectedRoomCounts}
                     isHotelDatesDebugMode={isHotelDatesDebugMode}
                     requiredRoomCount={requiredRoomCount}
-                    staySummary={staySummary}
                     minRoomPrice={minRoomPrice}
                     convertedLocalTaxByRoomId={convertedLocalTaxByRoomId}
                     handlePackageRoomContinue={handlePackageRoomContinue}
