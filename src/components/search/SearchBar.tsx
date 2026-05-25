@@ -289,12 +289,14 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
           countryCode: "",
         });
       }
+    }
 
-      const inStr = urlParams.get("checkIn") || savedHotelSearch?.checkIn || "";
-      const outStr = urlParams.get("checkOut") || savedHotelSearch?.checkOut || "";
-      const adults = Number(urlParams.get("adults") || savedHotelSearch?.adults || "") || undefined;
-      const children = Number(urlParams.get("children") || savedHotelSearch?.children || "") || 0;
-      const rms = Number(urlParams.get("rooms") || savedHotelSearch?.rooms || "") || undefined;
+    if (savedHotelSearch) {
+      const inStr = urlParams.get("checkIn") || savedHotelSearch.checkIn || "";
+      const outStr = urlParams.get("checkOut") || savedHotelSearch.checkOut || "";
+      const adults = Number(urlParams.get("adults") || savedHotelSearch.adults || "") || undefined;
+      const children = Number(urlParams.get("children") || savedHotelSearch.children || "") || 0;
+      const rms = Number(urlParams.get("rooms") || savedHotelSearch.rooms || "") || undefined;
       const childAgeParam = urlParams.get("child_age");
 
       if (inStr) {
@@ -310,8 +312,8 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
       if (rms) setHotelRooms(rms);
       setHotelChildAges(
         flattenHotelChildAges(
-          childAgeParam ?? savedHotelSearch?.child_age ?? [],
-          Math.max(1, Number(rms) || savedHotelSearch?.rooms || 1),
+          childAgeParam ?? savedHotelSearch.child_age ?? [],
+          Math.max(1, Number(rms) || savedHotelSearch.rooms || 1),
           Math.max(0, Number(children) || 0)
         )
       );
@@ -351,7 +353,12 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
   }, [from, hotelEndDate, hotelStartDate, packageDestinationItem]);
 
   const handleSearch = async () => {
-    if (activeProduct === "package") {
+    const effectiveProduct: Product =
+      pathname?.startsWith("/hotels") && urlParams.get("type") === "package"
+        ? "package"
+        : activeProduct;
+
+    if (effectiveProduct === "package") {
       if (!isPackageSearchValid) {
         return;
       }
@@ -401,7 +408,7 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
       router.push(`/hotels?${params.toString()}`);
       return;
     }
-    if (activeProduct === "hotel") {
+    if (effectiveProduct === "hotel") {
       // Hotels: navigate to /hotels with query params so results page can call Vyspa
       const loc = hotelLocationItem?.label?.trim() || "London";
       const checkIn = hotelStartDate ? format(hotelStartDate, "yyyy-MM-dd") : "";

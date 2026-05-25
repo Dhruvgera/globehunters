@@ -287,7 +287,7 @@ export async function POST(request: NextRequest) {
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), resolvePackageTransportTimeoutMs(criteria));
-
+    // console.log( 'vyspaRequest', vyspaRequest)
     const response = await fetch(url, {
       method: 'POST',
       headers: {

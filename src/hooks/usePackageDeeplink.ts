@@ -31,6 +31,7 @@ import type {
   PackageResultsMeta,
 } from "@/types/holidayPackage";
 import type { Flight, FlightSegment } from "@/types/flight";
+import type { VyspaCityHotelLookupItem } from "@/types/vyspaHotels";
 
 export type DeeplinkMode = "package" | "hotel";
 
@@ -192,6 +193,8 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
   const setSelectedFlight = useBookingStore((s) => s.setSelectedFlight);
   const setSearchParams = useBookingStore((s) => s.setSearchParams);
   const setSearchRequestId = useBookingStore((s) => s.setSearchRequestId);
+  const setPackageDestination = useBookingStore((s) => s.setPackageDestination);
+  const setHotelLocationSelection = useBookingStore((s) => s.setHotelLocationSelection);
 
   const processDeeplink = useCallback(async () => {
     const packageKey = searchParams.get("packageKey") || searchParams.get("package");
@@ -283,6 +286,12 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
       });
       setSearchRequestId(String(viewData.results.RequestId || hd.searchCriteriaId || ""));
 
+      setHotelLocationSelection({
+        id: Number(hd.hotel_id || 0),
+        label: hotelSearchLocation,
+        loc: String(hd.VmapId || ""),
+      } as VyspaCityHotelLookupItem);
+
       // For package mode, populate packageSearch/meta so downstream pages (review/checkout) work
       if (mode === "package" && "FlightResultId" in viewData.results) {
         const pkgView = viewData as HolidayPackageViewResponse;
@@ -312,6 +321,15 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
           requestId: results.RequestId,
         };
         setPackageSearch(deeplinkPackageSearch);
+
+        setPackageDestination({
+          id: destinationCode,
+          name: destinationDisplayName,
+          country_name: "",
+          airportcode: destinationCode,
+          featured_image: "",
+          hiddenvalue: destinationCode ? `${destinationCode};;${destinationDisplayName}` : `${hd.hotel_id};;${hd.hotel_name}`,
+        });
 
         const deeplinkMeta: PackageResultsMeta = {
           requestId: results.RequestId,
@@ -360,7 +378,7 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
       console.error("[usePackageDeeplink] Failed to process deeplink:", err);
       return err instanceof Error ? err.message : "Failed to load package details";
     }
-  }, [searchParams, pathname, setDeeplinkViewData, setIsFromDeeplink, setPackageSearch, setHotelSearch, setPackageResults, setSearchParams, setSelectedFlight, setSearchRequestId, router]);
+  }, [searchParams, pathname, setDeeplinkViewData, setIsFromDeeplink, setPackageSearch, setHotelSearch, setPackageResults, setSearchParams, setSelectedFlight, setSearchRequestId, setPackageDestination, setHotelLocationSelection, router]);
 
   // Auto-process on mount if key present
   useEffect(() => {

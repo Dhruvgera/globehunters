@@ -185,6 +185,7 @@ class PackageService {
         rooms: criteria.rooms.length,
       });
 
+      // console.log('Full search criteria:', JSON.stringify(criteria, null, 2));
       const response = await fetch('/api/packages/search', {
         method: 'POST',
         headers: {
@@ -289,6 +290,7 @@ class PackageService {
         hotelResultRoomIds: params.hotelResultRoomIds,
       });
 
+      // console.log('Request body:', JSON.stringify(params, null, 2));
       const response = await fetch('/api/packages/details', {
         method: 'POST',
         headers: {

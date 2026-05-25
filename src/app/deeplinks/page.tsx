@@ -64,11 +64,11 @@ function DeeplinksPageContent() {
           nights,
           rooms,
         }),
-        timeout: 30,
+        timeout: 120,
       };
 
       const response = await packageService.searchPackages(criteria);
-      setResults(response.results.slice(0, 5));
+      setResults(response.results);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Search failed");
       setResults([]);
