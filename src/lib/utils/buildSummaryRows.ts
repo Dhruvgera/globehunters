@@ -186,7 +186,7 @@ function buildPackageRows(params: PackageRowsParams): SummaryRow[] {
 
   if (protectionPlanCost && protectionPlanCost > 0) {
     rows.push({
-      label: t("protectionPlan"),
+      label: "Refund Shield",
       value: formatPrice(protectionPlanCost, currency),
     });
   }

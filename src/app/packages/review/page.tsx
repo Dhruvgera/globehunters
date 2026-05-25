@@ -13,13 +13,12 @@ import { FlightSummaryCard } from "@/components/booking/FlightSummaryCard";
 import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
 import { WebRefCard } from "@/components/booking/WebRefCard";
 import { BaggageSection } from "@/components/payment/BaggageSection";
-import { ProtectionPlanSection } from "@/components/payment/ProtectionPlanSection";
+import { PackageRefundShieldSection } from "@/components/payment/PackageRefundShieldSection";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
 import { useBookingStore, useSelectedFlight } from "@/store/bookingStore";
 import { packageService } from "@/services/api/packageService";
 import type { HolidayPackageViewResponse } from "@/types/holidayPackage";
-import { PRICING_CONFIG, IASSURE_PRICING } from "@/config/constants";
-import { getRegion } from "@/lib/utils/domainMapping";
+import { PRICING_CONFIG, REFUND_SHIELD_PRICING } from "@/config/constants";
 import { formatFareLabel } from "@/lib/utils";
 import { resolvePackagePricing } from "@/lib/package/pricing";
 import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
@@ -29,6 +28,8 @@ import { normalizePolicyCurrencyText } from "@/lib/currency/policyText";
 import { formatLongDate, shiftIsoDateByDays } from "@/lib/utils/dateFormat";
 import { buildDetailsFromDeeplinkView } from "@/lib/package/deeplinkDetails";
 import { buildChangeHotelHref } from "@/lib/package/changeLinks";
+
+const REFUNDABLE_TERMS_URL = "https://refundablebooking.com/refundable-terms";
 
 function parseMoneyString(value?: string | null) {
   const raw = String(value || "").trim();
@@ -207,15 +208,6 @@ function PackageReviewPageInner() {
     }));
   }, [selectedFlight]);
 
-  const region = getRegion();
-  const baseFare = selectedUpgrade?.totalPrice || selectedFlight?.price || 0;
-  const protectionPlanPercentages = IASSURE_PRICING.global;
-  const protectionPlanPrices = {
-    basic: baseFare * protectionPlanPercentages.basic,
-    premium: baseFare * protectionPlanPercentages.premium,
-    all: baseFare * protectionPlanPercentages.all,
-  };
-
   const parsedPackagePrice = parseMoneyString(packageDetails?.packagePrice);
   const uniqueHotelRooms = useMemo(
     () => getUniquePackageRooms(packageDetails?.hotel?.rooms),
@@ -295,6 +287,17 @@ function PackageReviewPageInner() {
     uniqueHotelRooms,
   ]);
 
+  const protectionPlanPercentages = {
+    basic: REFUND_SHIELD_PRICING.rate,
+    premium: REFUND_SHIELD_PRICING.rate,
+    all: REFUND_SHIELD_PRICING.rate,
+  };
+  const protectionPlanPrices = {
+    basic: pricing.packageTotal * protectionPlanPercentages.basic,
+    premium: pricing.packageTotal * protectionPlanPercentages.premium,
+    all: pricing.packageTotal * protectionPlanPercentages.all,
+  };
+
   const hotelDisplay = useMemo(() => {
     const cached = selectedHotel?.hotelId ? hotelDetailsCache?.[selectedHotel.hotelId] : undefined;
     return {
@@ -343,7 +346,7 @@ function PackageReviewPageInner() {
         : [];
   const baggageCost = addOns.additionalBaggage * PRICING_CONFIG.baggagePrice * journeySegments.length;
   const protectionPlanCost = addOns.protectionPlan
-    ? protectionPlanPrices[addOns.protectionPlan]
+    ? protectionPlanPrices.basic
     : 0;
   const totalPrice = pricing.packageTotal + baggageCost + protectionPlanCost;
   const totalPerPersonPrice = calculatePackagePerPersonPrice(totalPrice, packageSearch?.rooms);
@@ -570,12 +573,27 @@ function PackageReviewPageInner() {
               currencySymbol={baggageCurrency}
             />
 
-            <ProtectionPlanSection
-              selectedPlan={addOns.protectionPlan}
-              onSelectPlan={setProtectionPlan}
-              baseFare={baseFare}
+            <PackageRefundShieldSection
+              selected={Boolean(addOns.protectionPlan)}
+              onToggle={() => setProtectionPlan(addOns.protectionPlan ? undefined : "basic")}
+              price={protectionPlanPrices.basic}
               currency={baggageCurrency}
             />
+
+            <div className="bg-[#F5F7FF] border border-[#DFE0E4] rounded-xl p-3">
+              <p className="text-xs text-[#3A478A] leading-relaxed">
+                By selecting Refund Shield, you agree to the{" "}
+                <a
+                  href={REFUNDABLE_TERMS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#3754ED] font-semibold hover:underline"
+                >
+                  Refundable Terms
+                </a>
+                .
+              </p>
+            </div>
 
             <div className="bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden">
               <div className="px-4 sm:px-6 py-4 border-b border-[#DFE0E4]">
@@ -629,7 +647,7 @@ function PackageReviewPageInner() {
                   )}
                   {addOns.protectionPlan && (
                     <div className="flex justify-between">
-                      <span className="text-[#3A478A]">Protection plan</span>
+                      <span className="text-[#3A478A]">Refund Shield</span>
                       <span className="font-medium text-[#010D50]">
                         {formatMoneyFromSymbol(pricing.currency, protectionPlanCost)}
                       </span>

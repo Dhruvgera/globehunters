@@ -20,7 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ErrorMessage } from "@/components/ui/error-message";
 import { useAffiliate } from "@/lib/AffiliateContext";
 import { packageService } from "@/services/api/packageService";
-import { buildPackageFlightFilters, mapPackageAlternateFlightToFlight } from "@/lib/package/flights";
+import { buildPackageFlightFilters, mapPackageAlternateFlightToFlight, mapPackageSearchResultFlightToFlight } from "@/lib/package/flights";
 
 // Import new modular components
 import { SearchHeader } from "@/components/search/SearchHeader";
@@ -99,6 +99,7 @@ function SearchPageContent() {
   const searchRequestId = useBookingStore((state) => state.searchRequestId);
   const setSelectedFlight = useBookingStore((state) => state.setSelectedFlight);
   const selectedHotelRoomSummary = useBookingStore((state) => state.selectedHotelRoomSummary);
+  const packageResults = useBookingStore((state) => state.packageResults);
   const packageResultsMeta = useBookingStore((state) => state.packageResultsMeta);
   const setAffiliateData = useBookingStore((state) => state.setAffiliateData);
   const setIsFromDeeplink = useBookingStore((state) => state.setIsFromDeeplink);
@@ -350,6 +351,13 @@ function SearchPageContent() {
 
   useEffect(() => {
     const effectiveFlightResultId = packageFlightResultId || packageResultsMeta?.selectedFlightResultId || "";
+    const packageRequestId = packageResultsMeta?.requestId;
+    const fallbackPackage = packageResults?.find((row) => String(row.id) === String(packageHotelId));
+    const fallbackFlight = mapPackageSearchResultFlightToFlight(
+      fallbackPackage,
+      effectiveFlightResultId,
+      searchRequestId || String(packageRequestId || "")
+    );
 
     if (!isPackageMode || !packageHotelId || !effectiveFlightResultId) {
       setPackageFlights([]);
@@ -364,7 +372,6 @@ function SearchPageContent() {
       setPackageFlightsLoading(true);
       setPackageFlightsError(null);
       try {
-        const packageRequestId = packageResultsMeta?.requestId;
         const response = await packageService.getAlternateFlights({
           flightResultId: effectiveFlightResultId,
           hotelResultId: Number(packageHotelId),
@@ -392,8 +399,8 @@ function SearchPageContent() {
         setHasAttemptedFetch(true);
       } catch (err) {
         if (cancelled) return;
-        setPackageFlights([]);
-        setPackageFlightsError(err instanceof Error ? err : new Error("Failed to fetch package flights"));
+        setPackageFlights(fallbackFlight ? [fallbackFlight] : []);
+        setPackageFlightsError(fallbackFlight ? null : err instanceof Error ? err : new Error("Failed to fetch package flights"));
         setHasAttemptedFetch(true);
       } finally {
         if (!cancelled) {
@@ -408,7 +415,7 @@ function SearchPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [isPackageMode, packageFlightResultId, packageHotelId, packageResultsMeta, searchRequestId]);
+  }, [isPackageMode, packageFlightResultId, packageHotelId, packageResults, packageResultsMeta, searchRequestId]);
 
   // State for resolved airport names (loaded from cache)
   const [resolvedAirportNames, setResolvedAirportNames] = useState<{

@@ -25,6 +25,7 @@ import { PaymentHeader } from "@/components/payment/PaymentHeader";
 import { BaggageSection } from "@/components/payment/BaggageSection";
 import { ProtectionPlanSection } from "@/components/payment/ProtectionPlanSection";
 import { RefundShieldSection } from "@/components/payment/RefundShieldSection";
+import { PackageRefundShieldSection } from "@/components/payment/PackageRefundShieldSection";
 import { CostSummaryCard } from "@/components/shared/CostSummaryCard";
 import { FlightSummaryCard } from "@/components/booking/FlightSummaryCard";
 import { WebRefCard } from "@/components/booking/WebRefCard";
@@ -74,6 +75,7 @@ function PaymentContent() {
   const searchParams = useSearchParams();
   const isPackageMode = searchParams?.get("type") === "package";
   const isHotelMode = searchParams?.get("type") === "hotel";
+  const isRefundShieldMode = isHotelMode || isPackageMode;
   const [showFlightInfo, setShowFlightInfo] = useState(false);
   const [isPaymentValid, setIsPaymentValid] = useState(false);
   const [paymentTermsAccepted, setPaymentTermsAccepted] = useState(false);
@@ -344,7 +346,7 @@ function PaymentContent() {
     return byIncludes?.code || "";
   };
 
-  const protectionPlanPercentages = isHotelMode
+  const protectionPlanPercentages = isRefundShieldMode
     ? {
       basic: REFUND_SHIELD_PRICING.rate,
       premium: REFUND_SHIELD_PRICING.rate,
@@ -366,9 +368,7 @@ function PaymentContent() {
     return getJourneySegments(flight);
   }, [flight]);
 
-  const normalizedProtectionPlan = isPackageMode
-    ? undefined
-    : isHotelMode
+  const normalizedProtectionPlan = isRefundShieldMode
       ? (protectionPlan ? "basic" : undefined)
       : protectionPlan;
   const protectionPlanCost = normalizedProtectionPlan
@@ -418,7 +418,7 @@ function PaymentContent() {
   }, [currencyForGateway, hotelRoomSummary?.hotelBedsTaxes?.taxes, isHotelMode, isPackageMode]);
 
   const protectionPlanName =
-    isHotelMode
+    isRefundShieldMode
       ? "Refund Shield"
       : normalizedProtectionPlan === "basic"
         ? "Basic"
@@ -755,6 +755,13 @@ function PaymentContent() {
                 price={protectionPlanPrices.basic}
                 currency={currency || "GBP"}
               />
+            ) : isPackageMode ? (
+              <PackageRefundShieldSection
+                selected={Boolean(normalizedProtectionPlan)}
+                onToggle={() => setProtectionPlan(normalizedProtectionPlan ? undefined : "basic")}
+                price={protectionPlanPrices.basic}
+                currency={currency || "GBP"}
+              />
             ) : !isPackageMode ? (
               <ProtectionPlanSection
                 selectedPlan={normalizedProtectionPlan}
@@ -762,14 +769,9 @@ function PaymentContent() {
                 baseFare={baseFare}
                 currency={currency || 'GBP'}
               />
-            ) : (
-              <>
-                {/* Package hotel booking: iAssure temporarily disabled. */}
-                {/* Restore the ProtectionPlanSection block above for package mode when ready. */}
-              </>
-            )}
+            ) : null}
 
-            {isHotelMode && (
+            {isRefundShieldMode && (
               <div className="bg-[#F5F7FF] border border-[#DFE0E4] rounded-xl p-3">
                 <p className="text-xs text-[#3A478A] leading-relaxed">
                   By selecting Refund Shield, you agree to the{" "}
@@ -813,17 +815,13 @@ function PaymentContent() {
 
                   // Add protection plan if selected
                   if (normalizedProtectionPlan && protectionPlanPrices[normalizedProtectionPlan]) {
-                    if (!isPackageMode) {
-                      extras.push({
-                        type: 'insurance',
-                        planType: normalizedProtectionPlan,
-                        price: protectionPlanPrices[normalizedProtectionPlan],
-                        productName: isHotelMode ? 'Refund Shield' : 'iAssure Insurance',
-                        vendorMode: isHotelMode ? 'refund-shield' : 'iassure',
-                      });
-                    }
-                    // Package hotel booking: iAssure temporarily disabled.
-                    // Restore the extras.push block above for package mode when ready.
+                    extras.push({
+                      type: 'insurance',
+                      planType: normalizedProtectionPlan,
+                      price: protectionPlanPrices[normalizedProtectionPlan],
+                      productName: isRefundShieldMode ? 'Refund Shield' : 'iAssure Insurance',
+                      vendorMode: isRefundShieldMode ? 'refund-shield' : 'iassure',
+                    });
                   }
 
                   // Add baggage if selected
@@ -857,7 +855,7 @@ function PaymentContent() {
 
                     if (!folderNumberForExtras) {
                       if (hasInsuranceExtra) {
-                        throw new Error(`Could not apply ${isHotelMode ? 'Refund Shield' : 'iAssure'} because the booking reference is missing. Please restart checkout.`);
+                        throw new Error(`Could not apply ${isRefundShieldMode ? 'Refund Shield' : 'iAssure'} because the booking reference is missing. Please restart checkout.`);
                       }
                       console.warn('⚠️ Skipping extras sync because folder number is unavailable');
                     } else {
@@ -914,7 +912,7 @@ function PaymentContent() {
                             insuranceFailed,
                           });
                           if (hasInsuranceExtra || insuranceFailed) {
-                            throw new Error(`Could not add ${isHotelMode ? 'Refund Shield' : 'iAssure'} to booking in CMS. Payment not started. Please retry.`);
+                            throw new Error(`Could not add ${isRefundShieldMode ? 'Refund Shield' : 'iAssure'} to booking in CMS. Payment not started. Please retry.`);
                           }
                           // Continue for non-insurance extras failures
                         }

@@ -1122,7 +1122,7 @@ function PaymentCompleteContent() {
     : selectedProtectionPlan
       ? Math.max(0, chargedAmount - (fareAtCheckout || 0))
       : 0;
-  const showHotelRefundableGuidance = isHotelMode && protectionPlanPaid > 0.005;
+  const showHotelRefundableGuidance = (isHotelMode || isPackageMode) && protectionPlanPaid > 0.005;
   const hotelSearchForDisplay = ctx?.hotelSearch || storeHotelSearch;
   const termsText = isHotelMode
     ? "I acknowledge that guest information matches the passport or official ID for travel, and that name changes are not allowed. I confirm that I have reviewed the hotel details and agree to the Refund & Cancellation Policy. I understand bookings are non-transferable and non-changeable unless stated otherwise. I accept full responsibility for valid travel documentation and understand Globehunters cannot be held responsible for denied boarding due to passport or visa validity."

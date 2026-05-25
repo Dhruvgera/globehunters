@@ -30,6 +30,7 @@ import { formatMoneyFromSymbol } from "@/lib/currency/formatMoney";
 import { formatLongDate } from "@/lib/utils/dateFormat";
 import { buildDetailsFromDeeplinkView } from "@/lib/package/deeplinkDetails";
 import { buildChangeHotelHref } from "@/lib/package/changeLinks";
+import { PRICING_CONFIG, REFUND_SHIELD_PRICING } from "@/config/constants";
 
 function parseMoneyString(value?: string | null) {
   const raw = String(value || "").trim();
@@ -208,6 +209,7 @@ function PackageTravellerDetailsInner() {
   const hotelDetailsCache = useBookingStore((s) => s.hotelDetailsCache);
   const selectedHotelRoomIds = useBookingStore((s) => s.selectedHotelRoomIds);
   const selectedHotelRoomSummary = useBookingStore((s) => s.selectedHotelRoomSummary);
+  const addOns = useBookingStore((s) => s.addOns);
   const passengersSaved = useBookingStore((s) => s.passengersSaved);
   const passengers = useBookingStore((s) => s.passengers);
   const vyspaFolderNumber = useBookingStore((s) => s.vyspaFolderNumber);
@@ -363,68 +365,60 @@ function PackageTravellerDetailsInner() {
   const refNumber = vyspaFolderNumber || useBookingStore.getState().searchRequestId || flight?.webRef || "—";
 
   const parsedPackagePrice = useMemo(() => parseMoneyString(packageDetails?.packagePrice), [packageDetails?.packagePrice]);
+  const resolvedPackagePricing = useMemo(() => {
+    const selectedFlightDelta =
+      typeof flight?.packagePriceDeltaTotal === "number"
+        ? flight.packagePriceDeltaTotal
+        : 0;
+    return resolvePackagePricing({
+      packagePriceAmount: parsedPackagePrice.amount,
+      packagePriceCurrency: parsedPackagePrice.currency,
+      hotelRoomTotals: packageDetails?.hotel?.rooms?.map((room) => Number(room.price || 0) || undefined),
+      flightTotal: packageDetails?.flight?.totalFare,
+      flightCurrency: packageDetails?.flight?.currency,
+      selectedRoomPackageTotal: selectedHotelRoomSummary?.total,
+      selectedRoomCurrency: selectedHotelRoomSummary?.currency,
+      selectedFlightDelta,
+      selectedFlightCurrency: selectedUpgrade?.currency || flight?.currency,
+    });
+  }, [
+    flight?.currency,
+    flight?.packagePriceDeltaTotal,
+    packageDetails?.flight?.currency,
+    packageDetails?.flight?.totalFare,
+    packageDetails?.hotel?.rooms,
+    parsedPackagePrice.amount,
+    parsedPackagePrice.currency,
+    selectedHotelRoomSummary?.currency,
+    selectedHotelRoomSummary?.total,
+    selectedUpgrade?.currency,
+  ]);
+
+  const packageAddonPricing = useMemo(() => {
+    const baseAmount = resolvedPackagePricing.amount ?? 0;
+    const refundShieldCost = addOns.protectionPlan ? baseAmount * REFUND_SHIELD_PRICING.rate : 0;
+    const baggageWays = Math.max(1, summaryLegs.length);
+    const baggageCost = (addOns.additionalBaggage || 0) * PRICING_CONFIG.baggagePrice * baggageWays;
+    const totalAmount = baseAmount + refundShieldCost + baggageCost;
+
+    return {
+      currency: resolvedPackagePricing.currency,
+      totalAmount,
+      refundShieldCost,
+      baggageCost,
+    };
+  }, [addOns.additionalBaggage, addOns.protectionPlan, resolvedPackagePricing.amount, resolvedPackagePricing.currency, summaryLegs.length]);
+
   const packageTotalLabel = useMemo(() => {
-    const selectedFlightDelta =
-      typeof flight?.packagePriceDeltaTotal === "number"
-        ? flight.packagePriceDeltaTotal
-        : 0;
-    const resolved = resolvePackagePricing({
-      packagePriceAmount: parsedPackagePrice.amount,
-      packagePriceCurrency: parsedPackagePrice.currency,
-      hotelRoomTotals: packageDetails?.hotel?.rooms?.map((room) => Number(room.price || 0) || undefined),
-      flightTotal: packageDetails?.flight?.totalFare,
-      flightCurrency: packageDetails?.flight?.currency,
-      selectedRoomPackageTotal: selectedHotelRoomSummary?.total,
-      selectedRoomCurrency: selectedHotelRoomSummary?.currency,
-      selectedFlightDelta,
-      selectedFlightCurrency: selectedUpgrade?.currency || flight?.currency,
-    });
-    return formatMoneyFromSymbol(resolved.currency, resolved.amount);
-  }, [
-    flight?.currency,
-    flight?.packagePriceDeltaTotal,
-    packageDetails?.flight?.currency,
-    packageDetails?.flight?.totalFare,
-    packageDetails?.hotel?.rooms,
-    parsedPackagePrice.amount,
-    parsedPackagePrice.currency,
-    selectedHotelRoomSummary?.currency,
-    selectedHotelRoomSummary?.total,
-    selectedUpgrade?.currency,
-  ]);
+    return formatMoneyFromSymbol(packageAddonPricing.currency, packageAddonPricing.totalAmount);
+  }, [packageAddonPricing.currency, packageAddonPricing.totalAmount]);
+
   const packagePerPersonLabel = useMemo(() => {
-    const selectedFlightDelta =
-      typeof flight?.packagePriceDeltaTotal === "number"
-        ? flight.packagePriceDeltaTotal
-        : 0;
-    const resolved = resolvePackagePricing({
-      packagePriceAmount: parsedPackagePrice.amount,
-      packagePriceCurrency: parsedPackagePrice.currency,
-      hotelRoomTotals: packageDetails?.hotel?.rooms?.map((room) => Number(room.price || 0) || undefined),
-      flightTotal: packageDetails?.flight?.totalFare,
-      flightCurrency: packageDetails?.flight?.currency,
-      selectedRoomPackageTotal: selectedHotelRoomSummary?.total,
-      selectedRoomCurrency: selectedHotelRoomSummary?.currency,
-      selectedFlightDelta,
-      selectedFlightCurrency: selectedUpgrade?.currency || flight?.currency,
-    });
     return formatMoneyFromSymbol(
-      resolved.currency,
-      calculatePackagePerPersonPrice(resolved.amount, packageSearch?.rooms)
+      packageAddonPricing.currency,
+      calculatePackagePerPersonPrice(packageAddonPricing.totalAmount, packageSearch?.rooms)
     );
-  }, [
-    flight?.currency,
-    flight?.packagePriceDeltaTotal,
-    packageDetails?.flight?.currency,
-    packageDetails?.flight?.totalFare,
-    packageDetails?.hotel?.rooms,
-    packageSearch?.rooms,
-    parsedPackagePrice.amount,
-    parsedPackagePrice.currency,
-    selectedHotelRoomSummary?.currency,
-    selectedHotelRoomSummary?.total,
-    selectedUpgrade?.currency,
-  ]);
+  }, [packageAddonPricing.currency, packageAddonPricing.totalAmount, packageSearch?.rooms]);
 
   const hotelDisplay = useMemo(() => {
     const cached = selectedHotel?.hotelId ? hotelDetailsCache?.[selectedHotel.hotelId] : undefined;
