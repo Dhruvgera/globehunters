@@ -64,6 +64,7 @@ function DeeplinksPageContent() {
           nights,
           rooms,
         }),
+        includeFeesInTotal: true,
         timeout: 120,
       };
 
@@ -144,6 +145,9 @@ function PackageDeeplinkCard({ pkg, index }: { pkg: PackageSearchResult; index: 
   const keys = pkg.deepLinkKeys || {};
   const raw = pkg.rawSearchResult as Record<string, unknown> | undefined;
   const mainKey = typeof raw?.main === "string" ? raw.main : undefined;
+  const packagesData = raw?.packages as Record<string, unknown> | undefined;
+  const resultData = packagesData?.result as Record<string, unknown> | undefined;
+  const resultId = resultData?.id;
 
   const allDeeplinks: Array<{ label: string; code: string; url: string }> = [];
 
@@ -184,7 +188,7 @@ function PackageDeeplinkCard({ pkg, index }: { pkg: PackageSearchResult; index: 
           <div className="flex items-start justify-between gap-2 mb-1">
             <div>
               <span className="text-xs font-medium text-[#3754ED] mb-1 block">
-                #{index + 1}
+                #{index + 1}{resultId != null ? ` · ID: ${String(resultId)}` : ""}
               </span>
               <h3 className="text-lg font-bold text-[#010D50] leading-tight">
                 {pkg.hotelName}

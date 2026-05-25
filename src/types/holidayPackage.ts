@@ -920,6 +920,8 @@ export interface PackageSearchCriteria {
   timeout?: number;
   /** Optional request ID for package search retrieval / rerun */
   requestId?: number;
+  /** Include fees in total price */
+  includeFeesInTotal?: boolean;
 }
 
 /** Room configuration */

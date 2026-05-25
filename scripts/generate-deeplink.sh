@@ -28,13 +28,14 @@ RESPONSE=$(curl --silent --location "${VYSPA_API_URL}/rest/v4/accommodationAvail
         "branches": "UK",
         "supplier_id": 100,
         "hotel_cache": "redis",
+        "includeFeesInTotal": true,
         "filters": {
             "sort_by": "preferred"
         }
     }
 ]')
 
-echo "$RESPONSE" | jq -r '.Results[:5][] | "\(.hotel_name)\n  Deeplink BB: \(.DeepLink)\(.keys.BB)\n Deeplink RO: \(.DeepLink)\(.keys.RO)\n  Stars: \(.hotel_rating) | Min Price: £\(.minPrice)\n"'
+echo "$RESPONSE" | jq -r '.Results[:5][] | "\(.hotel_name)\n  ID: \(.packages.result.id)\n  Deeplink BB: \(.DeepLink)\(.keys.BB)\n  Deeplink RO: \(.DeepLink)\(.keys.RO)\n  Stars: \(.hotel_rating) | Min Price: £\(.minPrice)\n"'
 
 # echo "--- Pretty print Results[0:2] ---"
 # echo "$RESPONSE" | jq '.Results[:2]'

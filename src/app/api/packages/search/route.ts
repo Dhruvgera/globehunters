@@ -97,6 +97,7 @@ function buildVyspaRequest(criteria: PackageSearchCriteria): HolidayPackageSearc
     timeout: resolvePackageSearchTimeoutSec(criteria),
     ...(criteria.requestId ? { RequestId: criteria.requestId } : {}),
     ...(criteria.directFlightsOnly ? { direct_flight_only: 1 } : {}),
+    ...(criteria.includeFeesInTotal ? { includeFeesInTotal: true } : {}),
     ...(criteria.hotelFilters ? { hotel_filters: criteria.hotelFilters } : {}),
     ...(criteria.customSort ? { customsort: criteria.customSort } : {}),
   };

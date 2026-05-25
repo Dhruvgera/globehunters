@@ -2301,7 +2301,17 @@ export default function HotelRoomsPage() {
 
                 const existing = dedupedMap.get(dedupKey);
                 if (existing) {
-                  existing.groupSources[groupKey] = option;
+                  const existingPrice = Number(existing.option.cust_tot_sell_amt ?? existing.option.net_price ?? 0);
+                  if (price > 0 && (existingPrice <= 0 || price < existingPrice)) {
+                    existing.option = option;
+                  }
+                  const currentGroupOption = existing.groupSources[groupKey];
+                  const currentGroupPrice = currentGroupOption
+                    ? Number(currentGroupOption.cust_tot_sell_amt ?? currentGroupOption.net_price ?? 0)
+                    : 0;
+                  if (!currentGroupOption || (price > 0 && (currentGroupPrice <= 0 || price < currentGroupPrice))) {
+                    existing.groupSources[groupKey] = option;
+                  }
                 } else {
                   dedupedMap.set(dedupKey, {
                     option,
@@ -2359,11 +2369,16 @@ export default function HotelRoomsPage() {
             const initialSlots: Record<string, string> = {};
             const basePrices: Record<string, number> = {};
             for (const [groupKey, options] of groupEntries) {
-              if (options.length > 0 && options[0].id) {
-                const optionId = String(options[0].id);
-                initialSlots[groupKey] = optionToCardId.get(optionId) || optionId;
-                basePrices[groupKey] = Number(options[0].cust_tot_sell_amt ?? options[0].net_price ?? 0);
-              }
+              if (options.length === 0) continue;
+              const cheapest = options.reduce((best, opt) => {
+                const bestPrice = Number(best.cust_tot_sell_amt ?? best.net_price ?? 0);
+                const optPrice = Number(opt.cust_tot_sell_amt ?? opt.net_price ?? 0);
+                return optPrice > 0 && (bestPrice <= 0 || optPrice < bestPrice) ? opt : best;
+              }, options[0]);
+              const optionId = String(cheapest.id || "");
+              if (!optionId) continue;
+              initialSlots[groupKey] = optionToCardId.get(optionId) || optionId;
+              basePrices[groupKey] = Number(cheapest.cust_tot_sell_amt ?? cheapest.net_price ?? 0);
             }
 
             setAllDeeplinkRoomPricesSame(pricesSame);
