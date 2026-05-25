@@ -2319,6 +2319,15 @@ export default function HotelRoomsPage() {
               }
             }
 
+            const priorityCardIds = new Set<string>();
+            for (const [, options] of groupEntries) {
+              for (let i = 0; i < Math.min(2, options.length); i++) {
+                const optId = String(options[i].id || "");
+                const cardId = optionToCardId.get(optId) || optId;
+                if (cardId) priorityCardIds.add(cardId);
+              }
+            }
+
             const flattenedRooms: RoomCardData[] = Array.from(dedupedMap.values()).map(({ option, groupSources }) => {
               const total = Number(option.cust_tot_sell_amt ?? option.net_price ?? 0);
               const nights = Math.max(1, Number(option.days_spent ?? 1));
@@ -2339,7 +2348,12 @@ export default function HotelRoomsPage() {
               };
             });
 
-            flattenedRooms.sort((a, b) => (a.price.total || 0) - (b.price.total || 0));
+            flattenedRooms.sort((a, b) => {
+              const aPriority = priorityCardIds.has(a.id) ? 0 : 1;
+              const bPriority = priorityCardIds.has(b.id) ? 0 : 1;
+              if (aPriority !== bPriority) return aPriority - bPriority;
+              return (a.price.total || 0) - (b.price.total || 0);
+            });
 
             const pricesSame = allPrices.length === 0 || allPrices.every((p) => Math.abs(p - allPrices[0]) < 0.01);
             const initialSlots: Record<string, string> = {};
@@ -3807,6 +3821,22 @@ export default function HotelRoomsPage() {
                 <h2 className="text-xl lg:text-2xl font-semibold text-[#010D50]">
                   Availability
                 </h2>
+
+                {isPackageMode && packagePriceLabel && (
+                  <div className="flex flex-col justify-center px-4 py-3 border border-[#DFE0E4] rounded-2xl min-w-[220px] bg-[#F8FAFF] sm:ml-auto">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#3A478A]">
+                      Total Package Price
+                    </span>
+                    <span className="text-lg font-semibold text-[#010D50]">
+                      {packagePriceLabel}
+                    </span>
+                    {packagePerPersonLabel && (
+                      <span className="text-xs font-medium text-[#3A478A]">
+                        {packagePerPersonLabel} per person
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
               {priceIncreaseNotice && (
                 <div className="bg-[#FFF5EA] border border-[#FFD699] rounded-xl px-4 py-3">
@@ -3892,30 +3922,6 @@ export default function HotelRoomsPage() {
                   Search
                 </Button>
               </div>
-
-              {isPackageMode && packagePriceLabel && (
-                <div className="flex flex-col justify-center px-4 py-3 border border-[#DFE0E4] rounded-2xl min-w-[220px] bg-[#F8FAFF] w-fit">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#3A478A]">
-                    Total Package Price
-                  </span>
-                  <span className="text-lg font-semibold text-[#010D50]">
-                    {packagePriceLabel}
-                  </span>
-                  {packagePerPersonLabel && (
-                    <span className="text-xs font-medium text-[#3A478A]">
-                      {packagePerPersonLabel} per person
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {staySummary.nights > 0 && (
-                <div className="flex flex-col gap-1 text-sm text-[#3A478A]">
-                  <span>{staySummary.nights} {staySummary.nights === 1 ? "night" : "nights"}</span>
-                  <span>Check-in {staySummary.checkInLabel}</span>
-                  <span>Check-out {staySummary.checkOutLabel}</span>
-                </div>
-              )}
             </div>
 
             <Dialog open={stayEditorOpen} onOpenChange={(open) => !stayUpdateLoading && setStayEditorOpen(open)}>
@@ -4152,6 +4158,7 @@ export default function HotelRoomsPage() {
                     setSelectedRoomCounts={setSelectedRoomCounts}
                     isHotelDatesDebugMode={isHotelDatesDebugMode}
                     requiredRoomCount={requiredRoomCount}
+                    staySummary={staySummary}
                     minRoomPrice={minRoomPrice}
                     convertedLocalTaxByRoomId={convertedLocalTaxByRoomId}
                     handlePackageRoomContinue={handlePackageRoomContinue}
