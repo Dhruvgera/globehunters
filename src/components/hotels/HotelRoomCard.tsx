@@ -7,12 +7,6 @@ import { Dispatch, SetStateAction, useMemo, useState } from 'react';
 
 interface HotelRoomCardPropsType {
     room: RoomCardData;
-    staySummary:
-    {
-        nights: number;
-        checkInLabel: string;
-        checkOutLabel: string;
-    };
 
     requiredRoomCount: number;
 
@@ -69,7 +63,6 @@ export function HotelRoomCard({ room,
     setSelectedRoomCounts,
     selectedRoomCounts,
     requiredRoomCount,
-    staySummary,
     minRoomPrice,
     isHotelDatesDebugMode,
     convertedLocalTaxByRoomId,
@@ -303,13 +296,6 @@ export function HotelRoomCard({ room,
                 {/* Pricing & CTA */}
                 <div className="mt-auto pt-6 space-y-4">
                     <div className="flex flex-col items-end gap-1">
-                        {staySummary.nights > 0 && (
-                            <span className="text-xs text-[#3A478A]">
-                                {staySummary.nights} {staySummary.nights === 1 ? "night" : "nights"}
-                                • Check-in {staySummary.checkInLabel}
-                                • Check-out {staySummary.checkOutLabel}
-                            </span>
-                        )}
                         {isPackageMode && (
                             <span className="text-xs font-medium text-[#008234]">
                                 ✓ Return Flights Included
