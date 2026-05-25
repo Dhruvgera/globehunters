@@ -177,6 +177,7 @@ export interface RoomCardData {
     total: number;
   };
   _raw: UnknownRecord;
+  roomGroupSources?: Record<string, ViewRoomOption>;
 }
 
 function selectedRoomIdsFromCounts(counts: Record<string, number>): string[] {
@@ -1153,6 +1154,10 @@ export default function HotelRoomsPage() {
   const [activeRoomCardId, setActiveRoomCardId] = useState<string | null>(null);
   const [rawGetRoomsV3Response, setRawGetRoomsV3Response] = useState<unknown>(null);
   const [rawAccommodationDetailsResponse, setRawAccommodationDetailsResponse] = useState<unknown>(null);
+  const [allDeeplinkRoomPricesSame, setAllDeeplinkRoomPricesSame] = useState(true);
+  const [deeplinkSelectedSlots, setDeeplinkSelectedSlots] = useState<Record<string, string>>({});
+  const [deeplinkRoomGroupKeys, setDeeplinkRoomGroupKeys] = useState<string[]>([]);
+  const [deeplinkBaseSlotPrices, setDeeplinkBaseSlotPrices] = useState<Record<string, number>>({});
   const trustYouFetchKeyRef = useRef<string>("");
   const lastRoomsLoadKeyRef = useRef<string>("");
   const isHotelDatesDebugMode = process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES === "true";
@@ -2270,10 +2275,51 @@ export default function HotelRoomsPage() {
           setRoomsError(null);
 
           try {
-            const roomGroups = Object.values(viewHotel.rooms || {}).filter(
-              (entry): entry is ViewRoomOption[] => Array.isArray(entry)
-            );
-            const flattenedRooms = roomGroups.flat().map((option): RoomCardData => {
+            const roomGroupsMap = viewHotel.rooms || {};
+            const groupEntries = Object.entries(roomGroupsMap)
+              .filter(([, entry]) => Array.isArray(entry)) as [string, ViewRoomOption[]][];
+
+            const sortedGroupKeys = groupEntries
+              .map(([key]) => key)
+              .sort((a, b) => {
+                const numA = parseInt(a.replace(/\D/g, ""), 10) || 0;
+                const numB = parseInt(b.replace(/\D/g, ""), 10) || 0;
+                return numA - numB;
+              });
+
+            const dedupedMap = new Map<string, { option: ViewRoomOption; groupSources: Record<string, ViewRoomOption> }>();
+            const allPrices: number[] = [];
+
+            for (const [groupKey, options] of groupEntries) {
+              for (const option of options) {
+                const rawOption = option as unknown as Record<string, unknown>;
+                const dedupKey = String(rawOption.room_code || option.room_name || option.id || "").trim().toLowerCase();
+                if (!dedupKey) continue;
+
+                const price = Number(option.cust_tot_sell_amt ?? option.net_price ?? 0);
+                if (price > 0) allPrices.push(price);
+
+                const existing = dedupedMap.get(dedupKey);
+                if (existing) {
+                  existing.groupSources[groupKey] = option;
+                } else {
+                  dedupedMap.set(dedupKey, {
+                    option,
+                    groupSources: { [groupKey]: option },
+                  });
+                }
+              }
+            }
+
+            const optionToCardId = new Map<string, string>();
+            for (const [, { option, groupSources }] of dedupedMap) {
+              const cardId = String(option.id || "");
+              for (const groupOption of Object.values(groupSources)) {
+                optionToCardId.set(String(groupOption.id || ""), cardId);
+              }
+            }
+
+            const flattenedRooms: RoomCardData[] = Array.from(dedupedMap.values()).map(({ option, groupSources }) => {
               const total = Number(option.cust_tot_sell_amt ?? option.net_price ?? 0);
               const nights = Math.max(1, Number(option.days_spent ?? 1));
               const currencyCode = String(option.sell_currency_code || option.currency_code || viewHotel.SellCur || "GBP").toUpperCase();
@@ -2289,15 +2335,32 @@ export default function HotelRoomsPage() {
                 amenities: [] as RoomAmenity[],
                 price: { currency, nightly: nights > 0 ? total / nights : total, total },
                 _raw: option as unknown as Record<string, unknown>,
+                roomGroupSources: groupSources,
               };
             });
 
             flattenedRooms.sort((a, b) => (a.price.total || 0) - (b.price.total || 0));
 
+            const pricesSame = allPrices.length === 0 || allPrices.every((p) => Math.abs(p - allPrices[0]) < 0.01);
+            const initialSlots: Record<string, string> = {};
+            const basePrices: Record<string, number> = {};
+            for (const [groupKey, options] of groupEntries) {
+              if (options.length > 0 && options[0].id) {
+                const optionId = String(options[0].id);
+                initialSlots[groupKey] = optionToCardId.get(optionId) || optionId;
+                basePrices[groupKey] = Number(options[0].cust_tot_sell_amt ?? options[0].net_price ?? 0);
+              }
+            }
+
+            setAllDeeplinkRoomPricesSame(pricesSame);
+            setDeeplinkRoomGroupKeys(sortedGroupKeys);
+            setDeeplinkSelectedSlots(initialSlots);
+            setDeeplinkBaseSlotPrices(basePrices);
+
             const headerImage = ensureGiataImageUrl(fixStubaImageUrl(viewHotel.image_name) || "", 'original') as string;
             const headerAddress = [viewHotel.address1, viewHotel.address2].filter(Boolean).join(", ");
-            const roomImageCandidates = roomGroups
-              .flat()
+            const roomImageCandidates = groupEntries
+              .flatMap(([, options]) => options)
               .flatMap((option) => extractDeeplinkImagesFromRow(option as unknown as UnknownRecord));
             const hotelImageCandidates = extractDeeplinkImagesFromRow(viewHotel as unknown as UnknownRecord);
             const deeplinkGallery = mergeUniqueImages(
@@ -2332,11 +2395,19 @@ export default function HotelRoomsPage() {
             setSelectedHotel({ hotelId, hotelName: viewHotel.hotel_name });
 
             const deeplinkRoomCount = Math.max(1, Number(packageSearch?.rooms?.length || hotelSearch?.rooms || 1));
-            const deeplinkSelectedCounts: Record<string, number> = {};
-            if (flattenedRooms.length > 0) {
-              deeplinkSelectedCounts[flattenedRooms[0].id] = deeplinkRoomCount;
+            if (pricesSame) {
+              const deeplinkSelectedCounts: Record<string, number> = {};
+              if (flattenedRooms.length > 0) {
+                deeplinkSelectedCounts[flattenedRooms[0].id] = deeplinkRoomCount;
+              }
+              setSelectedRoomCounts(deeplinkSelectedCounts);
+            } else {
+              const slotCounts: Record<string, number> = {};
+              for (const roomId of Object.values(initialSlots)) {
+                slotCounts[roomId] = (slotCounts[roomId] || 0) + 1;
+              }
+              setSelectedRoomCounts(slotCounts);
             }
-            setSelectedRoomCounts(deeplinkSelectedCounts);
             if (flattenedRooms.length > 0) setActiveRoomCardId(flattenedRooms[0].id);
             if (deeplinkGallery.length > 0) setGalleryImages(deeplinkGallery);
             if (hasCoordinates) setCoordinates({ lat: latitude, lng: longitude });
@@ -3203,6 +3274,27 @@ export default function HotelRoomsPage() {
     };
     refs[section]?.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
+
+  function handleDeeplinkSlotToggle(roomId: string, groupKey: string) {
+    setDeeplinkSelectedSlots((prev) => {
+      if (prev[groupKey] === roomId) {
+        const next = { ...prev };
+        delete next[groupKey];
+        return next;
+      }
+      return { ...prev, [groupKey]: roomId };
+    });
+  }
+
+  useEffect(() => {
+    if (!isPackageMode || !isFromDeeplink || allDeeplinkRoomPricesSame) return;
+    const slotCounts: Record<string, number> = {};
+    for (const roomId of Object.values(deeplinkSelectedSlots)) {
+      slotCounts[roomId] = (slotCounts[roomId] || 0) + 1;
+    }
+    setSelectedRoomCounts(slotCounts);
+  }, [deeplinkSelectedSlots, isPackageMode, isFromDeeplink, allDeeplinkRoomPricesSame]);
+
   function handlePackageRoomContinue(roomIds?: string[]) {
     const ids = roomIds ?? selectedRoomIds;
     const firstRoom = remoteRooms.find(room => room.id == ids[0]);
@@ -4057,6 +4149,11 @@ export default function HotelRoomsPage() {
                     convertedLocalTaxByRoomId={convertedLocalTaxByRoomId}
                     handlePackageRoomContinue={handlePackageRoomContinue}
                     handleHotelRoomContinue={handleHotelRoomContinue}
+                    allDeeplinkRoomPricesSame={allDeeplinkRoomPricesSame}
+                    deeplinkRoomGroupKeys={deeplinkRoomGroupKeys}
+                    deeplinkSelectedSlots={deeplinkSelectedSlots}
+                    deeplinkBaseSlotPrices={deeplinkBaseSlotPrices}
+                    onDeeplinkSlotToggle={handleDeeplinkSlotToggle}
                   />)
                 })}
 

@@ -6,6 +6,7 @@ VYSPA_API_VERSION=2
 VYSPA_API_URL='https://a1.stagev4.vyspa.net'
 # VYSPA_API_URL='https://api.globehunters.com'
 
+START_TIME=$(date +%s%N)
 RESPONSE=$(curl --silent --location "${VYSPA_API_URL}/rest/v4/holiday_package_search/" \
 --header 'Content-Type: application/json' \
 --header "Api-Version: ${VYSPA_API_VERSION}" \
@@ -26,6 +27,9 @@ RESPONSE=$(curl --silent --location "${VYSPA_API_URL}/rest/v4/holiday_package_se
       "timeout": 120
     }
   ]')
+END_TIME=$(date +%s%N)
+ELAPSED=$(( (END_TIME - START_TIME) / 1000000 ))
 
-echo "$RESPONSE"
+echo "Response time: ${ELAPSED}ms"
+# echo "$RESPONSE"
 echo "$RESPONSE" | jq -r '.Packages.results[:5][] | "\(.hotel_name)\n  Deeplink Main: \(.DeepLink)\(.main)\n  Deeplink RO: \(.DeepLink)\(.keys.RO) \n  Deeplink BB: \(.DeepLink)\(.keys.BB) \n  Stars: \(.hotel_rating) | Min Price: £\(.minPrice)\n"'

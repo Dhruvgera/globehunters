@@ -317,7 +317,7 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
           checkIn,
           nights: Math.max(1, Number(firstRoom?.days_spent || 1)),
           rooms: roomConfigurations,
-          timeout: 30,
+          timeout: 60,
           requestId: results.RequestId,
         };
         setPackageSearch(deeplinkPackageSearch);
