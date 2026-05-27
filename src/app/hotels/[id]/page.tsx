@@ -58,7 +58,7 @@ import { decodeHotelSearchContext } from "@/lib/hotels/searchContextCodec";
 import { convertHotelLocalTaxTotal, formatMoneyFromCode, normalizeCurrencyCode } from "@/lib/currency/localTaxDisplay";
 import { parsePackageHotelContent, type PackageHotelNearbyPlace } from "@/lib/package/hotelContent";
 import { usePackageDeeplink } from "@/hooks/usePackageDeeplink";
-import { shortWebRefFromToken, toPositiveNumericId } from "../hotelUtils";
+import { buildPackageRoomConfigurations, shortWebRefFromToken, toPositiveNumericId } from "../hotelUtils";
 import { HotelRoomCard } from "@/components/hotels/HotelRoomCard";
 import { airportCache } from "@/lib/cache/airportCache";
 
@@ -180,6 +180,14 @@ export interface RoomCardData {
   roomGroupSources?: Record<string, ViewRoomOption>;
 }
 
+function selectedRoomCountsFromIds(ids: string[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const id of ids) {
+    counts[id] = (counts[id] || 0) + 1;
+  }
+  return counts;
+}
+
 function selectedRoomIdsFromCounts(counts: Record<string, number>): string[] {
   const out: string[] = [];
   for (const [roomId, countRaw] of Object.entries(counts)) {
@@ -252,6 +260,141 @@ function asRecord(value: unknown): UnknownRecord {
 
 function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
+}
+
+interface PackageRoomGroupResult {
+  flattenedRooms: RoomCardData[];
+  sortedGroupKeys: string[];
+  allPrices: number[];
+  pricesSame: boolean;
+  initialSlots: Record<string, string>;
+  basePrices: Record<string, number>;
+  groupEntries: [string, any[]][];
+}
+
+function deduplicateAndFlattenPackageRooms(
+  roomGroupsMap: Record<string, unknown>,
+  fallbackCurrency: string,
+  fallbackNights: number,
+  shouldExtractAmenities: boolean,
+): PackageRoomGroupResult {
+  const groupEntries = Object.entries(roomGroupsMap)
+    .filter(([, entry]) => Array.isArray(entry)) as [string, any[]][];
+
+  const sortedGroupKeys = groupEntries
+    .map(([key]) => key)
+    .sort((a, b) => {
+      const numA = parseInt(a.replace(/\D/g, ""), 10) || 0;
+      const numB = parseInt(b.replace(/\D/g, ""), 10) || 0;
+      return numA - numB;
+    });
+
+  const dedupedMap = new Map<string, { option: any; groupSources: Record<string, any> }>();
+  const allPrices: number[] = [];
+
+  for (const [groupKey, options] of groupEntries) {
+    for (const option of options) {
+      const rawOption = option as Record<string, unknown>;
+      const dedupKey = String(rawOption.room_code || option.room_name || option.id || "").trim().toLowerCase();
+      if (!dedupKey) continue;
+
+      const price = Number(option.cust_tot_sell_amt ?? option.net_price ?? 0);
+      if (price > 0) allPrices.push(price);
+
+      const existing = dedupedMap.get(dedupKey);
+      if (existing) {
+        const existingPrice = Number(existing.option.cust_tot_sell_amt ?? existing.option.net_price ?? 0);
+        if (price > 0 && (existingPrice <= 0 || price < existingPrice)) {
+          existing.option = option;
+        }
+        const currentGroupOption = existing.groupSources[groupKey];
+        const currentGroupPrice = currentGroupOption
+          ? Number(currentGroupOption.cust_tot_sell_amt ?? currentGroupOption.net_price ?? 0)
+          : 0;
+        if (!currentGroupOption || (price > 0 && (currentGroupPrice <= 0 || price < currentGroupPrice))) {
+          existing.groupSources[groupKey] = option;
+        }
+      } else {
+        dedupedMap.set(dedupKey, {
+          option,
+          groupSources: { [groupKey]: option },
+        });
+      }
+    }
+  }
+
+  const optionToCardId = new Map<string, string>();
+  for (const [, { option, groupSources }] of dedupedMap) {
+    const cardId = String(option.id || "");
+    for (const groupOption of Object.values(groupSources) as any[]) {
+      optionToCardId.set(String(groupOption.id || ""), cardId);
+    }
+  }
+
+  const priorityCardIds = new Set<string>();
+  for (const [, options] of groupEntries) {
+    for (let i = 0; i < Math.min(2, options.length); i++) {
+      const optId = String(options[i].id || "");
+      const cardId = optionToCardId.get(optId) || optId;
+      if (cardId) priorityCardIds.add(cardId);
+    }
+  }
+
+  const flattenedRooms: RoomCardData[] = Array.from(dedupedMap.values()).map(({ option, groupSources }) => {
+    const total = Number(option.cust_tot_sell_amt ?? option.net_price ?? 0);
+    const nights = Math.max(1, Number(option.days_spent ?? fallbackNights));
+    const currencyCode = String(option.sell_currency_code || option.currency_code || fallbackCurrency).toUpperCase();
+    const currency = currencyCode === "GBP" ? "£" : currencyCode;
+    const roomAmenities = shouldExtractAmenities
+      ? transformAmenities(extractAmenitiesFromGetRoomsResponse(option))
+      : ([] as RoomAmenity[]);
+    return {
+      id: String(option.id || ""),
+      sourceRoomOptionId: String(option.id || ""),
+      name: String(option.room_name || "Room"),
+      bedType: String(option.meal_name || option.MealPlan || "Meal plan"),
+      reviews: { score: 0, label: "No reviews", count: 0 },
+      isRefundable: Number(option.nonRef ?? 1) === 0,
+      paymentType: "Pay now",
+      amenities: roomAmenities,
+      price: { currency, nightly: nights > 0 ? total / nights : total, total },
+      _raw: option as unknown as Record<string, unknown>,
+      roomGroupSources: groupSources,
+    };
+  });
+
+  flattenedRooms.sort((a, b) => {
+    const aPriority = priorityCardIds.has(a.id) ? 0 : 1;
+    const bPriority = priorityCardIds.has(b.id) ? 0 : 1;
+    if (aPriority !== bPriority) return aPriority - bPriority;
+    return (a.price.total || 0) - (b.price.total || 0);
+  });
+
+  const pricesSame = allPrices.length === 0 || allPrices.every((p) => Math.abs(p - allPrices[0]) < 0.01);
+  const initialSlots: Record<string, string> = {};
+  const basePrices: Record<string, number> = {};
+  for (const [groupKey, options] of groupEntries) {
+    if (options.length === 0) continue;
+    const cheapest = options.reduce((best: any, opt: any) => {
+      const bestPrice = Number(best.cust_tot_sell_amt ?? best.net_price ?? 0);
+      const optPrice = Number(opt.cust_tot_sell_amt ?? opt.net_price ?? 0);
+      return optPrice > 0 && (bestPrice <= 0 || optPrice < bestPrice) ? opt : best;
+    }, options[0]);
+    const optionId = String(cheapest.id || "");
+    if (!optionId) continue;
+    initialSlots[groupKey] = optionToCardId.get(optionId) || optionId;
+    basePrices[groupKey] = Number(cheapest.cust_tot_sell_amt ?? cheapest.net_price ?? 0);
+  }
+
+  return {
+    flattenedRooms,
+    sortedGroupKeys,
+    allPrices,
+    pricesSame,
+    initialSlots,
+    basePrices,
+    groupEntries,
+  };
 }
 
 function toErrorMessage(error: unknown, fallback: string): string {
@@ -1297,6 +1440,57 @@ export default function HotelRoomsPage() {
     return { hotelImages: Array.from(new Set(hotelImages)), roomImages: dedupedRoomImages };
   }
 
+  function fetchAndApplyHotelDetails(
+    resolvedHotelId: number,
+    resolvedVMapId: number | undefined,
+    baseGallery: string[],
+    hasExistingCoords: boolean,
+    isCancelled: () => boolean,
+  ): Promise<{ detailsData: ReturnType<typeof extractVyspaGetHotelDetailsData>; nextGallery: string[] } | null> {
+    const detailsPayload: unknown[] = Number.isFinite(resolvedHotelId) && resolvedHotelId > 0
+      ? [String(resolvedHotelId)]
+      : Number.isFinite(resolvedVMapId) && (resolvedVMapId ?? 0) > 0
+        ? [0, { vMapId: resolvedVMapId }]
+        : [];
+
+    if (detailsPayload.length === 0) return Promise.resolve(null);
+
+    return hotelService
+      .hotelSearchDetails(detailsPayload)
+      .then((detailsResponse: any) => {
+        if (isCancelled()) return null;
+
+        const detailsData = extractVyspaGetHotelDetailsData(detailsResponse);
+        const vyspaMedia = parseVyspaHotelDetailsMedia(detailsResponse);
+        const nextGallery = mergeUniqueImages(
+          detailsData.galleryImages || [],
+          vyspaMedia.hotelImages || [],
+          flattenRoomImages(vyspaMedia.roomImages),
+          baseGallery
+        ).map((u) => ensureGiataImageUrl(u, 'original') as string).slice(0, 24);
+
+        if (nextGallery.length > 0) setGalleryImages(nextGallery);
+        if (detailsData.coordinates && !hasExistingCoords) setCoordinates(detailsData.coordinates);
+        if (detailsData.description) {
+          setDetailsText((previous) =>
+            previous.trim() ? mergeTextContent(previous, detailsData.description) : detailsData.description
+          );
+        }
+        if (detailsData.policies) {
+          setCancellationText((previous) => mergeTextContent(previous, detailsData.policies));
+        }
+        if (detailsData.importantInfo) {
+          setImportantInfoText((previous) => mergeTextContent(previous, detailsData.importantInfo));
+        }
+        if (detailsData.amenities.length > 0) {
+          setRemoteAmenities((previous) => Array.from(new Set([...(previous || []), ...detailsData.amenities])));
+        }
+
+        return { detailsData, nextGallery };
+      })
+      .catch(() => null);
+  }
+
   async function updateAvailabilityFromDateChanges(next: {
     checkIn: string;
     checkOut: string;
@@ -2072,7 +2266,9 @@ export default function HotelRoomsPage() {
   const resolvedPackagePrice = useMemo(() => {
     if (!isPackageMode) return null;
 
-    if (deeplinkViewData?.success) {
+    const useSlotPricing = !allDeeplinkRoomPricesSame && deeplinkRoomGroupKeys.length > 0;
+
+    if (deeplinkViewData?.success || useSlotPricing) {
       const selectedIds = selectedRoomIdsFromCounts(selectedRoomCounts);
       const total = selectedIds.reduce((sum, rid) => {
         const room = remoteRooms.find((r) => String(r.id) === String(rid));
@@ -2107,6 +2303,8 @@ export default function HotelRoomsPage() {
   }, [
     activePackageRoom?.price?.currency,
     activePackageRoom?.price?.total,
+    allDeeplinkRoomPricesSame,
+    deeplinkRoomGroupKeys,
     deeplinkViewData?.success,
     isPackageMode,
     matchedPackageResult?.currency,
@@ -2116,6 +2314,20 @@ export default function HotelRoomsPage() {
     selectedPackage?.totalPrice,
     selectedRoomCounts,
   ]);
+  const packageRoomsForPricing = useMemo(
+    () =>
+      packageSearch?.rooms?.length
+        ? packageSearch.rooms
+        : hotelSearch
+          ? buildPackageRoomConfigurations(
+              hotelSearch.adults || 2,
+              hotelSearch.children || 0,
+              hotelSearch.rooms || 1,
+              hotelSearch.child_age,
+            )
+          : undefined,
+    [packageSearch?.rooms, hotelSearch],
+  );
   const packagePriceLabel = resolvedPackagePrice
     ? formatDisplayPrice(resolvedPackagePrice.currency, resolvedPackagePrice.amount)
     : "";
@@ -2123,7 +2335,7 @@ export default function HotelRoomsPage() {
     resolvedPackagePrice?.amount != null
       ? formatDisplayPrice(
         resolvedPackagePrice.currency,
-        calculatePackagePerPersonPrice(resolvedPackagePrice.amount, packageSearch?.rooms)
+        calculatePackagePerPersonPrice(resolvedPackagePrice.amount, packageRoomsForPricing)
       )
       : "";
   const reviews: Array<{
@@ -2275,111 +2487,19 @@ export default function HotelRoomsPage() {
           setRoomsError(null);
 
           try {
-            const roomGroupsMap = viewHotel.rooms || {};
-            const groupEntries = Object.entries(roomGroupsMap)
-              .filter(([, entry]) => Array.isArray(entry)) as [string, ViewRoomOption[]][];
-
-            const sortedGroupKeys = groupEntries
-              .map(([key]) => key)
-              .sort((a, b) => {
-                const numA = parseInt(a.replace(/\D/g, ""), 10) || 0;
-                const numB = parseInt(b.replace(/\D/g, ""), 10) || 0;
-                return numA - numB;
-              });
-
-            const dedupedMap = new Map<string, { option: ViewRoomOption; groupSources: Record<string, ViewRoomOption> }>();
-            const allPrices: number[] = [];
-
-            for (const [groupKey, options] of groupEntries) {
-              for (const option of options) {
-                const rawOption = option as unknown as Record<string, unknown>;
-                const dedupKey = String(rawOption.room_code || option.room_name || option.id || "").trim().toLowerCase();
-                if (!dedupKey) continue;
-
-                const price = Number(option.cust_tot_sell_amt ?? option.net_price ?? 0);
-                if (price > 0) allPrices.push(price);
-
-                const existing = dedupedMap.get(dedupKey);
-                if (existing) {
-                  const existingPrice = Number(existing.option.cust_tot_sell_amt ?? existing.option.net_price ?? 0);
-                  if (price > 0 && (existingPrice <= 0 || price < existingPrice)) {
-                    existing.option = option;
-                  }
-                  const currentGroupOption = existing.groupSources[groupKey];
-                  const currentGroupPrice = currentGroupOption
-                    ? Number(currentGroupOption.cust_tot_sell_amt ?? currentGroupOption.net_price ?? 0)
-                    : 0;
-                  if (!currentGroupOption || (price > 0 && (currentGroupPrice <= 0 || price < currentGroupPrice))) {
-                    existing.groupSources[groupKey] = option;
-                  }
-                } else {
-                  dedupedMap.set(dedupKey, {
-                    option,
-                    groupSources: { [groupKey]: option },
-                  });
-                }
-              }
-            }
-
-            const optionToCardId = new Map<string, string>();
-            for (const [, { option, groupSources }] of dedupedMap) {
-              const cardId = String(option.id || "");
-              for (const groupOption of Object.values(groupSources)) {
-                optionToCardId.set(String(groupOption.id || ""), cardId);
-              }
-            }
-
-            const priorityCardIds = new Set<string>();
-            for (const [, options] of groupEntries) {
-              for (let i = 0; i < Math.min(2, options.length); i++) {
-                const optId = String(options[i].id || "");
-                const cardId = optionToCardId.get(optId) || optId;
-                if (cardId) priorityCardIds.add(cardId);
-              }
-            }
-
-            const flattenedRooms: RoomCardData[] = Array.from(dedupedMap.values()).map(({ option, groupSources }) => {
-              const total = Number(option.cust_tot_sell_amt ?? option.net_price ?? 0);
-              const nights = Math.max(1, Number(option.days_spent ?? 1));
-              const currencyCode = String(option.sell_currency_code || option.currency_code || viewHotel.SellCur || "GBP").toUpperCase();
-              const currency = currencyCode === "GBP" ? "£" : currencyCode;
-              return {
-                id: String(option.id || ""),
-                sourceRoomOptionId: String(option.id || ""),
-                name: String(option.room_name || "Room"),
-                bedType: String(option.meal_name || option.MealPlan || "Meal plan"),
-                reviews: { score: 0, label: "No reviews", count: 0 },
-                isRefundable: Number(option.nonRef ?? 1) === 0,
-                paymentType: "Pay now",
-                amenities: [] as RoomAmenity[],
-                price: { currency, nightly: nights > 0 ? total / nights : total, total },
-                _raw: option as unknown as Record<string, unknown>,
-                roomGroupSources: groupSources,
-              };
-            });
-
-            flattenedRooms.sort((a, b) => {
-              const aPriority = priorityCardIds.has(a.id) ? 0 : 1;
-              const bPriority = priorityCardIds.has(b.id) ? 0 : 1;
-              if (aPriority !== bPriority) return aPriority - bPriority;
-              return (a.price.total || 0) - (b.price.total || 0);
-            });
-
-            const pricesSame = allPrices.length === 0 || allPrices.every((p) => Math.abs(p - allPrices[0]) < 0.01);
-            const initialSlots: Record<string, string> = {};
-            const basePrices: Record<string, number> = {};
-            for (const [groupKey, options] of groupEntries) {
-              if (options.length === 0) continue;
-              const cheapest = options.reduce((best, opt) => {
-                const bestPrice = Number(best.cust_tot_sell_amt ?? best.net_price ?? 0);
-                const optPrice = Number(opt.cust_tot_sell_amt ?? opt.net_price ?? 0);
-                return optPrice > 0 && (bestPrice <= 0 || optPrice < bestPrice) ? opt : best;
-              }, options[0]);
-              const optionId = String(cheapest.id || "");
-              if (!optionId) continue;
-              initialSlots[groupKey] = optionToCardId.get(optionId) || optionId;
-              basePrices[groupKey] = Number(cheapest.cust_tot_sell_amt ?? cheapest.net_price ?? 0);
-            }
+            const {
+              flattenedRooms,
+              groupEntries,
+              sortedGroupKeys,
+              pricesSame,
+              initialSlots,
+              basePrices,
+            } = deduplicateAndFlattenPackageRooms(
+              (viewHotel.rooms || {}) as Record<string, unknown>,
+              viewHotel.SellCur || "GBP",
+              1,
+              false,
+            );
 
             setAllDeeplinkRoomPricesSame(pricesSame);
             setDeeplinkRoomGroupKeys(sortedGroupKeys);
@@ -2431,11 +2551,7 @@ export default function HotelRoomsPage() {
               }
               setSelectedRoomCounts(deeplinkSelectedCounts);
             } else {
-              const slotCounts: Record<string, number> = {};
-              for (const roomId of Object.values(initialSlots)) {
-                slotCounts[roomId] = (slotCounts[roomId] || 0) + 1;
-              }
-              setSelectedRoomCounts(slotCounts);
+              setSelectedRoomCounts(selectedRoomCountsFromIds(Object.values(initialSlots)));
             }
             if (flattenedRooms.length > 0) setActiveRoomCardId(flattenedRooms[0].id);
             if (deeplinkGallery.length > 0) setGalleryImages(deeplinkGallery);
@@ -2451,69 +2567,27 @@ export default function HotelRoomsPage() {
               fetchedAt: Date.now(),
             });
 
-            // Enrich deeplink payload with the same details API used in normal flow.
-            // package_view/accommodationView usually has one primary image, while
-            // get_hotel_details can provide VendorImages and richer media metadata.
             const resolvedHotelId = Number((viewHotel as unknown as UnknownRecord).hotel_id);
             const resolvedVMapId = Number((viewHotel as unknown as UnknownRecord).VmapId);
-            const detailsPayload: any[] = Number.isFinite(resolvedHotelId) && resolvedHotelId > 0
-              ? [String(resolvedHotelId)]
-              : Number.isFinite(resolvedVMapId) && resolvedVMapId > 0
-                ? [0, { vMapId: resolvedVMapId }]
-                : [];
 
-            if (detailsPayload.length > 0) {
-              hotelService
-                .hotelSearchDetails(detailsPayload)
-                .then((detailsResponse: any) => {
-                  if (cancelled) return;
+            fetchAndApplyHotelDetails(resolvedHotelId, resolvedVMapId, deeplinkGallery, hasCoordinates, () => cancelled)
+              .then((result) => {
+                if (!result || cancelled) return;
 
-                  const detailsData = extractVyspaGetHotelDetailsData(detailsResponse);
-                  const vyspaMedia = parseVyspaHotelDetailsMedia(detailsResponse);
-                  const nextGallery = mergeUniqueImages(
-                    detailsData.galleryImages || [],
-                    vyspaMedia.hotelImages || [],
-                    flattenRoomImages(vyspaMedia.roomImages),
-                    deeplinkGallery
-                  ).map((u) => ensureGiataImageUrl(u, 'original') as string).slice(0, 24);
-
-                  if (nextGallery.length > 0) {
-                    setGalleryImages(nextGallery);
-                  }
-                  if (detailsData.coordinates && !hasCoordinates) {
-                    setCoordinates(detailsData.coordinates);
-                  }
-                  if (detailsData.description) {
-                    setDetailsText((previous) =>
-                      previous.trim() ? mergeTextContent(previous, detailsData.description) : detailsData.description
-                    );
-                  }
-                  if (detailsData.policies) {
-                    setCancellationText((previous) => mergeTextContent(previous, detailsData.policies));
-                  }
-                  if (detailsData.importantInfo) {
-                    setImportantInfoText((previous) => mergeTextContent(previous, detailsData.importantInfo));
-                  }
-                  if (detailsData.amenities.length > 0) {
-                    setRemoteAmenities((previous) => Array.from(new Set([...(previous || []), ...detailsData.amenities])));
-                  }
-
-                  setHotelDetailsCache(hotelId, {
-                    hotelId,
-                    hotelName: viewHotel.hotel_name,
-                    hotelRating: Number(viewHotel.hotel_rating || 0) || undefined,
-                    mainImage: headerImage || nextGallery[0] || undefined,
-                    address: headerAddress || undefined,
-                    galleryImages: nextGallery.length > 0 ? nextGallery : deeplinkGallery,
-                    rooms: flattenedRooms,
-                    detailsText: detailsData.description || "",
-                    cancellationText: detailsData.policies || "",
-                    amenities: detailsData.amenities,
-                    fetchedAt: Date.now(),
-                  });
-                })
-                .catch(() => { });
-            }
+                setHotelDetailsCache(hotelId, {
+                  hotelId,
+                  hotelName: viewHotel.hotel_name,
+                  hotelRating: Number(viewHotel.hotel_rating || 0) || undefined,
+                  mainImage: headerImage || result.nextGallery[0] || undefined,
+                  address: headerAddress || undefined,
+                  galleryImages: result.nextGallery.length > 0 ? result.nextGallery : deeplinkGallery,
+                  rooms: flattenedRooms,
+                  detailsText: result.detailsData.description || "",
+                  cancellationText: result.detailsData.policies || "",
+                  amenities: result.detailsData.amenities,
+                  fetchedAt: Date.now(),
+                });
+              });
 
             if (!cancelled) {
               setRoomsLoading(false);
@@ -2603,42 +2677,36 @@ export default function HotelRoomsPage() {
             throw new Error("No live package rooms were returned for the selected hotel.");
           }
 
-          const roomGroups = Object.values(roomHotel.rooms || {}).filter(
-            (entry) => Array.isArray(entry)
+          const roomGroupsMap = roomHotel.rooms || {};
+          const {
+            flattenedRooms,
+            groupEntries,
+            sortedGroupKeys,
+            pricesSame,
+            initialSlots,
+            basePrices,
+          } = deduplicateAndFlattenPackageRooms(
+            (roomGroupsMap) as Record<string, unknown>,
+            roomHotel.SellCur || "GBP",
+            packageSearch?.nights ?? 1,
+            true,
           );
-          const flattenedRooms = roomGroups.flat().map((option) => {
-            const total = Number(option.cust_tot_sell_amt ?? option.net_price ?? 0);
-            const nights = Math.max(1, Number(option.days_spent ?? packageSearch?.nights ?? 1));
-            const currencyCode = String(option.sell_currency_code || option.currency_code || roomHotel.SellCur || "GBP").toUpperCase();
-            const currency = currencyCode === "GBP" ? "£" : currencyCode;
-            const roomAmenities = extractAmenitiesFromGetRoomsResponse(option);
-            return {
-              id: String(option.id || ""),
-              sourceRoomOptionId: String(option.id || ""),
-              name: String(option.room_name || "Room"),
-              bedType: String(option.meal_name || option.MealPlan || "Meal plan"),
-              reviews: { score: 0, label: "No reviews", count: 0 },
-              isRefundable: Number(option.nonRef ?? 1) === 0,
-              paymentType: "Pay now",
-              amenities: transformAmenities(roomAmenities),
-              price: {
-                currency,
-                nightly: nights > 0 ? total / nights : total,
-                total,
-              },
-              _raw: option,
-            } satisfies RoomCardData;
-          });
 
-          flattenedRooms.sort((a, b) => (a.price.total || 0) - (b.price.total || 0));
+          setAllDeeplinkRoomPricesSame(pricesSame);
+          setDeeplinkRoomGroupKeys(sortedGroupKeys);
+          setDeeplinkSelectedSlots(initialSlots);
+          setDeeplinkBaseSlotPrices(basePrices);
 
           const roomCount = Math.max(1, Number(packageSearch?.rooms?.length || hotelSearch?.rooms || 1));
           const defaultSelectedCounts = (() => {
-            const next: Record<string, number> = {};
-            if (flattenedRooms.length === 0 || roomCount > 1) return next;
-            const firstRoomId = String(flattenedRooms[0]?.id || "");
-            if (firstRoomId) next[firstRoomId] = 1;
-            return next;
+            if (pricesSame) {
+              const next: Record<string, number> = {};
+              if (flattenedRooms.length > 0) {
+                next[flattenedRooms[0].id] = roomCount;
+              }
+              return next;
+            }
+            return selectedRoomCountsFromIds(Object.values(initialSlots));
           })();
 
           const headerImage = ensureGiataImageUrl(fixStubaImageUrl(roomHotel.image_name) || packageHotel?.imageUrl || "", 'original') as string;
@@ -2703,74 +2771,35 @@ export default function HotelRoomsPage() {
           }
 
           const packageHotelDetailsId = Number(roomHotel.hotel_id ?? packageHotel?.hotelId);
-          if (packageHotelDetailsId > 0) {
-            hotelService
-              .hotelSearchDetails([String(packageHotelDetailsId)])
-              .then((detailsResponse: any) => {
-                if (cancelled) return;
 
-                const detailsData = extractVyspaGetHotelDetailsData(detailsResponse);
-                const vyspaMedia = parseVyspaHotelDetailsMedia(detailsResponse);
-                const nextGallery = mergeUniqueImages(
-                  detailsData.galleryImages || [],
-                  vyspaMedia.hotelImages || [],
-                  flattenRoomImages(vyspaMedia.roomImages),
-                  headerImage ? [headerImage] : []
-                ).map((u) => ensureGiataImageUrl(u, 'original') as string).slice(0, 24);
+          fetchAndApplyHotelDetails(packageHotelDetailsId, undefined, headerImage ? [headerImage] : [], !!coordinates, () => cancelled)
+            .then((result) => {
+              if (!result || cancelled) return;
 
-                if (detailsData.description) {
-                  setDetailsText((previous) =>
-                    previous.trim() ? mergeTextContent(previous, detailsData.description) : detailsData.description || previous
-                  );
-                }
+              if (result.nextGallery.length > 0) {
+                setRemoteHotelHeader((prev) =>
+                  prev ? { ...prev, image: prev.image || result.nextGallery[0] } : prev
+                );
+              }
 
-                if (detailsData.amenities.length > 0) {
-                  setRemoteAmenities((previous) =>
-                    Array.from(new Set([...(previous || []), ...detailsData.amenities]))
-                  );
-                }
-
-                if (detailsData.policies) {
-                  setCancellationText((previous) => mergeTextContent(previous, detailsData.policies));
-                }
-
-                if (detailsData.importantInfo) {
-                  setImportantInfoText((previous) => mergeTextContent(previous, detailsData.importantInfo, "\n"));
-                }
-
-                if (detailsData.coordinates && !coordinates) {
-                  setCoordinates(detailsData.coordinates);
-                }
-
-                if (nextGallery.length > 0) {
-                  setGalleryImages(nextGallery);
-                  setRemoteHotelHeader((prev) =>
-                    prev ? { ...prev, image: prev.image || nextGallery[0] } : prev
-                  );
-                }
-
-                setHotelDetailsCache(hotelId, {
-                  hotelId,
-                  hotelName: roomHotel.hotel_name || packageHotel?.hotelName,
-                  hotelRating: Number(roomHotel.hotel_rating || packageHotel?.starRating || 0) || undefined,
-                  mainImage: nextGallery[0] || headerImage || undefined,
-                  address: headerAddress || undefined,
-                  galleryImages: nextGallery.length > 0 ? nextGallery : (headerImage ? [headerImage] : []),
-                  rooms: flattenedRooms,
-                  detailsText: detailsData.description || packageDescription,
-                  cancellationText: detailsData.policies || parsedPackageContent.policyText || "",
-                  amenities:
-                    detailsData.amenities.length > 0
-                      ? Array.from(new Set([...extractedPackageAmenities, ...detailsData.amenities]))
-                      : extractedPackageAmenities,
-                  nearbyPlaces: parsedPackageContent.nearby,
-                  fetchedAt: Date.now(),
-                });
-              })
-              .catch(() => {
-                // Keep the base package room response if detail enrichment fails.
+              setHotelDetailsCache(hotelId, {
+                hotelId,
+                hotelName: roomHotel.hotel_name || packageHotel?.hotelName,
+                hotelRating: Number(roomHotel.hotel_rating || packageHotel?.starRating || 0) || undefined,
+                mainImage: result.nextGallery[0] || headerImage || undefined,
+                address: headerAddress || undefined,
+                galleryImages: result.nextGallery.length > 0 ? result.nextGallery : (headerImage ? [headerImage] : []),
+                rooms: flattenedRooms,
+                detailsText: result.detailsData.description || packageDescription,
+                cancellationText: result.detailsData.policies || parsedPackageContent.policyText || "",
+                amenities:
+                  result.detailsData.amenities.length > 0
+                    ? Array.from(new Set([...extractedPackageAmenities, ...result.detailsData.amenities]))
+                    : extractedPackageAmenities,
+                nearbyPlaces: parsedPackageContent.nearby,
+                fetchedAt: Date.now(),
               });
-          }
+            });
 
           return;
         }
@@ -3316,13 +3345,9 @@ export default function HotelRoomsPage() {
   }
 
   useEffect(() => {
-    if (!isPackageMode || !isFromDeeplink || allDeeplinkRoomPricesSame) return;
-    const slotCounts: Record<string, number> = {};
-    for (const roomId of Object.values(deeplinkSelectedSlots)) {
-      slotCounts[roomId] = (slotCounts[roomId] || 0) + 1;
-    }
-    setSelectedRoomCounts(slotCounts);
-  }, [deeplinkSelectedSlots, isPackageMode, isFromDeeplink, allDeeplinkRoomPricesSame]);
+    if (!isPackageMode || allDeeplinkRoomPricesSame) return;
+    setSelectedRoomCounts(selectedRoomCountsFromIds(Object.values(deeplinkSelectedSlots)));
+  }, [deeplinkSelectedSlots, isPackageMode, allDeeplinkRoomPricesSame]);
 
   function handlePackageRoomContinue(roomIds?: string[]) {
     const ids = roomIds ?? selectedRoomIds;
@@ -3378,7 +3403,7 @@ export default function HotelRoomsPage() {
 
   function handleHotelRoomContinue(roomIds?: string[]) {
     if (!roomIds || !roomIds.length) return;
-    setSelectedRoomCounts({ roomId: 1 });
+    setSelectedRoomCounts(selectedRoomCountsFromIds(roomIds));
     setSelectedHotelRoomIds(roomIds);
     setSelectedHotelRoomSummary(
       buildSelectedRoomSummary(hotelId, roomIds, remoteRooms)
@@ -3601,7 +3626,7 @@ export default function HotelRoomsPage() {
                       const ppLabel = displayTotal != null
                         ? formatDisplayPrice(
                             displayCurrency,
-                            calculatePackagePerPersonPrice(displayTotal, packageSearch?.rooms),
+                            calculatePackagePerPersonPrice(displayTotal, packageRoomsForPricing),
                           )
                         : null;
                       return (

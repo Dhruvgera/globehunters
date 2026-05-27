@@ -1198,7 +1198,7 @@ function SearchPageContent() {
           <div className="flex flex-col lg:flex-row gap-5">
             {/* Filters Sidebar - Desktop Only */}
             <div className="hidden lg:flex w-full lg:w-72 flex-col gap-5 order-3 lg:order-1">
-              <SearchSummary />
+              
               <FilterSidebar
                 filterState={filterState}
                 filters={effectiveFilters}
