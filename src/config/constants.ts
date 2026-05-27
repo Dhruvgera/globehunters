@@ -83,6 +83,8 @@ export const REFUND_SHIELD_PRICING = {
   rate: 0.1,
 } as const;
 
+export const REFUNDABLE_TERMS_URL = "https://refundablebooking.com/refundable-terms";
+
 
 
 // Filter constraints

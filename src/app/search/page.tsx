@@ -349,15 +349,23 @@ function SearchPageContent() {
     }
   }, [requestId, setSearchRequestId]);
 
-  useEffect(() => {
-    const effectiveFlightResultId = packageFlightResultId || packageResultsMeta?.selectedFlightResultId || "";
-    const packageRequestId = packageResultsMeta?.requestId;
-    const fallbackPackage = packageResults?.find((row) => String(row.id) === String(packageHotelId));
-    const fallbackFlight = mapPackageSearchResultFlightToFlight(
+  const fallbackPackage = useMemo(
+    () => packageResults?.find((row) => String(row.id) === String(packageHotelId)),
+    [packageResults, packageHotelId]
+  );
+
+  const effectiveFlightResultId = packageFlightResultId || packageResultsMeta?.selectedFlightResultId || "";
+
+  const fallbackFlight = useMemo(
+    () => mapPackageSearchResultFlightToFlight(
       fallbackPackage,
       effectiveFlightResultId,
-      searchRequestId || String(packageRequestId || "")
-    );
+      searchRequestId || String(packageResultsMeta?.requestId || "")
+    ),
+    [fallbackPackage, effectiveFlightResultId, searchRequestId, packageResultsMeta?.requestId]
+  );
+
+  useEffect(() => {
 
     if (!isPackageMode || !packageHotelId || !effectiveFlightResultId) {
       setPackageFlights([]);
@@ -415,7 +423,7 @@ function SearchPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [isPackageMode, packageFlightResultId, packageHotelId, packageResults, packageResultsMeta, searchRequestId]);
+  }, [isPackageMode, packageFlightResultId, packageHotelId, fallbackFlight, packageResultsMeta, searchRequestId]);
 
   // State for resolved airport names (loaded from cache)
   const [resolvedAirportNames, setResolvedAirportNames] = useState<{

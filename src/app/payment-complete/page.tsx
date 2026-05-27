@@ -44,8 +44,8 @@ import Image from "next/image";
 import { useMemo } from "react";
 import { FOLDER_STATUS_CODES } from "@/types/portal";
 import { calculateNights } from "@/lib/hotels/nights";
+import { REFUNDABLE_TERMS_URL } from "@/config/constants";
 
-const REFUNDABLE_TERMS_URL = "https://refundablebooking.com/refundable-terms";
 const REFUNDABLE_CLAIMS_URL = "https://form.refundablebooking.com";
 
 // Confetti particle component

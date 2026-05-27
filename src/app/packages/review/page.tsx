@@ -14,11 +14,13 @@ import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
 import { WebRefCard } from "@/components/booking/WebRefCard";
 import { BaggageSection } from "@/components/payment/BaggageSection";
 import { PackageRefundShieldSection } from "@/components/payment/PackageRefundShieldSection";
+import { RefundShieldTerms } from "@/components/payment/RefundShieldTerms";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
 import { useBookingStore, useSelectedFlight } from "@/store/bookingStore";
 import { packageService } from "@/services/api/packageService";
 import type { HolidayPackageViewResponse } from "@/types/holidayPackage";
-import { PRICING_CONFIG, REFUND_SHIELD_PRICING } from "@/config/constants";
+import { PRICING_CONFIG } from "@/config/constants";
+import { calculateProtectionPlanPrices } from "@/lib/package/protectionPlanPricing";
 import { formatFareLabel } from "@/lib/utils";
 import { resolvePackagePricing } from "@/lib/package/pricing";
 import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
@@ -28,8 +30,7 @@ import { normalizePolicyCurrencyText } from "@/lib/currency/policyText";
 import { formatLongDate, shiftIsoDateByDays } from "@/lib/utils/dateFormat";
 import { buildDetailsFromDeeplinkView } from "@/lib/package/deeplinkDetails";
 import { buildChangeHotelHref } from "@/lib/package/changeLinks";
-
-const REFUNDABLE_TERMS_URL = "https://refundablebooking.com/refundable-terms";
+import { getJourneySegments } from "@/lib/flight/segments";
 
 function parseMoneyString(value?: string | null) {
   const raw = String(value || "").trim();
@@ -186,13 +187,12 @@ function PackageReviewPageInner() {
     return parts.join(", ");
   }, [storeSearchParams?.passengers]);
 
+  const journeySegments = useMemo(() => {
+    return getJourneySegments(selectedFlight, true);
+  }, [selectedFlight]);
+
   const summaryLegs = useMemo(() => {
     if (!selectedFlight) return [];
-    const journeySegments =
-      selectedFlight.segments && selectedFlight.segments.length > 0
-        ? selectedFlight.segments
-        : [selectedFlight.outbound, ...(selectedFlight.inbound ? [selectedFlight.inbound] : [])];
-
     return journeySegments.map((segment) => ({
       from: segment.departureAirport.city || segment.departureAirport.name || segment.departureAirport.code,
       to: segment.arrivalAirport.city || segment.arrivalAirport.name || segment.arrivalAirport.code,
@@ -206,7 +206,7 @@ function PackageReviewPageInner() {
       airline: segment.carrierName || selectedFlight.airline.name,
       airlineCode: segment.carrierCode || selectedFlight.airline.code,
     }));
-  }, [selectedFlight]);
+  }, [selectedFlight, journeySegments]);
 
   const parsedPackagePrice = parseMoneyString(packageDetails?.packagePrice);
   const uniqueHotelRooms = useMemo(
@@ -287,16 +287,7 @@ function PackageReviewPageInner() {
     uniqueHotelRooms,
   ]);
 
-  const protectionPlanPercentages = {
-    basic: REFUND_SHIELD_PRICING.rate,
-    premium: REFUND_SHIELD_PRICING.rate,
-    all: REFUND_SHIELD_PRICING.rate,
-  };
-  const protectionPlanPrices = {
-    basic: pricing.packageTotal * protectionPlanPercentages.basic,
-    premium: pricing.packageTotal * protectionPlanPercentages.premium,
-    all: pricing.packageTotal * protectionPlanPercentages.all,
-  };
+  const protectionPlanPrices = calculateProtectionPlanPrices(pricing.packageTotal, "package");
 
   const hotelDisplay = useMemo(() => {
     const cached = selectedHotel?.hotelId ? hotelDetailsCache?.[selectedHotel.hotelId] : undefined;
@@ -338,13 +329,7 @@ function PackageReviewPageInner() {
   const selectedCancellation = packageDetails?.cancellationPolicies?.[0];
   const cabinLabel = formatFareLabel(selectedUpgrade?.cabinClassDisplay || selectedFareType);
   const baggageCurrency = selectedFlight?.currency || "£";
-  const journeySegments =
-    selectedFlight?.segments && selectedFlight.segments.length > 0
-      ? selectedFlight.segments
-      : selectedFlight
-        ? [selectedFlight.outbound, ...(selectedFlight.inbound ? [selectedFlight.inbound] : [])]
-        : [];
-  const baggageCost = addOns.additionalBaggage * PRICING_CONFIG.baggagePrice * journeySegments.length;
+  const baggageCost = addOns.additionalBaggage * PRICING_CONFIG.baggagePrice * Math.max(1, journeySegments.length);
   const protectionPlanCost = addOns.protectionPlan
     ? protectionPlanPrices.basic
     : 0;
@@ -580,20 +565,7 @@ function PackageReviewPageInner() {
               currency={baggageCurrency}
             />
 
-            <div className="bg-[#F5F7FF] border border-[#DFE0E4] rounded-xl p-3">
-              <p className="text-xs text-[#3A478A] leading-relaxed">
-                By selecting Refund Shield, you agree to the{" "}
-                <a
-                  href={REFUNDABLE_TERMS_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[#3754ED] font-semibold hover:underline"
-                >
-                  Refundable Terms
-                </a>
-                .
-              </p>
-            </div>
+            <RefundShieldTerms />
 
             <div className="bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden">
               <div className="px-4 sm:px-6 py-4 border-b border-[#DFE0E4]">

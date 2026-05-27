@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
 import { useBookingStore, useSelectedFlight, useStoreHydration } from "@/store/bookingStore";
-import { PRICING_CONFIG, IASSURE_PRICING, REFUND_SHIELD_PRICING } from "@/config/constants";
+import { PRICING_CONFIG } from "@/config/constants";
+import { calculateProtectionPlanPrices } from "@/lib/package/protectionPlanPricing";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
 import { useTranslations } from "next-intl";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -26,6 +27,7 @@ import { BaggageSection } from "@/components/payment/BaggageSection";
 import { ProtectionPlanSection } from "@/components/payment/ProtectionPlanSection";
 import { RefundShieldSection } from "@/components/payment/RefundShieldSection";
 import { PackageRefundShieldSection } from "@/components/payment/PackageRefundShieldSection";
+import { RefundShieldTerms } from "@/components/payment/RefundShieldTerms";
 import { CostSummaryCard } from "@/components/shared/CostSummaryCard";
 import { FlightSummaryCard } from "@/components/booking/FlightSummaryCard";
 import { WebRefCard } from "@/components/booking/WebRefCard";
@@ -43,8 +45,6 @@ import { FOLDER_STATUS_CODES } from "@/types/portal";
 import { countryCodes } from "@/lib/utils/countryCodes";
 import { convertHotelLocalTaxRows, convertHotelLocalTaxTotal } from "@/lib/currency/localTaxDisplay";
 import { calculateNights } from "@/lib/hotels/nights";
-
-const REFUNDABLE_TERMS_URL = "https://refundablebooking.com/refundable-terms";
 
 function parseMoneyString(value: string | undefined): { amount?: number; currency?: string } {
   if (!value) return { amount: undefined, currency: undefined };
@@ -346,27 +346,17 @@ function PaymentContent() {
     return byIncludes?.code || "";
   };
 
-  const protectionPlanPercentages = isRefundShieldMode
-    ? {
-      basic: REFUND_SHIELD_PRICING.rate,
-      premium: REFUND_SHIELD_PRICING.rate,
-      all: REFUND_SHIELD_PRICING.rate,
-    }
-    : IASSURE_PRICING.global;
-
-  const protectionPlanPrices = {
-    basic: baseFare * protectionPlanPercentages.basic,
-    premium: baseFare * protectionPlanPercentages.premium,
-    all: baseFare * protectionPlanPercentages.all,
-  };
+  const protectionPlanPrices = calculateProtectionPlanPrices(
+    baseFare,
+    isPackageMode ? "package" : isHotelMode ? "hotel" : "flight"
+  );
   const baggagePrice = PRICING_CONFIG.baggagePrice;
   const discountPercent = 0; // No automatic discount unless applied explicitly
 
   // Flight data for summary cards - Use real flight data (supports multi-city)
   const journeySegments = useMemo(() => {
-    if (!flight) return [];
-    return getJourneySegments(flight);
-  }, [flight]);
+    return getJourneySegments(flight, isPackageMode);
+  }, [flight, isPackageMode]);
 
   const normalizedProtectionPlan = isRefundShieldMode
       ? (protectionPlan ? "basic" : undefined)
@@ -377,7 +367,7 @@ function PaymentContent() {
 
   // Calculate number of ways for baggage pricing
   // For round-trip: 2 ways, for one-way: 1 way, for multi-city: number of segments
-  const numberOfWays = journeySegments.length;
+  const numberOfWays = Math.max(1, journeySegments.length);
   // Baggage is charged per person per way (e.g., £90 per way means £180 for round-trip)
   const baggageCost = additionalBaggage * baggagePrice * numberOfWays;
   const subtotal = baseFare + protectionPlanCost + baggageCost;
@@ -771,22 +761,7 @@ function PaymentContent() {
               />
             ) : null}
 
-            {isRefundShieldMode && (
-              <div className="bg-[#F5F7FF] border border-[#DFE0E4] rounded-xl p-3">
-                <p className="text-xs text-[#3A478A] leading-relaxed">
-                  By selecting Refund Shield, you agree to the{" "}
-                  <a
-                    href={REFUNDABLE_TERMS_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#3754ED] font-semibold hover:underline"
-                  >
-                    Refundable Terms
-                  </a>
-                  .
-                </p>
-              </div>
-            )}
+            {isRefundShieldMode && <RefundShieldTerms />}
 
             {/* Billing Address Form */}
             <PaymentForm onSubmit={async (billingAddress) => {

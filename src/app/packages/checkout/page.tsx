@@ -30,6 +30,7 @@ import { formatMoneyFromSymbol } from "@/lib/currency/formatMoney";
 import { formatLongDate } from "@/lib/utils/dateFormat";
 import { buildDetailsFromDeeplinkView } from "@/lib/package/deeplinkDetails";
 import { buildChangeHotelHref } from "@/lib/package/changeLinks";
+import { getJourneySegments } from "@/lib/flight/segments";
 import { PRICING_CONFIG, REFUND_SHIELD_PRICING } from "@/config/constants";
 
 function parseMoneyString(value?: string | null) {
@@ -331,12 +332,12 @@ function PackageTravellerDetailsInner() {
     return code;
   };
 
+  const journeySegments = useMemo(() => {
+    return getJourneySegments(flight, true);
+  }, [flight]);
+
   const summaryLegs = useMemo(() => {
     if (!flight) return [];
-    const journeySegments =
-      flight.segments && flight.segments.length > 0
-        ? flight.segments
-        : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
     return journeySegments.map((seg) => ({
       from: getAirportName(seg.departureAirport.code, seg.departureAirport.name, seg.departureAirport.city),
       to: getAirportName(seg.arrivalAirport.code, seg.arrivalAirport.name, seg.arrivalAirport.city),
@@ -350,7 +351,7 @@ function PackageTravellerDetailsInner() {
       airline: seg.carrierName || flight.airline.name,
       airlineCode: seg.carrierCode || flight.airline.code,
     }));
-  }, [airportNameCache, flight]);
+  }, [airportNameCache, flight, journeySegments]);
 
   const passengerLabel = useMemo(() => {
     const counts = storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 };
@@ -397,7 +398,7 @@ function PackageTravellerDetailsInner() {
   const packageAddonPricing = useMemo(() => {
     const baseAmount = resolvedPackagePricing.amount ?? 0;
     const refundShieldCost = addOns.protectionPlan ? baseAmount * REFUND_SHIELD_PRICING.rate : 0;
-    const baggageWays = Math.max(1, summaryLegs.length);
+    const baggageWays = Math.max(1, journeySegments.length);
     const baggageCost = (addOns.additionalBaggage || 0) * PRICING_CONFIG.baggagePrice * baggageWays;
     const totalAmount = baseAmount + refundShieldCost + baggageCost;
 
@@ -407,7 +408,7 @@ function PackageTravellerDetailsInner() {
       refundShieldCost,
       baggageCost,
     };
-  }, [addOns.additionalBaggage, addOns.protectionPlan, resolvedPackagePricing.amount, resolvedPackagePricing.currency, summaryLegs.length]);
+  }, [addOns.additionalBaggage, addOns.protectionPlan, resolvedPackagePricing.amount, resolvedPackagePricing.currency, journeySegments.length]);
 
   const packageTotalLabel = useMemo(() => {
     return formatMoneyFromSymbol(packageAddonPricing.currency, packageAddonPricing.totalAmount);
