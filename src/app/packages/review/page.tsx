@@ -13,13 +13,14 @@ import { FlightSummaryCard } from "@/components/booking/FlightSummaryCard";
 import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
 import { WebRefCard } from "@/components/booking/WebRefCard";
 import { BaggageSection } from "@/components/payment/BaggageSection";
-import { ProtectionPlanSection } from "@/components/payment/ProtectionPlanSection";
+import { PackageRefundShieldSection } from "@/components/payment/PackageRefundShieldSection";
+import { RefundShieldTerms } from "@/components/payment/RefundShieldTerms";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
 import { useBookingStore, useSelectedFlight } from "@/store/bookingStore";
 import { packageService } from "@/services/api/packageService";
 import type { HolidayPackageViewResponse } from "@/types/holidayPackage";
-import { PRICING_CONFIG, IASSURE_PRICING } from "@/config/constants";
-import { getRegion } from "@/lib/utils/domainMapping";
+import { PRICING_CONFIG } from "@/config/constants";
+import { calculateProtectionPlanPrices } from "@/lib/package/protectionPlanPricing";
 import { formatFareLabel } from "@/lib/utils";
 import { resolvePackagePricing } from "@/lib/package/pricing";
 import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
@@ -29,6 +30,7 @@ import { normalizePolicyCurrencyText } from "@/lib/currency/policyText";
 import { formatLongDate, shiftIsoDateByDays } from "@/lib/utils/dateFormat";
 import { buildDetailsFromDeeplinkView } from "@/lib/package/deeplinkDetails";
 import { buildChangeHotelHref } from "@/lib/package/changeLinks";
+import { getJourneySegments } from "@/lib/flight/segments";
 
 function parseMoneyString(value?: string | null) {
   const raw = String(value || "").trim();
@@ -185,13 +187,12 @@ function PackageReviewPageInner() {
     return parts.join(", ");
   }, [storeSearchParams?.passengers]);
 
+  const journeySegments = useMemo(() => {
+    return getJourneySegments(selectedFlight, true);
+  }, [selectedFlight]);
+
   const summaryLegs = useMemo(() => {
     if (!selectedFlight) return [];
-    const journeySegments =
-      selectedFlight.segments && selectedFlight.segments.length > 0
-        ? selectedFlight.segments
-        : [selectedFlight.outbound, ...(selectedFlight.inbound ? [selectedFlight.inbound] : [])];
-
     return journeySegments.map((segment) => ({
       from: segment.departureAirport.city || segment.departureAirport.name || segment.departureAirport.code,
       to: segment.arrivalAirport.city || segment.arrivalAirport.name || segment.arrivalAirport.code,
@@ -205,16 +206,7 @@ function PackageReviewPageInner() {
       airline: segment.carrierName || selectedFlight.airline.name,
       airlineCode: segment.carrierCode || selectedFlight.airline.code,
     }));
-  }, [selectedFlight]);
-
-  const region = getRegion();
-  const baseFare = selectedUpgrade?.totalPrice || selectedFlight?.price || 0;
-  const protectionPlanPercentages = IASSURE_PRICING.global;
-  const protectionPlanPrices = {
-    basic: baseFare * protectionPlanPercentages.basic,
-    premium: baseFare * protectionPlanPercentages.premium,
-    all: baseFare * protectionPlanPercentages.all,
-  };
+  }, [selectedFlight, journeySegments]);
 
   const parsedPackagePrice = parseMoneyString(packageDetails?.packagePrice);
   const uniqueHotelRooms = useMemo(
@@ -295,6 +287,8 @@ function PackageReviewPageInner() {
     uniqueHotelRooms,
   ]);
 
+  const protectionPlanPrices = calculateProtectionPlanPrices(pricing.packageTotal, "package");
+
   const hotelDisplay = useMemo(() => {
     const cached = selectedHotel?.hotelId ? hotelDetailsCache?.[selectedHotel.hotelId] : undefined;
     return {
@@ -335,15 +329,9 @@ function PackageReviewPageInner() {
   const selectedCancellation = packageDetails?.cancellationPolicies?.[0];
   const cabinLabel = formatFareLabel(selectedUpgrade?.cabinClassDisplay || selectedFareType);
   const baggageCurrency = selectedFlight?.currency || "£";
-  const journeySegments =
-    selectedFlight?.segments && selectedFlight.segments.length > 0
-      ? selectedFlight.segments
-      : selectedFlight
-        ? [selectedFlight.outbound, ...(selectedFlight.inbound ? [selectedFlight.inbound] : [])]
-        : [];
-  const baggageCost = addOns.additionalBaggage * PRICING_CONFIG.baggagePrice * journeySegments.length;
+  const baggageCost = addOns.additionalBaggage * PRICING_CONFIG.baggagePrice * Math.max(1, journeySegments.length);
   const protectionPlanCost = addOns.protectionPlan
-    ? protectionPlanPrices[addOns.protectionPlan]
+    ? protectionPlanPrices.basic
     : 0;
   const totalPrice = pricing.packageTotal + baggageCost + protectionPlanCost;
   const totalPerPersonPrice = calculatePackagePerPersonPrice(totalPrice, packageSearch?.rooms);
@@ -570,12 +558,14 @@ function PackageReviewPageInner() {
               currencySymbol={baggageCurrency}
             />
 
-            <ProtectionPlanSection
-              selectedPlan={addOns.protectionPlan}
-              onSelectPlan={setProtectionPlan}
-              baseFare={baseFare}
+            <PackageRefundShieldSection
+              selected={Boolean(addOns.protectionPlan)}
+              onToggle={() => setProtectionPlan(addOns.protectionPlan ? undefined : "basic")}
+              price={protectionPlanPrices.basic}
               currency={baggageCurrency}
             />
+
+            <RefundShieldTerms />
 
             <div className="bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden">
               <div className="px-4 sm:px-6 py-4 border-b border-[#DFE0E4]">
@@ -629,7 +619,7 @@ function PackageReviewPageInner() {
                   )}
                   {addOns.protectionPlan && (
                     <div className="flex justify-between">
-                      <span className="text-[#3A478A]">Protection plan</span>
+                      <span className="text-[#3A478A]">Refund Shield</span>
                       <span className="font-medium text-[#010D50]">
                         {formatMoneyFromSymbol(pricing.currency, protectionPlanCost)}
                       </span>

@@ -167,6 +167,7 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
   const savedHotelSearch = useBookingStore((s) => s.hotelSearch);
   const savedPackageDestination = useBookingStore((s) => s.packageDestination);
   const setPackageDestination = useBookingStore((s) => s.setPackageDestination);
+  const savedPackageSearch = useBookingStore((s) => s.packageSearch);
 
   useEffect(() => {
     setHotelChildAges((prev) => {
@@ -278,9 +279,10 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
     }
 
     if (pathname?.startsWith("/hotels")) {
-      const fromCode = urlParams.get("fromCode") || "";
-      const fromLabel = urlParams.get("from") || "";
-      if (urlParams.get("type") === "package" && fromCode && !fromRef.current) {
+      const urlFromCode = urlParams.get("fromCode");
+      const fromCode = urlFromCode || savedPackageSearch?.departureCode || "";
+      const fromLabel = urlParams.get("from") || savedPackageSearch?.departureName || "";
+      if (urlParams.get("type") === "package" && fromCode && (!fromRef.current || urlFromCode)) {
         setFrom({
           code: fromCode,
           name: fromLabel || fromCode,
@@ -318,7 +320,7 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
         )
       );
     }
-  }, [pathname, savedHotelLocation, savedHotelSearch, savedPackageDestination, setFrom, urlParams]);
+  }, [pathname, savedHotelLocation, savedHotelSearch, savedPackageDestination, savedPackageSearch, setFrom, urlParams]);
 
   const setProduct = (next: Product) => {
     setActiveProduct(next);

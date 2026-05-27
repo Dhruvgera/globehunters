@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
 import { useBookingStore, useSelectedFlight, useStoreHydration } from "@/store/bookingStore";
-import { PRICING_CONFIG, IASSURE_PRICING, REFUND_SHIELD_PRICING } from "@/config/constants";
+import { PRICING_CONFIG } from "@/config/constants";
+import { calculateProtectionPlanPrices } from "@/lib/package/protectionPlanPricing";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
 import { useTranslations } from "next-intl";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -25,6 +26,8 @@ import { PaymentHeader } from "@/components/payment/PaymentHeader";
 import { BaggageSection } from "@/components/payment/BaggageSection";
 import { ProtectionPlanSection } from "@/components/payment/ProtectionPlanSection";
 import { RefundShieldSection } from "@/components/payment/RefundShieldSection";
+import { PackageRefundShieldSection } from "@/components/payment/PackageRefundShieldSection";
+import { RefundShieldTerms } from "@/components/payment/RefundShieldTerms";
 import { CostSummaryCard } from "@/components/shared/CostSummaryCard";
 import { FlightSummaryCard } from "@/components/booking/FlightSummaryCard";
 import { WebRefCard } from "@/components/booking/WebRefCard";
@@ -42,8 +45,6 @@ import { FOLDER_STATUS_CODES } from "@/types/portal";
 import { countryCodes } from "@/lib/utils/countryCodes";
 import { convertHotelLocalTaxRows, convertHotelLocalTaxTotal } from "@/lib/currency/localTaxDisplay";
 import { calculateNights } from "@/lib/hotels/nights";
-
-const REFUNDABLE_TERMS_URL = "https://refundablebooking.com/refundable-terms";
 
 function parseMoneyString(value: string | undefined): { amount?: number; currency?: string } {
   if (!value) return { amount: undefined, currency: undefined };
@@ -74,6 +75,7 @@ function PaymentContent() {
   const searchParams = useSearchParams();
   const isPackageMode = searchParams?.get("type") === "package";
   const isHotelMode = searchParams?.get("type") === "hotel";
+  const isRefundShieldMode = isHotelMode || isPackageMode;
   const [showFlightInfo, setShowFlightInfo] = useState(false);
   const [isPaymentValid, setIsPaymentValid] = useState(false);
   const [paymentTermsAccepted, setPaymentTermsAccepted] = useState(false);
@@ -344,31 +346,19 @@ function PaymentContent() {
     return byIncludes?.code || "";
   };
 
-  const protectionPlanPercentages = isHotelMode
-    ? {
-      basic: REFUND_SHIELD_PRICING.rate,
-      premium: REFUND_SHIELD_PRICING.rate,
-      all: REFUND_SHIELD_PRICING.rate,
-    }
-    : IASSURE_PRICING.global;
-
-  const protectionPlanPrices = {
-    basic: baseFare * protectionPlanPercentages.basic,
-    premium: baseFare * protectionPlanPercentages.premium,
-    all: baseFare * protectionPlanPercentages.all,
-  };
+  const protectionPlanPrices = calculateProtectionPlanPrices(
+    baseFare,
+    isPackageMode ? "package" : isHotelMode ? "hotel" : "flight"
+  );
   const baggagePrice = PRICING_CONFIG.baggagePrice;
   const discountPercent = 0; // No automatic discount unless applied explicitly
 
   // Flight data for summary cards - Use real flight data (supports multi-city)
   const journeySegments = useMemo(() => {
-    if (!flight) return [];
-    return getJourneySegments(flight);
-  }, [flight]);
+    return getJourneySegments(flight, isPackageMode);
+  }, [flight, isPackageMode]);
 
-  const normalizedProtectionPlan = isPackageMode
-    ? undefined
-    : isHotelMode
+  const normalizedProtectionPlan = isRefundShieldMode
       ? (protectionPlan ? "basic" : undefined)
       : protectionPlan;
   const protectionPlanCost = normalizedProtectionPlan
@@ -377,7 +367,7 @@ function PaymentContent() {
 
   // Calculate number of ways for baggage pricing
   // For round-trip: 2 ways, for one-way: 1 way, for multi-city: number of segments
-  const numberOfWays = journeySegments.length;
+  const numberOfWays = Math.max(1, journeySegments.length);
   // Baggage is charged per person per way (e.g., £90 per way means £180 for round-trip)
   const baggageCost = additionalBaggage * baggagePrice * numberOfWays;
   const subtotal = baseFare + protectionPlanCost + baggageCost;
@@ -418,7 +408,7 @@ function PaymentContent() {
   }, [currencyForGateway, hotelRoomSummary?.hotelBedsTaxes?.taxes, isHotelMode, isPackageMode]);
 
   const protectionPlanName =
-    isHotelMode
+    isRefundShieldMode
       ? "Refund Shield"
       : normalizedProtectionPlan === "basic"
         ? "Basic"
@@ -755,36 +745,23 @@ function PaymentContent() {
                 price={protectionPlanPrices.basic}
                 currency={currency || "GBP"}
               />
-            ) : !isPackageMode ? (
+            ) : isPackageMode ? (
+              <PackageRefundShieldSection
+                selected={Boolean(normalizedProtectionPlan)}
+                onToggle={() => setProtectionPlan(normalizedProtectionPlan ? undefined : "basic")}
+                price={protectionPlanPrices.basic}
+                currency={currency || "GBP"}
+              />
+            ) : (
               <ProtectionPlanSection
                 selectedPlan={normalizedProtectionPlan}
                 onSelectPlan={setProtectionPlan}
                 baseFare={baseFare}
                 currency={currency || 'GBP'}
               />
-            ) : (
-              <>
-                {/* Package hotel booking: iAssure temporarily disabled. */}
-                {/* Restore the ProtectionPlanSection block above for package mode when ready. */}
-              </>
             )}
 
-            {isHotelMode && (
-              <div className="bg-[#F5F7FF] border border-[#DFE0E4] rounded-xl p-3">
-                <p className="text-xs text-[#3A478A] leading-relaxed">
-                  By selecting Refund Shield, you agree to the{" "}
-                  <a
-                    href={REFUNDABLE_TERMS_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#3754ED] font-semibold hover:underline"
-                  >
-                    Refundable Terms
-                  </a>
-                  .
-                </p>
-              </div>
-            )}
+            {isRefundShieldMode && <RefundShieldTerms />}
 
             {/* Billing Address Form */}
             <PaymentForm onSubmit={async (billingAddress) => {
@@ -813,17 +790,13 @@ function PaymentContent() {
 
                   // Add protection plan if selected
                   if (normalizedProtectionPlan && protectionPlanPrices[normalizedProtectionPlan]) {
-                    if (!isPackageMode) {
-                      extras.push({
-                        type: 'insurance',
-                        planType: normalizedProtectionPlan,
-                        price: protectionPlanPrices[normalizedProtectionPlan],
-                        productName: isHotelMode ? 'Refund Shield' : 'iAssure Insurance',
-                        vendorMode: isHotelMode ? 'refund-shield' : 'iassure',
-                      });
-                    }
-                    // Package hotel booking: iAssure temporarily disabled.
-                    // Restore the extras.push block above for package mode when ready.
+                    extras.push({
+                      type: 'insurance',
+                      planType: normalizedProtectionPlan,
+                      price: protectionPlanPrices[normalizedProtectionPlan],
+                      productName: isRefundShieldMode ? 'Refund Shield' : 'iAssure Insurance',
+                      vendorMode: isRefundShieldMode ? 'refund-shield' : 'iassure',
+                    });
                   }
 
                   // Add baggage if selected
@@ -857,7 +830,7 @@ function PaymentContent() {
 
                     if (!folderNumberForExtras) {
                       if (hasInsuranceExtra) {
-                        throw new Error(`Could not apply ${isHotelMode ? 'Refund Shield' : 'iAssure'} because the booking reference is missing. Please restart checkout.`);
+                        throw new Error(`Could not apply ${isRefundShieldMode ? 'Refund Shield' : 'iAssure'} because the booking reference is missing. Please restart checkout.`);
                       }
                       console.warn('⚠️ Skipping extras sync because folder number is unavailable');
                     } else {
@@ -914,7 +887,7 @@ function PaymentContent() {
                             insuranceFailed,
                           });
                           if (hasInsuranceExtra || insuranceFailed) {
-                            throw new Error(`Could not add ${isHotelMode ? 'Refund Shield' : 'iAssure'} to booking in CMS. Payment not started. Please retry.`);
+                            throw new Error(`Could not add ${isRefundShieldMode ? 'Refund Shield' : 'iAssure'} to booking in CMS. Payment not started. Please retry.`);
                           }
                           // Continue for non-insurance extras failures
                         }

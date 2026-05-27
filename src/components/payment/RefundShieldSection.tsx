@@ -9,11 +9,19 @@ interface RefundShieldSectionProps {
   onToggle: () => void;
   price: number;
   currency: string;
+  variant?: "hotel" | "package";
 }
 
-const REFUND_SHIELD_FEATURES = [
+const HOTEL_FEATURES = [
   "100% refund of the booking value for covered reasons",
   "Covers hotel bookings within the next 18 months",
+  "Includes fees and taxes in the protected value",
+  "Refund requests handled under the Refundable Terms",
+];
+
+const PACKAGE_FEATURES = [
+  "100% refund of the booking value for covered reasons",
+  "Covers package bookings within the next 18 months",
   "Includes fees and taxes in the protected value",
   "Refund requests handled under the Refundable Terms",
 ];
@@ -23,7 +31,12 @@ export function RefundShieldSection({
   onToggle,
   price,
   currency,
+  variant = "hotel",
 }: RefundShieldSectionProps) {
+  const features = variant === "package" ? PACKAGE_FEATURES : HOTEL_FEATURES;
+  const subtitle = variant === "package"
+    ? "Single Refund Shield offer calculated from your package total."
+    : "Single Refund Shield offer calculated from your hotel basket total.";
   return (
     <div className="bg-white border-2 border-[#3754ED] rounded-xl p-4 flex flex-col gap-4">
       <div className="bg-[#F5F7FF] rounded-full px-4 py-3 w-fit">
@@ -53,11 +66,11 @@ export function RefundShieldSection({
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-[#3754ED]" />
               <span className="text-base font-semibold text-[#010D50]">
-                Make this hotel booking refundable
+                {variant === "package" ? "Make your booking refundable" : "Make this hotel booking refundable"}
               </span>
             </div>
             <p className="text-sm text-[#3A478A]">
-              Single Refund Shield offer calculated from your hotel basket total.
+              {subtitle}
             </p>
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
@@ -69,7 +82,7 @@ export function RefundShieldSection({
         </div>
 
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          {REFUND_SHIELD_FEATURES.map((feature) => (
+          {features.map((feature) => (
             <div key={feature} className="flex items-start gap-2">
               <Check className="w-4 h-4 text-[#008234] shrink-0 mt-0.5" />
               <span className="text-xs text-[#010D50]">{feature}</span>

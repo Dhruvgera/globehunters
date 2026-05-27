@@ -1,5 +1,5 @@
 import type { Flight, FlightSegment } from "@/types/flight";
-import type { HolidayFlightDirection, TransformedAlternateFlight } from "@/types/holidayPackage";
+import type { HolidayFlightDirection, PackageSearchResult, TransformedAlternateFlight, TransformedFlightLeg } from "@/types/holidayPackage";
 import { getCurrencySymbol } from "@/lib/currency/converter";
 import { formatDuration } from "@/lib/vyspa/utils";
 import { buildFlightFilters } from "@/lib/utils/filterBuilder";
@@ -112,6 +112,90 @@ function mapDirectionToSegment(direction: HolidayFlightDirection | undefined): F
       arrivalDate: String(flight.arrival_date || ""),
     })),
     segmentBaggage: String(first.baggage || first.Baggage || "") || undefined,
+  };
+}
+
+function mapTransformedLegToSegment(leg: TransformedFlightLeg | undefined): FlightSegment | null {
+  const flights = leg?.segments || [];
+  if (flights.length === 0) return null;
+
+  const first = flights[0];
+  const last = flights[flights.length - 1];
+  const stops = Math.max(0, flights.length - 1);
+
+  return {
+    departureTime: formatClock(first.departureTime),
+    arrivalTime: formatClock(last.arrivalTime),
+    departureAirport: {
+      code: first.departureAirport,
+      name: first.departureAirport,
+      city: first.departureAirport,
+    },
+    arrivalAirport: {
+      code: last.arrivalAirport,
+      name: last.arrivalAirport,
+      city: last.arrivalAirport,
+    },
+    date: formatDateLabel(first.departureDate),
+    arrivalDate: formatDateLabel(last.arrivalDate || last.departureDate),
+    duration: formatDuration(Number(leg?.duration || 0)),
+    totalJourneyTime: formatDuration(Number(leg?.duration || 0)),
+    stops,
+    stopDetails: stops === 0 ? "Direct" : `${stops} Stop${stops === 1 ? "" : "s"}`,
+    layovers: [],
+    carrierCode: first.airlineCode,
+    carrierName: first.airlineName,
+    flightNumber: String(first.flightNumber || ""),
+    cabinClass: first.cabinClass || "",
+    individualFlights: flights.map((flight) => ({
+      departureAirport: flight.departureAirport,
+      arrivalAirport: flight.arrivalAirport,
+      departureTime: formatClock(flight.departureTime),
+      arrivalTime: formatClock(flight.arrivalTime),
+      duration: formatDuration(Number(flight.travelTime || 0)),
+      flightNumber: String(flight.flightNumber || ""),
+      carrierCode: flight.airlineCode,
+      departureDate: flight.departureDate,
+      arrivalDate: flight.arrivalDate,
+    })),
+    segmentBaggage: first.baggage,
+  };
+}
+
+export function mapPackageSearchResultFlightToFlight(
+  pkg: PackageSearchResult | undefined,
+  resultId: string,
+  webRef?: string
+): Flight | null {
+  const outbound = mapTransformedLegToSegment(pkg?.flight?.outbound);
+  const inbound = mapTransformedLegToSegment(pkg?.flight?.inbound);
+
+  if (!pkg || !resultId || !outbound) return null;
+
+  const price = Number(pkg.startingPrice || 0);
+
+  return {
+    id: resultId,
+    airline: {
+      name: outbound.carrierName || "Selected Airline",
+      logo: "",
+      code: outbound.carrierCode || "",
+    },
+    outbound,
+    inbound: inbound || undefined,
+    segments: [outbound, ...(inbound ? [inbound] : [])],
+    tripType: inbound ? "round-trip" : "one-way",
+    price,
+    pricePerPerson: price,
+    currency: getCurrencySymbol(pkg.currency || "GBP"),
+    packagePriceDeltaTotal: 0,
+    packagePriceDeltaPerPerson: 0,
+    ticketOptions: [],
+    webRef,
+    baggage: outbound.segmentBaggage,
+    refundable: null,
+    hasBaggage: Boolean(outbound.segmentBaggage),
+    segmentResultId: resultId,
   };
 }
 
