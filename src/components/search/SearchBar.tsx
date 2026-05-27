@@ -279,9 +279,10 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
     }
 
     if (pathname?.startsWith("/hotels")) {
-      const fromCode = urlParams.get("fromCode") || savedPackageSearch?.departureCode || "";
+      const urlFromCode = urlParams.get("fromCode");
+      const fromCode = urlFromCode || savedPackageSearch?.departureCode || "";
       const fromLabel = urlParams.get("from") || savedPackageSearch?.departureName || "";
-      if (urlParams.get("type") === "package" && fromCode && !fromRef.current) {
+      if (urlParams.get("type") === "package" && fromCode && (!fromRef.current || urlFromCode)) {
         setFrom({
           code: fromCode,
           name: fromLabel || fromCode,

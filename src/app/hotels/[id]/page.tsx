@@ -1256,6 +1256,49 @@ export default function HotelRoomsPage() {
     }
   }, [hasHydrated, hotelSearch, isPackageMode, deeplinkViewData?.success]);
 
+  // Hydrate packageSearch from URL params when the store is empty (fresh browser tab in package mode).
+  useEffect(() => {
+    if (!hasHydrated) return;
+    if (!isPackageMode) return;
+    if (packageSearch) return;
+
+    const urlFromCode = searchParams.get("fromCode");
+    const urlFromName = searchParams.get("from");
+    if (!urlFromCode) return;
+
+    const urlPkgRequestId = searchParams.get("pkgRequestId");
+    const urlCheckIn = searchParams.get("checkIn") || hotelSearch?.checkIn || "";
+    const urlCheckOut = searchParams.get("checkOut") || hotelSearch?.checkOut || "";
+    const nights = calculateStayNights(urlCheckIn, urlCheckOut);
+    const urlRooms = Number(searchParams.get("rooms") || hotelSearch?.rooms || 1);
+    const urlAdults = Number(searchParams.get("adults") || hotelSearch?.adults || 2);
+    const urlChildren = Number(searchParams.get("children") || hotelSearch?.children || 0);
+
+    const roomConfigs = Array.from({ length: Math.max(1, urlRooms) }, (_, idx) => ({
+      adults: idx === 0 ? Math.max(1, urlAdults - (urlRooms - 1)) : 1,
+      children: idx === 0 ? urlChildren : 0,
+      childAges: [] as number[],
+      infants: 0,
+    }));
+
+    const location = hotelSearch?.location || searchParams.get("location") || "";
+    const hiddenKey = hotelSearch?.hidden_key || searchParams.get("hidden_key") || "";
+    const destCode = hiddenKey.split(";")[0]?.trim() || "";
+
+    const { setPackageSearch: storeSetPkgSearch } = useBookingStore.getState();
+    storeSetPkgSearch({
+      departureCode: urlFromCode,
+      departureName: urlFromName || urlFromCode,
+      destinationCode: destCode,
+      destinationName: location,
+      destinationHiddenValue: hiddenKey,
+      checkIn: urlCheckIn,
+      nights: nights > 0 ? nights : 1,
+      rooms: roomConfigs,
+      requestId: urlPkgRequestId ? Number(urlPkgRequestId) || undefined : undefined,
+    });
+  }, [hasHydrated, isPackageMode, packageSearch, hotelSearch]);
+
   // State
   const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
@@ -2447,10 +2490,16 @@ export default function HotelRoomsPage() {
     if (hotelSearch?.hidden_id) params.set("hidden_id", hotelSearch.hidden_id);
     if (hotelSearch?.hidden_key) params.set("hidden_key", hotelSearch.hidden_key);
     if (hotelSearch?.arrivalPointCode) params.set("arrival_point_code", hotelSearch.arrivalPointCode);
-    if (isPackageMode) params.set("type", "package");
+    if (isPackageMode) {
+      params.set("type", "package");
+      const fromCode = packageSearch?.departureCode || searchParams.get("fromCode") || "";
+      const fromName = packageSearch?.departureName || searchParams.get("from") || "";
+      if (fromCode) params.set("fromCode", fromCode);
+      if (fromName) params.set("from", fromName);
+    }
     const query = params.toString();
     return query ? `/hotels?${query}` : "/hotels";
-  }, [hotelSearch, isPackageMode]);
+  }, [hotelSearch, isPackageMode, packageSearch, searchParams]);
 
   useEffect(() => {
     setSelectedHotelRoomIds(selectedRoomIds);
@@ -3649,13 +3698,23 @@ export default function HotelRoomsPage() {
                                 )}
                               </div>
                             )}
-                            <div>
-                              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#3A478A]">
-                                Guests
-                              </span>
-                              <div className="mt-1 text-sm font-medium text-[#010D50]">
-                                {stayAdults || 2} Adult{(stayAdults || 2) !== 1 ? "s" : ""}
-                                {stayChildren > 0 ? `, ${stayChildren} Child${stayChildren === 1 ? "" : "ren"}` : ""}
+                            <div className="flex gap-5">
+                              <div>
+                                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#3A478A]">
+                                  Guests
+                                </span>
+                                <div className="mt-1 text-sm font-medium text-[#010D50]">
+                                  {stayAdults || 2} Adult{(stayAdults || 2) !== 1 ? "s" : ""}
+                                  {stayChildren > 0 ? `, ${stayChildren} Child${stayChildren === 1 ? "" : "ren"}` : ""}
+                                </div>
+                              </div>
+                              <div className="border-l border-[#DFE0E4] pl-5">
+                                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#3A478A]">
+                                  Rooms
+                                </span>
+                                <div className="mt-1 text-sm font-medium text-[#010D50]">
+                                  {stayRooms || 1} Room{(stayRooms || 1) !== 1 ? "s" : ""}
+                                </div>
                               </div>
                             </div>
                             {(stayCheckIn || stayCheckOut) && (
