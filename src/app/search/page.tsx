@@ -388,7 +388,7 @@ function SearchPageContent() {
         if (cancelled) return;
 
         const mappedFlights = response.flights
-          .map((flight) => mapPackageAlternateFlightToFlight(flight, searchRequestId || String(packageRequestId || "")))
+          .map((flight) => mapPackageAlternateFlightToFlight(flight, searchRequestId || String(packageResultsMeta?.requestId || "")))
           .filter((flight): flight is Flight => !!flight);
 
         const includedFlight = mappedFlights.find(
