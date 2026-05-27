@@ -1266,13 +1266,16 @@ export default function HotelRoomsPage() {
     const urlFromName = searchParams.get("from");
     if (!urlFromCode) return;
 
+    const urlCtx = searchParams.get("ctx");
+    const decodedCtx = urlCtx ? decodeHotelSearchContext(urlCtx) : null;
+
     const urlPkgRequestId = searchParams.get("pkgRequestId");
-    const urlCheckIn = searchParams.get("checkIn") || hotelSearch?.checkIn || "";
-    const urlCheckOut = searchParams.get("checkOut") || hotelSearch?.checkOut || "";
+    const urlCheckIn = searchParams.get("checkIn") || hotelSearch?.checkIn || decodedCtx?.checkIn || "";
+    const urlCheckOut = searchParams.get("checkOut") || hotelSearch?.checkOut || decodedCtx?.checkOut || "";
     const nights = calculateStayNights(urlCheckIn, urlCheckOut);
-    const urlRooms = Number(searchParams.get("rooms") || hotelSearch?.rooms || 1);
-    const urlAdults = Number(searchParams.get("adults") || hotelSearch?.adults || 2);
-    const urlChildren = Number(searchParams.get("children") || hotelSearch?.children || 0);
+    const urlRooms = Number(searchParams.get("rooms") || hotelSearch?.rooms || decodedCtx?.rooms || 1);
+    const urlAdults = Number(searchParams.get("adults") || hotelSearch?.adults || decodedCtx?.adults || 2);
+    const urlChildren = Number(searchParams.get("children") || hotelSearch?.children || decodedCtx?.children || 0);
 
     const roomConfigs = Array.from({ length: Math.max(1, urlRooms) }, (_, idx) => ({
       adults: idx === 0 ? Math.max(1, urlAdults - (urlRooms - 1)) : 1,
@@ -1281,8 +1284,8 @@ export default function HotelRoomsPage() {
       infants: 0,
     }));
 
-    const location = hotelSearch?.location || searchParams.get("location") || "";
-    const hiddenKey = hotelSearch?.hidden_key || searchParams.get("hidden_key") || "";
+    const location = hotelSearch?.location || decodedCtx?.location || searchParams.get("location") || "";
+    const hiddenKey = hotelSearch?.hidden_key || decodedCtx?.hidden_key || searchParams.get("hidden_key") || "";
     const destCode = hiddenKey.split(";")[0]?.trim() || "";
 
     const { setPackageSearch: storeSetPkgSearch } = useBookingStore.getState();
