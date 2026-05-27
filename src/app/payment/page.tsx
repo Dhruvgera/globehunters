@@ -752,14 +752,14 @@ function PaymentContent() {
                 price={protectionPlanPrices.basic}
                 currency={currency || "GBP"}
               />
-            ) : !isPackageMode ? (
+            ) : (
               <ProtectionPlanSection
                 selectedPlan={normalizedProtectionPlan}
                 onSelectPlan={setProtectionPlan}
                 baseFare={baseFare}
                 currency={currency || 'GBP'}
               />
-            ) : null}
+            )}
 
             {isRefundShieldMode && <RefundShieldTerms />}
 
