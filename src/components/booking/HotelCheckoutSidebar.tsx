@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Phone, PawPrint, Bus } from "lucide-react";
 import { useBookingStore } from "@/store/bookingStore";
-import type { HotelTaxBreakdown, HotelBedsTaxItem } from "@/types/hotel";
+import type { HotelTaxBreakdown, HotelBedsTaxItem, locallyPayableFeesType } from "@/types/hotel";
 import { resolveTrustYouHotelId } from "@/lib/trustyou/hotelMapping";
 import type { TrustYouHotelReviewSummary } from "@/types/trustyou";
 import {
@@ -18,6 +18,7 @@ import { formatMoneyFromSymbol } from "@/lib/currency/formatMoney";
 import { normalizePolicyCurrencyText } from "@/lib/currency/policyText";
 
 import { calculateNights } from "@/lib/hotels/nights";
+import { type } from "os";
 
 
 function formatDateDisplay(dateStr: string): string {
@@ -143,7 +144,7 @@ export function HotelCheckoutSidebar({
         if (!data?.ok || !data?.review) return;
         setTrustYouReview(data.review as TrustYouHotelReviewSummary);
       })
-      .catch(() => {});
+      .catch(() => { });
 
     return () => {
       cancelled = true;
@@ -185,6 +186,8 @@ export function HotelCheckoutSidebar({
     const reviewLabel = trustYouReview?.scoreDescription || "";
     const reviewCount = trustYouReview?.reviewsCount || 0;
     const amenities = cached?.amenities || [];
+    let locallyPayaleTaxesTemp: any | undefined = undefined;
+
     const roomPolicyTexts: string[] = [];
     const selectedRoomId = String(
       selectedHotelRoomSummary?.roomId || selectedHotelRoomIds[0] || ""
@@ -202,7 +205,7 @@ export function HotelCheckoutSidebar({
             : "";
       const directPolicyText = sanitizePolicyText(directPolicy);
       if (directPolicyText) roomPolicyTexts.push(directPolicyText);
-
+      locallyPayaleTaxesTemp = raw?.locally_payable_fees;
       const hbPolicies = Array.isArray(raw?._hotelbeds?.cancellationPolicies)
         ? raw._hotelbeds.cancellationPolicies
         : [];
@@ -269,7 +272,6 @@ export function HotelCheckoutSidebar({
 
     const baseTotal = nightly && nights ? nightly * nights * rooms : undefined;
     const taxes = total && baseTotal ? Math.max(0, total - baseTotal) : undefined;
-
     const hbTaxBreakdown: HotelTaxBreakdown | null = roomSummary?.hotelBedsTaxes ?? null;
     const includedTaxes: HotelBedsTaxItem[] = [];
     const localTaxes: HotelBedsTaxItem[] = [];
@@ -279,6 +281,23 @@ export function HotelCheckoutSidebar({
         else localTaxes.push(t);
       }
     }
+    let locally_payable_fees: locallyPayableFeesType | undefined;
+    if (locallyPayaleTaxesTemp && locallyPayaleTaxesTemp.request && locallyPayaleTaxesTemp.billable) {
+      locally_payable_fees = {
+        amount: locallyPayaleTaxesTemp?.request?.value || "0",
+        currency: locallyPayaleTaxesTemp?.request?.currency || currency,
+        type: "Billable",
+        subTaxes: locallyPayaleTaxesTemp?.breakdown?.map((el: { amount: any; currency: any; description: any; }) => {
+          let am = el.amount * locallyPayaleTaxesTemp.request.value / locallyPayaleTaxesTemp.billable.value
+          return {
+            amount: am,
+            currency: locallyPayaleTaxesTemp?.request?.currency,
+            type: el.description
+          }
+        })
+      }
+    }
+
     const localTaxTotal = localTaxes.reduce((s, t) => s + Number(t.amount || 0), 0);
     const localTaxCurrency = localTaxes[0]?.currency || currency;
     const includedTaxTotal = includedTaxes.reduce((s, t) => s + Number(t.amount || 0), 0);
@@ -288,6 +307,7 @@ export function HotelCheckoutSidebar({
       currency, total, nightly, roomName, isRefundable,
       nights, rooms, adults, children, roomNames, baseTotal, taxes,
       hbTaxBreakdown, includedTaxes, localTaxes, localTaxTotal, localTaxCurrency, includedTaxTotal,
+      locally_payable_fees
     };
   }, [cached, hotelSearch, selectedHotel, selectedHotelRoomIds, selectedHotelRoomSummary, trustYouReview]);
 
@@ -468,13 +488,32 @@ export function HotelCheckoutSidebar({
               {formatMoneyFromSymbol(
                 display.currency,
                 ((display.total ?? display.baseTotal) || 0) +
-                  (convertedLocalTaxRows.length > 0
-                    ? convertedLocalTaxRows.reduce((sum, row) => sum + Number(row.amount || 0), 0)
-                    : 0)
+                (convertedLocalTaxRows.length > 0
+                  ? convertedLocalTaxRows.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+                  : 0)
               )}
             </span>
           </div>
-
+          {display.locally_payable_fees?.amount && (
+            <div className="bg-[#FFF8F0] border border-[#F5D9B3] rounded-lg p-3 flex flex-col gap-2">
+              <span className="text-xs font-semibold text-[#8B5E20]">
+                Local Fees Payable
+              </span>
+              <div className="flex items-center justify-between text-xs text-[#8B5E20]">
+                <span>{display.locally_payable_fees.type}</span>
+                <div className="text-right">
+                  <div>{formatMoneyFromCode(display.locally_payable_fees.currency, Number(display.locally_payable_fees.amount || 0))}</div>
+                  {display.locally_payable_fees.subTaxes?.map(el => {
+                    return (
+                      <div key={el.type}>
+                        {el.type}: {formatMoneyFromCode(el.currency, Number(el.amount || 0))}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
           {display.localTaxes.length > 0 && (
             <div className="bg-[#FFF8F0] border border-[#F5D9B3] rounded-lg p-3 flex flex-col gap-2">
               <span className="text-xs font-semibold text-[#8B5E20]">
@@ -486,7 +525,7 @@ export function HotelCheckoutSidebar({
                 currencyCode: tax.clientCurrency || tax.currency || display.localTaxCurrency,
                 localAmount: Number(tax.clientAmount || tax.amount || 0),
                 localCurrencyCode: tax.clientCurrency || tax.currency || display.localTaxCurrency,
-              })) ).map((tax, i) => (
+              }))).map((tax, i) => (
                 <div key={i} className="flex items-center justify-between text-xs text-[#8B5E20]">
                   <span>{tax.label}</span>
                   <div className="text-right">
