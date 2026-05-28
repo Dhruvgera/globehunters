@@ -25,7 +25,12 @@ export interface HotelBedsTaxItem {
   clientAmount?: string;
   clientCurrency?: string;
 }
-
+export interface locallyPayableFeesType {
+  amount: string;
+  currency: string;
+  type: string;
+  subTaxes?: locallyPayableFeesType[]
+}
 export interface HotelTaxBreakdown {
   allIncluded: boolean;
   taxes: HotelBedsTaxItem[];
