@@ -452,6 +452,8 @@ export function HotelRoomCard({ room,
                             onClick={(e) => {
                                 e.stopPropagation();
                                 const roomId = String(room.id);
+                                setActiveRoomCardId(roomId);
+                                setSelectedRoomCounts({ [roomId]: 1 });
                                 handleHotelRoomContinue([roomId])
                             }}
                         >

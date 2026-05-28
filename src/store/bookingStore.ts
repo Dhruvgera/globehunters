@@ -305,7 +305,10 @@ interface BookingState {
   // Deeplink tracking (for meta channel URLs from Skyscanner, etc.)
   isFromDeeplink: boolean;
   setIsFromDeeplink: (isDeeplink: boolean) => void;
-
+  deeplinkType: "package" | "hotel" | "flight" | null;
+  setDeeplinkType: (type: "package" | "hotel" | "flight" | null) => void;
+  isLoadingDeeplink: boolean;
+  setIsLoadingDeeplink: (loading: boolean) => void;
   // Deeplink view data (from holiday_package_view / accommodationView via encrypted key)
   deeplinkViewData: HolidayPackageViewResponse | AccommodationViewResponse | null;
   setDeeplinkViewData: (data: HolidayPackageViewResponse | AccommodationViewResponse | null) => void;
@@ -392,6 +395,8 @@ const initialState = {
   // End package state
   affiliateData: null,
   isFromDeeplink: false,
+  deeplinkType: null,
+  isLoadingDeeplink: false,
   deeplinkViewData: null,
   selectedFlight: null,
   selectedFareType: 'Economy',
@@ -481,7 +486,10 @@ export const useBookingStore = create<BookingState & HydrationState>()(
             [hotelId]: data,
           },
         })),
-      setSelectedHotelRoomSummary: (summary) => set({ selectedHotelRoomSummary: summary }),
+      setSelectedHotelRoomSummary: (summary) => {
+        console.log("set", summary)
+        set({ selectedHotelRoomSummary: summary })
+      },
 
       // Holiday Package state
       setPackageSearch: (search) =>
@@ -544,7 +552,8 @@ export const useBookingStore = create<BookingState & HydrationState>()(
       // Deeplink tracking
       setIsFromDeeplink: (isDeeplink) => set({ isFromDeeplink: isDeeplink }),
       setDeeplinkViewData: (data) => set({ deeplinkViewData: data }),
-
+      setDeeplinkType: (type) => set({ deeplinkType: type }),
+      setIsLoadingDeeplink: (loading) => set({ isLoadingDeeplink: loading }),
       // Selected flight
       setSelectedFlight: (flight, fareType = 'Economy') =>
         set({
