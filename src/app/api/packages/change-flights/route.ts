@@ -90,7 +90,6 @@ export async function POST(request: NextRequest) {
     const url = `${getVyspaBaseUrl()}/rest/v4/holiday_change_flights/`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), VYSPA_CONFIG.defaults.timeout * 2);
-
     const response = await fetch(url, {
       method: 'POST',
       headers: {

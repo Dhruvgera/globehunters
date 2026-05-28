@@ -27,11 +27,16 @@ import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
 import { hasErrors, validatePassenger } from "@/utils/validation";
 import type { HolidayPackageViewResponse } from "@/types/holidayPackage";
 import { formatMoneyFromSymbol } from "@/lib/currency/formatMoney";
+import { formatMoneyFromCode } from "@/lib/currency/localTaxDisplay";
+import type { locallyPayableFeesType } from "@/types/hotel";
+import { computeLocallyPayableFees } from "@/lib/hotels/locallyPayableFees";
 import { formatLongDate } from "@/lib/utils/dateFormat";
 import { buildDetailsFromDeeplinkView } from "@/lib/package/deeplinkDetails";
 import { buildChangeHotelHref } from "@/lib/package/changeLinks";
 import { getJourneySegments } from "@/lib/flight/segments";
 import { PRICING_CONFIG, REFUND_SHIELD_PRICING } from "@/config/constants";
+import { CustomerReviewsCard } from "@/components/booking/CustomerReviewsCard";
+import { useReviews } from "@/hooks/useReviews";
 
 function parseMoneyString(value?: string | null) {
   const raw = String(value || "").trim();
@@ -220,6 +225,7 @@ function PackageTravellerDetailsInner() {
   const isFromDeeplink = useBookingStore((s) => s.isFromDeeplink);
 
   const { phoneNumber: affiliatePhone } = useAffiliatePhone();
+  const { reviews, totalReviews, averageRating } = useReviews();
 
   const [showFlightInfo, setShowFlightInfo] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -432,6 +438,23 @@ function PackageTravellerDetailsInner() {
       amenities: packageDetails?.hotel?.amenities || cached?.amenities || [],
     };
   }, [hotelDetailsCache, packageDetails?.hotel, selectedHotel]);
+
+  const locallyPayableFees = useMemo<locallyPayableFeesType | undefined>(() => {
+    const fallbackCurrency = selectedHotelRoomSummary?.currency || "$";
+    const result = computeLocallyPayableFees(
+      packageDetails?.hotel?.rooms as any,
+      selectedHotelRoomIds,
+      fallbackCurrency
+    );
+    if (result) return result;
+
+    const cached = selectedHotel?.hotelId ? hotelDetailsCache?.[selectedHotel.hotelId] : undefined;
+    return computeLocallyPayableFees(
+      cached?.rooms as any,
+      selectedHotelRoomIds,
+      fallbackCurrency
+    );
+  }, [hotelDetailsCache, packageDetails?.hotel?.rooms, selectedHotel?.hotelId, selectedHotelRoomIds, selectedHotelRoomSummary?.currency]);
 
   const changeHotelHref = useMemo(
     () => buildChangeHotelHref(hotelSearch, packageSearch),
@@ -813,10 +836,29 @@ function PackageTravellerDetailsInner() {
           <div className="w-full lg:w-[482px] flex flex-col gap-4">
             <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={false} isJourneyRef={!!vyspaFolderNumber} />
 
+            {reviews.length > 0 && (
+              <CustomerReviewsCard
+                overallRating={averageRating}
+                totalReviews={totalReviews}
+                reviews={reviews}
+              />
+            )}
+
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 sm:p-5">
               <div className="text-xs uppercase tracking-[0.12em] text-[#3A478A]">Total package price</div>
               <div className="mt-1 text-2xl font-semibold text-[#010D50]">{packageTotalLabel}</div>
               <div className="mt-1 text-sm text-[#3A478A]">{packagePerPersonLabel} per person</div>
+              {locallyPayableFees?.amount && (
+                <div className="mt-3 pt-3 border-t border-[#DFE0E4] flex flex-col gap-1.5">
+                  <div className="flex items-center justify-between text-xs text-[#010D50]">
+                    <span className="font-semibold">Locally Payable Fees & Taxes</span>
+                    <span>{formatMoneyFromCode(locallyPayableFees.currency, Number(locallyPayableFees.amount || 0))}</span>
+                  </div>
+                  <span className="text-[10px] text-[#3A478A]">
+                    Payable locally at the hotel. Not included in the package price.
+                  </span>
+                </div>
+              )}
             </div>
 
             <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 sm:p-5">

@@ -642,6 +642,7 @@ function HotelsPageInner() {
           child_age: search.child_age,
           branches: search.branches,
           timeout: VYSPA_SEARCH_TIMEOUT_SEC,
+          includeFeesInTotal: true,
         });
 
         const nights = calculateNights(search.checkIn, search.checkOut) || 1;
@@ -768,6 +769,7 @@ function HotelsPageInner() {
                 child_age: search.child_age,
                 branches: search.branches,
                 timeout: VYSPA_SEARCH_TIMEOUT_SEC,
+                includeFeesInTotal: true,
                 ...(isVyspaSearchCriteriaId(latestCriteriaId) ? { searchCriteriaId: latestCriteriaId } : {}),
               });
 

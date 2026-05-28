@@ -25,6 +25,7 @@ interface HotelSearchParams {
   timeout?: number;
   searchCriteriaId?: number | string;
   providerOverride?: HotelProvider;
+  includeFeesInTotal?: boolean;
 }
 
 interface CreateHotelFolderParams {
@@ -109,6 +110,9 @@ export class HotelService {
     }
     if (params.providerOverride) {
       criteria.providerOverride = params.providerOverride;
+    }
+    if (params.includeFeesInTotal) {
+      criteria.includeFeesInTotal = true;
     }
 
     
