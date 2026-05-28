@@ -15,6 +15,7 @@ import {
   type ConvertedHotelLocalTaxRow,
 } from "@/lib/currency/localTaxDisplay";
 import { formatMoneyFromSymbol } from "@/lib/currency/formatMoney";
+import { LocallyPayableFeesCard } from "@/components/booking/LocallyPayableFeesCard";
 import { normalizePolicyCurrencyText } from "@/lib/currency/policyText";
 import { computeLocallyPayableFees } from "@/lib/hotels/locallyPayableFees";
 
@@ -58,6 +59,13 @@ function sanitizePolicyText(value: unknown): string {
   }
 
   return normalizePolicyCurrencyText(deduped.join("\n"));
+}
+
+function firstStringOf(obj: any, ...keys: string[]): string {
+  for (const k of keys) {
+    if (typeof obj?.[k] === "string") return obj[k].trim();
+  }
+  return "";
 }
 
 interface HotelCheckoutSidebarProps {
@@ -195,34 +203,21 @@ export function HotelCheckoutSidebar({
 
     if (Array.isArray(cached?.rooms) && roomIdsToProcess.length > 0) {
       for (const rid of roomIdsToProcess) {
-        const selectedRoom = (cached.rooms as any[]).find(
-          (room) => String(room?.id || "").trim() === String(rid).trim()
+        const room = (cached.rooms as any[]).find(
+          (r) => String(r?.id ?? "").trim() === String(rid).trim()
         );
-        if (!selectedRoom) continue;
-        const raw = selectedRoom._raw;
-        const directPolicy =
-          typeof raw?.cancellation_policy === "string"
-            ? raw.cancellation_policy.trim()
-            : typeof raw?.cancellationPolicy === "string"
-              ? raw.cancellationPolicy.trim()
-              : "";
-        const directPolicyText = sanitizePolicyText(directPolicy);
-        if (directPolicyText) roomPolicyTexts.push(directPolicyText);
-        const hbPolicies = Array.isArray(raw?._hotelbeds?.cancellationPolicies)
-          ? raw._hotelbeds.cancellationPolicies
-          : [];
+        const raw = room?._raw;
+        if (!raw) continue;
+
+        const direct = sanitizePolicyText(firstStringOf(raw, "cancellation_policy", "cancellationPolicy"));
+        if (direct) roomPolicyTexts.push(direct);
+
+        const hbPolicies: any[] = Array.isArray(raw._hotelbeds?.cancellationPolicies)
+          ? raw._hotelbeds.cancellationPolicies : [];
         for (const p of hbPolicies) {
           if (!p || typeof p !== "object") continue;
-          const policy =
-            typeof p.policy === "string"
-              ? p.policy.trim()
-              : typeof p.description === "string"
-                ? p.description.trim()
-                : typeof p.text === "string"
-                  ? p.text.trim()
-                  : "";
-          const policyText = sanitizePolicyText(policy);
-          if (policyText) roomPolicyTexts.push(policyText);
+          const text = sanitizePolicyText(firstStringOf(p, "policy", "description", "text"));
+          if (text) roomPolicyTexts.push(text);
         }
       }
     }
@@ -491,24 +486,7 @@ export function HotelCheckoutSidebar({
             </span>
           </div>
           {display.locally_payable_fees?.amount && (
-            <div className="bg-[#FFF8F0] border border-[#F5D9B3] rounded-lg p-3 flex flex-col gap-2">
-              <span className="text-xs font-semibold text-[#8B5E20]">
-                
-              </span>
-              <div className="flex items-center justify-between text-xs text-[#8B5E20]">
-                <span>Locally Payable Fees & Taxes</span>
-                <div className="text-right">
-                  <div>{formatMoneyFromCode(display.locally_payable_fees.currency, Number(display.locally_payable_fees.amount || 0))}</div>
-                  {/* {display.locally_payable_fees.subTaxes?.map(el => {
-                    return (
-                      <div key={el.type}>
-                        {el.type}: {formatMoneyFromCode(el.currency, Number(el.amount || 0))}
-                      </div>
-                    )
-                  })} */}
-                </div>
-              </div>
-            </div>
+            <LocallyPayableFeesCard fees={display.locally_payable_fees} />
           )}
           {display.localTaxes.length > 0 && (
             <div className="bg-[#FFF8F0] border border-[#F5D9B3] rounded-lg p-3 flex flex-col gap-2">

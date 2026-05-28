@@ -27,8 +27,8 @@ import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
 import { hasErrors, validatePassenger } from "@/utils/validation";
 import type { HolidayPackageViewResponse } from "@/types/holidayPackage";
 import { formatMoneyFromSymbol } from "@/lib/currency/formatMoney";
-import { formatMoneyFromCode } from "@/lib/currency/localTaxDisplay";
 import type { locallyPayableFeesType } from "@/types/hotel";
+import { LocallyPayableFeesCard } from "@/components/booking/LocallyPayableFeesCard";
 import { computeLocallyPayableFees } from "@/lib/hotels/locallyPayableFees";
 import { formatLongDate } from "@/lib/utils/dateFormat";
 import { buildDetailsFromDeeplinkView } from "@/lib/package/deeplinkDetails";
@@ -849,15 +849,10 @@ function PackageTravellerDetailsInner() {
               <div className="mt-1 text-2xl font-semibold text-[#010D50]">{packageTotalLabel}</div>
               <div className="mt-1 text-sm text-[#3A478A]">{packagePerPersonLabel} per person</div>
               {locallyPayableFees?.amount && (
-                <div className="mt-3 pt-3 border-t border-[#DFE0E4] flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between text-xs text-[#010D50]">
-                    <span className="font-semibold">Locally Payable Fees & Taxes</span>
-                    <span>{formatMoneyFromCode(locallyPayableFees.currency, Number(locallyPayableFees.amount || 0))}</span>
-                  </div>
-                  <span className="text-[10px] text-[#3A478A]">
-                    Payable locally at the hotel. Not included in the package price.
-                  </span>
-                </div>
+                <LocallyPayableFeesCard
+                  fees={locallyPayableFees}
+                  className="mt-3 pt-3 border-t border-[#DFE0E4] flex flex-col gap-1.5"
+                />
               )}
             </div>
 
