@@ -1613,6 +1613,7 @@ export default function HotelRoomsPage() {
       children: next.children,
       child_age: buildHotelChildAgesFromFlat(next.childAges, next.rooms, next.children),
       branches: hotelSearch.branches,
+      includeFeesInTotal: true,
     });
     const shouldPollMore =
       (availability.Criteria?.provider === "hybrid" || availability.Criteria?.provider === "vyspa") &&
@@ -2954,6 +2955,7 @@ export default function HotelRoomsPage() {
               children: hotelSearch.children,
               child_age: hotelSearch.child_age,
               branches: hotelSearch.branches,
+              includeFeesInTotal: true,
             });
             const refreshedCriteriaId = (refreshedAvailability as any)?.Criteria?.searchCriteriaId;
             const refreshedResults = Array.isArray((refreshedAvailability as any)?.Results)
@@ -3447,6 +3449,13 @@ export default function HotelRoomsPage() {
     if (packageSearch?.destinationCode) params.set("to", packageSearch.destinationCode);
     if (packageSearch?.departureName) params.set("fromName", packageSearch.departureName);
     if (packageSearch?.destinationName) params.set("toName", packageSearch.destinationName);
+    const destinationName = packageSearch?.destinationName || hotelSearch?.location || "";
+    const destinationHiddenValue = packageSearch?.destinationHiddenValue || hotelSearch?.hidden_key || "";
+    if (destinationName) params.set("location", destinationName);
+    if (hotelSearch?.hidden_id) params.set("hidden_id", hotelSearch.hidden_id);
+    if (destinationHiddenValue) params.set("hidden_key", destinationHiddenValue);
+    if (hotelSearch?.arrivalPointCode) params.set("arrival_point_code", hotelSearch.arrivalPointCode);
+    if (packageSearch?.departureCode) params.set("fromCode", packageSearch.departureCode);
     params.set("adults", adults);
     params.set("children", children);
     params.set("tripType", "round-trip");

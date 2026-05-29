@@ -236,7 +236,6 @@ export function HotelRoomCard({ room,
                     </div>
                 )}
 
-                {/* Refund & Payment Tags */}
                 <div className="flex flex-wrap gap-2 mt-4">
                     {room.isRefundable ?
                         (<div className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs bg-green-100 text-green-700"
@@ -252,7 +251,7 @@ export function HotelRoomCard({ room,
                         </div>)
                     }
                 </div>
-                {roomCancellationSummaryShort && (
+                {!isPackageMode && roomCancellationSummaryShort && (
                     <p className="mt-3 text-xs text-[#3A478A] leading-relaxed">
                         {roomCancellationSummaryShort}
                     </p>

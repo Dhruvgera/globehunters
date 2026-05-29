@@ -63,6 +63,10 @@ export interface PackageDetailsResponse {
         currency?: string;
         nonRefundable?: boolean;
         remarks?: string;
+        locallyPayableFees?: {
+          billable?: { value: number; currency: string };
+          request?: { value: number; currency: string };
+        };
       }>;
     };
     cancellationPolicies?: Array<{

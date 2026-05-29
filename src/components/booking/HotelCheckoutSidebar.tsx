@@ -15,11 +15,11 @@ import {
   type ConvertedHotelLocalTaxRow,
 } from "@/lib/currency/localTaxDisplay";
 import { formatMoneyFromSymbol } from "@/lib/currency/formatMoney";
+import { LocallyPayableFeesCard } from "@/components/booking/LocallyPayableFeesCard";
 import { normalizePolicyCurrencyText } from "@/lib/currency/policyText";
+import { computeLocallyPayableFees } from "@/lib/hotels/locallyPayableFees";
 
 import { calculateNights } from "@/lib/hotels/nights";
-import { type } from "os";
-
 
 function formatDateDisplay(dateStr: string): string {
   const d = new Date(dateStr + "T12:00:00");
@@ -61,6 +61,13 @@ function sanitizePolicyText(value: unknown): string {
   return normalizePolicyCurrencyText(deduped.join("\n"));
 }
 
+function firstStringOf(obj: any, ...keys: string[]): string {
+  for (const k of keys) {
+    if (typeof obj?.[k] === "string") return obj[k].trim();
+  }
+  return "";
+}
+
 interface HotelCheckoutSidebarProps {
   webRef: string;
   phoneNumber: string;
@@ -80,6 +87,8 @@ export function HotelCheckoutSidebar({
   const hotelResultsMeta = useBookingStore((s) => s.hotelResultsMeta);
   const selectedHotelRoomSummary = useBookingStore((s) => s.selectedHotelRoomSummary);
   const selectedHotelRoomIds = useBookingStore((s) => s.selectedHotelRoomIds);
+  const selectedPackage = useBookingStore((s) => s.selectedPackage);
+  const isPackageMode = !!selectedPackage;
 
   const hotelId = selectedHotel?.hotelId;
   const cached = hotelId ? hotelDetailsCache?.[hotelId] : undefined;
@@ -186,41 +195,30 @@ export function HotelCheckoutSidebar({
     const reviewLabel = trustYouReview?.scoreDescription || "";
     const reviewCount = trustYouReview?.reviewsCount || 0;
     const amenities = cached?.amenities || [];
-    let locallyPayaleTaxesTemp: any | undefined = undefined;
 
     const roomPolicyTexts: string[] = [];
-    const selectedRoomId = String(
-      selectedHotelRoomSummary?.roomId || selectedHotelRoomIds[0] || ""
-    ).trim();
-    if (Array.isArray(cached?.rooms) && selectedRoomId) {
-      const selectedRoom = (cached.rooms as any[]).find(
-        (room) => String(room?.id || "").trim() === selectedRoomId
-      );
-      const raw = selectedRoom?._raw;
-      const directPolicy =
-        typeof raw?.cancellation_policy === "string"
-          ? raw.cancellation_policy.trim()
-          : typeof raw?.cancellationPolicy === "string"
-            ? raw.cancellationPolicy.trim()
-            : "";
-      const directPolicyText = sanitizePolicyText(directPolicy);
-      if (directPolicyText) roomPolicyTexts.push(directPolicyText);
-      locallyPayaleTaxesTemp = raw?.locally_payable_fees;
-      const hbPolicies = Array.isArray(raw?._hotelbeds?.cancellationPolicies)
-        ? raw._hotelbeds.cancellationPolicies
-        : [];
-      for (const p of hbPolicies) {
-        if (!p || typeof p !== "object") continue;
-        const policy =
-          typeof p.policy === "string"
-            ? p.policy.trim()
-            : typeof p.description === "string"
-              ? p.description.trim()
-              : typeof p.text === "string"
-                ? p.text.trim()
-                : "";
-        const policyText = sanitizePolicyText(policy);
-        if (policyText) roomPolicyTexts.push(policyText);
+    const roomIdsToProcess = selectedHotelRoomIds.length > 0
+      ? selectedHotelRoomIds
+      : (selectedHotelRoomSummary?.roomId ? [selectedHotelRoomSummary.roomId] : []);
+
+    if (Array.isArray(cached?.rooms) && roomIdsToProcess.length > 0) {
+      for (const rid of roomIdsToProcess) {
+        const room = (cached.rooms as any[]).find(
+          (r) => String(r?.id ?? "").trim() === String(rid).trim()
+        );
+        const raw = room?._raw;
+        if (!raw) continue;
+
+        const direct = sanitizePolicyText(firstStringOf(raw, "cancellation_policy", "cancellationPolicy"));
+        if (direct) roomPolicyTexts.push(direct);
+
+        const hbPolicies: any[] = Array.isArray(raw._hotelbeds?.cancellationPolicies)
+          ? raw._hotelbeds.cancellationPolicies : [];
+        for (const p of hbPolicies) {
+          if (!p || typeof p !== "object") continue;
+          const text = sanitizePolicyText(firstStringOf(p, "policy", "description", "text"));
+          if (text) roomPolicyTexts.push(text);
+        }
       }
     }
 
@@ -282,21 +280,14 @@ export function HotelCheckoutSidebar({
       }
     }
     let locally_payable_fees: locallyPayableFeesType | undefined;
-    if (locallyPayaleTaxesTemp && locallyPayaleTaxesTemp.request && locallyPayaleTaxesTemp.billable) {
-      locally_payable_fees = {
-        amount: locallyPayaleTaxesTemp?.request?.value || "0",
-        currency: locallyPayaleTaxesTemp?.request?.currency || currency,
-        type: "Billable",
-        subTaxes: locallyPayaleTaxesTemp?.breakdown?.map((el: { amount: any; currency: any; description: any; }) => {
-          let am = el.amount * locallyPayaleTaxesTemp.request.value / locallyPayaleTaxesTemp.billable.value
-          return {
-            amount: am,
-            currency: locallyPayaleTaxesTemp?.request?.currency,
-            type: el.description
-          }
-        })
-      }
-    }
+    const roomIdsForFees = selectedHotelRoomIds.length > 0
+      ? selectedHotelRoomIds
+      : (selectedHotelRoomSummary?.roomId ? [selectedHotelRoomSummary.roomId] : []);
+    locally_payable_fees = computeLocallyPayableFees(
+      cached?.rooms as any,
+      roomIdsForFees,
+      currency
+    );
 
     const localTaxTotal = localTaxes.reduce((s, t) => s + Number(t.amount || 0), 0);
     const localTaxCurrency = localTaxes[0]?.currency || currency;
@@ -495,24 +486,7 @@ export function HotelCheckoutSidebar({
             </span>
           </div>
           {display.locally_payable_fees?.amount && (
-            <div className="bg-[#FFF8F0] border border-[#F5D9B3] rounded-lg p-3 flex flex-col gap-2">
-              <span className="text-xs font-semibold text-[#8B5E20]">
-                Local Fees Payable
-              </span>
-              <div className="flex items-center justify-between text-xs text-[#8B5E20]">
-                <span>{display.locally_payable_fees.type}</span>
-                <div className="text-right">
-                  <div>{formatMoneyFromCode(display.locally_payable_fees.currency, Number(display.locally_payable_fees.amount || 0))}</div>
-                  {display.locally_payable_fees.subTaxes?.map(el => {
-                    return (
-                      <div key={el.type}>
-                        {el.type}: {formatMoneyFromCode(el.currency, Number(el.amount || 0))}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            </div>
+            <LocallyPayableFeesCard fees={display.locally_payable_fees} />
           )}
           {display.localTaxes.length > 0 && (
             <div className="bg-[#FFF8F0] border border-[#F5D9B3] rounded-lg p-3 flex flex-col gap-2">
@@ -568,7 +542,7 @@ export function HotelCheckoutSidebar({
           <p className="text-sm font-medium text-[#010D50]">Non-refundable</p>
         )}
 
-        {display.cancellationText && (
+        {!isPackageMode && display.cancellationText && (
           <p className="text-xs text-[#3A478A] whitespace-pre-line">{display.cancellationText}</p>
         )}
       </div>

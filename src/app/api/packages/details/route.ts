@@ -76,6 +76,10 @@ interface TransformedPackageDetails {
       currency?: string;
       nonRefundable?: boolean;
       remarks?: string;
+      locallyPayableFees?: {
+        billable?: { value: number; currency: string };
+        request?: { value: number; currency: string };
+      };
     }>;
   };
   /** Cancellation policies */
@@ -261,6 +265,7 @@ function transformResponse(vyspaResponse: any): TransformedPackageDetails {
           currency: roomDetail.currency_code || roomDetail.branch_currency,
           nonRefundable: Number(roomDetail.nonRef ?? 0) === 1,
           remarks: roomDetail.non_printing_notes || roomDetail.quote_remarks,
+          locallyPayableFees: roomDetail.locally_payable_fees || undefined,
         };
       }),
     };

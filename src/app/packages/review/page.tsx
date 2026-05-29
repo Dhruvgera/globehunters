@@ -26,11 +26,15 @@ import { resolvePackagePricing } from "@/lib/package/pricing";
 import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
 import { calculateNights } from "@/lib/hotels/nights";
 import { formatMoneyFromSymbol } from "@/lib/currency/formatMoney";
-import { normalizePolicyCurrencyText } from "@/lib/currency/policyText";
+import type { locallyPayableFeesType } from "@/types/hotel";
+import { LocallyPayableFeesCard } from "@/components/booking/LocallyPayableFeesCard";
+import { computeLocallyPayableFees } from "@/lib/hotels/locallyPayableFees";
 import { formatLongDate, shiftIsoDateByDays } from "@/lib/utils/dateFormat";
 import { buildDetailsFromDeeplinkView } from "@/lib/package/deeplinkDetails";
 import { buildChangeHotelHref } from "@/lib/package/changeLinks";
 import { getJourneySegments } from "@/lib/flight/segments";
+import { CustomerReviewsCard } from "@/components/booking/CustomerReviewsCard";
+import { useReviews } from "@/hooks/useReviews";
 
 function parseMoneyString(value?: string | null) {
   const raw = String(value || "").trim();
@@ -86,6 +90,7 @@ function PackageReviewPageInner() {
   const selectedFareType = useBookingStore((state) => state.selectedFareType);
   const selectedUpgrade = useBookingStore((state) => state.selectedUpgradeOption);
   const selectedFlight = useSelectedFlight();
+  const { reviews, totalReviews, averageRating } = useReviews();
 
   const [showFlightInfo, setShowFlightInfo] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -318,6 +323,23 @@ function PackageReviewPageInner() {
     if (flightResultId) params.set("flightResultId", flightResultId);
     return `/search?${params.toString()}`;
   }, [flightResultId, hotelId, packageResultsMeta?.hotelRequestId]);
+
+  const locallyPayableFees = useMemo<locallyPayableFeesType | undefined>(() => {
+    const fallbackCurrency = hotelRoomSummary?.currency || "$";
+    const result = computeLocallyPayableFees(
+      packageDetails?.hotel?.rooms as any,
+      selectedHotelRoomIds,
+      fallbackCurrency
+    );
+    if (result) return result;
+
+    const cached = selectedHotel?.hotelId ? hotelDetailsCache?.[selectedHotel.hotelId] : undefined;
+    return computeLocallyPayableFees(
+      cached?.rooms as any,
+      selectedHotelRoomIds,
+      fallbackCurrency
+    );
+  }, [hotelDetailsCache, hotelRoomSummary?.currency, packageDetails?.hotel?.rooms, selectedHotel?.hotelId, selectedHotelRoomIds]);
 
   const handleContinue = () => {
     const params = new URLSearchParams(searchParams.toString());
@@ -567,36 +589,21 @@ function PackageReviewPageInner() {
 
             <RefundShieldTerms />
 
-            <div className="bg-white border border-[#DFE0E4] rounded-2xl overflow-hidden">
-              <div className="px-4 sm:px-6 py-4 border-b border-[#DFE0E4]">
-                <h2 className="text-xl font-semibold text-[#010D50]">Cancellation Policy</h2>
-              </div>
-              <div className="p-4 sm:p-6 flex flex-col gap-2">
-                {selectedCancellation ? (
-                  <>
-                    <p className="text-sm font-medium text-[#010D50]">
-                      Effective from {formatLongDate(selectedCancellation.effectiveDate)}
-                    </p>
-                    <p className="text-sm text-[#3A478A]">
-                      {normalizePolicyCurrencyText(selectedCancellation.policy)}
-                    </p>
-                    {selectedCancellation.penalty != null && (
-                      <p className="text-sm text-[#3A478A]">
-                        Penalty: {formatMoneyFromSymbol(selectedCancellation.penaltyCurrency, selectedCancellation.penalty)}
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-sm text-[#3A478A]">Live cancellation details will appear here once the package detail request completes.</p>
-                )}
-              </div>
-            </div>
+            {/* Cancellation Policy hidden for package mode */}
           </div>
 
           <div className="w-full lg:w-96 flex-shrink-0 flex flex-col gap-4">
             <WebRefCard refNumber={refNumber} phoneNumber={affiliatePhone} isMobile={false} isJourneyRef={!!vyspaFolderNumber} />
 
-            <div className="bg-white border border-[#DFE0E4] rounded-xl lg:sticky lg:top-4">
+            {reviews.length > 0 && (
+              <CustomerReviewsCard
+                overallRating={averageRating}
+                totalReviews={totalReviews}
+                reviews={reviews}
+              />
+            )}
+
+            <div className="bg-white border border-[#DFE0E4] rounded-xl lg:sticky lg:top-20">
               <div className="p-4 sm:p-6 space-y-4">
                 <h3 className="font-semibold text-[#010D50]">Summary</h3>
 
@@ -641,6 +648,10 @@ function PackageReviewPageInner() {
                     </div>
                   </div>
                 </div>
+
+                {locallyPayableFees?.amount && (
+                  <LocallyPayableFeesCard fees={locallyPayableFees} />
+                )}
 
                 <Button
                   onClick={handleContinue}

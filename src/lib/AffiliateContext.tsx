@@ -20,7 +20,7 @@ interface AffiliateContextType {
   affiliates: Affiliate[];
 }
 
-const DEFAULT_PHONE = '020 4502 2984';
+const DEFAULT_PHONE = '020 8944 4666';
 
 const AffiliateContext = createContext<AffiliateContextType>({
   affiliateCode: null,
