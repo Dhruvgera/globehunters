@@ -354,7 +354,7 @@ export function HotelRoomCard({ room,
                         <div className="font-semibold text-yellow-800 mb-1">🔧 Rate Breakdown IDs</div>
                         {Object.entries(debugSlotRoomIds).map(([groupKey, rawId]) => {
                             const srcOption = room.roomGroupSources?.[groupKey];
-                            const srcId = srcOption ? String((srcOption as Record<string, unknown>).id ?? "") : "";
+                            const srcId = srcOption ? String((srcOption as unknown as Record<string, unknown>).id ?? "") : "";
                             const matchesThisRoom = rawId === room.id || rawId === room.sourceRoomOptionId || rawId === srcId;
                              return (
                                 <div key={groupKey} className="flex flex-col gap-0.5">
@@ -421,7 +421,7 @@ export function HotelRoomCard({ room,
                                                 </label>
                                                 {isHotelDatesDebugMode && (() => {
                                                     const srcOption = room.roomGroupSources?.[groupKey];
-                                                    const srcId = srcOption ? String((srcOption as Record<string, unknown>).id ?? "") : "";
+                                                    const srcId = srcOption ? String((srcOption as unknown as Record<string, unknown>).id ?? "") : "";
                                                     return srcId ? (
                                                         <span className="text-[9px] font-mono text-yellow-700 bg-yellow-50 px-1 rounded">
                                                             {srcId}
