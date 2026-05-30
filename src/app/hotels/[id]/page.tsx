@@ -6,7 +6,6 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronRight,
   ChevronUp,
-  ChevronDown,
   Star,
   Building2,
   Calendar,
@@ -35,6 +34,7 @@ import Footer from "@/components/navigation/Footer";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import HotelGallery from "@/components/hotels/HotelGallery";
+import HotelFAQSection from "@/components/hotels/HotelFAQSection";
 import { hotelService } from "@/services/api/hotelService";
 import { packageService } from "@/services/api/packageService";
 import { useBookingStore, useStoreHydration } from "@/store/bookingStore";
@@ -358,7 +358,7 @@ function deduplicateAndFlattenPackageRooms(
   for (const [groupKey, options] of groupEntries) {
     for (const option of options) {
       const rawOption = option as Record<string, unknown>;
-      const dedupKey = String(rawOption.room_code || option.room_name || option.id || "").trim().toLowerCase();
+      const dedupKey = `${String(rawOption.room_code || option.room_name || option.id || "")}|${String(rawOption.meal_name || option.MealPlan || "")}`.trim().toLowerCase();
       if (!dedupKey) continue;
 
       const price = Number(option.cust_tot_sell_amt ?? option.net_price ?? 0);
@@ -1470,7 +1470,6 @@ export default function HotelRoomsPage() {
   }, [hasHydrated, isPackageMode, packageSearch, hotelSearch]);
 
   // State
-  const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
   const [flightInfoModalOpen, setFlightInfoModalOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("Overview");
@@ -1521,16 +1520,7 @@ export default function HotelRoomsPage() {
   const isHotelDatesDebugMode = process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES === "true";
   const checkoutRef = useRef<HTMLInputElement>(null)
 
-  // Reset rooms-load dedup guard when navigating to a different hotel,
-  // or when hotelSearch transitions from null to populated (URL hydration).
-  const prevHotelSearchRef = useRef(hotelSearch);
-  useEffect(() => {
-    if (!prevHotelSearchRef.current && hotelSearch) {
-      lastRoomsLoadKeyRef.current = "";
-    }
-    prevHotelSearchRef.current = hotelSearch;
-  }, [hotelSearch]);
-
+  // Reset rooms-load dedup guard when navigating to a different hotel.
   useEffect(() => {
     lastRoomsLoadKeyRef.current = "";
   }, [hotelId]);
@@ -1724,6 +1714,11 @@ export default function HotelRoomsPage() {
       while (retries < 5 && !searchResultsSuccess) {
         searchResultsSuccess = await runStaySearch(next);
         retries++;
+      }
+
+      if (!searchResultsSuccess) {
+        setRemoteRooms([]);
+        throw new Error("Unable to find availability for the selected dates. Please try different dates.");
       }
 
       // Sync URL with the new search context so refreshes / shares use the correct criteria.
@@ -2284,7 +2279,7 @@ export default function HotelRoomsPage() {
       trustYou: trustYouReview,
       fetchedAt: cached.fetchedAt || Date.now(),
     });
-  }, [hotelDetailsCache, hotelId, setHotelDetailsCache, trustYouReview]);
+  }, [hotelDetailsCache?.[hotelId], hotelId, setHotelDetailsCache, trustYouReview]);
 
   const hotel = useMemo(() => {
     const mapQuery = (() => {
@@ -2902,18 +2897,6 @@ export default function HotelRoomsPage() {
       }
       lastRoomsLoadKeyRef.current = roomsLoadKey;
 
-      // 🔍 DIAGNOSTIC: log why loadRooms effect fired
-      console.log("[loadRooms] effect fired", {
-        hotelId,
-        "hotelSearch.provider": hotelSearch?.provider,
-        "hotelSearch.searchCriteriaId": hotelSearch?.searchCriteriaId,
-        effectiveProvider,
-        effectiveSearchCriteriaId,
-        urlSearchCriteriaId,
-        urlProvider,
-        metaProvider,
-      });
-
       const searchResultSeed = extractSearchResultHotelData(meta?.rawSearchResult);
       setRoomsLoading(true);
       setRoomsError(null);
@@ -3282,13 +3265,6 @@ export default function HotelRoomsPage() {
           hotelSearch &&
           (hotelSearch.provider !== effectiveProvider || hotelSearch.searchCriteriaId !== effectiveSearchCriteriaId)
         ) {
-          // 🔍 DIAGNOSTIC: this setHotelSearch call likely triggers the feedback loop
-          console.log("[loadRooms] setHotelSearch (feedback loop candidate)", {
-            "prev.provider": hotelSearch.provider,
-            "prev.searchCriteriaId": hotelSearch.searchCriteriaId,
-            "next.provider": effectiveProvider,
-            "next.searchCriteriaId": effectiveSearchCriteriaId,
-          });
           setHotelSearch({
             ...hotelSearch,
             provider: effectiveProvider,
@@ -3423,11 +3399,11 @@ export default function HotelRoomsPage() {
             name: opt?.room_name || "Room",
             bedType: opt?.meal_name || opt?.MealPlan || "Meal plan",
             reviews: { score: 0, label: "No reviews", count: 0 },
-            isRefundable: opt?.nonRef === 0,
+            isRefundable: Number(opt?.nonRef ?? 1) === 0,
             paymentType: "Pay now",
             amenities: [],
             price: {
-              currency: opt?.sell_currency_code === "GBP" ? "£" : opt?.sell_currency_code || "£",
+              currency: String(opt?.sell_currency_code || opt?.currency_code || "GBP").toUpperCase() === "GBP" ? "£" : String(opt?.sell_currency_code || opt?.currency_code || "GBP").toUpperCase(),
               nightly:
                 Number(opt?.days_spent) > 0
                   ? Number(opt?.cust_tot_sell_amt ?? opt?.net_price ?? 0) / Number(opt?.days_spent)
@@ -3567,6 +3543,7 @@ export default function HotelRoomsPage() {
           }
         }
       } catch (e: any) {
+        lastRoomsLoadKeyRef.current = "";
         if (!cancelled) {
           setRoomsError(e?.message || "Failed to load rooms");
           setRemoteRooms([]);
@@ -4642,45 +4619,7 @@ export default function HotelRoomsPage() {
           )}
 
           {/* FAQ Section */}
-          {faqs.length > 0 && (
-            <div className="mx-4 lg:mx-6 mb-6 bg-[#F5F7FF] rounded-3xl p-6 lg:p-8 space-y-6">
-              <h2 className="text-xl lg:text-2xl font-semibold text-[#010D50]">
-                Got questions about {hotel.name.split(' ').slice(0, 3).join(' ')}?
-              </h2>
-
-              <div className="space-y-4">
-                {faqs.map((faq) => (
-                  <div
-                    key={faq.id}
-                    className="bg-white border border-[#DFE0E4] rounded-[32px] overflow-hidden"
-                  >
-                    <button
-                      onClick={() =>
-                        setExpandedFAQ(expandedFAQ === faq.id ? null : faq.id)
-                      }
-                      className="w-full flex items-center justify-between p-6 text-left"
-                    >
-                      <span className="text-base lg:text-lg font-medium text-[#010D50] pr-4">
-                        {faq.question}
-                      </span>
-                      {expandedFAQ === faq.id ? (
-                        <ChevronUp className="w-6 h-6 text-[#010D50] flex-shrink-0" />
-                      ) : (
-                        <ChevronDown className="w-6 h-6 text-[#010D50] flex-shrink-0" />
-                      )}
-                    </button>
-                    {expandedFAQ === faq.id && (
-                      <div className="px-6 pb-6">
-                        <p className="text-sm text-[#3A478A] leading-relaxed">
-                          {faq.answer}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <HotelFAQSection faqs={faqs} hotelName={hotel.name} />
 
           {/* Important Information Section */}
           {hasImportantInfo && (

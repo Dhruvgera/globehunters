@@ -78,10 +78,12 @@ export function PackageDestinationAutocomplete({
 
   const displayResults = useMemo(() => {
     const deduped = new Map<string, HolidayDestination>();
-    results.forEach((destination) => {
-      const key = `${String(destination.id)}:${destination.name.trim().toLowerCase()}`;
-      if (!deduped.has(key)) deduped.set(key, destination);
-    });
+    results
+      .filter((destination) => String(destination.airportcode || "").trim())
+      .forEach((destination) => {
+        const key = `${String(destination.id)}:${destination.name.trim().toLowerCase()}`;
+        if (!deduped.has(key)) deduped.set(key, destination);
+      });
 
     return Array.from(deduped.values()).sort((a, b) => {
       const aName = a.name.trim().toLowerCase();
