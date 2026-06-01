@@ -156,18 +156,18 @@ function PackageDeeplinkCard({ pkg, index }: { pkg: PackageSearchResult; index: 
   const raw = pkg.rawSearchResult as Record<string, unknown> | undefined;
   const mainKey = typeof raw?.main === "string" ? raw.main : undefined;
 
-  const allDeeplinks: Array<{ label: string; code: string; url: string }> = [];
+  const allDeeplinks: Array<{ label: string; code: string; url: string, price?: string }> = [];
 
   if (mainKey && baseUrl) {
     allDeeplinks.push({ label: "Main", code: "main", url: `${baseUrl}${mainKey}` });
   }
-
   for (const [code, key] of Object.entries(keys)) {
     if (key && baseUrl) {
       allDeeplinks.push({
         label: MEAL_PLAN_LABELS[code] || code,
         code,
         url: `${baseUrl}${key}`,
+        price: raw?.['Min' + code] as string | undefined,
       });
     }
   }
@@ -235,16 +235,26 @@ function PackageDeeplinkCard({ pkg, index }: { pkg: PackageSearchResult; index: 
               </p>
               <div className="flex flex-wrap gap-2">
                 {allDeeplinks.map((link) => (
-                  <a
-                    key={link.code}
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors bg-[#F5F7FF] border-[#3754ED]/20 text-[#3754ED] hover:bg-[#3754ED] hover:text-white"
-                  >
-                    {link.label}
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
+                  <>
+                    <a
+                      key={link.code}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors bg-[#F5F7FF] border-[#3754ED]/20 text-[#3754ED] hover:bg-[#3754ED] hover:text-white"
+                    >
+                      {link.label}
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                    {
+                      link.price && (
+                        <span className="font-bold font-large">
+                          <span className="text-xs font-medium"> From </span>
+
+                          {pkg.currency === "GBP" ? "£" : pkg.currency || "£"}{link.price}
+                        </span>
+                      )
+                    }</>
                 ))}
               </div>
             </div>
