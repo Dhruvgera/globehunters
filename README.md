@@ -3,7 +3,7 @@
 A full-stack travel booking platform built with Next.js 16, TypeScript, and Tailwind CSS v4. Integrates with Vyspa (flights, hotels, portal), BoxPay (payments), Hotelbeds (hotels), and TrustYou (reviews).
 
 ## Features
-
+ 
 - **Flight Search & Booking** – Vyspa Search API with filters, sorting, date-price tiles, and multi-city support
 - **Deeplinks** – Meta channel entry (Skyscanner etc.) via `?key=` / `?flight=` params
 - **Price Check & Upgrades** – Fare verification and upgrade options (V1 + V3 flows)
