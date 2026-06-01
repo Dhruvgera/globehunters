@@ -293,33 +293,32 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
       }
     }
 
-    if (savedHotelSearch) {
-      const inStr = urlParams.get("checkIn") || savedHotelSearch.checkIn || "";
-      const outStr = urlParams.get("checkOut") || savedHotelSearch.checkOut || "";
-      const adults = Number(urlParams.get("adults") || savedHotelSearch.adults || "") || undefined;
-      const children = Number(urlParams.get("children") || savedHotelSearch.children || "") || 0;
-      const rms = Number(urlParams.get("rooms") || savedHotelSearch.rooms || "") || undefined;
-      const childAgeParam = urlParams.get("child_age");
+    // Always hydrate from URL params first, then fall back to saved search
+    const inStr = urlParams.get("checkIn") || savedHotelSearch?.checkIn || "";
+    const outStr = urlParams.get("checkOut") || savedHotelSearch?.checkOut || "";
+    const adults = Number(urlParams.get("adults") || savedHotelSearch?.adults || "") || undefined;
+    const children = Number(urlParams.get("children") || savedHotelSearch?.children || "") || 0;
+    const rms = Number(urlParams.get("rooms") || savedHotelSearch?.rooms || "") || undefined;
+    const childAgeParam = urlParams.get("child_age");
 
-      if (inStr) {
-        const d = new Date(inStr);
-        if (!Number.isNaN(d.getTime())) setHotelStartDate(d);
-      }
-      if (outStr) {
-        const d = new Date(outStr);
-        if (!Number.isNaN(d.getTime())) setHotelEndDate(d);
-      }
-      if (adults) setHotelGuests(adults);
-      setHotelChildren(Math.max(0, Number(children) || 0));
-      if (rms) setHotelRooms(rms);
-      setHotelChildAges(
-        flattenHotelChildAges(
-          childAgeParam ?? savedHotelSearch.child_age ?? [],
-          Math.max(1, Number(rms) || savedHotelSearch.rooms || 1),
-          Math.max(0, Number(children) || 0)
-        )
-      );
+    if (inStr) {
+      const d = new Date(inStr);
+      if (!Number.isNaN(d.getTime())) setHotelStartDate(d);
     }
+    if (outStr) {
+      const d = new Date(outStr);
+      if (!Number.isNaN(d.getTime())) setHotelEndDate(d);
+    }
+    if (adults) setHotelGuests(adults);
+    setHotelChildren(Math.max(0, Number(children) || 0));
+    if (rms) setHotelRooms(rms);
+    setHotelChildAges(
+      flattenHotelChildAges(
+        childAgeParam ?? savedHotelSearch?.child_age ?? [],
+        Math.max(1, Number(rms) || savedHotelSearch?.rooms || 1),
+        Math.max(0, Number(children) || 0)
+      )
+    );
   }, [pathname, savedHotelLocation, savedHotelSearch, savedPackageDestination, savedPackageSearch, setFrom, urlParams]);
 
   const setProduct = (next: Product) => {
