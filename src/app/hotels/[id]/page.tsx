@@ -6,7 +6,6 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronRight,
   ChevronUp,
-  ChevronDown,
   Star,
   Building2,
   Calendar,
@@ -35,6 +34,7 @@ import Footer from "@/components/navigation/Footer";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import HotelGallery from "@/components/hotels/HotelGallery";
+import HotelFAQSection from "@/components/hotels/HotelFAQSection";
 import { hotelService } from "@/services/api/hotelService";
 import { packageService } from "@/services/api/packageService";
 import { useBookingStore, useStoreHydration } from "@/store/bookingStore";
@@ -201,10 +201,59 @@ function countSelectedRooms(counts: Record<string, number>): number {
   return Object.values(counts).reduce((sum, count) => sum + Math.max(0, Number(count || 0)), 0);
 }
 
+interface GroupSlotContext {
+  groupKeys: string[];
+  selectedSlots: Record<string, string>;
+}
+
+function resolveGroupSlotPrice(
+  room: RoomCardData,
+  groupKey: string,
+): { total: number; nightly: number; currency: string } | null {
+  const groupOption = room.roomGroupSources?.[groupKey] as Record<string, unknown> | undefined;
+  if (!groupOption) return null;
+  const rawTotal = Number(groupOption.cust_tot_sell_amt ?? groupOption.net_price ?? 0);
+  const daysSpent = Math.max(1, Number(groupOption.days_spent ?? 1));
+  const gc = String(groupOption.sell_currency_code || groupOption.currency_code || "").toUpperCase();
+  return {
+    total: rawTotal,
+    nightly: rawTotal / daysSpent,
+    currency: gc ? (gc === "GBP" ? "£" : gc) : "",
+  };
+}
+
+function sumGroupSlotPrices(
+  allRooms: RoomCardData[],
+  groupSlots: GroupSlotContext,
+): { total: number; nightly: number; currency: string } | null {
+  let total = 0;
+  let nightly = 0;
+  let currency = "";
+  for (const groupKey of groupSlots.groupKeys) {
+    const cardId = groupSlots.selectedSlots[groupKey];
+    if (!cardId) continue;
+    const room = allRooms.find((r) => String(r.id) === String(cardId));
+    if (!room) continue;
+    const gp = resolveGroupSlotPrice(room, groupKey);
+    if (gp) {
+      total += gp.total;
+      nightly += gp.nightly;
+      if (!currency && gp.currency) currency = gp.currency;
+    } else {
+      total += Number(room.price?.total || 0);
+      nightly += Number(room.price?.nightly || 0);
+      if (!currency && room.price?.currency) currency = room.price.currency;
+    }
+  }
+  if (total <= 0) return null;
+  return { total, nightly, currency: currency || "£" };
+}
+
 function buildSelectedRoomSummary(
   hotelId: string,
   selectedRoomIds: string[],
-  allRooms: RoomCardData[]
+  allRooms: RoomCardData[],
+  groupSlots?: GroupSlotContext,
 ) {
   if (!hotelId || selectedRoomIds.length === 0) return null;
 
@@ -214,9 +263,23 @@ function buildSelectedRoomSummary(
   if (selectedRooms.length === 0) return null;
 
   const firstRoom = selectedRooms[0];
-  const currency = firstRoom.price?.currency;
-  const total = selectedRooms.reduce((sum, room) => sum + Number(room.price?.total || 0), 0);
-  const nightly = selectedRooms.reduce((sum, room) => sum + Number(room.price?.nightly || 0), 0);
+  const hasGroupPricing = groupSlots && groupSlots.groupKeys.length > 0;
+
+  let currency = firstRoom.price?.currency;
+  let total = 0;
+  let nightly = 0;
+
+  if (hasGroupPricing) {
+    const slotPrices = sumGroupSlotPrices(allRooms, groupSlots);
+    if (slotPrices) {
+      total = slotPrices.total;
+      nightly = slotPrices.nightly;
+      currency = slotPrices.currency;
+    }
+  } else {
+    total = selectedRooms.reduce((sum, room) => sum + Number(room.price?.total || 0), 0);
+    nightly = selectedRooms.reduce((sum, room) => sum + Number(room.price?.nightly || 0), 0);
+  }
   const uniqueRoomNames = Array.from(new Set(selectedRooms.map((room) => room.name).filter(Boolean)));
   const uniqueMealPlans = Array.from(new Set(selectedRooms.map((room) => room.bedType).filter(Boolean)));
   const allRefundable = selectedRooms.every((room) => room.isRefundable);
@@ -295,7 +358,7 @@ function deduplicateAndFlattenPackageRooms(
   for (const [groupKey, options] of groupEntries) {
     for (const option of options) {
       const rawOption = option as Record<string, unknown>;
-      const dedupKey = String(rawOption.room_code || option.room_name || option.id || "").trim().toLowerCase();
+      const dedupKey = `${String(rawOption.room_code || option.room_name || option.id || "")}|${String(rawOption.meal_name || option.MealPlan || "")}`.trim().toLowerCase();
       if (!dedupKey) continue;
 
       const price = Number(option.cust_tot_sell_amt ?? option.net_price ?? 0);
@@ -395,6 +458,110 @@ function deduplicateAndFlattenPackageRooms(
     basePrices,
     groupEntries,
   };
+}
+
+interface RateBreakdownPreselection {
+  slots: Record<string, string>;
+  totalPrice: number;
+}
+
+function buildRoomLookupMaps(flattenedRooms: RoomCardData[]) {
+  const byId = new Map<string, RoomCardData>();
+  const bySourceOptionId = new Map<string, RoomCardData>();
+  for (const room of flattenedRooms) {
+    byId.set(String(room.id), room);
+    const srcId = String(room.sourceRoomOptionId || "");
+    if (srcId && srcId !== String(room.id)) {
+      bySourceOptionId.set(srcId, room);
+    }
+  }
+  return { byId, bySourceOptionId };
+}
+
+function extractRateBreakdownPreselection(
+  breakdown: import("@/types/holidayPackage").RoomRateBreakdown | undefined,
+  flattenedRooms: RoomCardData[],
+  sortedGroupKeys: string[],
+): RateBreakdownPreselection | null {
+  if (!breakdown) return null;
+  const entryKey = Object.keys(breakdown)[0];
+  if (!entryKey) return null;
+  const entry = breakdown[entryKey];
+  if (!entry || typeof entry !== "object") return null;
+
+  const { byId, bySourceOptionId } = buildRoomLookupMaps(flattenedRooms);
+  const slots: Record<string, string> = {};
+  for (const groupKey of sortedGroupKeys) {
+    const numMatch = groupKey.match(/\d+/);
+    if (!numMatch) continue;
+    const roomNum = numMatch[0];
+    const rawOptionId = String((entry as Record<string, unknown>)[`room${roomNum}id`] || "").trim();
+    if (!rawOptionId) continue;
+    let room = byId.get(rawOptionId) || bySourceOptionId.get(rawOptionId);
+    if (!room) {
+      for (const r of flattenedRooms) {
+        const gs = r.roomGroupSources?.[groupKey] as Record<string, unknown> | undefined;
+        if (gs && String(gs.id || "") === rawOptionId) {
+          room = r;
+          break;
+        }
+      }
+    }
+    if (room) slots[groupKey] = String(room.id);
+  }
+
+  if (Object.keys(slots).length === 0) return null;
+  const totalPrice = Number(entry.total_price ?? 0);
+  return { slots, totalPrice };
+}
+
+function computeEffectiveBasePrices(
+  rateBreakdown: RateBreakdownPreselection | null,
+  basePrices: Record<string, number>,
+  sortedGroupKeys: string[],
+  flattenedRooms: RoomCardData[],
+): Record<string, number> {
+  if (!rateBreakdown) return basePrices;
+  const roomById = new Map<string, RoomCardData>();
+  for (const room of flattenedRooms) {
+    roomById.set(String(room.id), room);
+  }
+  const adjusted: Record<string, number> = {};
+  for (const groupKey of sortedGroupKeys) {
+    const selectedCardId = rateBreakdown.slots[groupKey];
+    if (!selectedCardId) {
+      adjusted[groupKey] = basePrices[groupKey] ?? 0;
+      continue;
+    }
+    const room = roomById.get(String(selectedCardId));
+    if (room) {
+      const gp = resolveGroupSlotPrice(room, groupKey);
+      adjusted[groupKey] = gp?.total ?? basePrices[groupKey] ?? 0;
+    } else {
+      adjusted[groupKey] = basePrices[groupKey] ?? 0;
+    }
+  }
+  return adjusted;
+}
+
+function resolveDefaultRoomCounts(
+  rateBreakdown: RateBreakdownPreselection | null,
+  pricesSame: boolean,
+  initialSlots: Record<string, string>,
+  flattenedRooms: RoomCardData[],
+  roomCount: number,
+): Record<string, number> {
+  if (rateBreakdown) {
+    return selectedRoomCountsFromIds(Object.values(rateBreakdown.slots));
+  }
+  if (pricesSame) {
+    const next: Record<string, number> = {};
+    if (flattenedRooms.length > 0) {
+      next[flattenedRooms[0].id] = roomCount;
+    }
+    return next;
+  }
+  return selectedRoomCountsFromIds(Object.values(initialSlots));
 }
 
 function toErrorMessage(error: unknown, fallback: string): string {
@@ -1303,7 +1470,6 @@ export default function HotelRoomsPage() {
   }, [hasHydrated, isPackageMode, packageSearch, hotelSearch]);
 
   // State
-  const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
   const [flightInfoModalOpen, setFlightInfoModalOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("Overview");
@@ -1347,21 +1513,14 @@ export default function HotelRoomsPage() {
   const [deeplinkSelectedSlots, setDeeplinkSelectedSlots] = useState<Record<string, string>>({});
   const [deeplinkRoomGroupKeys, setDeeplinkRoomGroupKeys] = useState<string[]>([]);
   const [deeplinkBaseSlotPrices, setDeeplinkBaseSlotPrices] = useState<Record<string, number>>({});
+  const [rateBreakdownTotalPrice, setRateBreakdownTotalPrice] = useState<number | null>(null);
+  const [rawRateBreakdown, setRawRateBreakdown] = useState<import("@/types/holidayPackage").RoomRateBreakdown | null>(null);
   const trustYouFetchKeyRef = useRef<string>("");
   const lastRoomsLoadKeyRef = useRef<string>("");
   const isHotelDatesDebugMode = process.env.NEXT_PUBLIC_DEBUG_HOTEL_DATES === "true";
   const checkoutRef = useRef<HTMLInputElement>(null)
 
-  // Reset rooms-load dedup guard when navigating to a different hotel,
-  // or when hotelSearch transitions from null to populated (URL hydration).
-  const prevHotelSearchRef = useRef(hotelSearch);
-  useEffect(() => {
-    if (!prevHotelSearchRef.current && hotelSearch) {
-      lastRoomsLoadKeyRef.current = "";
-    }
-    prevHotelSearchRef.current = hotelSearch;
-  }, [hotelSearch]);
-
+  // Reset rooms-load dedup guard when navigating to a different hotel.
   useEffect(() => {
     lastRoomsLoadKeyRef.current = "";
   }, [hotelId]);
@@ -1555,6 +1714,11 @@ export default function HotelRoomsPage() {
       while (retries < 5 && !searchResultsSuccess) {
         searchResultsSuccess = await runStaySearch(next);
         retries++;
+      }
+
+      if (!searchResultsSuccess) {
+        setRemoteRooms([]);
+        throw new Error("Unable to find availability for the selected dates. Please try different dates.");
       }
 
       // Sync URL with the new search context so refreshes / shares use the correct criteria.
@@ -2115,7 +2279,7 @@ export default function HotelRoomsPage() {
       trustYou: trustYouReview,
       fetchedAt: cached.fetchedAt || Date.now(),
     });
-  }, [hotelDetailsCache, hotelId, setHotelDetailsCache, trustYouReview]);
+  }, [hotelDetailsCache?.[hotelId], hotelId, setHotelDetailsCache, trustYouReview]);
 
   const hotel = useMemo(() => {
     const mapQuery = (() => {
@@ -2303,12 +2467,19 @@ export default function HotelRoomsPage() {
       currency: displayedSearchPrice.currency,
     };
   }, [displayedSearchPrice, minRoomPrice]);
+  const remoteRoomsById = useMemo(() => {
+    const map = new Map<string, RoomCardData>();
+    for (const room of remoteRooms) {
+      map.set(String(room.id), room);
+    }
+    return map;
+  }, [remoteRooms]);
   const activePackageRoom = useMemo(
     () =>
       isPackageMode
-        ? remoteRooms.find((room) => String(room.id) === String(activeRoomCardId || ""))
+        ? remoteRoomsById.get(String(activeRoomCardId || ""))
         : undefined,
-    [activeRoomCardId, isPackageMode, remoteRooms]
+    [activeRoomCardId, isPackageMode, remoteRoomsById]
   );
   const resolvedPackagePrice = useMemo(() => {
     if (!isPackageMode) return null;
@@ -2316,14 +2487,26 @@ export default function HotelRoomsPage() {
     const useSlotPricing = !allDeeplinkRoomPricesSame && deeplinkRoomGroupKeys.length > 0;
 
     if (deeplinkViewData?.success || useSlotPricing) {
-      const selectedIds = selectedRoomIdsFromCounts(selectedRoomCounts);
-      const total = selectedIds.reduce((sum, rid) => {
-        const room = remoteRooms.find((r) => String(r.id) === String(rid));
-        return sum + (room?.price?.total || 0);
-      }, 0);
-      if (total > 0) {
+      if (useSlotPricing) {
+        const slotPrices = sumGroupSlotPrices(remoteRooms, {
+          groupKeys: deeplinkRoomGroupKeys,
+          selectedSlots: deeplinkSelectedSlots,
+        });
+        if (slotPrices) return { amount: slotPrices.total, currency: slotPrices.currency };
+      } else if (rateBreakdownTotalPrice != null && rateBreakdownTotalPrice > 0) {
         const currency = remoteRooms.find((r) => r.price?.currency)?.price?.currency || "£";
-        return { amount: total, currency };
+        return { amount: rateBreakdownTotalPrice, currency };
+      } else {
+        const selectedIds = selectedRoomIdsFromCounts(selectedRoomCounts);
+        let total = 0;
+        for (const rid of selectedIds) {
+          const room = remoteRoomsById.get(String(rid));
+          total += room?.price?.total || 0;
+        }
+        if (total > 0) {
+          const currency = remoteRooms.find((r) => r.price?.currency)?.price?.currency || "£";
+          return { amount: total, currency };
+        }
       }
     }
 
@@ -2352,15 +2535,32 @@ export default function HotelRoomsPage() {
     activePackageRoom?.price?.total,
     allDeeplinkRoomPricesSame,
     deeplinkRoomGroupKeys,
+    deeplinkSelectedSlots,
     deeplinkViewData?.success,
     isPackageMode,
     matchedPackageResult?.currency,
     matchedPackageResult?.startingPrice,
+    rateBreakdownTotalPrice,
     remoteRooms,
+    remoteRoomsById,
     selectedPackage?.hotel?.currency,
     selectedPackage?.totalPrice,
     selectedRoomCounts,
   ]);
+  const activeGroupSlotsKey = useMemo(
+    () =>
+      !allDeeplinkRoomPricesSame && deeplinkRoomGroupKeys.length > 0
+        ? JSON.stringify({ k: deeplinkRoomGroupKeys, s: deeplinkSelectedSlots })
+        : "",
+    [allDeeplinkRoomPricesSame, deeplinkRoomGroupKeys, deeplinkSelectedSlots],
+  );
+  const activeGroupSlots: GroupSlotContext | undefined = useMemo(
+    () =>
+      activeGroupSlotsKey
+        ? { groupKeys: deeplinkRoomGroupKeys, selectedSlots: deeplinkSelectedSlots }
+        : undefined,
+    [activeGroupSlotsKey, deeplinkRoomGroupKeys, deeplinkSelectedSlots],
+  );
   const packageRoomsForPricing = useMemo(
     () =>
       packageSearch?.rooms?.length
@@ -2507,9 +2707,9 @@ export default function HotelRoomsPage() {
 
   useEffect(() => {
     setSelectedHotelRoomIds(selectedRoomIds);
-    const summary = buildSelectedRoomSummary(hotelId, selectedRoomIds, remoteRooms);
+    const summary = buildSelectedRoomSummary(hotelId, selectedRoomIds, remoteRooms, activeGroupSlots);
     setSelectedHotelRoomSummary(summary);
-  }, [hotelId, remoteRooms, selectedRoomIds, setSelectedHotelRoomIds, setSelectedHotelRoomSummary]);
+  }, [hotelId, remoteRooms, selectedRoomIds, activeGroupSlots, setSelectedHotelRoomIds, setSelectedHotelRoomSummary]);
 
   useEffect(() => {
     if (filterBoardQuery.trim()) return;
@@ -2528,6 +2728,11 @@ export default function HotelRoomsPage() {
 
     async function loadRooms() {
       if (!hasHydrated) {
+        return;
+      }
+      const urlPackageKey = searchParams.get("packageKey") || searchParams.get("package");
+      const urlHotelKey = searchParams.get("key") || searchParams.get("hotel");
+      if ((urlPackageKey || urlHotelKey) && !deeplinkViewData) {
         return;
       }
       // ─── Deeplink view data path (self-contained, no session needed) ───
@@ -2554,10 +2759,24 @@ export default function HotelRoomsPage() {
               false,
             );
 
+            const rateBreakdown = extractRateBreakdownPreselection(
+              viewHotel.room_rate_breakdown,
+              flattenedRooms,
+              sortedGroupKeys,
+            );
+            const effectiveSlots = rateBreakdown?.slots || initialSlots;
+            const effectiveBasePrices = computeEffectiveBasePrices(
+              rateBreakdown,
+              basePrices,
+              sortedGroupKeys,
+              flattenedRooms,
+            );
+            setRateBreakdownTotalPrice(rateBreakdown?.totalPrice ?? null);
+            setRawRateBreakdown(viewHotel.room_rate_breakdown ?? null);
             setAllDeeplinkRoomPricesSame(pricesSame);
             setDeeplinkRoomGroupKeys(sortedGroupKeys);
-            setDeeplinkSelectedSlots(initialSlots);
-            setDeeplinkBaseSlotPrices(basePrices);
+            setDeeplinkSelectedSlots(effectiveSlots);
+            setDeeplinkBaseSlotPrices(effectiveBasePrices);
 
             const headerImage = ensureGiataImageUrl(fixStubaImageUrl(viewHotel.image_name) || "", 'original') as string;
             const headerAddress = [viewHotel.address1, viewHotel.address2].filter(Boolean).join(", ");
@@ -2597,15 +2816,13 @@ export default function HotelRoomsPage() {
             setSelectedHotel({ hotelId, hotelName: viewHotel.hotel_name });
 
             const deeplinkRoomCount = Math.max(1, Number(packageSearch?.rooms?.length || hotelSearch?.rooms || 1));
-            if (pricesSame) {
-              const deeplinkSelectedCounts: Record<string, number> = {};
-              if (flattenedRooms.length > 0) {
-                deeplinkSelectedCounts[flattenedRooms[0].id] = deeplinkRoomCount;
-              }
-              setSelectedRoomCounts(deeplinkSelectedCounts);
-            } else {
-              setSelectedRoomCounts(selectedRoomCountsFromIds(Object.values(initialSlots)));
-            }
+            setSelectedRoomCounts(resolveDefaultRoomCounts(
+              rateBreakdown,
+              pricesSame,
+              initialSlots,
+              flattenedRooms,
+              deeplinkRoomCount,
+            ));
             if (flattenedRooms.length > 0) setActiveRoomCardId(flattenedRooms[0].id);
             if (deeplinkGallery.length > 0) setGalleryImages(deeplinkGallery);
             if (hasCoordinates) setCoordinates({ lat: latitude, lng: longitude });
@@ -2680,18 +2897,6 @@ export default function HotelRoomsPage() {
       }
       lastRoomsLoadKeyRef.current = roomsLoadKey;
 
-      // 🔍 DIAGNOSTIC: log why loadRooms effect fired
-      console.log("[loadRooms] effect fired", {
-        hotelId,
-        "hotelSearch.provider": hotelSearch?.provider,
-        "hotelSearch.searchCriteriaId": hotelSearch?.searchCriteriaId,
-        effectiveProvider,
-        effectiveSearchCriteriaId,
-        urlSearchCriteriaId,
-        urlProvider,
-        metaProvider,
-      });
-
       const searchResultSeed = extractSearchResultHotelData(meta?.rawSearchResult);
       setRoomsLoading(true);
       setRoomsError(null);
@@ -2745,22 +2950,33 @@ export default function HotelRoomsPage() {
             true,
           );
 
+          const rateBreakdown = extractRateBreakdownPreselection(
+            roomHotel.room_rate_breakdown,
+            flattenedRooms,
+            sortedGroupKeys,
+          );
+          const effectiveSlots = rateBreakdown?.slots || initialSlots;
+          const effectiveBasePrices = computeEffectiveBasePrices(
+            rateBreakdown,
+            basePrices,
+            sortedGroupKeys,
+            flattenedRooms,
+          );
+          setRateBreakdownTotalPrice(rateBreakdown?.totalPrice ?? null);
+          setRawRateBreakdown(roomHotel.room_rate_breakdown ?? null);
           setAllDeeplinkRoomPricesSame(pricesSame);
           setDeeplinkRoomGroupKeys(sortedGroupKeys);
-          setDeeplinkSelectedSlots(initialSlots);
-          setDeeplinkBaseSlotPrices(basePrices);
+          setDeeplinkSelectedSlots(effectiveSlots);
+          setDeeplinkBaseSlotPrices(effectiveBasePrices);
 
           const roomCount = Math.max(1, Number(packageSearch?.rooms?.length || hotelSearch?.rooms || 1));
-          const defaultSelectedCounts = (() => {
-            if (pricesSame) {
-              const next: Record<string, number> = {};
-              if (flattenedRooms.length > 0) {
-                next[flattenedRooms[0].id] = roomCount;
-              }
-              return next;
-            }
-            return selectedRoomCountsFromIds(Object.values(initialSlots));
-          })();
+          const defaultSelectedCounts = resolveDefaultRoomCounts(
+            rateBreakdown,
+            pricesSame,
+            initialSlots,
+            flattenedRooms,
+            roomCount,
+          );
 
           const headerImage = ensureGiataImageUrl(fixStubaImageUrl(roomHotel.image_name) || packageHotel?.imageUrl || "", 'original') as string;
           const headerAddress = [roomHotel.address1, roomHotel.address2, packageHotel?.address?.street1]
@@ -3049,13 +3265,6 @@ export default function HotelRoomsPage() {
           hotelSearch &&
           (hotelSearch.provider !== effectiveProvider || hotelSearch.searchCriteriaId !== effectiveSearchCriteriaId)
         ) {
-          // 🔍 DIAGNOSTIC: this setHotelSearch call likely triggers the feedback loop
-          console.log("[loadRooms] setHotelSearch (feedback loop candidate)", {
-            "prev.provider": hotelSearch.provider,
-            "prev.searchCriteriaId": hotelSearch.searchCriteriaId,
-            "next.provider": effectiveProvider,
-            "next.searchCriteriaId": effectiveSearchCriteriaId,
-          });
           setHotelSearch({
             ...hotelSearch,
             provider: effectiveProvider,
@@ -3190,11 +3399,11 @@ export default function HotelRoomsPage() {
             name: opt?.room_name || "Room",
             bedType: opt?.meal_name || opt?.MealPlan || "Meal plan",
             reviews: { score: 0, label: "No reviews", count: 0 },
-            isRefundable: opt?.nonRef === 0,
+            isRefundable: Number(opt?.nonRef ?? 1) === 0,
             paymentType: "Pay now",
             amenities: [],
             price: {
-              currency: opt?.sell_currency_code === "GBP" ? "£" : opt?.sell_currency_code || "£",
+              currency: String(opt?.sell_currency_code || opt?.currency_code || "GBP").toUpperCase() === "GBP" ? "£" : String(opt?.sell_currency_code || opt?.currency_code || "GBP").toUpperCase(),
               nightly:
                 Number(opt?.days_spent) > 0
                   ? Number(opt?.cust_tot_sell_amt ?? opt?.net_price ?? 0) / Number(opt?.days_spent)
@@ -3334,6 +3543,7 @@ export default function HotelRoomsPage() {
           }
         }
       } catch (e: any) {
+        lastRoomsLoadKeyRef.current = "";
         if (!cancelled) {
           setRoomsError(e?.message || "Failed to load rooms");
           setRemoteRooms([]);
@@ -3351,6 +3561,7 @@ export default function HotelRoomsPage() {
   }, [
     hotelId,
     hasHydrated,
+    deeplinkViewData?.success,
     hotelSearch?.provider,
     hotelSearch?.searchCriteriaId,
     hotelSearch?.location,
@@ -3410,7 +3621,7 @@ export default function HotelRoomsPage() {
     const rid = firstRoom.id;
     setSelectedHotelRoomIds(ids);
     setSelectedHotelRoomSummary(
-      buildSelectedRoomSummary(hotelId, ids, remoteRooms)
+      buildSelectedRoomSummary(hotelId, ids, remoteRooms, activeGroupSlots)
     );
     const params = new URLSearchParams();
     params.set("type", "package");
@@ -3674,7 +3885,10 @@ export default function HotelRoomsPage() {
                     {isPackageMode && (() => {
                       let displayTotal: number | null = null;
                       let displayCurrency = "GBP";
-                      if (selectedHotelRoomSummary?.total) {
+                      if (activeGroupSlots && resolvedPackagePrice?.amount) {
+                        displayTotal = resolvedPackagePrice.amount;
+                        displayCurrency = resolvedPackagePrice.currency || "GBP";
+                      } else if (selectedHotelRoomSummary?.total) {
                         displayTotal = selectedHotelRoomSummary.total;
                         displayCurrency = selectedHotelRoomSummary.currency || "GBP";
                       } else if (resolvedPackagePrice?.amount) {
@@ -4278,6 +4492,7 @@ export default function HotelRoomsPage() {
                     deeplinkSelectedSlots={deeplinkSelectedSlots}
                     deeplinkBaseSlotPrices={deeplinkBaseSlotPrices}
                     onDeeplinkSlotToggle={handleDeeplinkSlotToggle}
+                    rawRateBreakdown={rawRateBreakdown}
                   />)
                 })}
 
@@ -4404,45 +4619,7 @@ export default function HotelRoomsPage() {
           )}
 
           {/* FAQ Section */}
-          {faqs.length > 0 && (
-            <div className="mx-4 lg:mx-6 mb-6 bg-[#F5F7FF] rounded-3xl p-6 lg:p-8 space-y-6">
-              <h2 className="text-xl lg:text-2xl font-semibold text-[#010D50]">
-                Got questions about {hotel.name.split(' ').slice(0, 3).join(' ')}?
-              </h2>
-
-              <div className="space-y-4">
-                {faqs.map((faq) => (
-                  <div
-                    key={faq.id}
-                    className="bg-white border border-[#DFE0E4] rounded-[32px] overflow-hidden"
-                  >
-                    <button
-                      onClick={() =>
-                        setExpandedFAQ(expandedFAQ === faq.id ? null : faq.id)
-                      }
-                      className="w-full flex items-center justify-between p-6 text-left"
-                    >
-                      <span className="text-base lg:text-lg font-medium text-[#010D50] pr-4">
-                        {faq.question}
-                      </span>
-                      {expandedFAQ === faq.id ? (
-                        <ChevronUp className="w-6 h-6 text-[#010D50] flex-shrink-0" />
-                      ) : (
-                        <ChevronDown className="w-6 h-6 text-[#010D50] flex-shrink-0" />
-                      )}
-                    </button>
-                    {expandedFAQ === faq.id && (
-                      <div className="px-6 pb-6">
-                        <p className="text-sm text-[#3A478A] leading-relaxed">
-                          {faq.answer}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <HotelFAQSection faqs={faqs} hotelName={hotel.name} />
 
           {/* Important Information Section */}
           {hasImportantInfo && (

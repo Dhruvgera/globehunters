@@ -25,6 +25,7 @@ interface HotelRoomCardPropsType {
     deeplinkSelectedSlots?: Record<string, string>;
     deeplinkBaseSlotPrices?: Record<string, number>;
     onDeeplinkSlotToggle?: (roomId: string, groupKey: string) => void;
+    rawRateBreakdown?: Record<string, Record<string, unknown>> | null;
 }
 
 function sanitizeHotelText(value: unknown): string {
@@ -85,6 +86,7 @@ export function HotelRoomCard({ room,
     deeplinkSelectedSlots = {},
     deeplinkBaseSlotPrices = {},
     onDeeplinkSlotToggle,
+    rawRateBreakdown,
 }: HotelRoomCardPropsType) {
     const [expandedRoomInfoById, setExpandedRoomInfoById] = useState<Record<string, boolean>>({});
 
@@ -168,6 +170,25 @@ export function HotelRoomCard({ room,
         }
         return out;
     }, [useDeeplinkSlotMode, availableSlots, room.roomGroupSources]);
+
+    const debugBreakdownEntry = useMemo(() => {
+        if (!rawRateBreakdown) return null;
+        const entryKey = Object.keys(rawRateBreakdown)[0];
+        if (!entryKey) return null;
+        return rawRateBreakdown[entryKey];
+    }, [rawRateBreakdown]);
+
+    const debugSlotRoomIds = useMemo(() => {
+        if (!debugBreakdownEntry) return {} as Record<string, string>;
+        const out: Record<string, string> = {};
+        for (const groupKey of deeplinkRoomGroupKeys) {
+            const numMatch = groupKey.match(/\d+/);
+            if (!numMatch) continue;
+            const rawId = String(debugBreakdownEntry[`room${numMatch[0]}id`] || "").trim();
+            if (rawId) out[groupKey] = rawId;
+        }
+        return out;
+    }, [debugBreakdownEntry, deeplinkRoomGroupKeys]);
 
     return (
         <div
@@ -328,6 +349,39 @@ export function HotelRoomCard({ room,
                     </details>
                 )}
 
+                 {isHotelDatesDebugMode && debugBreakdownEntry && Object.keys(debugSlotRoomIds).length > 0 && (
+                     <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs font-mono space-y-1" onClick={(e) => e.stopPropagation()}>
+                        <div className="font-semibold text-yellow-800 mb-1">🔧 Rate Breakdown IDs</div>
+                        {Object.entries(debugSlotRoomIds).map(([groupKey, rawId]) => {
+                            const srcOption = room.roomGroupSources?.[groupKey];
+                            const srcId = srcOption ? String((srcOption as unknown as Record<string, unknown>).id ?? "") : "";
+                            const matchesThisRoom = rawId === room.id || rawId === room.sourceRoomOptionId || rawId === srcId;
+                             return (
+                                <div key={groupKey} className="flex flex-col gap-0.5">
+                                    <div className={`flex gap-2 ${matchesThisRoom ? "text-yellow-900 font-bold" : "text-yellow-700"}`}>
+                                        <span className="font-semibold text-yellow-800">{groupKey.replace(/options$/i, "id")}:</span>
+                                        <span>{rawId}</span>
+                                        {matchesThisRoom && <span className="text-green-700">← this room</span>}
+                                    </div>
+                                    {srcId && <span className="pl-4 text-yellow-600">option.id: {srcId}</span>}
+                                 </div>
+                             );
+                         })}
+                        {debugBreakdownEntry.total_price != null && (
+                            <div className="flex gap-2 text-yellow-900 pt-1 border-t border-yellow-200 mt-1">
+                                <span className="font-semibold text-yellow-800">total_price:</span>
+                                <span>{String(debugBreakdownEntry.total_price)}</span>
+                            </div>
+                        )}
+                        {debugBreakdownEntry.flight_price != null && (
+                            <div className="flex gap-2 text-yellow-900">
+                                <span className="font-semibold text-yellow-800">flight_price:</span>
+                                <span>{String(debugBreakdownEntry.flight_price)}</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {/* Pricing & CTA */}
                 <div className="mt-auto pt-6 space-y-4">
                     <div className="flex flex-col items-end gap-1">
@@ -365,11 +419,22 @@ export function HotelRoomCard({ room,
                                                         {extractSlotLabel(groupKey)}
                                                     </span>
                                                 </label>
+                                                {isHotelDatesDebugMode && (() => {
+                                                    const srcOption = room.roomGroupSources?.[groupKey];
+                                                    const srcId = srcOption ? String((srcOption as unknown as Record<string, unknown>).id ?? "") : "";
+                                                    return srcId ? (
+                                                        <span className="text-[9px] font-mono text-yellow-700 bg-yellow-50 px-1 rounded">
+                                                            {srcId}
+                                                        </span>
+                                                    ) : null;
+                                                })()}
                                                 {priceInfo && (
                                                     <span className={`text-sm font-semibold ${isSelected ? "text-[#008234]" : "text-[#010D50]"}`}>
                                                         {Math.abs(delta) < 0.01
                                                             ? formatDisplayPrice(priceInfo.currency, 0)
-                                                            : `+${priceInfo.currency}${delta.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                                                            : delta < 0
+                                                                ? `-${priceInfo.currency}${Math.abs(delta).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                                                                : `+${priceInfo.currency}${delta.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                                                     </span>
                                                 )}
                                             </div>
@@ -388,7 +453,7 @@ export function HotelRoomCard({ room,
                                     }
                                     return (
                                         <span className="text-xl font-semibold text-[#010D50]">
-                                            +{room.price.currency}{delta.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            {delta < 0 ? '-' : '+'}{room.price.currency}{Math.abs(delta).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </span>
                                     );
                                 })()

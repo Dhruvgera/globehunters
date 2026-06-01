@@ -77,7 +77,7 @@ function DeeplinksPageContent() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [includeFees]);
 
   return (
     <div className="min-h-screen bg-white">
@@ -151,7 +151,14 @@ function DeeplinksPageContent() {
 }
 
 function PackageDeeplinkCard({ pkg, index }: { pkg: PackageSearchResult; index: number }) {
-  const baseUrl = pkg.deepLinkUrl || "";
+  const apiBaseUrl = pkg.deepLinkUrl || "";
+  let baseUrl = apiBaseUrl;
+  if (typeof window !== "undefined" && apiBaseUrl) {
+    try {
+      const apiOrigin = new URL(apiBaseUrl).origin;
+      baseUrl = apiBaseUrl.replace(apiOrigin, window.location.origin);
+    } catch {}
+  }
   const keys = pkg.deepLinkKeys || {};
   const raw = pkg.rawSearchResult as Record<string, unknown> | undefined;
   const mainKey = typeof raw?.main === "string" ? raw.main : undefined;

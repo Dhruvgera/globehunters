@@ -985,6 +985,15 @@ export interface PackageSearchResult {
 
 // ─── View API Response Types (v5.17.0 deeplink key detail retrieval) ───
 
+export interface RoomRateBreakdownEntry {
+  flight_price: number;
+  room_price: Record<string, number>;
+  total_price: number;
+  [key: string]: unknown;
+}
+
+export type RoomRateBreakdown = Record<string, RoomRateBreakdownEntry>;
+
 /** Room option from holiday_package_view / accommodationView */
 export interface ViewRoomOption {
   id: string;
@@ -1040,6 +1049,7 @@ export interface PackageViewHotelDetails {
   CheckInDate?: string | null;
   CheckOutDate?: string | null;
   rooms: Record<string, ViewRoomOption[]>; // room1options, room2options, etc.
+  room_rate_breakdown?: RoomRateBreakdown;
 }
 
 /** Full holiday_package_view API response */
@@ -1287,5 +1297,6 @@ export interface PackageRoomsResponse {
       nonRef?: number;
       cancellation_policy?: string;
     }>>;
+    room_rate_breakdown?: RoomRateBreakdown;
   }>;
 }
