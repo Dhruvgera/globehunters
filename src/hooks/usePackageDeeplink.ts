@@ -195,6 +195,8 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
   const setSearchRequestId = useBookingStore((s) => s.setSearchRequestId);
   const setPackageDestination = useBookingStore((s) => s.setPackageDestination);
   const setHotelLocationSelection = useBookingStore((s) => s.setHotelLocationSelection);
+  const setDeeplinkType = useBookingStore((s) => s.setDeeplinkType);
+  const setIsLoadingDeeplink = useBookingStore((s) => s.setIsLoadingDeeplink);
 
   const processDeeplink = useCallback(async () => {
     const packageKey = searchParams.get("packageKey") || searchParams.get("package");
@@ -204,7 +206,9 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
     const mode: DeeplinkMode | null = packageKey ? "package" : hotelKey ? "hotel" : null;
 
     if (!key?.trim() || !mode) return;
-
+    setIsFromDeeplink(true);
+    setDeeplinkType(mode);
+    setIsLoadingDeeplink(true);
     const existingViewData = useBookingStore.getState().deeplinkViewData;
     if (existingViewData?.success) {
       const existingHotelId = String(existingViewData.results?.HotelDetails?.hotel_id || "");
@@ -212,7 +216,7 @@ export function usePackageDeeplink(): UsePackageDeeplinkReturn {
       if (urlHotelId && existingHotelId === urlHotelId) return;
     }
 
-    setIsFromDeeplink(true);
+
 
     try {
       let viewData: HolidayPackageViewResponse | AccommodationViewResponse;

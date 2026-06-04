@@ -13,6 +13,7 @@ import { useAffiliate, useAffiliatePhone } from "@/lib/AffiliateContext";
 import { normalizeCabinClass } from "@/lib/utils";
 import type { SearchParams } from "@/types/flight";
 import type { Airport } from "@/types/airport";
+import { DeeplinkLoader } from "@/components/shared/DeeplinkLoader";
 
 // Airline logos for the "Why Book With Us" section
 const airlineLogos = [
@@ -145,7 +146,7 @@ function DestinationCard({ card }: { card: typeof destinationCards[0] }) {
           <div className="w-1 h-1 bg-white/40 rounded-full" />
         </div>
       </div>
-      
+
       {/* Content Section */}
       <div className="p-4 flex flex-col gap-3">
         <h3 className="text-xl font-bold text-[#010D50] transition-colors group-hover:text-white">
@@ -154,10 +155,10 @@ function DestinationCard({ card }: { card: typeof destinationCards[0] }) {
         <p className="text-sm leading-relaxed text-[#3A478A] transition-colors group-hover:text-white/80">
           {card.description}
         </p>
-        
+
         {/* Divider */}
         <div className="h-px bg-[#DFE0E4] transition-colors group-hover:bg-white/20" />
-        
+
         {/* Destinations List */}
         <div className="flex flex-col gap-2">
           {card.destinations.map((dest, idx) => (
@@ -254,8 +255,10 @@ function HomeContent() {
   const setSearchRequestId = useBookingStore((state) => state.setSearchRequestId);
   const searchFormState = useBookingStore((state) => state.searchParams);
   const searchSectionRef = useRef<HTMLElement | null>(null);
-
-  const [isLoadingDeeplink, setIsLoadingDeeplink] = useState(false);
+  const isLoadingDeeplink = useBookingStore((state) => state.isLoadingDeeplink);
+  const setIsLoadingDeeplink = useBookingStore((state) => state.setIsLoadingDeeplink);
+  const deeplinkType = useBookingStore((state) => state.deeplinkType);
+  const setDeeplinkType = useBookingStore((state) => state.setDeeplinkType);
   usePackageDeeplink();
 
   const getBaseSearchParams = (): SearchParams => ({
@@ -340,6 +343,7 @@ function HomeContent() {
 
       // Mark this as a deeplink flow
       setIsFromDeeplink(true);
+      setDeeplinkType("flight")
 
       // Store affiliate/tracking data with full UTM params
       if (utmSource) {
@@ -419,39 +423,14 @@ function HomeContent() {
   // Show loading state when processing deeplink
   if (isLoadingDeeplink) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-        <Navbar />
-        <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
-          <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full text-center">
-            <div className="relative mb-6">
-              <div className="w-20 h-20 mx-auto bg-[rgba(55,84,237,0.1)] rounded-full flex items-center justify-center">
-                <Plane className="w-10 h-10 text-[#3754ED] animate-pulse" />
-              </div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Loader2 className="w-24 h-24 text-[#3754ED]/20 animate-spin" />
-              </div>
-            </div>
-            <h1 className="text-2xl font-bold text-[#010D50] mb-3">
-              Loading Your Flight
-            </h1>
-            <p className="text-[#3A478A]">
-              Please wait while we retrieve your selected flight details...
-            </p>
-            <div className="mt-6 flex justify-center gap-1">
-              <span className="w-2 h-2 bg-[#3754ED] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-              <span className="w-2 h-2 bg-[#3754ED] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-              <span className="w-2 h-2 bg-[#3754ED] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+      <DeeplinkLoader deeplinkType={deeplinkType} />
+    )
   }
 
   return (
     <div className="min-h-screen bg-white">
       <Navbar />
-      
+
       {/* Hero Section with Background Image */}
       <section ref={searchSectionRef} className="relative min-h-[500px] sm:min-h-[600px] lg:min-h-[700px] flex items-center justify-center">
         {/* Background Image */}
@@ -465,12 +444,12 @@ function HomeContent() {
           />
           <div className="absolute inset-0 bg-black/30" />
         </div>
-        
+
         {/* Search Bar Container */}
         <div className="relative z-10 w-full max-w-[1564px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <SearchBar />
         </div>
-        
+
         {/* Location Badge */}
         <div className="absolute bottom-6 right-6 z-10 hidden sm:flex items-center gap-2 bg-black/40 backdrop-blur-sm text-white px-4 py-2 rounded-full">
           <MapPin className="w-5 h-5" />
@@ -489,7 +468,7 @@ function HomeContent() {
               Book cheap flights over 100 of the World&apos;s leading Airlines...
             </p>
           </div>
-          
+
           {/* Airline Logos */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {airlineLogos.map((logo) => (
@@ -521,7 +500,7 @@ function HomeContent() {
               Find the best deals, compare prices instantly, and book your next adventure with ease
             </p>
           </div>
-          
+
           {/* Destination Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {destinationCards.map((card) => (
@@ -553,7 +532,7 @@ function HomeContent() {
               Compare cheap flights to worldwide destinations over the phone or online! Call us now to speak to our experienced and helpful flight experts for tailor made itineraries and personalised quotes. We&apos;ll even aim to price match any flight offers you may have received elsewhere! Take a look at our amazing flight deals and book now!
             </p>
           </div>
-          
+
           {/* Featured Destination Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {featuredDestinationsWithAction.map((dest) => (
@@ -567,7 +546,7 @@ function HomeContent() {
       <section className="py-12 sm:py-16 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Full-width container with background image */}
-          <div 
+          <div
             className="relative rounded-[24px] overflow-hidden min-h-[400px] sm:min-h-[450px] flex items-center"
             style={{
               backgroundImage: 'url(/woman.png)',
@@ -580,7 +559,7 @@ function HomeContent() {
               <h2 className="text-2xl sm:text-3xl font-bold text-[#010D50] mb-6 text-center">
                 CALL NOW SAVE BIG
               </h2>
-              
+
               {/* Phone CTA */}
               <a
                 href={`tel:${phoneNumber.replace(/\s/g, '')}`}
@@ -594,11 +573,11 @@ function HomeContent() {
                   <p className="text-white text-xl font-bold">{phoneNumber}</p>
                 </div>
               </a>
-              
+
               <p className="text-[#3754ED] text-sm text-center italic mb-6">
                 Call to unlock unlisted fares & personalized offers!
               </p>
-              
+
               <div className="text-center">
                 <p className="text-[#010D50] text-base mb-1">
                   Not all deals are online. Get in touch for exclusive
