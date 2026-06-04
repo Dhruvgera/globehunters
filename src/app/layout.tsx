@@ -17,22 +17,22 @@ export const metadata: Metadata = {
   title: "Find Cheap Flights, Airline Tickets & More | Book Online With Globehunters",
   description: "Find cheap flights, airline tickets, hotels and more with Globehunters with 1000's of holiday destinations to suit any budget.",
   icons: {
-    icon: "/image.png",
-    shortcut: "/image.png",
-    apple: "/image.png",
+    icon: "/image1.png",
+    shortcut: "/image1.png",
+    apple: "/image1.png",
   },
   openGraph: {
     title: "Cheap Flights, Airline Tickets & More | Book Online With Globehunters",
     description: "Find cheap flights, airline tickets, hotels and more with Globehunters with 1000's of holiday destinations to suit any budget.",
     siteName: "Globehunters",
     type: "website",
-    images: ["/image.png"],
+    images: ["/image1.png"],
   },
   twitter: {
     card: "summary_large_image",
     title: "Cheap Flights, Airline Tickets & More | Book Online With Globehunters",
     description: "Find cheap flights, airline tickets, hotels and more with Globehunters with 1000's of holiday destinations to suit any budget.",
-    images: ["/image.png"],
+    images: ["/image1.png"],
   },
 };
 
