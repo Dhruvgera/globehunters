@@ -9,6 +9,7 @@ import Footer from "@/components/navigation/Footer";
 import SearchBar from "@/components/search/SearchBar";
 import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
 import { FlightSummaryCard, type FlightLeg } from "@/components/booking/FlightSummaryCard";
+import { HotelFiltersSidebar, type HotelAmenityOption, type HotelFiltersState } from "@/components/hotels/HotelFiltersSidebar";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { activityService } from "@/services/api/activityService";
@@ -21,7 +22,15 @@ import type { Hotel } from "@/types/hotel";
 import type { SearchParams } from "@/types/flight";
 import { calculateNights } from "@/lib/hotels/nights";
 import { normalizeCabinClass } from "@/lib/utils";
-import { mapAvailability, shortWebRefFromToken, VYSPA_SEARCH_TIMEOUT_SEC } from "@/app/hotels/hotelUtils";
+import {
+  DEFAULT_FILTERS,
+  includesBreakfast,
+  mapAvailability,
+  mealPlanKey,
+  normalizeNeighborhoodValue,
+  shortWebRefFromToken,
+  VYSPA_SEARCH_TIMEOUT_SEC,
+} from "@/app/hotels/hotelUtils";
 import {
   ArrowRight,
   BedDouble,
@@ -88,6 +97,8 @@ type RichHotelDetails = {
   rooms: RichHotelRoom[];
   sourceLabel: string;
 };
+
+type HotelChangeSortMode = "recommended" | "price_low" | "review_score";
 
 function textValue(value: unknown): string {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -616,6 +627,18 @@ function AiPackageContent() {
   const [hotelDetailsLoading, setHotelDetailsLoading] = useState(false);
   const [hotelDetailsError, setHotelDetailsError] = useState<string | null>(null);
   const [hotelChangeOpen, setHotelChangeOpen] = useState(false);
+  const [hotelFilters, setHotelFilters] = useState<HotelFiltersState>({ ...DEFAULT_FILTERS, priceMode: "total" });
+  const [hotelFiltersExpanded, setHotelFiltersExpanded] = useState<Record<string, boolean>>({
+    price: true,
+    stars: true,
+    amenities: true,
+    mealPlans: true,
+  });
+  const [hotelSortMode, setHotelSortMode] = useState<HotelChangeSortMode>("recommended");
+  const [expandedHotelRoomsId, setExpandedHotelRoomsId] = useState<string | null>(null);
+  const [roomOptionsByHotelId, setRoomOptionsByHotelId] = useState<Record<string, RichHotelRoom[]>>({});
+  const [roomOptionsLoadingByHotelId, setRoomOptionsLoadingByHotelId] = useState<Record<string, boolean>>({});
+  const [roomOptionsErrorByHotelId, setRoomOptionsErrorByHotelId] = useState<Record<string, string | null>>({});
   const [flightInfoOpen, setFlightInfoOpen] = useState(false);
   const [addDestinationOpen, setAddDestinationOpen] = useState(false);
   const [newDestinationName, setNewDestinationName] = useState("");
@@ -1066,6 +1089,138 @@ function AiPackageContent() {
   const liveHotelName = liveSearch.hotel?.name || "Live hotel search";
   const liveHotelRating = liveSearch.hotel?.starRating || 0;
   const liveFlight = liveSearch.flight;
+  const hotelFilterPriceBounds = useMemo(() => {
+    const values = hotelOptions
+      .map((hotel) => (hotelFilters.priceMode === "nightly" ? hotel.price.nightly : hotel.price.total))
+      .filter((value) => Number.isFinite(value) && value > 0);
+    if (values.length === 0) return { min: 0, max: 1 };
+    return {
+      min: Math.floor(Math.min(...values)),
+      max: Math.ceil(Math.max(...values)),
+    };
+  }, [hotelFilters.priceMode, hotelOptions]);
+
+  useEffect(() => {
+    if (hotelOptions.length === 0) return;
+    setHotelFilters((current) => {
+      const isDefaultRange =
+        current.priceRange[0] === DEFAULT_FILTERS.priceRange[0] &&
+        current.priceRange[1] === DEFAULT_FILTERS.priceRange[1];
+      const outsideBounds =
+        current.priceRange[0] < hotelFilterPriceBounds.min ||
+        current.priceRange[1] > hotelFilterPriceBounds.max ||
+        current.priceRange[0] > hotelFilterPriceBounds.max;
+      if (!isDefaultRange && !outsideBounds) return current;
+      return { ...current, priceRange: [hotelFilterPriceBounds.min, hotelFilterPriceBounds.max] };
+    });
+  }, [hotelFilterPriceBounds.max, hotelFilterPriceBounds.min, hotelOptions.length]);
+
+  const availableHotelMealPlans = useMemo(() => {
+    const byKey = new Map<string, string>();
+    for (const hotel of hotelOptions) {
+      for (const plan of hotel.mealPlans || []) {
+        const label = textValue(plan);
+        const key = mealPlanKey(label);
+        if (!label || !key) continue;
+        if (!byKey.has(key)) byKey.set(key, label);
+      }
+    }
+    return Array.from(byKey.values()).sort((a, b) => a.localeCompare(b));
+  }, [hotelOptions]);
+
+  const availableHotelAmenities = useMemo<HotelAmenityOption[]>(() => {
+    const byKey = new Map<string, { label: string; count: number }>();
+    for (const hotel of hotelOptions) {
+      for (const amenity of hotel.amenities || []) {
+        const label = textValue(amenity);
+        if (!label) continue;
+        const key = label.toLowerCase();
+        const current = byKey.get(key);
+        if (current) current.count += 1;
+        else byKey.set(key, { label, count: 1 });
+      }
+    }
+    return Array.from(byKey.values())
+      .sort((a, b) => (b.count !== a.count ? b.count - a.count : a.label.localeCompare(b.label)))
+      .slice(0, 24);
+  }, [hotelOptions]);
+
+  const availableHotelNeighborhoods = useMemo(() => {
+    const byKey = new Map<string, string>();
+    for (const hotel of hotelOptions) {
+      const { key, label } = normalizeNeighborhoodValue(hotel.neighborhood || "", {
+        city: hotel.cityName,
+        country: hotel.countryName,
+        searchLocation: destination,
+      });
+      if (!key) continue;
+      const existing = byKey.get(key);
+      if (!existing || label.length < existing.length) byKey.set(key, label);
+    }
+    return Array.from(byKey.values()).sort((a, b) => a.localeCompare(b));
+  }, [destination, hotelOptions]);
+
+  const hotelMinPriceByStarRating = useMemo(() => {
+    const minByRating: Record<number, number> = {};
+    for (const hotel of hotelOptions) {
+      const rating = hotel.starRating;
+      const price = hotel.price.nightly;
+      if (minByRating[rating] === undefined || price < minByRating[rating]) minByRating[rating] = price;
+    }
+    return minByRating;
+  }, [hotelOptions]);
+
+  const hotelRefundableFilterEnabled = useMemo(
+    () => hotelOptions.some((hotel) => hotel.refundable === true || hotel.refundable === false),
+    [hotelOptions]
+  );
+
+  const filteredHotelOptions = useMemo(() => {
+    const query = hotelFilters.propertyQuery.trim().toLowerCase();
+    const [minPrice, maxPrice] = hotelFilters.priceRange;
+    const selectedNeighborhoodKeys = new Set(
+      hotelFilters.neighborhoods
+        .map((neighborhood) => normalizeNeighborhoodValue(neighborhood, { searchLocation: destination }).key)
+        .filter(Boolean)
+    );
+
+    const base = hotelOptions.filter((hotel) => {
+      if (query && !hotel.name.toLowerCase().includes(query)) return false;
+      if (hotelFilters.starRatings.length > 0 && !hotelFilters.starRatings.includes(hotel.starRating)) return false;
+      if (hotelFilters.fullyRefundableOnly && hotel.refundable !== true) return false;
+      if (selectedNeighborhoodKeys.size > 0) {
+        const hotelNeighborhoodKey = normalizeNeighborhoodValue(hotel.neighborhood || "", {
+          city: hotel.cityName,
+          country: hotel.countryName,
+          searchLocation: destination,
+        }).key;
+        if (!hotelNeighborhoodKey || !selectedNeighborhoodKeys.has(hotelNeighborhoodKey)) return false;
+      }
+      if (hotelFilters.amenities.length > 0) {
+        const amenitySet = new Set((hotel.amenities || []).map((amenity) => String(amenity).toLowerCase().trim()));
+        if (!hotelFilters.amenities.every((amenity) => amenitySet.has(String(amenity).toLowerCase().trim()))) return false;
+      }
+      if (hotelFilters.mealPlans.length > 0) {
+        const hotelMealKeys = new Set((hotel.mealPlans || []).map((plan) => mealPlanKey(plan)).filter(Boolean));
+        if (!hotelFilters.mealPlans.some((plan) => hotelMealKeys.has(mealPlanKey(plan)))) return false;
+      }
+      if (hotelFilters.popular.breakfastIncluded && !includesBreakfast(hotel.mealPlans || [])) return false;
+      const priceValue = hotelFilters.priceMode === "nightly" ? hotel.price.nightly : hotel.price.total;
+      return priceValue >= minPrice && priceValue <= maxPrice;
+    });
+
+    const sorted = [...base];
+    if (hotelSortMode === "price_low") {
+      sorted.sort((a, b) => (a.price.total || 0) - (b.price.total || 0));
+    } else if (hotelSortMode === "review_score") {
+      sorted.sort((a, b) => {
+        const scoreDelta = (b.reviews?.score || 0) - (a.reviews?.score || 0);
+        if (scoreDelta !== 0) return scoreDelta;
+        return b.starRating - a.starRating;
+      });
+    }
+    return sorted;
+  }, [destination, hotelFilters, hotelOptions, hotelSortMode]);
 
   const toggleActivity = (productCode: string) => {
     setSelectedActivityCodes((current) => {
@@ -1155,11 +1310,78 @@ function AiPackageContent() {
     setHotelDetailsOpen(true);
   };
 
-  const selectHotelOption = (hotel: Hotel) => {
-    const compactHotel = compactHotelForSession(hotel);
+  const loadHotelRoomOptions = async (hotel: Hotel) => {
+    if (roomOptionsByHotelId[hotel.id]?.length || roomOptionsLoadingByHotelId[hotel.id]) return;
+    setRoomOptionsLoadingByHotelId((current) => ({ ...current, [hotel.id]: true }));
+    setRoomOptionsErrorByHotelId((current) => ({ ...current, [hotel.id]: null }));
+    try {
+      const raw = rawRecord(hotel.rawSearchResult);
+      const criteriaIdRaw = raw?.searchCriteriaId ?? storeHotelSearch?.searchCriteriaId;
+      const criteriaId = typeof criteriaIdRaw === "string" || typeof criteriaIdRaw === "number" ? criteriaIdRaw : undefined;
+      if (!criteriaId) throw new Error("Room availability criteria is not available for this hotel.");
+      const roomHotelId = textValue(raw?.hotel_id ?? raw?.hotelId ?? hotel.id);
+      const srId = textValue(raw?.id ?? raw?.srId);
+      const response = await hotelService.getRoomsV3(criteriaId, roomHotelId || hotel.id, srId || undefined);
+      const roomsFromResponse = collectRooms(response, 16);
+      const seedRoom: RichHotelRoom = {
+        name: hotel.room?.name || "Selected room",
+        board: hotel.room?.highlights?.join(" - ") || undefined,
+        price: hotel.price.total,
+        currency: hotel.price.currency,
+        refundable: hotel.refundable ?? null,
+      };
+      const options = roomsFromResponse.length > 0 ? roomsFromResponse : [seedRoom];
+      setRoomOptionsByHotelId((current) => ({ ...current, [hotel.id]: options }));
+    } catch (error) {
+      setRoomOptionsErrorByHotelId((current) => ({
+        ...current,
+        [hotel.id]: error instanceof Error ? error.message : "Failed to load room options.",
+      }));
+      setRoomOptionsByHotelId((current) => ({
+        ...current,
+        [hotel.id]: [
+          {
+            name: hotel.room?.name || "Selected room",
+            board: hotel.room?.highlights?.join(" - ") || undefined,
+            price: hotel.price.total,
+            currency: hotel.price.currency,
+            refundable: hotel.refundable ?? null,
+          },
+        ],
+      }));
+    } finally {
+      setRoomOptionsLoadingByHotelId((current) => ({ ...current, [hotel.id]: false }));
+    }
+  };
+
+  const toggleHotelRooms = (hotel: Hotel) => {
+    setExpandedHotelRoomsId((current) => (current === hotel.id ? null : hotel.id));
+    void loadHotelRoomOptions(hotel);
+  };
+
+  const selectHotelOption = (hotel: Hotel, room?: RichHotelRoom) => {
+    const nextHotel: Hotel = room
+      ? {
+          ...hotel,
+          room: {
+            name: room.name,
+            highlights: [room.board, room.refundable === true ? "Refundable" : room.refundable === false ? "Non-refundable" : ""].filter(Boolean) as string[],
+          },
+          refundable: room.refundable ?? hotel.refundable,
+          price: room.price
+            ? {
+                ...hotel.price,
+                total: room.price,
+                nightly: hotel.price.nights > 0 ? Math.round((room.price / hotel.price.nights) * 100) / 100 : room.price,
+                currency: room.currency || hotel.price.currency,
+              }
+            : hotel.price,
+        }
+      : hotel;
+    const compactHotel = compactHotelForSession(nextHotel);
     setLiveSearch((current) => ({
       ...current,
-      hotel: compactHotel || hotel,
+      hotel: compactHotel || nextHotel,
       hotelLoading: false,
       hotelError: null,
     }));
@@ -1168,7 +1390,7 @@ function AiPackageContent() {
       paramsKey,
       flight: cached?.flight || liveSearch.flight,
       flightRequestId: cached?.flightRequestId || liveSearch.flightRequestId,
-      hotel: compactHotel || hotel,
+      hotel: compactHotel || nextHotel,
       hotelOptions,
       hotelSearch: cached?.hotelSearch || storeHotelSearch,
       activitiesKey: cached?.activitiesKey,
@@ -1176,6 +1398,7 @@ function AiPackageContent() {
       selectedActivityCodes: selectedActivityCodes,
     });
     setHotelChangeOpen(false);
+    setExpandedHotelRoomsId(null);
   };
 
   const flightSummaryLegs = liveFlight
@@ -1343,6 +1566,15 @@ function AiPackageContent() {
                   <div className="mt-3 text-sm font-semibold text-[#010D50]">
                     {liveSearch.hotel?.price.total ? money(liveSearch.hotel.price.total, liveSearch.hotel.price.currency || "GBP") : null}
                   </div>
+                  {liveSearch.hotel?.room?.name ? (
+                    <div className="mt-3 rounded-xl border border-[#DFE0E4] bg-[#F5F7FF] p-3">
+                      <div className="text-xs font-medium text-[#3A478A]">Selected room</div>
+                      <div className="mt-1 text-sm font-semibold text-[#010D50]">{liveSearch.hotel.room.name}</div>
+                      {liveSearch.hotel.room.highlights?.length ? (
+                        <div className="mt-1 text-xs text-[#3A478A]">{liveSearch.hotel.room.highlights.slice(0, 2).join(" - ")}</div>
+                      ) : null}
+                    </div>
+                  ) : null}
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <SummaryTile label="Check-in" value={formatDate(checkIn, "Select date")} icon={<CalendarDays className="h-4 w-4" />} />
                     <SummaryTile label="Check-out" value={formatDate(checkOut, "Select date")} icon={<CalendarDays className="h-4 w-4" />} />
@@ -1613,45 +1845,154 @@ function AiPackageContent() {
       </Dialog>
 
       <Dialog open={hotelChangeOpen} onOpenChange={setHotelChangeOpen}>
-        <DialogContent className="max-h-[min(92vh,860px)] max-w-[min(100vw-24px,980px)] overflow-hidden bg-white p-0">
+        <DialogContent className="max-h-[min(94vh,900px)] max-w-[min(100vw-24px,1180px)] overflow-hidden bg-white p-0">
           <DialogHeader className="border-b border-[#DFE0E4] px-5 py-4">
             <DialogTitle className="text-[#010D50]">Choose a hotel</DialogTitle>
           </DialogHeader>
-          <div className="max-h-[calc(min(92vh,860px)-76px)] overflow-y-auto p-5">
+          <div className="grid max-h-[calc(min(94vh,900px)-76px)] min-h-[560px] grid-cols-1 overflow-hidden lg:grid-cols-[300px_1fr]">
             {liveSearch.hotelLoading && hotelOptions.length === 0 ? (
-              <div className="rounded-xl bg-[#F5F7FF] p-4 text-sm text-[#3A478A]">Loading hotel options...</div>
+              <div className="col-span-full m-5 rounded-xl bg-[#F5F7FF] p-4 text-sm text-[#3A478A]">Loading hotel options...</div>
             ) : hotelOptions.length === 0 ? (
-              <div className="rounded-xl bg-[#F5F7FF] p-4 text-sm text-[#3A478A]">No cached hotel options are available for this search.</div>
+              <div className="col-span-full m-5 rounded-xl bg-[#F5F7FF] p-4 text-sm text-[#3A478A]">No cached hotel options are available for this search.</div>
             ) : (
-              <div className="grid gap-3">
-                {hotelOptions.map((hotel) => (
-                  <div key={hotel.id} className="grid gap-3 rounded-xl border border-[#DFE0E4] bg-white p-3 sm:grid-cols-[120px_1fr_auto]">
-                    <div className="relative h-[92px] overflow-hidden rounded-lg bg-[#F5F7FF]">
-                      {hotel.imageSrc ? <Image src={hotel.imageSrc} alt={hotel.name} fill className="object-cover" /> : null}
+              <>
+                <aside className="overflow-y-auto border-b border-[#DFE0E4] bg-[#F7F8FE] p-4 lg:border-b-0 lg:border-r">
+                  <HotelFiltersSidebar
+                    resultCount={filteredHotelOptions.length}
+                    value={hotelFilters}
+                    onChange={setHotelFilters}
+                    onPriceModeChange={(mode) => setHotelFilters((current) => ({ ...current, priceMode: mode }))}
+                    onPriceRangeChange={(range) => setHotelFilters((current) => ({ ...current, priceRange: range }))}
+                    minPrice={hotelFilterPriceBounds.min}
+                    maxPrice={hotelFilterPriceBounds.max}
+                    currencySymbol={liveSearch.hotel?.price.currency || hotelOptions[0]?.price.currency || String.fromCharCode(163)}
+                    expanded={hotelFiltersExpanded}
+                    onToggleExpanded={(key) => setHotelFiltersExpanded((current) => ({ ...current, [key]: !current[key] }))}
+                    availableMealPlans={availableHotelMealPlans}
+                    availableNeighborhoods={availableHotelNeighborhoods}
+                    availableAmenities={availableHotelAmenities}
+                    minPriceByStarRating={hotelMinPriceByStarRating}
+                    refundableFilterEnabled={hotelRefundableFilterEnabled}
+                  />
+                </aside>
+
+                <div className="overflow-y-auto p-5">
+                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="text-sm text-[#3A478A]">
+                      Showing <span className="font-semibold text-[#010D50]">{filteredHotelOptions.length}</span> of {hotelOptions.length} live hotels
                     </div>
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-[#010D50]">{hotel.name}</div>
-                      <div className="mt-1 text-xs text-[#3A478A]">{hotel.distanceLabel || hotel.neighborhood || stayPreference}</div>
-                      <div className="mt-2 flex items-center gap-1">
-                        {Array.from({ length: Math.max(1, hotel.starRating || 0) }).map((_, index) => (
-                          <Star key={index} className="h-3.5 w-3.5 fill-[#FFB800] text-[#FFB800]" />
-                        ))}
-                      </div>
-                      <div className="mt-2 text-xs text-[#3A478A]">{hotel.room?.name || "Room returned by hotel search"}</div>
-                    </div>
-                    <div className="flex flex-col items-start justify-between gap-3 sm:items-end">
-                      <div className="text-base font-bold text-[#010D50]">{money(hotel.price.total, hotel.price.currency || "GBP")}</div>
-                      <Button
-                        type="button"
-                        onClick={() => selectHotelOption(hotel)}
-                        className="h-9 rounded-full bg-[#3754ED] px-5 text-xs font-semibold text-white hover:bg-[#2942D1]"
-                      >
-                        Select hotel
-                      </Button>
-                    </div>
+                    <select
+                      value={hotelSortMode}
+                      onChange={(event) => setHotelSortMode(event.target.value as HotelChangeSortMode)}
+                      className="h-10 rounded-xl border border-[#DFE0E4] bg-white px-3 text-sm text-[#010D50]"
+                    >
+                      <option value="recommended">Recommended order</option>
+                      <option value="price_low">Price low to high</option>
+                      <option value="review_score">Rating</option>
+                    </select>
                   </div>
-                ))}
-              </div>
+
+                  {filteredHotelOptions.length === 0 ? (
+                    <div className="rounded-xl bg-[#F5F7FF] p-4 text-sm text-[#3A478A]">No hotels match the selected filters.</div>
+                  ) : (
+                    <div className="grid gap-3">
+                      {filteredHotelOptions.map((hotel) => {
+                        const roomsOpen = expandedHotelRoomsId === hotel.id;
+                        const roomOptions = roomOptionsByHotelId[hotel.id] || [];
+                        const roomLoading = !!roomOptionsLoadingByHotelId[hotel.id];
+                        const roomError = roomOptionsErrorByHotelId[hotel.id];
+                        return (
+                          <div key={hotel.id} className="rounded-xl border border-[#DFE0E4] bg-white p-3">
+                            <div className="grid gap-3 sm:grid-cols-[120px_1fr_auto]">
+                              <div className="relative h-[92px] overflow-hidden rounded-lg bg-[#F5F7FF]">
+                                {hotel.imageSrc ? <Image src={hotel.imageSrc} alt={hotel.name} fill className="object-cover" /> : null}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-semibold text-[#010D50]">{hotel.name}</div>
+                                <div className="mt-1 text-xs text-[#3A478A]">{hotel.distanceLabel || hotel.neighborhood || stayPreference}</div>
+                                <div className="mt-2 flex items-center gap-1">
+                                  {Array.from({ length: Math.max(1, hotel.starRating || 0) }).map((_, index) => (
+                                    <Star key={index} className="h-3.5 w-3.5 fill-[#FFB800] text-[#FFB800]" />
+                                  ))}
+                                </div>
+                                <div className="mt-2 text-xs text-[#3A478A]">{hotel.room?.name || "Room returned by hotel search"}</div>
+                                {(hotel.amenities || []).length > 0 ? (
+                                  <div className="mt-2 flex flex-wrap gap-1">
+                                    {(hotel.amenities || []).slice(0, 3).map((amenity) => (
+                                      <span key={amenity} className="rounded-full bg-[#F5F7FF] px-2 py-1 text-[11px] text-[#3A478A]">
+                                        {amenity}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </div>
+                              <div className="flex flex-col items-start justify-between gap-3 sm:items-end">
+                                <div className="text-base font-bold text-[#010D50]">{money(hotel.price.total, hotel.price.currency || "GBP")}</div>
+                                <div className="flex flex-wrap gap-2 sm:justify-end">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => toggleHotelRooms(hotel)}
+                                    className="h-9 rounded-full px-4 text-xs font-semibold"
+                                  >
+                                    {roomsOpen ? "Hide rooms" : "Choose room"}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    onClick={() => selectHotelOption(hotel)}
+                                    className="h-9 rounded-full bg-[#3754ED] px-5 text-xs font-semibold text-white hover:bg-[#2942D1]"
+                                  >
+                                    Select hotel
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+
+                            {roomsOpen ? (
+                              <div className="mt-3 border-t border-[#DFE0E4] pt-3">
+                                {roomLoading ? (
+                                  <div className="rounded-lg bg-[#F5F7FF] p-3 text-sm text-[#3A478A]">Loading room options...</div>
+                                ) : roomError ? (
+                                  <div className="rounded-lg bg-[#FFF7ED] p-3 text-sm text-[#9A3412]">{roomError}</div>
+                                ) : null}
+                                {roomOptions.length > 0 ? (
+                                  <div className="grid gap-2">
+                                    {roomOptions.map((room, index) => (
+                                      <div key={`${hotel.id}-${room.name}-${index}`} className="flex flex-col gap-3 rounded-lg border border-[#DFE0E4] p-3 sm:flex-row sm:items-center sm:justify-between">
+                                        <div>
+                                          <div className="text-sm font-semibold text-[#010D50]">{room.name}</div>
+                                          {room.board ? <div className="mt-1 text-xs text-[#3A478A]">{room.board}</div> : null}
+                                          {room.refundable != null ? (
+                                            <div className="mt-1 text-xs text-[#3A478A]">{room.refundable ? "Refundable" : "Non-refundable"}</div>
+                                          ) : null}
+                                        </div>
+                                        <div className="flex items-center gap-3 sm:justify-end">
+                                          {room.price ? (
+                                            <div className="text-sm font-bold text-[#010D50]">{money(room.price, room.currency || hotel.price.currency || "GBP")}</div>
+                                          ) : null}
+                                          <Button
+                                            type="button"
+                                            onClick={() => selectHotelOption(hotel, room)}
+                                            className="h-9 rounded-full bg-[#3754ED] px-4 text-xs font-semibold text-white hover:bg-[#2942D1]"
+                                          >
+                                            Select room
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : !roomLoading ? (
+                                  <div className="rounded-lg bg-[#F5F7FF] p-3 text-sm text-[#3A478A]">No additional room options returned for this hotel.</div>
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
         </DialogContent>

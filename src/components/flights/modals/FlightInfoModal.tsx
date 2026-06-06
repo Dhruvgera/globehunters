@@ -77,6 +77,10 @@ export default function FlightInfoModal({
   const selectedUpgradeInStore = useBookingStore((state) => state.selectedUpgradeOption);
   const passengersInStore = useBookingStore((state) => state.passengers);
   const searchParams = useBookingStore((state) => state.searchParams);
+  const isDebugMode =
+    process.env.NEXT_PUBLIC_DEBUG_FLIGHT_IDS === "true" &&
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("debugFlights") === "1";
   const [imgError, setImgError] = useState(false);
   const [selectedLegIndex, setSelectedLegIndex] = useState(0);
   const [selectedUpgradeOption, setSelectedUpgradeOption] = useState<TransformedPriceOption | null>(null);
@@ -122,10 +126,10 @@ export default function FlightInfoModal({
   // Trigger price check when modal opens - run immediately, don't wait for other requests
   // V3 flow: Use flightKey for FlightView -> psw_result_id -> PriceCheck
   useEffect(() => {
-    if (open && !isPackageMode && (flight.flightKey || flight.segmentResultId)) {
+    if (open && (flight.flightKey || flight.segmentResultId)) {
       checkPrice(flight.segmentResultId || '', flight.flightKey);
     }
-  }, [open, flight.segmentResultId, flight.flightKey, checkPrice, isPackageMode]);
+  }, [open, flight.segmentResultId, flight.flightKey, checkPrice]);
 
   useEffect(() => {
     if (!open) return;
@@ -805,8 +809,8 @@ export default function FlightInfoModal({
 
           {/* Fare Details Section (Dynamic from Price Check or Flight data fallback) */}
           {/* Show either when we have upgrade options OR when price check has loaded (even with fallback data) */}
-          {!isPackageMode && ((priceCheck && priceCheck.priceOptions.length > 0 && selectedUpgradeOption) || (!isLoading && priceCheck)) && (
-            <div className="flex flex-col gap-5 sm:gap-6 hidden">
+          {((priceCheck && priceCheck.priceOptions.length > 0 && selectedUpgradeOption) || (!isLoading && priceCheck)) && (
+            <div className="flex flex-col gap-5 sm:gap-6">
               {/* Only show fare option chips if there are multiple options */}
               {priceCheck && priceCheck.priceOptions.length > 1 && (
                 <div className="flex flex-wrap items-center gap-2 py-1">
@@ -1277,7 +1281,7 @@ export default function FlightInfoModal({
           )}
 
           {/* Debug: Raw Price Check Response */}
-          {process.env.NEXT_PUBLIC_DEBUG_FLIGHT_IDS === 'true' && priceCheck?.rawResponse && (
+          {isDebugMode && priceCheck?.rawResponse && (
             <RawResponseDebug rawResponse={priceCheck.rawResponse} title="Price Check Raw Response" />
           )}
 
