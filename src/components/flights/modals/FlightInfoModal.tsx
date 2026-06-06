@@ -48,6 +48,7 @@ interface FlightInfoModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   stayOnCurrentPage?: boolean;
+  hideFooter?: boolean;
   isPackageMode?: boolean;
   onPackageSelect?: () => void;
 }
@@ -63,6 +64,7 @@ export default function FlightInfoModal({
   open,
   onOpenChange,
   stayOnCurrentPage = false,
+  hideFooter = false,
   isPackageMode = false,
   onPackageSelect,
 }: FlightInfoModalProps) {
@@ -1173,7 +1175,7 @@ export default function FlightInfoModal({
                         const isIncluded = seatService.chargeable === 'included';
                         const isChargeable = seatService.chargeable === 'chargeable';
 
-                        let displayLabel = seatService.text || 'Seat selection';
+                        const displayLabel = seatService.text || 'Seat selection';
                         let displayText = '';
 
                         if (isIncluded) {
@@ -1280,7 +1282,7 @@ export default function FlightInfoModal({
           )}
 
           {/* Footer - Only show on search/results pages, not on payment page */}
-          {!stayOnCurrentPage && (
+          {!hideFooter && !stayOnCurrentPage && (
             <div className="sticky bottom-0 z-20 bg-white rounded-xl px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-3 border border-[#EEF0F7] shadow-[0_-8px_24px_-12px_rgba(2,6,23,0.35)]">
               <div className="flex flex-col gap-1">
                 <span className="text-sm sm:text-lg font-medium text-[#3754ED] whitespace-nowrap">
@@ -1329,7 +1331,7 @@ export default function FlightInfoModal({
           )}
 
           {/* Footer for booking page - "Done" button to confirm upgrade selection */}
-          {stayOnCurrentPage && selectedUpgradeOption && (
+          {!hideFooter && stayOnCurrentPage && selectedUpgradeOption && (
             <div className="sticky bottom-0 z-20 bg-white rounded-xl px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-3 border border-[#EEF0F7] shadow-[0_-8px_24px_-12px_rgba(2,6,23,0.35)]">
               <div className="flex flex-col gap-1">
                 <span className="text-sm sm:text-lg font-medium text-[#3754ED] whitespace-nowrap">

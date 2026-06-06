@@ -15,7 +15,7 @@ import { SwapLocationsButton } from "./search-bar/SwapLocationsButton";
 import { DateSelector } from "./search-bar/DateSelector";
 import { SearchButton } from "./search-bar/SearchButton";
 import { Button } from "@/components/ui/button";
-import { Calendar, Plus, X, Building2, ChevronDown, Minus, Plane, Plus as PlusIcon } from "lucide-react";
+import { Calendar, Plus, X, Building2, ChevronDown, Minus, Plane, Plus as PlusIcon, Sparkles } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -51,12 +51,12 @@ interface SearchBarProps {
    */
   embedded?: boolean;
   /** Pre-select product tab on mount */
-  defaultProduct?: "flight" | "hotel" | "package";
+  defaultProduct?: "flight" | "hotel" | "package" | "ai";
   /** When provided, called instead of navigating for package searches */
   onPackageSearch?: (data: PackageSearchFormData) => void;
 }
 
-type Product = "flight" | "hotel" | "package";
+type Product = "flight" | "hotel" | "package" | "ai";
 
 function isSamePackageDestination(
   current: HolidayDestination | null,
@@ -134,6 +134,9 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
       }
       return "hotel";
     }
+    if (pathname?.startsWith("/packages/ai")) {
+      return "ai";
+    }
     if (typeof window !== "undefined") {
       const hostname = window.location.hostname;
       if (hostname.startsWith("package")) return "package";
@@ -161,6 +164,9 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
   const [isHotelDatesOpen, setIsHotelDatesOpen] = useState(false);
   const [isHotelGuestsOpen, setIsHotelGuestsOpen] = useState(false);
   const [openMultiCityDateIndex, setOpenMultiCityDateIndex] = useState<number | null>(null);
+  const [aiLookingFor, setAiLookingFor] = useState("A bit of everything");
+  const [aiStayPreference, setAiStayPreference] = useState("At only the best");
+  const [aiBudget, setAiBudget] = useState(3000);
 
   const savedHotelLocation = useBookingStore((s) => s.hotelLocationSelection);
   const setHotelLocationSelection = useBookingStore((s) => s.setHotelLocationSelection);
@@ -228,15 +234,16 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
     const hkey = urlParams.get("hidden_key");
     const apc = urlParams.get("arrival_point_code");
     const isPackageHotelsPage = pathname?.startsWith("/hotels") && urlParams.get("type") === "package";
+    const isAiPackagePage = pathname?.startsWith("/packages/ai");
 
-    if (isPackageHotelsPage && urlLocation && hid && hkey && hkey.includes(";")) {
+    if ((isPackageHotelsPage || isAiPackagePage) && urlLocation) {
       const nextPackageDestination = {
-        id: String(hid),
+        id: String(hid || urlLocation),
         name: urlLocation,
         country_name: "",
-        airportcode: hkey.split(";")[0] || "",
+        airportcode: hkey?.split(";")[0] || "",
         featured_image: "",
-        hiddenvalue: hkey,
+        hiddenvalue: hkey || "",
       } satisfies HolidayDestination;
 
       if (!isSamePackageDestination(packageDestinationItemRef.current, nextPackageDestination)) {
@@ -278,11 +285,11 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
       }
     }
 
-    if (pathname?.startsWith("/hotels")) {
+    if (pathname?.startsWith("/hotels") || isAiPackagePage) {
       const urlFromCode = urlParams.get("fromCode");
       const fromCode = urlFromCode || savedPackageSearch?.departureCode || "";
       const fromLabel = urlParams.get("from") || savedPackageSearch?.departureName || "";
-      if (urlParams.get("type") === "package" && fromCode && (!fromRef.current || urlFromCode)) {
+      if ((urlParams.get("type") === "package" || isAiPackagePage) && fromCode && (!fromRef.current || urlFromCode)) {
         setFrom({
           code: fromCode,
           name: fromLabel || fromCode,
@@ -353,13 +360,40 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
     );
   }, [from, hotelEndDate, hotelStartDate, packageDestinationItem]);
 
+  const isAiSearchValid = isPackageSearchValid;
+
   const handleSearch = async () => {
     const effectiveProduct: Product =
       pathname?.startsWith("/hotels") && urlParams.get("type") === "package"
         ? "package"
         : activeProduct;
 
-    if (effectiveProduct === "package") {
+    if (effectiveProduct === "package" || effectiveProduct === "ai") {
+      if (effectiveProduct === "ai") {
+        if (!isAiSearchValid) return;
+
+        const loc = packageDestinationItem?.name?.trim() || "London";
+        const checkIn = hotelStartDate ? format(hotelStartDate, "yyyy-MM-dd") : "";
+        const checkOut = hotelEndDate ? format(hotelEndDate, "yyyy-MM-dd") : "";
+        const params = new URLSearchParams();
+        params.set("location", loc);
+        if (checkIn) params.set("checkIn", checkIn);
+        if (checkOut) params.set("checkOut", checkOut);
+        params.set("adults", String(Math.max(1, hotelGuests)));
+        params.set("children", String(Math.max(0, hotelChildren)));
+        params.set("rooms", String(Math.max(1, hotelRooms)));
+        if (from?.code) params.set("fromCode", from.code);
+        if (from?.name || from?.city) params.set("from", from?.name || from?.city || "");
+        if (packageDestinationItem?.id) params.set("hidden_id", String(packageDestinationItem.id));
+        if (packageDestinationItem?.hiddenvalue) params.set("hidden_key", packageDestinationItem.hiddenvalue);
+        params.set("lookingFor", aiLookingFor);
+        params.set("stayPreference", aiStayPreference);
+        params.set("budget", String(aiBudget));
+        if (packageDestinationItem) setPackageDestination(packageDestinationItem);
+        router.push(`/packages/ai?${params.toString()}`);
+        return;
+      }
+
       if (!isPackageSearchValid) {
         return;
       }
@@ -497,6 +531,13 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
               </span>
             }
             label="Flight + Hotels"
+            compact={compact}
+          />
+          <ProductTab
+            active={activeProduct === "ai"}
+            onClick={() => setProduct("ai")}
+            icon={<Sparkles className="h-4 w-4 text-[#3754ED]" />}
+            label="AI Mode"
             compact={compact}
           />
         </div>
@@ -642,7 +683,7 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
             transition={{ duration: 0.22 }}
           >
             <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
-          {activeProduct === "package" && (
+          {(activeProduct === "package" || activeProduct === "ai") && (
             <PackageOriginAutocomplete
               value={from}
               onChange={setFrom}
@@ -650,11 +691,11 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
             />
           )}
           {/* Location */}
-          {activeProduct === "package" ? (
+          {activeProduct === "package" || activeProduct === "ai" ? (
             <PackageDestinationAutocomplete
               value={packageDestinationItem}
               onChange={setPackageDestinationItem}
-              placeholder="Find Location"
+              placeholder={activeProduct === "ai" ? "Going to" : "Find Location"}
             />
           ) : (
             <HotelLocationAutocomplete
@@ -759,7 +800,7 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="text-sm font-semibold text-[#010D50]">Children</div>
-                    <div className="text-xs text-[#3A478A]">Ages 0–17</div>
+                    <div className="text-xs text-[#3A478A]">Ages 0-17</div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Button
@@ -860,12 +901,68 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
           <Button
             type="button"
             onClick={handleSearch}
-            disabled={activeProduct === "package" ? !isPackageSearchValid : false}
+            disabled={activeProduct === "package" ? !isPackageSearchValid : activeProduct === "ai" ? !isAiSearchValid : false}
             className="rounded-xl px-5 py-2.5 h-auto gap-2 text-sm font-medium w-full md:w-auto bg-[#3754ED] hover:bg-[#2A3FB8] text-white"
           >
-            Search
+            {activeProduct === "ai" ? "Plan my trip" : "Search"}
           </Button>
             </div>
+            {activeProduct === "ai" && (
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+                <label className="flex flex-col gap-1">
+                  <span className="flex items-center gap-2 px-2 text-xs font-medium text-[#3A478A]">
+                    <Sparkles className="h-4 w-4 text-[#3754ED]" />
+                    Looking for
+                  </span>
+                  <select
+                    value={aiLookingFor}
+                    onChange={(event) => setAiLookingFor(event.target.value)}
+                    className="h-[46px] rounded-xl border border-[#D3D3D3] bg-white px-4 text-sm font-medium text-[#010D50] outline-none focus:border-[#3754ED]"
+                  >
+                    <option>A bit of everything</option>
+                    <option>Culture and landmarks</option>
+                    <option>Food and nightlife</option>
+                    <option>Family friendly</option>
+                    <option>Adventure and outdoors</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="flex items-center gap-2 px-2 text-xs font-medium text-[#3A478A]">
+                    <Building2 className="h-4 w-4 text-[#3754ED]" />
+                    Stay preference
+                  </span>
+                  <select
+                    value={aiStayPreference}
+                    onChange={(event) => setAiStayPreference(event.target.value)}
+                    className="h-[46px] rounded-xl border border-[#D3D3D3] bg-white px-4 text-sm font-medium text-[#010D50] outline-none focus:border-[#3754ED]"
+                  >
+                    <option>At only the best</option>
+                    <option>Balanced comfort</option>
+                    <option>Value stays</option>
+                    <option>Luxury hotels</option>
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="flex items-center gap-2 px-2 text-xs font-medium text-[#3A478A]">
+                    Budget
+                  </span>
+                  <div className="flex h-[46px] items-center gap-3 rounded-xl border border-[#D3D3D3] bg-white px-4">
+                    <input
+                      type="range"
+                      min={500}
+                      max={10000}
+                      step={100}
+                      value={aiBudget}
+                      onChange={(event) => setAiBudget(Number(event.target.value))}
+                      className="w-full accent-[#3754ED]"
+                    />
+                    <span className="w-16 text-right text-sm font-semibold text-[#010D50]">
+                      ${aiBudget.toLocaleString()}
+                    </span>
+                  </div>
+                </label>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

@@ -1,0 +1,362 @@
+"use client";
+
+import { Suspense, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import Navbar from "@/components/navigation/Navbar";
+import Footer from "@/components/navigation/Footer";
+import PassengerFormsSection from "@/components/booking/PassengerFormsSection";
+import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
+import { FlightSummaryCard, type FlightLeg } from "@/components/booking/FlightSummaryCard";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useBookingStore } from "@/store/bookingStore";
+import type { Flight } from "@/types/flight";
+import { ArrowLeft, CalendarDays, Clock, Users } from "lucide-react";
+
+type AiBookingDraft = {
+  search?: {
+    destination?: string;
+    fromCode?: string;
+    fromName?: string;
+    checkIn?: string;
+    checkOut?: string;
+    adults?: number;
+    children?: number;
+    rooms?: number;
+    lookingFor?: string;
+    stayPreference?: string;
+  };
+  hotel?: {
+    name?: string;
+    imageSrc?: string;
+    distanceLabel?: string;
+    price?: { total?: number; currency?: string };
+  };
+  flight?: Flight | null;
+  activities?: Array<{
+    productCode: string;
+    title: string;
+    imageUrl?: string;
+    price?: number;
+    currency?: string;
+    duration?: string;
+    rating?: number;
+    itineraryDate?: string;
+    itineraryTime?: string;
+  }>;
+  totals?: {
+    flight?: number;
+    hotel?: number;
+    activities?: number;
+    package?: number;
+    currency?: string;
+  };
+};
+
+function money(value?: number, currency = "GBP") {
+  const amount = Number(value || 0);
+  const normalized = (() => {
+    const raw = String(currency || "GBP").trim().toUpperCase();
+    if (raw === "£") return "GBP";
+    if (raw === "$") return "USD";
+    if (raw === "€") return "EUR";
+    return /^[A-Z]{3}$/.test(raw) ? raw : "GBP";
+  })();
+  return new Intl.NumberFormat("en-GB", { style: "currency", currency: normalized, maximumFractionDigits: 0 }).format(amount);
+}
+
+function longDate(value?: string) {
+  if (!value) return "Date pending";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" }).format(date);
+}
+
+function flightSegmentToSummaryLeg(flight: Flight, segment: Flight["outbound"]): FlightLeg {
+  return {
+    from: segment.departureAirport.name || segment.departureAirport.city || segment.departureAirport.code,
+    to: segment.arrivalAirport.name || segment.arrivalAirport.city || segment.arrivalAirport.code,
+    fromCode: segment.departureAirport.code,
+    toCode: segment.arrivalAirport.code,
+    departureTime: segment.departureTime || "",
+    arrivalTime: segment.arrivalTime || "",
+    date: segment.date || "",
+    duration: segment.totalJourneyTime || segment.duration || "",
+    stops: Number(segment.stops || 0) > 0
+      ? `${segment.stops} stop${Number(segment.stops || 0) === 1 ? "" : "s"}`
+      : "Direct",
+    airline: segment.carrierName || flight.airline.name || "Selected airline",
+    airlineCode: segment.carrierCode || flight.airline.code,
+    cabinClass: segment.cabinClass || "Economy",
+  };
+}
+
+function AiCheckoutContent() {
+  const router = useRouter();
+  const [draft, setDraft] = useState<AiBookingDraft | null>(null);
+  const [showTravellers, setShowTravellers] = useState(false);
+  const [flightInfoOpen, setFlightInfoOpen] = useState(false);
+  const [hotelDetailsOpen, setHotelDetailsOpen] = useState(false);
+  const setSearchParams = useBookingStore((s) => s.setSearchParams);
+
+  useEffect(() => {
+    const raw = window.sessionStorage.getItem("aiPackageBookingDraft");
+    if (!raw) return;
+    try {
+      setDraft(JSON.parse(raw) as AiBookingDraft);
+    } catch {
+      setDraft(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!draft?.search?.checkIn) return;
+    setSearchParams({
+      from: draft.search.fromCode || "",
+      to: draft.search.destination || "",
+      departureDate: new Date(`${draft.search.checkIn}T00:00:00`),
+      returnDate: draft.search.checkOut ? new Date(`${draft.search.checkOut}T00:00:00`) : undefined,
+      passengers: {
+        adults: Number(draft.search.adults || 1),
+        children: Number(draft.search.children || 0),
+        infants: 0,
+      },
+      class: "Economy",
+      tripType: "round-trip",
+    });
+  }, [draft, setSearchParams]);
+
+  const currency = draft?.totals?.currency || draft?.flight?.currency || draft?.hotel?.price?.currency || "GBP";
+  const travellers = useMemo(() => {
+    const adults = Number(draft?.search?.adults || 0);
+    const children = Number(draft?.search?.children || 0);
+    return `${adults || 1} adult${adults === 1 ? "" : "s"}${children ? `, ${children} child${children === 1 ? "" : "ren"}` : ""}`;
+  }, [draft?.search?.adults, draft?.search?.children]);
+  const flightSummaryLegs = draft?.flight
+    ? [
+        flightSegmentToSummaryLeg(draft.flight, draft.flight.outbound),
+        ...(draft.flight.inbound ? [flightSegmentToSummaryLeg(draft.flight, draft.flight.inbound)] : []),
+      ]
+    : [];
+
+  if (!draft) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Navbar />
+        <main className="mx-auto max-w-4xl px-4 py-10">
+          <Link href="/packages/ai" className="inline-flex items-center gap-2 text-sm font-medium text-[#3754ED]">
+            <ArrowLeft className="h-4 w-4" />
+            Back to AI planner
+          </Link>
+          <div className="mt-6 rounded-xl border border-[#DFE0E4] p-6 text-[#010D50]">
+            Your AI itinerary is not available in this browser session.
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-white">
+      <Navbar />
+      <main className="mx-auto max-w-[1240px] px-4 py-6 sm:px-6 lg:px-8">
+        <Link href="/packages/ai" className="inline-flex items-center gap-2 text-sm font-medium text-[#3754ED]">
+          <ArrowLeft className="h-4 w-4" />
+          Back to AI planner
+        </Link>
+
+        <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_380px]">
+          <div className="flex flex-col gap-5">
+            <section className="rounded-xl border border-[#DFE0E4] bg-white p-5">
+              <h1 className="text-2xl font-bold text-[#010D50]">Review your AI trip</h1>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-lg bg-[#F5F7FF] p-3 text-sm text-[#010D50]">
+                  <CalendarDays className="mb-2 h-4 w-4 text-[#3754ED]" />
+                  {longDate(draft.search?.checkIn)} - {longDate(draft.search?.checkOut)}
+                </div>
+                <div className="rounded-lg bg-[#F5F7FF] p-3 text-sm text-[#010D50]">
+                  <Users className="mb-2 h-4 w-4 text-[#3754ED]" />
+                  {travellers}
+                </div>
+                <div className="rounded-lg bg-[#F5F7FF] p-3 text-sm text-[#010D50]">
+                  {draft.search?.destination}
+                  <div className="text-xs text-[#3A478A]">{draft.search?.lookingFor}</div>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-xl border border-[#DFE0E4] bg-white p-5">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold text-[#010D50]">Hotel</h2>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setHotelDetailsOpen(true)}
+                  className="h-9 rounded-full border-[#DFE0E4] px-4 text-xs font-semibold text-[#3754ED]"
+                >
+                  View details
+                </Button>
+              </div>
+              <div className="grid gap-4 md:grid-cols-[220px_1fr]">
+                {draft.hotel?.imageSrc ? (
+                  <div className="relative h-40 overflow-hidden rounded-xl bg-[#F5F7FF]">
+                    <Image src={draft.hotel.imageSrc} alt={draft.hotel.name || "Hotel"} fill className="object-cover" />
+                  </div>
+                ) : null}
+                <div>
+                  <h3 className="text-xl font-bold text-[#010D50]">{draft.hotel?.name || "Selected hotel"}</h3>
+                  <p className="mt-1 text-sm text-[#3A478A]">{draft.hotel?.distanceLabel}</p>
+                  <div className="mt-3 font-semibold text-[#010D50]">{money(draft.totals?.hotel, currency)}</div>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-xl border border-[#DFE0E4] bg-white p-5">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-[#010D50]">Flight</h2>
+                  <div className="mt-1 text-sm font-semibold text-[#010D50]">{draft.flight?.airline?.name}</div>
+                </div>
+                {draft.flight ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setFlightInfoOpen(true)}
+                    className="h-9 rounded-full border-[#DFE0E4] px-4 text-xs font-semibold text-[#3754ED]"
+                  >
+                    View flight info
+                  </Button>
+                ) : null}
+              </div>
+              <div className="grid gap-3">
+                {flightSummaryLegs.map((leg, index) => (
+                  <FlightSummaryCard
+                    key={`${leg.fromCode}-${leg.toCode}-${index}`}
+                    leg={leg}
+                    passengers={travellers}
+                    cabinLabel={leg.cabinClass}
+                    onViewDetails={() => setFlightInfoOpen(true)}
+                  />
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-xl border border-[#DFE0E4] bg-white p-5">
+              <h2 className="mb-4 text-lg font-semibold text-[#010D50]">Itinerary</h2>
+              <div className="grid gap-3">
+                {(draft.activities || []).map((activity) => (
+                  <div key={activity.productCode} className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl border border-[#DFE0E4] p-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#F5F7FF]">
+                      <Clock className="h-4 w-4 text-[#3754ED]" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-[#010D50]">{activity.title}</div>
+                      <div className="text-xs text-[#3A478A]">
+                        {longDate(activity.itineraryDate)} at {activity.itineraryTime}
+                        {activity.duration ? ` - ${activity.duration}` : ""}
+                        {activity.rating ? ` - ${activity.rating.toFixed(1)} rating` : ""}
+                      </div>
+                    </div>
+                    <div className="text-sm font-semibold text-[#010D50]">{money(activity.price, activity.currency || currency)}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {showTravellers ? (
+              <section id="traveller-details">
+                <PassengerFormsSection showPassportFields requireContactInfoForAll={false} />
+              </section>
+            ) : null}
+          </div>
+
+          <aside className="h-fit rounded-xl border border-[#DFE0E4] bg-white p-5">
+            <h2 className="text-lg font-semibold text-[#010D50]">Trip total</h2>
+            <div className="mt-3 text-3xl font-bold text-[#010D50]">{money(draft.totals?.package, currency)}</div>
+            <div className="mt-4 grid gap-2 text-sm text-[#3A478A]">
+              <div className="flex justify-between"><span>Flight</span><span>{money(draft.totals?.flight, currency)}</span></div>
+              <div className="flex justify-between"><span>Hotel</span><span>{money(draft.totals?.hotel, currency)}</span></div>
+              <div className="flex justify-between"><span>Activities</span><span>{money(draft.totals?.activities, currency)}</span></div>
+            </div>
+            <Button
+              className="mt-5 h-11 w-full rounded-xl bg-[#3754ED] text-white hover:bg-[#2942D1]"
+              onClick={() => {
+                setShowTravellers(true);
+                window.setTimeout(() => {
+                  document.getElementById("traveller-details")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }, 50);
+              }}
+            >
+              Continue to traveller details
+            </Button>
+            <Button
+              variant="outline"
+              className="mt-3 h-11 w-full rounded-xl border-[#DFE0E4] text-[#010D50]"
+              onClick={() => router.push("/packages/ai")}
+            >
+              Back to AI planner
+            </Button>
+          </aside>
+        </div>
+      </main>
+      {draft.flight ? (
+        <FlightInfoModal
+          flight={draft.flight}
+          open={flightInfoOpen}
+          onOpenChange={setFlightInfoOpen}
+          stayOnCurrentPage
+          hideFooter
+          isPackageMode
+        />
+      ) : null}
+      <Dialog open={hotelDetailsOpen} onOpenChange={setHotelDetailsOpen}>
+        <DialogContent className="max-w-[min(100vw-24px,680px)] bg-white">
+          <DialogHeader>
+            <DialogTitle className="pr-6 text-[#010D50]">{draft.hotel?.name || "Selected hotel"}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 md:grid-cols-[220px_1fr]">
+            {draft.hotel?.imageSrc ? (
+              <div className="relative h-40 overflow-hidden rounded-xl bg-[#F5F7FF]">
+                <Image src={draft.hotel.imageSrc} alt={draft.hotel.name || "Hotel"} fill className="object-cover" />
+              </div>
+            ) : null}
+            <div>
+              <p className="text-sm text-[#3A478A]">{draft.hotel?.distanceLabel}</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-lg border border-[#DFE0E4] p-3">
+                  <div className="text-xs text-[#3A478A]">Check-in</div>
+                  <div className="text-sm font-semibold text-[#010D50]">{longDate(draft.search?.checkIn)}</div>
+                </div>
+                <div className="rounded-lg border border-[#DFE0E4] p-3">
+                  <div className="text-xs text-[#3A478A]">Check-out</div>
+                  <div className="text-sm font-semibold text-[#010D50]">{longDate(draft.search?.checkOut)}</div>
+                </div>
+                <div className="rounded-lg border border-[#DFE0E4] p-3">
+                  <div className="text-xs text-[#3A478A]">Travellers</div>
+                  <div className="text-sm font-semibold text-[#010D50]">{travellers}</div>
+                </div>
+                <div className="rounded-lg border border-[#DFE0E4] p-3">
+                  <div className="text-xs text-[#3A478A]">Rooms</div>
+                  <div className="text-sm font-semibold text-[#010D50]">{draft.search?.rooms || 1} room</div>
+                </div>
+              </div>
+              <div className="mt-4 text-base font-bold text-[#010D50]">{money(draft.totals?.hotel, currency)}</div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Footer />
+    </div>
+  );
+}
+
+export default function AiCheckoutPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+      <AiCheckoutContent />
+    </Suspense>
+  );
+}

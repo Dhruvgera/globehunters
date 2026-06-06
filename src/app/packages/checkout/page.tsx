@@ -461,16 +461,22 @@ function PackageTravellerDetailsInner() {
     [hotelSearch, packageSearch],
   );
 
+  const effectiveHotelId = String(selectedHotel?.hotelId || sp.get("hotelId") || packageResultsMeta?.hotelRequestId || "");
+
   const changeFlightHref = useMemo(() => {
     const params = new URLSearchParams();
     params.set("type", "package");
-    const effectiveHotelId = String(packageResultsMeta?.hotelRequestId || selectedHotel?.hotelId || "");
     if (effectiveHotelId) params.set("hotelId", effectiveHotelId);
+    const roomIds = selectedHotelRoomIds.length > 0 ? selectedHotelRoomIds : sp.getAll("roomId");
+    roomIds.forEach((roomId) => {
+      const normalized = String(roomId || "").trim();
+      if (normalized) params.append("roomId", normalized);
+    });
     if (flight?.segmentResultId || flight?.id) {
       params.set("flightResultId", flight?.segmentResultId || flight?.id || "");
     }
     return `/search?${params.toString()}`;
-  }, [flight?.id, flight?.segmentResultId, selectedHotel?.hotelId, packageResultsMeta?.hotelRequestId]);
+  }, [effectiveHotelId, flight?.id, flight?.segmentResultId, selectedHotelRoomIds, sp]);
 
   const stayDetails = useMemo(() => {
     const checkIn =
@@ -518,7 +524,11 @@ function PackageTravellerDetailsInner() {
   ]);
 
   const handleContinue = async () => {
-    if (!termsAccepted || !flight || !selectedHotel?.hotelId || selectedHotelRoomIds.length === 0) return;
+    if (!termsAccepted) return;
+    if (!flight || !effectiveHotelId || selectedHotelRoomIds.length === 0) {
+      setError("Please reselect your hotel room and flight before continuing.");
+      return;
+    }
 
     const counts = storeSearchParams?.passengers || { adults: 1, children: 0, infants: 0 };
     const required = (counts.adults || 0) + (counts.children || 0) + (counts.infants || 0);

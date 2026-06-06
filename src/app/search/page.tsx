@@ -92,6 +92,8 @@ function SearchPageContent() {
   const packageHotelId = getQueryParamCaseInsensitive(urlParams, "hotelId");
   const packageHotelName = getQueryParamCaseInsensitive(urlParams, "hotelName");
   const packageFlightResultId = getQueryParamCaseInsensitive(urlParams, "flightResultId");
+  const aiReturnHref = getQueryParamCaseInsensitive(urlParams, "aiReturn");
+  const isAiFlightChangeMode = Boolean(aiReturnHref?.startsWith("/packages/ai"));
   
   const setStoreSearchParams = useBookingStore((state) => state.setSearchParams);
   const storeSearchParams = useBookingStore((state) => state.searchParams);
@@ -488,11 +490,11 @@ function SearchPageContent() {
     fetchDatePrice,
     fetchDatePricesBatch,
     getDateFromIndex
-  } = useDatePrices(isInitialized && !isPackageMode ? effectiveSearchParams : null, actualMinPrice);
+  } = useDatePrices(isInitialized && !isPackageMode && !isAiFlightChangeMode ? effectiveSearchParams : null, actualMinPrice);
 
   // Auto-prefetch date prices in background; start early for better concurrency
   useEffect(() => {
-    if (isPackageMode) return;
+    if (isPackageMode || isAiFlightChangeMode) return;
     if (departureDates.length > 0) {
       const departureCenter = Math.floor(departureDates.length / 2);
       const departureIndices = departureDates
@@ -520,7 +522,7 @@ function SearchPageContent() {
         });
       }
     }
-  }, [departureDates.length, returnDates.length, fetchDatePricesBatch, effectiveSearchParams.tripType, isPackageMode]);
+  }, [departureDates.length, returnDates.length, fetchDatePricesBatch, effectiveSearchParams.tripType, isAiFlightChangeMode, isPackageMode]);
 
   const effectiveFlights = useMemo(() => {
     if (isPackageMode) {
@@ -1019,6 +1021,21 @@ function SearchPageContent() {
 
   // Handler for package mode flight selection
   const handlePackageFlightSelect = (flight: typeof filteredFlights[0]) => {
+    setSelectedFlight(flight, normalizeCabinClass(flight.outbound?.cabinClass));
+    if (aiReturnHref?.startsWith("/packages/ai")) {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem(
+          "aiPackageSelectionPatch",
+          JSON.stringify({
+            type: "flight",
+            flight,
+            createdAt: Date.now(),
+          })
+        );
+      }
+      router.push(aiReturnHref);
+      return;
+    }
     // Build URL with all package parameters for review page
     const params = new URLSearchParams(urlParams.toString());
     params.set("flightId", flight.id);
@@ -1098,7 +1115,7 @@ function SearchPageContent() {
       )}
 
       {/* Date Price Selector - Show for one-way and round-trip only (not multi-city) */}
-      {!isPackageMode && !activeError && departureDates.length > 0 && effectiveSearchParams.tripType !== 'multi-city' && (
+      {!isPackageMode && !isAiFlightChangeMode && !activeError && departureDates.length > 0 && effectiveSearchParams.tripType !== 'multi-city' && (
         <div className="relative">
           <DatePriceSelector
             departureDates={departureDates}
@@ -1257,8 +1274,9 @@ function SearchPageContent() {
                     flights={filteredFlights}
                     displayCount={displayedFlightsCount}
                     onLoadMore={handleLoadMore}
-                    isPackageMode={isPackageMode}
-                    onSelect={isPackageMode ? handlePackageFlightSelect : undefined}
+                    isPackageMode={isPackageMode || isAiFlightChangeMode}
+                    showPackageDelta={isPackageMode}
+                    onSelect={isPackageMode || isAiFlightChangeMode ? handlePackageFlightSelect : undefined}
                   />
                 </>
               ) : (

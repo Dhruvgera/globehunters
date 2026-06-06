@@ -116,6 +116,8 @@ function HotelsPageInner() {
 
   // Detect if we're in package (Flight+Hotel) mode
   const isPackageMode = urlParams.get("type") === "package";
+  const aiReturnHref = urlParams.get("aiReturn");
+  const isAiHotelChangeMode = Boolean(aiReturnHref?.startsWith("/packages/ai"));
 
   const setHotelSearch = useBookingStore((s) => s.setHotelSearch);
   const setHotelResultsMeta = useBookingStore((s) => s.setHotelResultsMeta);
@@ -1679,6 +1681,8 @@ function HotelsPageInner() {
                         selected={hotelKey === selectedHotelKey}
                         onSelect={() => setSelectedHotelKey(hotelKey)}
                         isPackageMode={isPackageMode}
+                        openInCurrentTab={isAiHotelChangeMode}
+                        aiReturnHref={aiReturnHref}
                         onImageError={handleHotelImageError}
                       />
                     );
@@ -1700,6 +1704,8 @@ function HotelsPageInner() {
                           selected={hotelKey === selectedHotelKey}
                           onSelect={() => setSelectedHotelKey(hotelKey)}
                           isPackageMode={isPackageMode}
+                          openInCurrentTab={isAiHotelChangeMode}
+                          aiReturnHref={aiReturnHref}
                           onImageError={handleHotelImageError}
                         />
                       );
@@ -1719,6 +1725,8 @@ function HotelsPageInner() {
                           selected={hotelKey === selectedHotelKey}
                           onSelect={() => setSelectedHotelKey(hotelKey)}
                           isPackageMode={isPackageMode}
+                          openInCurrentTab={isAiHotelChangeMode}
+                          aiReturnHref={aiReturnHref}
                           onImageError={handleHotelImageError}
                         />
                       );

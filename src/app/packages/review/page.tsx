@@ -314,15 +314,16 @@ function PackageReviewPageInner() {
   const changeFlightHref = useMemo(() => {
     const params = new URLSearchParams();
     params.set("type", "package");
-    // The change-flights API requires the hotel *result* ID from the package
-    // search response, NOT the vendor hotel_id. In deeplink flows the route
-    // param (selectedHotel.hotelId) is the vendor hotel_id, while
-    // packageResultsMeta.hotelRequestId stores the correct HotelResultId.
-    const effectiveHotelId = String(packageResultsMeta?.hotelRequestId || hotelId || "");
+    const effectiveHotelId = String(hotelId || packageResultsMeta?.hotelRequestId || "");
     if (effectiveHotelId) params.set("hotelId", effectiveHotelId);
+    const roomIds = selectedHotelRoomIds.length > 0 ? selectedHotelRoomIds : searchParams.getAll("roomId");
+    roomIds.forEach((roomId) => {
+      const normalized = String(roomId || "").trim();
+      if (normalized) params.append("roomId", normalized);
+    });
     if (flightResultId) params.set("flightResultId", flightResultId);
     return `/search?${params.toString()}`;
-  }, [flightResultId, hotelId, packageResultsMeta?.hotelRequestId]);
+  }, [flightResultId, hotelId, packageResultsMeta?.hotelRequestId, searchParams, selectedHotelRoomIds]);
 
   const locallyPayableFees = useMemo<locallyPayableFeesType | undefined>(() => {
     const fallbackCurrency = hotelRoomSummary?.currency || "$";

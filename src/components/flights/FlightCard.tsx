@@ -26,6 +26,9 @@ interface FlightCardProps {
   showReturn?: boolean;
   onSelect?: () => void;
   isPackageMode?: boolean;
+  showBookButton?: boolean;
+  showPackageDelta?: boolean;
+  detailsOnly?: boolean;
 }
 
 export default function FlightCard({
@@ -33,6 +36,9 @@ export default function FlightCard({
   showReturn = true,
   onSelect,
   isPackageMode = false,
+  showBookButton = true,
+  showPackageDelta = true,
+  detailsOnly = false,
 }: FlightCardProps) {
   const router = useRouter();
   const setSelectedFlight = useBookingStore(
@@ -66,7 +72,7 @@ export default function FlightCard({
   const effectivePricePerPerson = baseOption?.pricePerPerson ?? flight.pricePerPerson;
   const effectiveCurrency = baseOption?.currency ?? flight.currency;
   const isPackagePerPersonDelta = typeof flight.packagePriceDeltaPerPerson === "number";
-  const packagePrimaryPriceLabel = isPackageMode
+  const packagePrimaryPriceLabel = isPackageMode && showPackageDelta
     ? formatPackageDeltaLabel(
         isPackagePerPersonDelta ? flight.packagePriceDeltaPerPerson : flight.packagePriceDeltaTotal,
         flight.currency,
@@ -129,8 +135,10 @@ export default function FlightCard({
     router.push('/booking');
   };
 
-  // Debug mode - show module_id and Result_id when enabled
-  const isDebugMode = process.env.NEXT_PUBLIC_DEBUG_FLIGHT_IDS === 'true';
+  const isDebugMode =
+    process.env.NEXT_PUBLIC_DEBUG_FLIGHT_IDS === "true" &&
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("debugFlights") === "1";
 
   return (
     <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 shadow-sm hover:shadow-md transition-shadow overflow-hidden w-full max-w-full">
@@ -223,7 +231,7 @@ export default function FlightCard({
           setShowTicketOptions(!showTicketOptions);
         }}
         onPrefetchOptions={prefetchOptions}
-        onBook={handleBook}
+        onBook={showBookButton ? handleBook : undefined}
       />
 
       {/* Expandable Ticket Options */}
@@ -244,6 +252,8 @@ export default function FlightCard({
         flight={flight}
         open={showFlightInfo}
         onOpenChange={setShowFlightInfo}
+        stayOnCurrentPage={detailsOnly}
+        hideFooter={detailsOnly}
         isPackageMode={isPackageMode}
         onPackageSelect={onSelect}
       />

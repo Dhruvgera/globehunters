@@ -67,6 +67,8 @@ export function HotelResultCard({
   selected = false,
   onSelect,
   isPackageMode = false,
+  openInCurrentTab = false,
+  aiReturnHref,
   onImageError,
 }: {
   hotel: Hotel;
@@ -74,6 +76,8 @@ export function HotelResultCard({
   selected?: boolean;
   onSelect?: () => void;
   isPackageMode?: boolean;
+  openInCurrentTab?: boolean;
+  aiReturnHref?: string | null;
   onImageError?: (hotelId: string) => void;
 }) {
   const isGrid = view === "grid";
@@ -91,6 +95,10 @@ export function HotelResultCard({
   if (srId != null && String(srId).trim() && String(srId) !== String(hotel.id)) detailParams.set("srId", String(srId));
   if (typeof provider === "string" && provider.trim()) detailParams.set("provider", provider.trim().toLowerCase());
   if (hotel.tyId) detailParams.set("tyId", hotel.tyId);
+  if (aiReturnHref?.startsWith("/packages/ai")) {
+    detailParams.set("aiReturn", aiReturnHref);
+    detailParams.set("context", "ai-change-hotel");
+  }
   if (hotelSearch) {
     const encoded = encodeHotelSearchContext({
       ...hotelSearch,
@@ -134,12 +142,26 @@ export function HotelResultCard({
       onClick={(e) => {
         e.preventDefault();
         onSelect?.();
+        if (aiReturnHref?.startsWith("/packages/ai")) {
+          window.sessionStorage.setItem("aiPackageCandidateHotel", JSON.stringify(hotel));
+        }
+        if (openInCurrentTab) {
+          window.location.assign(hotelDetailUrl);
+          return;
+        }
         window.open(hotelDetailUrl, "_blank", "noopener,noreferrer");
       }}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onSelect?.();
+          if (aiReturnHref?.startsWith("/packages/ai")) {
+            window.sessionStorage.setItem("aiPackageCandidateHotel", JSON.stringify(hotel));
+          }
+          if (openInCurrentTab) {
+            window.location.assign(hotelDetailUrl);
+            return;
+          }
           window.open(hotelDetailUrl, "_blank", "noopener,noreferrer");
         }
       }}

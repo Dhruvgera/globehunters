@@ -1324,6 +1324,9 @@ export default function HotelRoomsPage() {
   const urlSrId = searchParams.get("srId");
   const urlProvider = searchParams.get("provider");
   const urlTyId = searchParams.get("tyId");
+  const isAiHotelDialog = searchParams.get("context") === "ai-hotel-dialog";
+  const aiReturnHref = searchParams.get("aiReturn");
+  const isAiHotelChange = Boolean(aiReturnHref?.startsWith("/packages/ai"));
 
   // Detect if we're in package (flight+hotel) mode
   const isPackageMode = searchParams.get("type") === "package";
@@ -3673,7 +3676,70 @@ export default function HotelRoomsPage() {
     router.push(`/search?${params.toString()}`);
   };
 
+  function handleAiHotelRoomContinue(roomIds?: string[]) {
+    const ids = roomIds ?? selectedRoomIds;
+    const firstRoom = remoteRooms.find(room => room.id == ids[0]);
+    if (!firstRoom || !aiReturnHref?.startsWith("/packages/ai")) return;
+    setSelectedHotel({ hotelId, hotelName: hotel.name });
+    setSelectedHotelRoomIds(ids);
+    const summary = buildSelectedRoomSummary(hotelId, ids, remoteRooms, activeGroupSlots);
+    setSelectedHotelRoomSummary(summary);
+
+    let candidateHotel: Record<string, unknown> | null = null;
+    if (typeof window !== "undefined") {
+      try {
+        const raw = window.sessionStorage.getItem("aiPackageCandidateHotel");
+        const parsed = raw ? JSON.parse(raw) : null;
+        if (parsed && typeof parsed === "object") candidateHotel = parsed as Record<string, unknown>;
+      } catch {
+        candidateHotel = null;
+      }
+
+      const existingPrice =
+        candidateHotel?.price && typeof candidateHotel.price === "object" && !Array.isArray(candidateHotel.price)
+          ? (candidateHotel.price as Record<string, unknown>)
+          : {};
+
+      window.sessionStorage.setItem(
+        "aiPackageSelectionPatch",
+        JSON.stringify({
+          type: "hotel",
+          hotel: {
+            ...(candidateHotel || {}),
+            id: candidateHotel?.id || hotelId,
+            name: hotel.name || candidateHotel?.name || "Selected hotel",
+            imageSrc: candidateHotel?.imageSrc || hotel.mainImage,
+            starRating: hotel.starRating,
+            distanceLabel: candidateHotel?.distanceLabel || hotel.address,
+            price: {
+              ...existingPrice,
+              total: summary?.total,
+              currency: summary?.currency || existingPrice.currency || "GBP",
+            },
+            room: {
+              name: firstRoom.name,
+              highlights: [
+                firstRoom.bedType,
+                firstRoom.paymentType,
+                firstRoom.isRefundable ? "Refundable" : "",
+              ].filter(Boolean),
+            },
+          },
+          selectedRoomIds: ids,
+          roomSummary: summary,
+          createdAt: Date.now(),
+        })
+      );
+
+      window.top?.location.assign(aiReturnHref);
+    }
+  }
+
   function handleHotelRoomContinue(roomIds?: string[]) {
+    if (isAiHotelChange) {
+      handleAiHotelRoomContinue(roomIds);
+      return;
+    }
     if (!roomIds || !roomIds.length) return;
     setSelectedRoomCounts(selectedRoomCountsFromIds(roomIds));
     setSelectedHotelRoomIds(roomIds);
@@ -3793,6 +3859,8 @@ export default function HotelRoomsPage() {
 
               {/* Flight summary + Package cost card — shown in package mode */}
               {(() => {
+                if (isAiHotelDialog || isAiHotelChange) return null;
+
                 const deeplinkFlights = deeplinkViewData?.success && "FlightResultId" in deeplinkViewData.results
                   ? (deeplinkViewData as HolidayPackageViewResponse).results.FlightDetails
                   : null;
@@ -4466,7 +4534,7 @@ export default function HotelRoomsPage() {
                     <Button
                       className="rounded-full px-6 py-3 h-auto gap-2 bg-[#3754ED] hover:bg-[#2A3FB8] text-white font-bold disabled:bg-[#A8B3F5]"
                       disabled={!canProceedWithRooms}
-                      onClick={isPackageMode ? () => handlePackageRoomContinue() : () => router.push("/hotels/checkout")}
+                      onClick={isAiHotelChange ? () => handleAiHotelRoomContinue() : isPackageMode ? () => handlePackageRoomContinue() : () => router.push("/hotels/checkout")}
                     >
                       Continue
                       <ChevronRight className="w-5 h-5" />

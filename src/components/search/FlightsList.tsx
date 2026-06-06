@@ -11,7 +11,7 @@ interface FlightsListProps {
   onLoadMore?: () => void;
   onSelect?: (flight: Flight) => void;
   isPackageMode?: boolean;
-  currency?: string;
+  showPackageDelta?: boolean;
 }
 
 export function FlightsList({
@@ -20,24 +20,24 @@ export function FlightsList({
   onLoadMore,
   onSelect,
   isPackageMode = false,
-  currency = "£",
+  showPackageDelta = true,
 }: FlightsListProps) {
-  const t = useTranslations('search.flights');
+  const t = useTranslations("search.flights");
   const displayedFlights = displayCount ? flights.slice(0, displayCount) : flights;
   const hasMore = displayCount ? displayCount < flights.length : false;
 
   return (
     <div className="flex-1 flex flex-col gap-2 min-w-0">
       {displayedFlights.map((flight) => (
-        <FlightCard 
-          key={flight.id} 
-          flight={flight} 
+        <FlightCard
+          key={flight.id}
+          flight={flight}
           onSelect={onSelect ? () => onSelect(flight) : undefined}
           isPackageMode={isPackageMode}
+          showPackageDelta={showPackageDelta}
         />
       ))}
 
-      {/* Show More Results Button */}
       {hasMore && onLoadMore && (
         <div className="flex justify-center mt-4">
           <Button
@@ -45,7 +45,7 @@ export function FlightsList({
             variant="outline"
             className="bg-white hover:bg-[#F5F7FF] text-[#3754ED] border-[#3754ED] rounded-full px-8 py-2 h-auto text-sm font-medium"
           >
-            {t('loadMore')}
+            {t("loadMore")}
           </Button>
         </div>
       )}
