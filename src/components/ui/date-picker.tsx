@@ -11,6 +11,7 @@ interface DatePickerProps {
   onStartDateChange?: (date: Date | undefined) => void;
   onEndDateChange?: (date: Date | undefined) => void;
   onDone?: () => void;
+  minDate?: Date;
   className?: string;
 }
 
@@ -97,6 +98,7 @@ function MonthCalendar({
   onNext,
   canGoPrev,
   canGoNext,
+  minDate,
 }: {
   year: number;
   month: number;
@@ -108,10 +110,13 @@ function MonthCalendar({
   onNext?: () => void;
   canGoPrev?: boolean;
   canGoNext?: boolean;
+  minDate?: Date;
 }) {
   const days = getDaysInMonth(year, month);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const effectiveMinDate = minDate && minDate > today ? new Date(minDate) : today;
+  effectiveMinDate.setHours(0, 0, 0, 0);
 
   return (
     <div className="flex flex-col w-full min-w-0 lg:min-w-[252px]">
@@ -182,7 +187,7 @@ function MonthCalendar({
           const isStart = isRangeStart(date, selectedStart);
           const isEnd = isRangeEnd(date, selectedEnd);
           const inRange = selectedStart && selectedEnd ? isInRange(date, selectedStart, selectedEnd) : false;
-          const isPast = date < today;
+          const isPast = date < effectiveMinDate;
           const isSelected = isStart || isEnd;
 
           // Determine position for range highlighting
@@ -270,12 +275,14 @@ export function DatePicker({
   onStartDateChange,
   onEndDateChange,
   onDone,
+  minDate,
   className,
 }: DatePickerProps) {
   const today = new Date();
+  const effectiveMinDate = minDate && minDate > today ? minDate : today;
 
   // Initialize to the selected start date's month if available, otherwise use today
-  const initialDate = startDate || today;
+  const initialDate = startDate || effectiveMinDate;
 
   // Skyscanner-style: unified navigation - both months move together
   // Initialize once based on startDate or today, don't auto-advance when user selects dates
@@ -287,8 +294,8 @@ export function DatePicker({
   const secondYear = baseMonth === 11 ? baseYear + 1 : baseYear;
 
   // Check if we can go back (don't go before current month)
-  const canGoPrev = baseYear > today.getFullYear() ||
-    (baseYear === today.getFullYear() && baseMonth > today.getMonth());
+  const canGoPrev = baseYear > effectiveMinDate.getFullYear() ||
+    (baseYear === effectiveMinDate.getFullYear() && baseMonth > effectiveMinDate.getMonth());
 
   // Allow going forward up to 12 months
   const maxDate = new Date(today.getFullYear() + 1, today.getMonth(), 1);
@@ -404,6 +411,7 @@ export function DatePicker({
           onNext={handleNext}
           canGoPrev={canGoPrev}
           canGoNext={canGoNext}
+          minDate={effectiveMinDate}
         />
 
         {isRangeMode && (
@@ -417,6 +425,7 @@ export function DatePicker({
               showNavigation="right"
               onNext={handleNext}
               canGoNext={canGoNext}
+              minDate={effectiveMinDate}
             />
           </div>
         )}

@@ -32,7 +32,7 @@ export function FlightsList({
         <FlightCard
           key={flight.id}
           flight={flight}
-          onSelect={onSelect ? () => onSelect(flight) : undefined}
+          onSelect={onSelect ? (selectedFlight) => onSelect(selectedFlight || flight) : undefined}
           isPackageMode={isPackageMode}
           showPackageDelta={showPackageDelta}
         />

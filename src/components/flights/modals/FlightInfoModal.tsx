@@ -16,7 +16,7 @@ import { useTranslations } from "next-intl";
 import { formatPrice } from "@/lib/currency";
 import { useBookingStore } from "@/store/bookingStore";
 import { usePriceCheck } from "@/hooks/usePriceCheck";
-import { TransformedPriceOption } from "@/types/priceCheck";
+import { PriceCheckResult, TransformedPriceOption } from "@/types/priceCheck";
 import { ErrorMessage } from "@/components/ui/error-message";
 import { useAirportNames } from "@/hooks/useAirportNames";
 import { getJourneySegments } from "@/lib/flight/segments";
@@ -50,13 +50,35 @@ interface FlightInfoModalProps {
   stayOnCurrentPage?: boolean;
   hideFooter?: boolean;
   isPackageMode?: boolean;
-  onPackageSelect?: () => void;
+  onPackageSelect?: (flight: Flight) => void;
+  onPackageApply?: (option: TransformedPriceOption, priceCheck: PriceCheckResult | null) => void;
 }
 
-function formatPackageDeltaLabel(amount?: number, currency?: string): string {
-  const delta = Number(amount || 0);
-  if (Math.abs(delta) < 0.01) return formatPrice(0, currency || "GBP");
-  return `${delta > 0 ? "+" : "-"}${formatPrice(Math.abs(delta), currency || "GBP")}`;
+function flightWithSelectedFare(flight: Flight, option: TransformedPriceOption): Flight {
+  const cabinClass = option.cabinClassDisplay || option.cabinName || option.cabinClass || "Economy";
+  return {
+    ...flight,
+    price: option.totalPrice || flight.price,
+    pricePerPerson: option.pricePerPerson || flight.pricePerPerson,
+    currency: option.currency || flight.currency,
+    outbound: {
+      ...flight.outbound,
+      cabinClass,
+      segmentBaggage: option.baggage?.description || flight.outbound.segmentBaggage,
+    },
+    inbound: flight.inbound
+      ? {
+          ...flight.inbound,
+          cabinClass,
+          segmentBaggage: option.baggage?.description || flight.inbound.segmentBaggage,
+        }
+      : undefined,
+    segments: flight.segments?.map((segment) => ({
+      ...segment,
+      cabinClass,
+      segmentBaggage: option.baggage?.description || segment.segmentBaggage,
+    })),
+  };
 }
 
 export default function FlightInfoModal({
@@ -67,6 +89,7 @@ export default function FlightInfoModal({
   hideFooter = false,
   isPackageMode = false,
   onPackageSelect,
+  onPackageApply,
 }: FlightInfoModalProps) {
   const t = useTranslations('flightInfo');
   const router = useRouter();
@@ -285,11 +308,13 @@ export default function FlightInfoModal({
     // This ensures old folder IDs don't carry over to a new booking
     setVyspaFolderInfo({ folderNumber: '', customerId: null, emailAddress: null });
 
+    const selectedFlightForFlow = selectedUpgradeOption ? flightWithSelectedFare(flight, selectedUpgradeOption) : flight;
+
     if (selectedUpgradeOption) {
       // Save selected upgrade to store
       setSelectedUpgrade(selectedUpgradeOption);
       // Save flight with selected cabin class
-      setSelectedFlight(flight, selectedUpgradeOption.cabinClassDisplay);
+      setSelectedFlight(selectedFlightForFlow, selectedUpgradeOption.cabinClassDisplay);
       // Save price check data
       if (priceCheck) {
         setPriceCheckData(priceCheck);
@@ -311,7 +336,7 @@ export default function FlightInfoModal({
     // For package mode, use the onPackageSelect callback
     if (isPackageMode && onPackageSelect) {
       onOpenChange(false);
-      onPackageSelect();
+      onPackageSelect(selectedFlightForFlow);
       return;
     }
 
@@ -1291,19 +1316,18 @@ export default function FlightInfoModal({
               <div className="flex flex-col gap-1">
                 <span className="text-sm sm:text-lg font-medium text-[#3754ED] whitespace-nowrap">
                   {isPackageMode
-                    ? formatPackageDeltaLabel(
-                      typeof flight.packagePriceDeltaPerPerson === "number"
-                        ? flight.packagePriceDeltaPerPerson
-                        : flight.packagePriceDeltaTotal,
-                      flight.currency
-                    )
+                    ? selectedUpgradeOption
+                      ? formatPrice(selectedUpgradeOption.totalPrice, selectedUpgradeOption.currency)
+                      : formatPrice(flight.price, flight.currency)
                     : selectedUpgradeOption
                       ? formatPrice(selectedUpgradeOption.totalPrice, selectedUpgradeOption.currency)
                       : formatPrice(flight.price, flight.currency)}
                 </span>
                 <span className="text-xs text-[#3A478A]">
                   {isPackageMode
-                    ? `${formatPrice(0, flight.currency || "GBP")} package adjustment`
+                    ? selectedUpgradeOption
+                      ? `${formatPrice(selectedUpgradeOption.pricePerPerson, selectedUpgradeOption.currency)} per person`
+                      : `${formatPrice(flight.pricePerPerson, flight.currency)} per person`
                     : selectedUpgradeOption
                       ? `${formatPrice(selectedUpgradeOption.pricePerPerson, selectedUpgradeOption.currency)} per person`
                       : `${formatPrice(flight.pricePerPerson, flight.currency)} per person`}
@@ -1314,7 +1338,7 @@ export default function FlightInfoModal({
                 disabled={!flight.price && !selectedUpgradeOption}
                 className="bg-[#3754ED] hover:bg-[#2A3FB8] text-white rounded-full px-4 sm:px-5 py-2 h-auto gap-1 text-sm font-bold shrink-0 disabled:opacity-50"
               >
-                {isLoading ? 'Book' : (priceCheck && priceCheck.priceOptions.length === 0 ? 'Book Now' : 'Book')}
+                {isPackageMode ? 'Select flight' : isLoading ? 'Book' : (priceCheck && priceCheck.priceOptions.length === 0 ? 'Book Now' : 'Book')}
                 <svg
                   width="20"
                   height="20"
@@ -1354,6 +1378,9 @@ export default function FlightInfoModal({
                   // Save price check data
                   if (priceCheck) {
                     setPriceCheckData(priceCheck);
+                  }
+                  if (isPackageMode) {
+                    onPackageApply?.(selectedUpgradeOption, priceCheck || null);
                   }
                   // Close the dialog
                   onOpenChange(false);

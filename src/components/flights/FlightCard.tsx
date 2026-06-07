@@ -24,7 +24,7 @@ function formatPackageDeltaLabel(amount?: number, currency?: string, perPerson =
 interface FlightCardProps {
   flight: Flight;
   showReturn?: boolean;
-  onSelect?: () => void;
+  onSelect?: (flight: Flight) => void;
   isPackageMode?: boolean;
   showBookButton?: boolean;
   showPackageDelta?: boolean;
@@ -86,7 +86,7 @@ export default function FlightCard({
     // For package mode, use the onSelect callback instead of navigating to booking
     if (isPackageMode && onSelect) {
       setSelectedFlight(flight, fareType);
-      onSelect();
+      onSelect(flight);
       return;
     }
 
@@ -109,7 +109,7 @@ export default function FlightCard({
         setSelectedUpgrade(baseOption);
       }
       setSelectedFlight(flight, baseOption?.cabinClassDisplay || 'Economy');
-      onSelect();
+      onSelect(flight);
       return;
     }
 

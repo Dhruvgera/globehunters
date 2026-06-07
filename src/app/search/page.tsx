@@ -1104,7 +1104,7 @@ function SearchPageContent() {
               checkOut={urlParams.get("checkOut") || urlParams.get("returnDate") || ""}
               guests={parseInt(urlParams.get("guests") || urlParams.get("adults") || "2")}
               adults={parseInt(urlParams.get("adults") || "2")}
-              children={parseInt(urlParams.get("children") || "0")}
+              childCount={parseInt(urlParams.get("children") || "0")}
               infants={parseInt(urlParams.get("infants") || "0")}
               rooms={parseInt(urlParams.get("rooms") || "1")}
               price={selectedHotelRoomSummary?.total}

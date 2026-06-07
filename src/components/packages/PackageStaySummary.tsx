@@ -11,7 +11,7 @@ interface PackageStaySummaryProps {
   checkOut: string;
   guests: number;
   adults?: number;
-  children?: number;
+  childCount?: number;
   infants?: number;
   rooms: number;
   price?: number;
@@ -27,7 +27,7 @@ export function PackageStaySummary({
   checkOut,
   guests,
   adults,
-  children,
+  childCount,
   infants,
   rooms,
   price,
@@ -68,13 +68,13 @@ export function PackageStaySummary({
     const chargeableGuests = getChargeablePassengerCount([
       {
         adults: Math.max(0, Number(adults ?? guests ?? 0)),
-        children: Math.max(0, Number(children || 0)),
+        children: Math.max(0, Number(childCount || 0)),
         infants: Math.max(0, Number(infants || 0)),
       },
     ]);
     const perPersonPrice = Math.round((price / chargeableGuests) * 100) / 100;
     return formatPrice(perPersonPrice, currency || "GBP");
-  }, [adults, children, currency, guests, infants, price]);
+  }, [adults, childCount, currency, guests, infants, price]);
 
   return (
     <div className="mt-5 bg-[#F5F7FF] rounded-2xl p-6 lg:p-7 border border-[#E5E8F5]">
