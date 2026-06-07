@@ -70,6 +70,7 @@ class FlightService {
       params.class,
       params.tripType,
       segmentsPart,
+      params.aiBudget || '',
       // Affiliate can affect results; include it to avoid cross-affiliate cache bleed.
       (affiliateCode || '').trim().toLowerCase()
     ].join('|');

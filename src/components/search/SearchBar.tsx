@@ -124,6 +124,7 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
   const router = useRouter();
   const pathname = usePathname();
   const urlParams = useSearchParams();
+  const urlParamsKey = urlParams.toString();
 
   const productFromUrl: Product = useMemo(() => {
     if (defaultProduct) return defaultProduct;
@@ -229,11 +230,12 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
 
   // Hydrate hotel location selection from URL (preferred) or store (like flights).
   useEffect(() => {
-    const urlLocation = urlParams.get("location");
-    const hid = urlParams.get("hidden_id");
-    const hkey = urlParams.get("hidden_key");
-    const apc = urlParams.get("arrival_point_code");
-    const isPackageHotelsPage = pathname?.startsWith("/hotels") && urlParams.get("type") === "package";
+    const currentUrlParams = new URLSearchParams(urlParamsKey);
+    const urlLocation = currentUrlParams.get("location");
+    const hid = currentUrlParams.get("hidden_id");
+    const hkey = currentUrlParams.get("hidden_key");
+    const apc = currentUrlParams.get("arrival_point_code");
+    const isPackageHotelsPage = pathname?.startsWith("/hotels") && currentUrlParams.get("type") === "package";
     const isAiPackagePage = pathname?.startsWith("/packages/ai");
 
     if ((isPackageHotelsPage || isAiPackagePage) && urlLocation) {
@@ -286,10 +288,10 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
     }
 
     if (pathname?.startsWith("/hotels") || isAiPackagePage) {
-      const urlFromCode = urlParams.get("fromCode");
+      const urlFromCode = currentUrlParams.get("fromCode");
       const fromCode = urlFromCode || savedPackageSearch?.departureCode || "";
-      const fromLabel = urlParams.get("from") || savedPackageSearch?.departureName || "";
-      if ((urlParams.get("type") === "package" || isAiPackagePage) && fromCode && (!fromRef.current || urlFromCode)) {
+      const fromLabel = currentUrlParams.get("from") || savedPackageSearch?.departureName || "";
+      if ((currentUrlParams.get("type") === "package" || isAiPackagePage) && fromCode && (!fromRef.current || urlFromCode)) {
         setFrom({
           code: fromCode,
           name: fromLabel || fromCode,
@@ -301,12 +303,12 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
     }
 
     // Always hydrate from URL params first, then fall back to saved search
-    const inStr = urlParams.get("checkIn") || savedHotelSearch?.checkIn || "";
-    const outStr = urlParams.get("checkOut") || savedHotelSearch?.checkOut || "";
-    const adults = Number(urlParams.get("adults") || savedHotelSearch?.adults || "") || undefined;
-    const children = Number(urlParams.get("children") || savedHotelSearch?.children || "") || 0;
-    const rms = Number(urlParams.get("rooms") || savedHotelSearch?.rooms || "") || undefined;
-    const childAgeParam = urlParams.get("child_age");
+    const inStr = currentUrlParams.get("checkIn") || savedHotelSearch?.checkIn || "";
+    const outStr = currentUrlParams.get("checkOut") || savedHotelSearch?.checkOut || "";
+    const adults = Number(currentUrlParams.get("adults") || savedHotelSearch?.adults || "") || undefined;
+    const children = Number(currentUrlParams.get("children") || savedHotelSearch?.children || "") || 0;
+    const rms = Number(currentUrlParams.get("rooms") || savedHotelSearch?.rooms || "") || undefined;
+    const childAgeParam = currentUrlParams.get("child_age");
 
     if (inStr) {
       const d = new Date(inStr);
@@ -326,7 +328,15 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
         Math.max(0, Number(children) || 0)
       )
     );
-  }, [pathname, savedHotelLocation, savedHotelSearch, savedPackageDestination, savedPackageSearch, setFrom, urlParams]);
+    if (isAiPackagePage) {
+      const nextLookingFor = currentUrlParams.get("lookingFor");
+      const nextStayPreference = currentUrlParams.get("stayPreference");
+      const nextBudget = Number(currentUrlParams.get("budget") || "");
+      if (nextLookingFor) setAiLookingFor(nextLookingFor);
+      if (nextStayPreference) setAiStayPreference(nextStayPreference);
+      if (Number.isFinite(nextBudget) && nextBudget > 0) setAiBudget(nextBudget);
+    }
+  }, [pathname, savedHotelLocation, savedHotelSearch, savedPackageDestination, savedPackageSearch, setFrom, urlParamsKey]);
 
   const setProduct = (next: Product) => {
     setActiveProduct(next);
@@ -389,6 +399,10 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
         params.set("lookingFor", aiLookingFor);
         params.set("stayPreference", aiStayPreference);
         params.set("budget", String(aiBudget));
+        const existingDestinations = urlParams.get("destinations");
+        if (pathname?.startsWith("/packages/ai") && existingDestinations) {
+          params.set("destinations", existingDestinations);
+        }
         if (packageDestinationItem) setPackageDestination(packageDestinationItem);
         router.push(`/packages/ai?${params.toString()}`);
         return;

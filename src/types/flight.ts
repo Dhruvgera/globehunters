@@ -125,6 +125,11 @@ export interface SearchParams {
   class: 'Economy' | 'Premium Economy' | 'Business' | 'First';
   tripType: 'round-trip' | 'one-way' | 'multi-city';
   /**
+   * Local AI-package cache discriminator. This is not sent to flight suppliers,
+   * but lets budget changes trigger a fresh client-side flight selection/search.
+   */
+  aiBudget?: number;
+  /**
    * Optional: Multi-city segments (used when tripType === 'multi-city')
    * First segment should correspond to top-level from/to/departureDate.
    */
