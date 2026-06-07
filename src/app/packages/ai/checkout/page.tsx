@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/navigation/Navbar";
 import Footer from "@/components/navigation/Footer";
 import PassengerFormsSection from "@/components/booking/PassengerFormsSection";
@@ -109,8 +109,60 @@ function flightSegmentToSummaryLeg(flight: Flight, segment: Flight["outbound"]):
   };
 }
 
+function parseCheckoutDestinations(raw: string | null): AiDestinationDraft[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as AiDestinationDraft[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function sameText(a?: string | null, b?: string | null) {
+  return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+}
+
+function draftMatchesCheckoutUrl(draft: AiBookingDraft, params: URLSearchParams) {
+  const location = params.get("location");
+  const checkIn = params.get("checkIn");
+  const checkOut = params.get("checkOut");
+  const adults = Number(params.get("adults") || "0") || 0;
+  const children = Number(params.get("children") || "0") || 0;
+  const rooms = Number(params.get("rooms") || "0") || 0;
+  const urlDestinations = parseCheckoutDestinations(params.get("destinations"));
+  const draftDestinations = draft.destinations || [];
+
+  if (location && !sameText(draft.search?.destination, location)) return false;
+  if (checkIn && draft.search?.checkIn !== checkIn) return false;
+  if (checkOut && draft.search?.checkOut !== checkOut) return false;
+  if (adults && Number(draft.search?.adults || 0) !== adults) return false;
+  if (children !== Number(draft.search?.children || 0)) return false;
+  if (rooms && Number(draft.search?.rooms || 0) !== rooms) return false;
+
+  if (urlDestinations.length > 0) {
+    if (draftDestinations.length !== urlDestinations.length + 1) return false;
+    const primary = draftDestinations[0];
+    if (!sameText(primary?.name, location)) return false;
+    if (checkIn && primary?.checkIn !== checkIn) return false;
+    if (checkOut && primary?.checkOut !== checkOut) return false;
+    return urlDestinations.every((destination, index) => {
+      const draftDestination = draftDestinations[index + 1];
+      return (
+        sameText(draftDestination?.name, destination.name) &&
+        draftDestination?.checkIn === destination.checkIn &&
+        draftDestination?.checkOut === destination.checkOut
+      );
+    });
+  }
+
+  return draftDestinations.length <= 1;
+}
+
 function AiCheckoutContent() {
   const router = useRouter();
+  const params = useSearchParams();
+  const paramsKey = params.toString();
   const [draft, setDraft] = useState<AiBookingDraft | null>(null);
   const [showTravellers, setShowTravellers] = useState(false);
   const [flightInfoOpen, setFlightInfoOpen] = useState(false);
@@ -122,11 +174,18 @@ function AiCheckoutContent() {
     const raw = window.sessionStorage.getItem("aiPackageBookingDraft");
     if (!raw) return;
     try {
-      setDraft(JSON.parse(raw) as AiBookingDraft);
+      const parsed = JSON.parse(raw) as AiBookingDraft;
+      if (!draftMatchesCheckoutUrl(parsed, new URLSearchParams(paramsKey))) {
+        window.sessionStorage.removeItem("aiPackageBookingDraft");
+        setDraft(null);
+        router.replace(`/packages/ai?${paramsKey}`);
+        return;
+      }
+      setDraft(parsed);
     } catch {
       setDraft(null);
     }
-  }, []);
+  }, [paramsKey, router]);
 
   useEffect(() => {
     if (!draft?.search?.checkIn) return;
