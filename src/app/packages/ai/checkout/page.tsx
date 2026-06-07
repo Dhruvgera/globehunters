@@ -15,6 +15,36 @@ import { useBookingStore } from "@/store/bookingStore";
 import type { Flight } from "@/types/flight";
 import { ArrowLeft, CalendarDays, Clock, Users } from "lucide-react";
 
+type AiHotelDraft = {
+  name?: string;
+  imageSrc?: string;
+  distanceLabel?: string;
+  price?: { total?: number; currency?: string };
+};
+
+type AiActivityDraft = {
+  productCode: string;
+  title: string;
+  imageUrl?: string;
+  price?: number;
+  currency?: string;
+  duration?: string;
+  rating?: number;
+  itineraryDate?: string;
+  itineraryTime?: string;
+};
+
+type AiDestinationDraft = {
+  id?: string;
+  name?: string;
+  checkIn?: string;
+  checkOut?: string;
+  airportCode?: string;
+  hotel?: AiHotelDraft | null;
+  activities?: AiActivityDraft[];
+  order?: number;
+};
+
 type AiBookingDraft = {
   search?: {
     destination?: string;
@@ -28,24 +58,10 @@ type AiBookingDraft = {
     lookingFor?: string;
     stayPreference?: string;
   };
-  hotel?: {
-    name?: string;
-    imageSrc?: string;
-    distanceLabel?: string;
-    price?: { total?: number; currency?: string };
-  };
+  hotel?: AiHotelDraft;
   flight?: Flight | null;
-  activities?: Array<{
-    productCode: string;
-    title: string;
-    imageUrl?: string;
-    price?: number;
-    currency?: string;
-    duration?: string;
-    rating?: number;
-    itineraryDate?: string;
-    itineraryTime?: string;
-  }>;
+  activities?: AiActivityDraft[];
+  destinations?: AiDestinationDraft[];
   totals?: {
     flight?: number;
     hotel?: number;
@@ -99,6 +115,7 @@ function AiCheckoutContent() {
   const [showTravellers, setShowTravellers] = useState(false);
   const [flightInfoOpen, setFlightInfoOpen] = useState(false);
   const [hotelDetailsOpen, setHotelDetailsOpen] = useState(false);
+  const [hotelDetailsDestinationIndex, setHotelDetailsDestinationIndex] = useState(0);
   const setSearchParams = useBookingStore((s) => s.setSearchParams);
 
   useEffect(() => {
@@ -135,11 +152,27 @@ function AiCheckoutContent() {
     return `${adults || 1} adult${adults === 1 ? "" : "s"}${children ? `, ${children} child${children === 1 ? "" : "ren"}` : ""}`;
   }, [draft?.search?.adults, draft?.search?.children]);
   const flightSummaryLegs = draft?.flight
-    ? [
-        flightSegmentToSummaryLeg(draft.flight, draft.flight.outbound),
-        ...(draft.flight.inbound ? [flightSegmentToSummaryLeg(draft.flight, draft.flight.inbound)] : []),
-      ]
+    ? (draft.flight.tripType === "multi-city" && draft.flight.segments?.length
+        ? draft.flight.segments
+        : [draft.flight.outbound, ...(draft.flight.inbound ? [draft.flight.inbound] : [])]
+      ).map((segment) => flightSegmentToSummaryLeg(draft.flight!, segment))
     : [];
+  const destinationDrafts = useMemo<AiDestinationDraft[]>(() => {
+    if (draft?.destinations?.length) return draft.destinations;
+    if (!draft) return [];
+    return [
+      {
+        id: "primary",
+        name: draft.search?.destination || "Destination",
+        checkIn: draft.search?.checkIn,
+        checkOut: draft.search?.checkOut,
+        hotel: draft.hotel || null,
+        activities: draft.activities || [],
+        order: 0,
+      },
+    ];
+  }, [draft]);
+  const selectedHotelDestination = destinationDrafts[hotelDetailsDestinationIndex] || destinationDrafts[0];
 
   if (!draft) {
     return (
@@ -175,42 +208,50 @@ function AiCheckoutContent() {
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-lg bg-[#F5F7FF] p-3 text-sm text-[#010D50]">
                   <CalendarDays className="mb-2 h-4 w-4 text-[#3754ED]" />
-                  {longDate(draft.search?.checkIn)} - {longDate(draft.search?.checkOut)}
+                  {longDate(destinationDrafts[0]?.checkIn || draft.search?.checkIn)} - {longDate(destinationDrafts[destinationDrafts.length - 1]?.checkOut || draft.search?.checkOut)}
                 </div>
                 <div className="rounded-lg bg-[#F5F7FF] p-3 text-sm text-[#010D50]">
                   <Users className="mb-2 h-4 w-4 text-[#3754ED]" />
                   {travellers}
                 </div>
                 <div className="rounded-lg bg-[#F5F7FF] p-3 text-sm text-[#010D50]">
-                  {draft.search?.destination}
+                  {destinationDrafts.map((item) => item.name).filter(Boolean).join(" + ") || draft.search?.destination}
                   <div className="text-xs text-[#3A478A]">{draft.search?.lookingFor}</div>
                 </div>
               </div>
             </section>
 
             <section className="rounded-xl border border-[#DFE0E4] bg-white p-5">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold text-[#010D50]">Hotel</h2>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setHotelDetailsOpen(true)}
-                  className="h-9 rounded-full border-[#DFE0E4] px-4 text-xs font-semibold text-[#3754ED]"
-                >
-                  View details
-                </Button>
-              </div>
-              <div className="grid gap-4 md:grid-cols-[220px_1fr]">
-                {draft.hotel?.imageSrc ? (
-                  <div className="relative h-40 overflow-hidden rounded-xl bg-[#F5F7FF]">
-                    <Image src={draft.hotel.imageSrc} alt={draft.hotel.name || "Hotel"} fill className="object-cover" />
+              <h2 className="mb-4 text-lg font-semibold text-[#010D50]">Stays</h2>
+              <div className="grid gap-4">
+                {destinationDrafts.map((destination, index) => (
+                  <div key={destination.id || `${destination.name}-${index}`} className="grid gap-4 rounded-xl border border-[#DFE0E4] p-3 md:grid-cols-[220px_1fr_auto]">
+                    {destination.hotel?.imageSrc ? (
+                      <div className="relative h-40 overflow-hidden rounded-xl bg-[#F5F7FF]">
+                        <Image src={destination.hotel.imageSrc} alt={destination.hotel.name || "Hotel"} fill className="object-cover" />
+                      </div>
+                    ) : null}
+                    <div>
+                      <div className="text-xs font-semibold uppercase text-[#3A478A]">
+                        {destination.name} - {longDate(destination.checkIn)} to {longDate(destination.checkOut)}
+                      </div>
+                      <h3 className="mt-1 text-xl font-bold text-[#010D50]">{destination.hotel?.name || "Selected hotel"}</h3>
+                      <p className="mt-1 text-sm text-[#3A478A]">{destination.hotel?.distanceLabel}</p>
+                      <div className="mt-3 font-semibold text-[#010D50]">{money(destination.hotel?.price?.total, destination.hotel?.price?.currency || currency)}</div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        setHotelDetailsDestinationIndex(index);
+                        setHotelDetailsOpen(true);
+                      }}
+                      className="h-9 rounded-full border-[#DFE0E4] px-4 text-xs font-semibold text-[#3754ED] md:self-start"
+                    >
+                      View details
+                    </Button>
                   </div>
-                ) : null}
-                <div>
-                  <h3 className="text-xl font-bold text-[#010D50]">{draft.hotel?.name || "Selected hotel"}</h3>
-                  <p className="mt-1 text-sm text-[#3A478A]">{draft.hotel?.distanceLabel}</p>
-                  <div className="mt-3 font-semibold text-[#010D50]">{money(draft.totals?.hotel, currency)}</div>
-                </div>
+                ))}
               </div>
             </section>
 
@@ -246,21 +287,35 @@ function AiCheckoutContent() {
 
             <section className="rounded-xl border border-[#DFE0E4] bg-white p-5">
               <h2 className="mb-4 text-lg font-semibold text-[#010D50]">Itinerary</h2>
-              <div className="grid gap-3">
-                {(draft.activities || []).map((activity) => (
-                  <div key={activity.productCode} className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl border border-[#DFE0E4] p-3">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#F5F7FF]">
-                      <Clock className="h-4 w-4 text-[#3754ED]" />
+              <div className="grid gap-5">
+                {destinationDrafts.map((destination, destinationIndex) => (
+                  <div key={destination.id || `${destination.name}-activities-${destinationIndex}`} className="space-y-3">
+                    <div className="rounded-lg bg-[#F5F7FF] px-3 py-2 text-sm font-semibold text-[#010D50]">
+                      {destination.name}
+                      <span className="ml-2 text-xs font-normal text-[#3A478A]">
+                        {longDate(destination.checkIn)} - {longDate(destination.checkOut)}
+                      </span>
                     </div>
-                    <div>
-                      <div className="font-semibold text-[#010D50]">{activity.title}</div>
-                      <div className="text-xs text-[#3A478A]">
-                        {longDate(activity.itineraryDate)} at {activity.itineraryTime}
-                        {activity.duration ? ` - ${activity.duration}` : ""}
-                        {activity.rating ? ` - ${activity.rating.toFixed(1)} rating` : ""}
-                      </div>
-                    </div>
-                    <div className="text-sm font-semibold text-[#010D50]">{money(activity.price, activity.currency || currency)}</div>
+                    {(destination.activities || []).length > 0 ? (
+                      (destination.activities || []).map((activity) => (
+                        <div key={`${destination.id || destinationIndex}-${activity.productCode}`} className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl border border-[#DFE0E4] p-3">
+                          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#F5F7FF]">
+                            <Clock className="h-4 w-4 text-[#3754ED]" />
+                          </div>
+                          <div>
+                            <div className="font-semibold text-[#010D50]">{activity.title}</div>
+                            <div className="text-xs text-[#3A478A]">
+                              {longDate(activity.itineraryDate)} at {activity.itineraryTime}
+                              {activity.duration ? ` - ${activity.duration}` : ""}
+                              {activity.rating ? ` - ${activity.rating.toFixed(1)} rating` : ""}
+                            </div>
+                          </div>
+                          <div className="text-sm font-semibold text-[#010D50]">{money(activity.price, activity.currency || currency)}</div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-xl bg-[#F5F7FF] p-3 text-sm text-[#3A478A]">No activities selected for this destination.</div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -315,24 +370,24 @@ function AiCheckoutContent() {
       <Dialog open={hotelDetailsOpen} onOpenChange={setHotelDetailsOpen}>
         <DialogContent className="max-w-[min(100vw-24px,680px)] bg-white">
           <DialogHeader>
-            <DialogTitle className="pr-6 text-[#010D50]">{draft.hotel?.name || "Selected hotel"}</DialogTitle>
+            <DialogTitle className="pr-6 text-[#010D50]">{selectedHotelDestination?.hotel?.name || "Selected hotel"}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 md:grid-cols-[220px_1fr]">
-            {draft.hotel?.imageSrc ? (
+            {selectedHotelDestination?.hotel?.imageSrc ? (
               <div className="relative h-40 overflow-hidden rounded-xl bg-[#F5F7FF]">
-                <Image src={draft.hotel.imageSrc} alt={draft.hotel.name || "Hotel"} fill className="object-cover" />
+                <Image src={selectedHotelDestination.hotel.imageSrc} alt={selectedHotelDestination.hotel.name || "Hotel"} fill className="object-cover" />
               </div>
             ) : null}
             <div>
-              <p className="text-sm text-[#3A478A]">{draft.hotel?.distanceLabel}</p>
+              <p className="text-sm text-[#3A478A]">{selectedHotelDestination?.hotel?.distanceLabel}</p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-lg border border-[#DFE0E4] p-3">
                   <div className="text-xs text-[#3A478A]">Check-in</div>
-                  <div className="text-sm font-semibold text-[#010D50]">{longDate(draft.search?.checkIn)}</div>
+                  <div className="text-sm font-semibold text-[#010D50]">{longDate(selectedHotelDestination?.checkIn || draft.search?.checkIn)}</div>
                 </div>
                 <div className="rounded-lg border border-[#DFE0E4] p-3">
                   <div className="text-xs text-[#3A478A]">Check-out</div>
-                  <div className="text-sm font-semibold text-[#010D50]">{longDate(draft.search?.checkOut)}</div>
+                  <div className="text-sm font-semibold text-[#010D50]">{longDate(selectedHotelDestination?.checkOut || draft.search?.checkOut)}</div>
                 </div>
                 <div className="rounded-lg border border-[#DFE0E4] p-3">
                   <div className="text-xs text-[#3A478A]">Travellers</div>
@@ -343,7 +398,9 @@ function AiCheckoutContent() {
                   <div className="text-sm font-semibold text-[#010D50]">{draft.search?.rooms || 1} room</div>
                 </div>
               </div>
-              <div className="mt-4 text-base font-bold text-[#010D50]">{money(draft.totals?.hotel, currency)}</div>
+              <div className="mt-4 text-base font-bold text-[#010D50]">
+                {money(selectedHotelDestination?.hotel?.price?.total, selectedHotelDestination?.hotel?.price?.currency || currency)}
+              </div>
             </div>
           </div>
         </DialogContent>
