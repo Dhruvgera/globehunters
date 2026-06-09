@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -692,11 +692,27 @@ function shortDate(value: string | null, fallback: string) {
   }).format(date);
 }
 
+function compactDateParts(value: string | null, fallbackDay = "--") {
+  if (!value) return { month: "", day: fallbackDay };
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return { month: "", day: fallbackDay };
+  return {
+    month: new Intl.DateTimeFormat("en-GB", { month: "short" }).format(date).toUpperCase(),
+    day: new Intl.DateTimeFormat("en-GB", { day: "2-digit" }).format(date),
+  };
+}
+
+function truncateWords(text: string | undefined | null, maxWords: number) {
+  const words = String(text || "").replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  if (words.length <= maxWords) return words.join(" ");
+  return `${words.slice(0, maxWords).join(" ")}...`;
+}
+
 function addDaysIso(value: string | null, days: number) {
   if (!value) return "";
   const date = parseLocalDate(value, new Date());
   date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
+  return formatIsoDate(date);
 }
 
 function money(value: number, currency = "GBP") {
@@ -1052,6 +1068,7 @@ function AiPackageContent() {
   const [aiBrief, setAiBrief] = useState("");
   const [aiBriefLoading, setAiBriefLoading] = useState(false);
   const [aiBriefError, setAiBriefError] = useState<string | null>(null);
+  const [aiActivityNotes, setAiActivityNotes] = useState<Record<string, string>>({});
   const [aiChatMessages, setAiChatMessages] = useState<AiChatMessage[]>([]);
   const [aiChatInput, setAiChatInput] = useState("");
   const [aiChatLoading, setAiChatLoading] = useState(false);
@@ -2188,6 +2205,7 @@ function AiPackageContent() {
     }
     if (aiActivityContext.length === 0) {
       setAiBrief("");
+      setAiActivityNotes({});
       setAiBriefLoading(false);
       setAiBriefError(activitiesError ? "AI brief unavailable until live activities return." : null);
       return () => controller.abort();
@@ -2202,7 +2220,7 @@ function AiPackageContent() {
           headers: { "Content-Type": "application/json" },
           signal: controller.signal,
           body: JSON.stringify({
-            mode: "brief",
+            mode: "itinerary",
             destination: activeDestination?.name || destination,
             dateRange: tripDates,
             lookingFor,
@@ -2210,12 +2228,24 @@ function AiPackageContent() {
             activities: aiActivityContext,
           }),
         });
-        const data = (await response.json().catch(() => ({}))) as { text?: string; error?: string };
+        const data = (await response.json().catch(() => ({}))) as {
+          text?: string;
+          error?: string;
+          notes?: Array<{ productCode?: string; note?: string }>;
+        };
         if (!response.ok) throw new Error(data.error || "AI brief failed.");
         setAiBrief(data.text || "");
+        setAiActivityNotes(
+          Object.fromEntries(
+            (data.notes || [])
+              .filter((note) => note.productCode && note.note)
+              .map((note) => [String(note.productCode), String(note.note)])
+          )
+        );
       } catch (error) {
         if (controller.signal.aborted) return;
         setAiBrief("");
+        setAiActivityNotes({});
         setAiBriefError(error instanceof Error ? error.message : "AI brief failed.");
       } finally {
         if (!controller.signal.aborted) setAiBriefLoading(false);
@@ -2991,22 +3021,136 @@ function AiPackageContent() {
             </section>
 
             <section className="rounded-xl border border-[#DFE0E4] bg-white p-4">
-              <h2 className="mb-4 text-lg font-semibold text-[#010D50]">Trip Activity</h2>
-              <div className="rounded-lg bg-[#F5F7FF] px-3 py-2 text-sm font-semibold text-[#010D50]">
-                {activeDestination?.name || destination}
-                <span className="ml-2 text-xs font-normal text-[#3A478A]">{tripDates}</span>
-              </div>
-              <div className="mt-4 flex flex-col gap-3 border-l border-dashed border-[#B7BFEA] pl-4">
-                {visibleActivities.map((activity, index) => (
-                  <div key={activity.productCode} className="relative">
-                    <span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-[#3754ED]" />
-                    <div className="text-sm font-semibold text-[#010D50]">{activity.title}</div>
-                    <div className="text-xs text-[#3A478A]">{itineraryLabelFor(index)}</div>
+              <h2 className="pb-4 text-lg font-semibold text-[#010D50]">Trip Activity</h2>
+              <div className="border-t border-[#EEF0F6] pt-4">
+                <div className="flex items-center gap-3 rounded-lg bg-[#F5F7FF] px-4 py-3">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#010D50] text-white">
+                    <MapPin className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <div className="text-sm font-bold text-[#010D50]">{activeDestination?.name || destination}</div>
+                    <div className="mt-0.5 text-xs text-[#3A478A]">{tripDates}</div>
                   </div>
-                ))}
-                {activitiesLoading && <div className="text-sm text-[#3A478A]">Loading Viator activities...</div>}
+                </div>
+
+                <div className="mt-4 grid grid-cols-[54px_1fr] gap-x-4">
+                  <div className="flex flex-col items-center">
+                    <div className="rounded-t-lg bg-[#EEF2FF] px-2 py-2 text-center text-xs font-bold leading-tight text-[#010D50]">
+                      <div>{compactDateParts(activeDestination?.checkIn || checkIn, "01").month}</div>
+                      <div>{compactDateParts(activeDestination?.checkIn || checkIn, "01").day}</div>
+                    </div>
+                    <div className="min-h-16 flex-1 border-l border-dashed border-[#010D50]" />
+                  </div>
+                  <div className="pb-5">
+                    {liveSearch.hotelLoading ? (
+                      <div className="text-sm text-[#3A478A]">Searching live hotel...</div>
+                    ) : liveSearch.hotel ? (
+                      <div className="flex gap-3">
+                        <span className="mt-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#010D50] text-white">
+                          <BedDouble className="h-4 w-4" />
+                        </span>
+                        <div>
+                          <div className="text-sm font-bold text-[#010D50]">{liveHotelName}</div>
+                          {liveSearch.hotel.room?.name ? (
+                            <div className="mt-1 text-xs text-[#3A478A]">{liveSearch.hotel.room.name}</div>
+                          ) : null}
+                          {liveSearch.hotel.reviews?.score ? (
+                            <div className="mt-3 inline-grid grid-cols-[auto_1fr] items-center gap-2">
+                              <span className="rounded-lg bg-[#008A5B] px-2 py-2 text-xs font-bold text-white">
+                                {liveSearch.hotel.reviews.score.toFixed(1)}
+                              </span>
+                              <span className="text-xs leading-tight text-[#010D50]">
+                                <span className="block font-semibold">{liveSearch.hotel.reviews.label || "Guest rated"}</span>
+                                <span className="text-[#3A478A]">{liveSearch.hotel.reviews.count || 0} reviews</span>
+                              </span>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  {visibleActivities.map((activity, index) => {
+                    const activityDate = addDaysIso(activeDestination?.checkIn || checkIn, index);
+                    const dateParts = compactDateParts(activityDate, String(index + 1).padStart(2, "0"));
+                    const note = aiActivityNotes[activity.productCode];
+                    return (
+                      <Fragment key={activity.productCode}>
+                        <div className="flex flex-col items-center">
+                          <div className="bg-[#EEF2FF] px-2 py-2 text-center text-xs font-bold leading-tight text-[#010D50]">
+                            <div>{dateParts.month}</div>
+                            <div>{dateParts.day}</div>
+                          </div>
+                          <div className="min-h-20 flex-1 border-l border-dashed border-[#010D50]" />
+                        </div>
+                        <div className="pb-5">
+                          <div className="flex gap-3">
+                            <span className="mt-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#010D50] text-white">
+                              <Sparkles className="h-4 w-4" />
+                            </span>
+                            <div className="min-w-0">
+                              <div className="text-sm font-bold leading-snug text-[#010D50]">{activity.title}</div>
+                              <div className="mt-1 text-xs font-medium text-[#3A478A]">{itineraryLabelFor(index)}</div>
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {activity.duration ? (
+                                  <span className="rounded-full bg-[#F5F7FF] px-2 py-1 text-[11px] font-semibold text-[#3A478A]">
+                                    {activity.duration}
+                                  </span>
+                                ) : null}
+                                {activity.rating ? (
+                                  <span className="rounded-full bg-[#FFF7E0] px-2 py-1 text-[11px] font-semibold text-[#7A5200]">
+                                    {activity.rating.toFixed(1)} rated
+                                  </span>
+                                ) : null}
+                                {activity.price ? (
+                                  <span className="rounded-full bg-[#F5F7FF] px-2 py-1 text-[11px] font-semibold text-[#3A478A]">
+                                    {money(activity.price, activity.currency || "GBP")}
+                                  </span>
+                                ) : null}
+                              </div>
+                              {note ? (
+                                <p className="mt-2 text-xs leading-relaxed text-[#3A478A]">{note}</p>
+                              ) : aiBriefLoading ? (
+                                <p className="mt-2 inline-flex items-center gap-2 text-xs text-[#3A478A]">
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin text-[#3754ED]" />
+                                  Writing AI activity note...
+                                </p>
+                              ) : activity.description ? (
+                                <p className="mt-2 text-xs leading-relaxed text-[#3A478A]">{truncateWords(activity.description, 48)}</p>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      </Fragment>
+                    );
+                  })}
+
+                  {!activitiesLoading && visibleActivities.length === 0 ? (
+                    <>
+                      <div className="flex flex-col items-center">
+                        <div className="rounded-b-lg bg-[#EEF2FF] px-2 py-2 text-center text-xs font-bold leading-tight text-[#010D50]">
+                          <div>{compactDateParts(activeDestination?.checkOut || checkOut, "01").month}</div>
+                          <div>{compactDateParts(activeDestination?.checkOut || checkOut, "01").day}</div>
+                        </div>
+                      </div>
+                      <div className="pb-2">
+                        <div className="flex gap-3">
+                          <span className="mt-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#010D50] text-white">
+                            <Sparkles className="h-4 w-4" />
+                          </span>
+                          <div>
+                            <div className="text-sm font-bold text-[#010D50]">Day at Leisure</div>
+                            <div className="mt-1 text-xs text-[#3A478A]">No live Viator activity is selected for this day.</div>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+
+                {activitiesLoading && <div className="rounded-lg bg-[#F5F7FF] px-3 py-2 text-sm text-[#3A478A]">Loading Viator activities...</div>}
                 {activitiesError && (
-                  <div className="max-h-48 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-lg border border-red-200 bg-red-50 px-3 py-2 font-mono text-xs text-red-600">
+                  <div className="mt-3 max-h-48 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-lg border border-red-200 bg-red-50 px-3 py-2 font-mono text-xs text-red-600">
                     {activitiesError}
                   </div>
                 )}
@@ -3021,7 +3165,7 @@ function AiPackageContent() {
                 </h2>
                 <span className="rounded-full bg-[#F5F7FF] px-2 py-1 text-[11px] font-semibold text-[#3A478A]">120 words</span>
               </div>
-              <div className="rounded-xl bg-[#F5F7FF] p-3 text-sm text-[#010D50]">
+              <div className="whitespace-pre-line rounded-xl bg-[#F5F7FF] px-4 py-3 text-sm leading-6 text-[#26356F]">
                 {aiBriefLoading ? (
                   <span className="inline-flex items-center gap-2 text-[#3A478A]">
                     <Loader2 className="h-4 w-4 animate-spin text-[#3754ED]" />
@@ -3068,7 +3212,7 @@ function AiPackageContent() {
                     }
                   }}
                   placeholder="Ask about the itinerary"
-                  className="h-10 min-w-0 flex-1 rounded-xl border border-[#DFE0E4] px-3 text-sm text-[#010D50] outline-none focus:border-[#3754ED]"
+                  className="h-10 min-w-0 flex-1 rounded-xl border border-[#DFE0E4] px-3 text-sm text-[#010D50] outline-none placeholder:text-[#98A0C2] focus:border-[#3754ED]"
                 />
                 <Button
                   type="button"

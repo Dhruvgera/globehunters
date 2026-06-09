@@ -33,6 +33,11 @@ const nextConfig: NextConfig = {
         hostname: 'cdn.worldota.net',
         pathname: '/**',
       },
+      {
+        protocol: 'https' as const,
+        hostname: 'media-cdn.tripadvisor.com',
+        pathname: '/**',
+      },
     ],
   },
   // Production source maps - disable to avoid source map warnings

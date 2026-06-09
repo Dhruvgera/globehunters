@@ -16,6 +16,11 @@ type AiChatMessageInput = {
   content?: unknown;
 };
 
+type AiItineraryResponse = {
+  summary?: string;
+  notes?: Array<{ productCode?: string; note?: string }>;
+};
+
 const DEFAULT_MODEL = process.env.OPENAI_TRIP_MODEL || "gpt-5-nano";
 const MAX_ACTIVITIES = 12;
 const MAX_CHAT_HISTORY = 8;
@@ -42,6 +47,21 @@ function wordLimit(text: string, maxWords: number): string {
   const words = text.trim().split(/\s+/).filter(Boolean);
   if (words.length <= maxWords) return text.trim();
   return `${words.slice(0, maxWords).join(" ")}...`;
+}
+
+function parseJsonObject(text: string): AiItineraryResponse | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const jsonText = trimmed.startsWith("{")
+    ? trimmed
+    : trimmed.match(/\{[\s\S]*\}/)?.[0] || "";
+  if (!jsonText) return null;
+  try {
+    const parsed = JSON.parse(jsonText) as AiItineraryResponse;
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
 }
 
 function getClientKey(request: NextRequest): string {
@@ -118,7 +138,7 @@ function buildGrounding(body: Record<string, unknown>, activities: AiActivityInp
     ? activities
         .map((activity, index) => {
           const price = activity.price ? `${activity.currency || "GBP"} ${activity.price}` : "price unavailable";
-          return `${index + 1}. ${activity.title || "Untitled activity"} | ${activity.dateLabel || "date not assigned"} | ${activity.duration || "duration unavailable"} | ${price} | rating ${activity.rating || "n/a"} | ${activity.description || "no supplier description"}`;
+          return `${index + 1}. code ${activity.productCode || "unknown"} | ${activity.title || "Untitled activity"} | ${activity.dateLabel || "date not assigned"} | ${activity.duration || "duration unavailable"} | ${price} | rating ${activity.rating || "n/a"} | ${activity.description || "no supplier description"}`;
         })
         .join("\n")
     : "No live activities are currently available for this destination.";
@@ -155,7 +175,9 @@ async function callOpenAi(input: string, maxOutputTokens: number): Promise<strin
         "Keep answers concise, practical, and travel-focused.",
       ].join("\n"),
       input,
-      max_output_tokens: maxOutputTokens,
+      max_output_tokens: Math.max(maxOutputTokens, 320),
+      reasoning: { effort: "minimal" },
+      text: { verbosity: "low" },
       store: false,
     }),
   });
@@ -166,6 +188,14 @@ async function callOpenAi(input: string, maxOutputTokens: number): Promise<strin
   }
 
   const data = await response.json();
+  if (
+    data &&
+    typeof data === "object" &&
+    (data as { status?: unknown }).status === "incomplete" &&
+    (data as { incomplete_details?: { reason?: unknown } }).incomplete_details?.reason
+  ) {
+    throw new Error(`OpenAI response incomplete: ${String((data as { incomplete_details: { reason: unknown } }).incomplete_details.reason)}`);
+  }
   return parseOutputText(data);
 }
 
@@ -181,7 +211,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const mode = body.mode === "chat" ? "chat" : "brief";
+  const mode = body.mode === "chat" ? "chat" : body.mode === "itinerary" ? "itinerary" : "brief";
   const activities = sanitizeActivities(body.activities);
   const grounding = buildGrounding(body, activities);
 
@@ -198,13 +228,39 @@ export async function POST(request: NextRequest) {
             chatTrail ? `Recent chat:\n${chatTrail}` : "",
             `User question: ${question || "Explain this itinerary."}`,
           ].join("\n\n")
-        : [
-            "Write a polished trip activity brief in 110 words or fewer.",
-            "Mention the rhythm across dates, highlight why the selected activities fit the travel intent, and call out obvious timing gaps if present.",
-            grounding,
-          ].join("\n\n");
+        : mode === "itinerary"
+          ? [
+              "Return JSON only with this shape:",
+              '{"summary":"130 words or fewer","notes":[{"productCode":"same code from input","note":"35 to 45 useful words"}]}',
+              "The summary should describe the destination rhythm across dates and why the selected activities work together.",
+              "Each note must be practical and specific: explain what the guest will do/see, why it fits this trip, duration or energy level, and one timing or comfort tip.",
+              "Do not just restate the title. If supplier details are thin, infer cautiously from the activity title and duration, and say the detail is based on the listed activity name.",
+              "Use plain ASCII punctuation only.",
+              grounding,
+            ].join("\n\n")
+          : [
+              "Write a polished trip activity brief in 110 words or fewer.",
+              "Mention the rhythm across dates, highlight why the selected activities fit the travel intent, and call out obvious timing gaps if present.",
+              grounding,
+            ].join("\n\n");
 
-    const text = await callOpenAi(prompt, mode === "chat" ? 260 : 180);
+    const text = await callOpenAi(prompt, mode === "chat" ? 260 : mode === "itinerary" ? 760 : 180);
+    if (mode === "itinerary") {
+      const parsed = parseJsonObject(text);
+      const notes = Array.isArray(parsed?.notes)
+        ? parsed.notes
+            .map((note) => ({
+              productCode: textFrom(note.productCode, 80),
+              note: wordLimit(textFrom(note.note, 520), 52),
+            }))
+            .filter((note) => note.productCode && note.note)
+        : [];
+      return NextResponse.json({
+        text: wordLimit(parsed?.summary || text || "I could not generate an itinerary note from the current live activity data.", 140),
+        notes,
+        model: DEFAULT_MODEL,
+      });
+    }
     return NextResponse.json({
       text: wordLimit(text || "I could not generate an itinerary note from the current live activity data.", mode === "chat" ? 150 : 120),
       model: DEFAULT_MODEL,
