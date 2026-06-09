@@ -900,7 +900,7 @@ function flightSegmentToSummaryLeg(flight: Flight, segment: Flight["outbound"]):
       : "Direct",
     airline: segment.carrierName || flight.airline.name || "Selected airline",
     airlineCode: segment.carrierCode || flight.airline.code,
-    cabinClass: segment.cabinClass || "Economy",
+    cabinClass: normalizeCabinClass(segment.cabinClass || "Economy"),
   };
 }
 
@@ -1073,6 +1073,7 @@ function AiPackageContent() {
   const [aiChatInput, setAiChatInput] = useState("");
   const [aiChatLoading, setAiChatLoading] = useState(false);
   const [aiChatError, setAiChatError] = useState<string | null>(null);
+  const aiChatScrollRef = useRef<HTMLDivElement | null>(null);
   const [hotelOptions, setHotelOptions] = useState<Hotel[]>([]);
   const [destinationStateById, setDestinationStateById] = useState<Record<string, DestinationLiveState>>({});
   const destinationStateByIdRef = useRef<Record<string, DestinationLiveState>>({});
@@ -2097,6 +2098,42 @@ function AiPackageContent() {
       .sort((first, second) => Number(second.selected) - Number(first.selected))
       .slice(0, 12);
   }, [activeDestinationCheckIn, activities, itinerarySlots, selectedActivityCodes]);
+  const aiHotelContext = useMemo(() => {
+    const hotel = liveSearch.hotel;
+    if (!hotel || (activeDestination && !hotelMatchesSegment(hotel, activeDestination, destinationSegments))) return null;
+    return {
+      name: hotel.name,
+      city: hotel.cityName || activeDestination?.name || destination,
+      room: hotel.room?.name,
+      board: hotel.room?.highlights?.join(", "),
+      checkIn: activeDestination?.checkIn || checkIn,
+      checkOut: activeDestination?.checkOut || checkOut,
+      price: hotel.price?.total,
+      currency: hotel.price?.currency || "GBP",
+      starRating: hotel.starRating,
+      reviewScore: hotel.reviews?.score,
+      reviewLabel: hotel.reviews?.label,
+      reviewCount: hotel.reviews?.count,
+      distanceLabel: hotel.distanceLabel,
+      amenities: hotel.amenities,
+    };
+  }, [activeDestination, checkIn, checkOut, destination, destinationSegments, liveSearch.hotel]);
+  const aiFlightContext = useMemo(() => {
+    const flight = liveSearch.flight;
+    if (!flight) return null;
+    const segments = flight.tripType === "multi-city" && flight.segments?.length
+      ? flight.segments
+      : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
+    const legs = segments.map((segment) => flightSegmentToSummaryLeg(flight, segment));
+    return {
+      airline: flight.airline?.name,
+      price: flight.price,
+      pricePerPerson: flight.pricePerPerson || flight.price / Math.max(1, adults + children),
+      currency: flight.currency || "GBP",
+      cabinClass: legs.find((leg) => leg.cabinClass)?.cabinClass,
+      legs,
+    };
+  }, [adults, children, liveSearch.flight]);
   const aiContextKey = useMemo(
     () =>
       [
@@ -2104,8 +2141,10 @@ function AiPackageContent() {
         activeActivitiesKey,
         selectedActivityCodes.join(","),
         aiActivityContext.map((activity) => `${activity.productCode}:${activity.dateLabel}`).join("|"),
+        aiHotelContext ? `${aiHotelContext.name}:${aiHotelContext.room}:${aiHotelContext.price}` : "no-hotel",
+        aiFlightContext ? `${aiFlightContext.airline}:${aiFlightContext.price}:${aiFlightContext.legs.map((leg) => `${leg.fromCode}-${leg.toCode}-${leg.date}`).join("|")}` : "no-flight",
       ].join("::"),
-    [activeActivitiesKey, activeDestinationId, aiActivityContext, selectedActivityCodes]
+    [activeActivitiesKey, activeDestinationId, aiActivityContext, aiFlightContext, aiHotelContext, selectedActivityCodes]
   );
   const activeMatchedHotel =
     activeDestination && hotelMatchesSegment(liveSearch.hotel, activeDestination, destinationSegments) ? liveSearch.hotel : null;
@@ -2197,6 +2236,14 @@ function AiPackageContent() {
   }, [activeDestinationId]);
 
   useEffect(() => {
+    const container = aiChatScrollRef.current;
+    if (!container) return;
+    window.requestAnimationFrame(() => {
+      container.scrollTop = container.scrollHeight;
+    });
+  }, [aiBrief, aiBriefError, aiBriefLoading, aiChatLoading, aiChatMessages.length]);
+
+  useEffect(() => {
     const controller = new AbortController();
     if (activitiesLoading) {
       setAiBriefLoading(true);
@@ -2225,6 +2272,8 @@ function AiPackageContent() {
             dateRange: tripDates,
             lookingFor,
             stayPreference,
+            hotel: aiHotelContext,
+            flight: aiFlightContext,
             activities: aiActivityContext,
           }),
         });
@@ -2254,7 +2303,7 @@ function AiPackageContent() {
 
     loadAiBrief();
     return () => controller.abort();
-  }, [activeDestination?.name, activitiesError, activitiesLoading, aiActivityContext, aiContextKey, destination, lookingFor, stayPreference, tripDates]);
+  }, [activeDestination?.name, activitiesError, activitiesLoading, aiActivityContext, aiContextKey, aiFlightContext, aiHotelContext, destination, lookingFor, stayPreference, tripDates]);
 
   useEffect(() => {
     if (!addDestinationOpen) return;
@@ -2488,6 +2537,8 @@ function AiPackageContent() {
           dateRange: tripDates,
           lookingFor,
           stayPreference,
+          hotel: aiHotelContext,
+          flight: aiFlightContext,
           activities: aiActivityContext,
           history: nextMessages,
           question,
@@ -3165,26 +3216,26 @@ function AiPackageContent() {
                 </h2>
                 <span className="rounded-full bg-[#F5F7FF] px-2 py-1 text-[11px] font-semibold text-[#3A478A]">120 words</span>
               </div>
-              <div className="whitespace-pre-line rounded-xl bg-[#F5F7FF] px-4 py-3 text-sm leading-6 text-[#26356F]">
-                {aiBriefLoading ? (
-                  <span className="inline-flex items-center gap-2 text-[#3A478A]">
-                    <Loader2 className="h-4 w-4 animate-spin text-[#3754ED]" />
-                    Writing activity brief...
-                  </span>
-                ) : aiBriefError ? (
-                  <span className="break-words text-red-600">{aiBriefError}</span>
-                ) : aiBrief ? (
-                  aiBrief
-                ) : (
-                  "Select live activities to generate a trip brief."
-                )}
-              </div>
-              <div className="mt-3 max-h-44 space-y-2 overflow-auto pr-1">
+              <div ref={aiChatScrollRef} className="max-h-72 space-y-2 overflow-auto pr-1">
+                <div className="mr-6 whitespace-pre-line rounded-xl bg-[#F5F7FF] px-4 py-3 text-sm leading-6 text-[#26356F]">
+                  {aiBriefLoading ? (
+                    <span className="inline-flex items-center gap-2 text-[#3A478A]">
+                      <Loader2 className="h-4 w-4 animate-spin text-[#3754ED]" />
+                      Writing activity brief...
+                    </span>
+                  ) : aiBriefError ? (
+                    <span className="break-words text-red-600">{aiBriefError}</span>
+                  ) : aiBrief ? (
+                    aiBrief
+                  ) : (
+                    "Select live activities to generate a trip brief."
+                  )}
+                </div>
                 {aiChatMessages.map((message, index) => (
                   <div
                     key={`${message.role}-${index}`}
                     className={[
-                      "rounded-xl px-3 py-2 text-xs leading-relaxed",
+                      "whitespace-pre-line rounded-xl px-3 py-2 text-xs leading-relaxed",
                       message.role === "user"
                         ? "ml-6 bg-[#3754ED] text-white"
                         : "mr-6 bg-[#F5F7FF] text-[#010D50]",
@@ -3217,7 +3268,7 @@ function AiPackageContent() {
                 <Button
                   type="button"
                   onClick={submitAiChat}
-                  disabled={aiChatLoading || !aiChatInput.trim() || aiActivityContext.length === 0}
+                  disabled={aiChatLoading || !aiChatInput.trim() || (!aiActivityContext.length && !aiHotelContext && !aiFlightContext)}
                   className="h-10 rounded-xl bg-[#3754ED] px-3 text-white hover:bg-[#2942D1] disabled:bg-[#AEB8F8]"
                   aria-label="Send AI itinerary question"
                 >
