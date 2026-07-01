@@ -4,6 +4,11 @@ const VIATOR_ACCEPT = "application/json;version=2.0";
 const DEFAULT_LANGUAGE = "en-US";
 const DEFAULT_CURRENCY = "GBP";
 const VIATOR_TIMEOUT_MS = 10_000;
+const VIATOR_TIMEOUT_RETRIES = 10;
+const VIATOR_RATE_LIMIT_RETRIES = 10;
+const VIATOR_RETRY_BASE_DELAY_MS = 300;
+const VIATOR_RATE_LIMIT_BASE_DELAY_MS = 1_000;
+const VIATOR_RETRY_MAX_DELAY_MS = 30_000;
 
 type ViatorEnvironment = "sandbox" | "production";
 
@@ -38,33 +43,93 @@ function getViatorApiKey(): string {
     .trim();
 }
 
+function timeoutRetryCount(): number {
+  const configured = Number(process.env.VIATOR_TIMEOUT_RETRIES);
+  if (Number.isFinite(configured) && configured >= 0) return Math.min(10, Math.floor(configured));
+  return VIATOR_TIMEOUT_RETRIES;
+}
+
+function rateLimitRetryCount(): number {
+  const configured = Number(process.env.VIATOR_RATE_LIMIT_RETRIES);
+  if (Number.isFinite(configured) && configured >= 0) return Math.min(10, Math.floor(configured));
+  return VIATOR_RATE_LIMIT_RETRIES;
+}
+
+function retryDelayMs(attemptIndex: number, baseDelayMs = VIATOR_RETRY_BASE_DELAY_MS): number {
+  const exponential = baseDelayMs * 2 ** Math.max(0, attemptIndex - 1);
+  const jitter = Math.floor(Math.random() * 150);
+  return Math.min(VIATOR_RETRY_MAX_DELAY_MS, exponential + jitter);
+}
+
+function retryAfterDelayMs(response: Response, attemptIndex: number): number {
+  const retryAfter = response.headers.get("retry-after");
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds >= 0) return Math.min(VIATOR_RETRY_MAX_DELAY_MS, seconds * 1000);
+    const dateMs = Date.parse(retryAfter);
+    if (Number.isFinite(dateMs)) return Math.min(VIATOR_RETRY_MAX_DELAY_MS, Math.max(0, dateMs - Date.now()));
+  }
+  return retryDelayMs(attemptIndex, VIATOR_RATE_LIMIT_BASE_DELAY_MS);
+}
+
+function isTimeoutError(error: unknown): boolean {
+  return error instanceof Error && (error.name === "AbortError" || /timed?\s*out|aborted/i.test(error.message));
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function viatorFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), VIATOR_TIMEOUT_MS);
+  const maxTimeoutRetries = init.signal ? 0 : timeoutRetryCount();
+  const maxRateLimitRetries = init.signal ? 0 : rateLimitRetryCount();
+  let lastTimeoutError: unknown;
+  let rateLimitAttempts = 0;
 
-  const response = await fetch(`${getViatorBaseUrl()}${path}`, {
-    ...init,
-    signal: init.signal || controller.signal,
-    headers: {
-      "Content-Type": "application/json",
-      Accept: VIATOR_ACCEPT,
-      "Accept-Language": process.env.VIATOR_ACCEPT_LANGUAGE || DEFAULT_LANGUAGE,
-      "exp-api-key": getViatorApiKey(),
-      ...(init.headers || {}),
-    },
-  });
-  clearTimeout(timeout);
+  for (let attempt = 0; attempt <= maxTimeoutRetries + maxRateLimitRetries; attempt += 1) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), VIATOR_TIMEOUT_MS);
 
-  if (!response.ok) {
-    const errorBody = await response.json().catch(() => null);
-    throw new Error(
-      `Viator request failed: ${response.status} ${response.statusText}${
-        errorBody ? ` ${JSON.stringify(errorBody)}` : ""
-      }`
-    );
+    try {
+      const response = await fetch(`${getViatorBaseUrl()}${path}`, {
+        ...init,
+        signal: init.signal || controller.signal,
+        headers: {
+          "Content-Type": "application/json",
+          Accept: VIATOR_ACCEPT,
+          "Accept-Language": process.env.VIATOR_ACCEPT_LANGUAGE || DEFAULT_LANGUAGE,
+          "exp-api-key": getViatorApiKey(),
+          ...(init.headers || {}),
+        },
+      });
+
+      if (response.status === 429 && rateLimitAttempts < maxRateLimitRetries) {
+        rateLimitAttempts += 1;
+        clearTimeout(timeout);
+        await delay(retryAfterDelayMs(response, rateLimitAttempts));
+        continue;
+      }
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => null);
+        throw new Error(
+          `Viator request failed: ${response.status} ${response.statusText}${
+            errorBody ? ` ${JSON.stringify(errorBody)}` : ""
+          }`
+        );
+      }
+
+      return response.json() as Promise<T>;
+    } catch (error) {
+      if (!isTimeoutError(error) || attempt >= maxTimeoutRetries) throw error;
+      lastTimeoutError = error;
+      await delay(retryDelayMs(attempt + 1));
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
-  return response.json() as Promise<T>;
+  throw lastTimeoutError instanceof Error ? lastTimeoutError : new Error("Viator request timed out.");
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
