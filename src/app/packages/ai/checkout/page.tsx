@@ -402,61 +402,28 @@ function buildAiPackageNotes(draft: AiBookingDraft, currency: string) {
   const normalizedCurrency = normalizeCurrencyCode(currency);
   const search = draft.search;
   const destinations = draft.destinations || [];
+  const selectedActivities = destinations.flatMap((destination) => destination.activities || []);
 
-  lines.push("[AI_PACKAGE] Source: AI itinerary");
+  if (selectedActivities.length === 0) return lines;
+
   lines.push(
     [
-      "[AI_PACKAGE] Search",
-      search?.destination ? `destination=${search.destination}` : "",
-      search?.fromCode ? `origin=${search.fromCode}` : "",
-      search?.checkIn ? `checkIn=${search.checkIn}` : "",
-      search?.checkOut ? `checkOut=${search.checkOut}` : "",
-      typeof search?.adults === "number" ? `adults=${search.adults}` : "",
-      typeof search?.children === "number" ? `children=${search.children}` : "",
-      typeof search?.rooms === "number" ? `rooms=${search.rooms}` : "",
-      search?.lookingFor ? `intent=${search.lookingFor}` : "",
-      search?.stayPreference ? `stay=${search.stayPreference}` : "",
+      "[AI_PACKAGE] Viator selections",
+      search?.destination ? `trip=${search.destination}` : "",
+      search?.checkIn && search?.checkOut ? `dates=${search.checkIn} to ${search.checkOut}` : "",
+      `activities=${selectedActivities.length}`,
+      Number.isFinite(draft.totals?.activities) ? `activitiesTotal=${money(Number(draft.totals?.activities || 0), normalizedCurrency)}` : "",
     ]
       .filter(Boolean)
       .join(" | ")
   );
 
   destinations.forEach((destination, index) => {
-    const hotel = destination.hotel;
-    const hotelId = resolveAiHotelId(hotel);
-    const roomId = resolveAiRoomId(hotel);
-    lines.push(
-      [
-        `[AI_PACKAGE] Destination ${index + 1}`,
-        destination.name || `Stop ${index + 1}`,
-        destination.checkIn ? `checkIn=${destination.checkIn}` : "",
-        destination.checkOut ? `checkOut=${destination.checkOut}` : "",
-        destination.airportCode ? `airport=${destination.airportCode}` : "",
-      ]
-        .filter(Boolean)
-        .join(" | ")
-    );
-
-    if (hotel) {
-      lines.push(
-        [
-          "[AI_PACKAGE] Hotel",
-          hotel.name,
-          hotelId ? `hotelId=${hotelId}` : "",
-          roomId ? `roomSelectionId=${roomId}` : "",
-          hotel.room?.name ? `room=${hotel.room.name}` : "",
-          hotel.room?.highlights?.length ? `details=${hotel.room.highlights.join(", ")}` : "",
-          Number.isFinite(hotel.price?.total) ? `price=${money(Number(hotel.price.total || 0), hotel.price?.currency || normalizedCurrency)}` : "",
-        ]
-          .filter(Boolean)
-          .join(" | ")
-      );
-    }
-
     (destination.activities || []).forEach((activity, activityIndex) => {
       lines.push(
         [
           `[AI_PACKAGE] Viator ${index + 1}.${activityIndex + 1}`,
+          destination.name || `Stop ${index + 1}`,
           activity.productCode,
           activity.title,
           activity.itineraryDate ? `date=${activity.itineraryDate}` : "",
@@ -470,20 +437,6 @@ function buildAiPackageNotes(draft: AiBookingDraft, currency: string) {
       );
     });
   });
-
-  if (draft.totals) {
-    lines.push(
-      [
-        "[AI_PACKAGE] Totals",
-        Number.isFinite(draft.totals.flight) ? `flight=${money(Number(draft.totals.flight || 0), normalizedCurrency)}` : "",
-        Number.isFinite(draft.totals.hotel) ? `hotel=${money(Number(draft.totals.hotel || 0), normalizedCurrency)}` : "",
-        Number.isFinite(draft.totals.activities) ? `activities=${money(Number(draft.totals.activities || 0), normalizedCurrency)}` : "",
-        Number.isFinite(draft.totals.package) ? `package=${money(Number(draft.totals.package || 0), normalizedCurrency)}` : "",
-      ]
-        .filter(Boolean)
-        .join(" | ")
-    );
-  }
 
   return lines;
 }
@@ -962,7 +915,6 @@ function AiCheckoutContent() {
                 children: Math.max(0, Number(draft.search?.children || 0)),
               },
               passengers: folderPassengers as never,
-              comments: [`AI package hotel itinerary - ${destinationLabel}`],
               selection: {
                 total: Number(destination.hotel.price?.total || 0),
                 nightly: destination.hotel.price?.nightly,
@@ -1005,7 +957,6 @@ function AiCheckoutContent() {
             itineraryNumber: "1",
             foldcur: normalizeCurrencyCode(currency),
             travelPurpose: "Holiday",
-            comments: [`AI package hotel itinerary - ${destinationLabel}`],
             set_as_preferred_itinerary: true,
             passengers: folderPassengers as never,
             requestData: [hotelRequestItem] as never,

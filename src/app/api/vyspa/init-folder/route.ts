@@ -560,8 +560,17 @@ export async function POST(req: Request) {
       bookingComments.push(`Booking Class: ${ccClassCode}`);
     }
 
-    if (Array.isArray(additionalComments) && additionalComments.length > 0) {
-      for (const note of additionalComments) {
+    const normalizedAdditionalComments = Array.isArray(additionalComments)
+      ? additionalComments
+          .map((note) => String(note || '').trim())
+          .filter(Boolean)
+      : [];
+    const isAiPackageCommentSync =
+      normalizedAdditionalComments.length > 0 &&
+      normalizedAdditionalComments.every((note) => note.startsWith('[AI_PACKAGE]'));
+
+    if (normalizedAdditionalComments.length > 0) {
+      for (const note of normalizedAdditionalComments) {
         const normalized = String(note || '').trim();
         if (normalized) bookingComments.push(normalized);
       }
@@ -575,7 +584,7 @@ export async function POST(req: Request) {
       }
     }
 
-    if (Array.isArray(additionalComments) && additionalComments.length > 0) {
+    if (normalizedAdditionalComments.length > 0) {
       manualItems.push({
         Segment: {
           fi_type: 'OTH',
@@ -587,7 +596,7 @@ export async function POST(req: Request) {
           num_bum: '1',
           pax_no: '1',
           desc: 'AI Package Notes',
-          printing_note: additionalComments.join(' | '),
+          printing_note: normalizedAdditionalComments.join(' | '),
         },
         FolderPricings: [
           {
@@ -601,7 +610,8 @@ export async function POST(req: Request) {
     }
 
     // Build the saveBasketToFolder request
-    const combinedBookingNotes = bookingComments.join('\n').trim();
+    const folderComments = isAiPackageCommentSync ? normalizedAdditionalComments : bookingComments;
+    const combinedBookingNotes = folderComments.join('\n').trim();
     const createFolderPayload = [{
       SaveBasketToFolder: 'True',
       CartSessionKey: '',
@@ -794,7 +804,7 @@ export async function POST(req: Request) {
       ok: false,
     };
 
-    if (bookingComments.length > 0) {
+    if (folderComments.length > 0) {
       commentSync.attempted = true;
       try {
         const commentsFormData = new URLSearchParams();
@@ -808,14 +818,15 @@ export async function POST(req: Request) {
             {
               folder_no: String(folderNumber),
               new_folder_status_code: FOLDER_STATUS_CODES.BASKET,
-              comments: bookingComments,
+              comments: folderComments,
             },
           ])
         );
 
         console.log('➡️ Calling Portal api_update_folder_status for folder notes', {
           folderNumber,
-          commentsCount: bookingComments.length,
+          commentsCount: folderComments.length,
+          aiPackageOnly: isAiPackageCommentSync,
         });
 
         const commentsResponse = await fetch(apiUrl, {
