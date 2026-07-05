@@ -1197,6 +1197,22 @@ function AiCheckoutContent() {
             {showTravellers ? (
               <section id="traveller-details">
                 <PassengerFormsSection showPassportFields requireContactInfoForAll={false} />
+                <div className="mt-5 flex justify-end">
+                  <Button
+                    className="h-11 min-w-[220px] rounded-xl bg-[#010D50] px-6 text-white hover:bg-[#0B1C73] disabled:opacity-50"
+                    disabled={submitting}
+                    onClick={proceedToPayment}
+                  >
+                    {submitting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating basket...
+                      </>
+                    ) : (
+                      "Continue to payment"
+                    )}
+                  </Button>
+                </div>
               </section>
             ) : null}
             {submitError ? (
