@@ -73,6 +73,40 @@ interface InitFolderRequestBody {
   // Per-passenger pricing from price check (for separate TKT segments per passenger)
   passengerPricing?: PassengerPricing[];
   priceDifference?: number | null;
+  additionalComments?: string[];
+}
+
+function extractFolderResponseMeta(payload: unknown): {
+  folderNumber: string | number | null;
+  customerId: string | number | null;
+} {
+  const seen = new Set<unknown>();
+  const queue: unknown[] = [payload];
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || typeof current !== 'object' || seen.has(current)) continue;
+    seen.add(current);
+
+    if (Array.isArray(current)) {
+      queue.push(...current);
+      continue;
+    }
+
+    const record = current as Record<string, unknown>;
+    const folderNumber = record.folder_no ?? record.folderNumber ?? record.fold_no ?? null;
+    const customerId = record.customer_id ?? record.cust_id ?? null;
+
+    if (folderNumber != null) {
+      return { folderNumber: folderNumber as string | number, customerId: customerId as string | number | null };
+    }
+
+    for (const value of Object.values(record)) {
+      if (value && typeof value === 'object') queue.push(value);
+    }
+  }
+
+  return { folderNumber: null, customerId: null };
 }
 
 function mapPassengerType(type: string): 'ADT' | 'CHD' | 'INF' {
@@ -211,7 +245,8 @@ export async function POST(req: Request) {
       galileoNotes,
       gds,
       chooseSupplier,
-      priceDifference
+      priceDifference,
+      additionalComments,
     } = body;
 
     if (!Array.isArray(passengers) || passengers.length === 0) {
@@ -525,6 +560,13 @@ export async function POST(req: Request) {
       bookingComments.push(`Booking Class: ${ccClassCode}`);
     }
 
+    if (Array.isArray(additionalComments) && additionalComments.length > 0) {
+      for (const note of additionalComments) {
+        const normalized = String(note || '').trim();
+        if (normalized) bookingComments.push(normalized);
+      }
+    }
+
     // Galileo tag notes (requested)
     if (Array.isArray(galileoNotes) && galileoNotes.length > 0) {
       for (const note of galileoNotes) {
@@ -533,7 +575,33 @@ export async function POST(req: Request) {
       }
     }
 
+    if (Array.isArray(additionalComments) && additionalComments.length > 0) {
+      manualItems.push({
+        Segment: {
+          fi_type: 'OTH',
+          start_date_time_dt: portalDateFormat,
+          end_date_time_dt: portalDateFormat,
+          status: 'OK',
+          finan_vend_id: 0,
+          itin_vend_id: 0,
+          num_bum: '1',
+          pax_no: '1',
+          desc: 'AI Package Notes',
+          printing_note: additionalComments.join(' | '),
+        },
+        FolderPricings: [
+          {
+            tot_net_amt: '0.00',
+            tot_sell_amt: '0.00',
+            desc: 'AI Package Notes',
+            cu_curr_code: currency,
+          },
+        ],
+      });
+    }
+
     // Build the saveBasketToFolder request
+    const combinedBookingNotes = bookingComments.join('\n').trim();
     const createFolderPayload = [{
       SaveBasketToFolder: 'True',
       CartSessionKey: '',
@@ -554,6 +622,8 @@ export async function POST(req: Request) {
       marketsource: marketSourceId,
       marketsubsource: marketSubSourceId,
       comments: bookingComments,
+      itinerary_remark: combinedBookingNotes,
+      non_printing_notes: combinedBookingNotes,
       matchAllContacts: 'True', // Required for customer creation/matching
       passengers: portalPassengers,
       manual_items: manualItems,
@@ -666,7 +736,9 @@ export async function POST(req: Request) {
           result = { raw: retryRawText };
         }
 
-        if (!retryResponse.ok && !result?.folder_no && !result?.folderNumber && !result?.fold_no) {
+        const retryFolderMeta = extractFolderResponseMeta(result);
+
+        if (!retryResponse.ok && !retryFolderMeta.folderNumber) {
           console.error('❌ Portal saveBasketToFolder RETRY failed', {
             status: retryResponse.status,
             response: retryRawText.substring(0, 500),
@@ -683,7 +755,9 @@ export async function POST(req: Request) {
       }
     }
 
-    if (!response.ok && !result?.folder_no && !result?.folderNumber && !result?.fold_no) {
+    const folderMeta = extractFolderResponseMeta(result);
+
+    if (!response.ok && !folderMeta.folderNumber) {
       console.error('❌ Portal saveBasketToFolder failed', {
         status: response.status,
         response: rawText.substring(0, 500),
@@ -699,9 +773,8 @@ export async function POST(req: Request) {
     }
 
     // Extract folder number and customer ID
-    const folderData = Array.isArray(result) ? result[0] : result;
-    const folderNumber = folderData?.folder_no || folderData?.folderNumber || folderData?.fold_no || null;
-    const customerId = folderData?.customer_id || folderData?.cust_id || null;
+    const folderNumber = folderMeta.folderNumber;
+    const customerId = folderMeta.customerId;
     const emailAddress = lead.email;
 
     if (!folderNumber) {
@@ -714,6 +787,74 @@ export async function POST(req: Request) {
         },
         { status: 502 }
       );
+    }
+
+    let commentSync: { attempted: boolean; ok: boolean; status?: number; raw?: unknown; error?: string } = {
+      attempted: false,
+      ok: false,
+    };
+
+    if (bookingComments.length > 0) {
+      commentSync.attempted = true;
+      try {
+        const commentsFormData = new URLSearchParams();
+        commentsFormData.append('username', credentials.username);
+        commentsFormData.append('password', credentials.password);
+        commentsFormData.append('token', credentials.token);
+        commentsFormData.append('method', 'api_update_folder_status');
+        commentsFormData.append(
+          'params',
+          JSON.stringify([
+            {
+              folder_no: String(folderNumber),
+              new_folder_status_code: FOLDER_STATUS_CODES.BASKET,
+              comments: bookingComments,
+            },
+          ])
+        );
+
+        console.log('➡️ Calling Portal api_update_folder_status for folder notes', {
+          folderNumber,
+          commentsCount: bookingComments.length,
+        });
+
+        const commentsResponse = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: commentsFormData.toString(),
+        });
+
+        const commentsRawText = await commentsResponse.text();
+        let commentsResult: unknown = { raw: commentsRawText };
+        try {
+          commentsResult = JSON.parse(commentsRawText);
+        } catch {}
+
+        commentSync = {
+          attempted: true,
+          ok: commentsResponse.ok,
+          status: commentsResponse.status,
+          raw: commentsResult,
+        };
+
+        if (!commentsResponse.ok) {
+          console.error('❌ Portal api_update_folder_status note sync failed', {
+            folderNumber,
+            status: commentsResponse.status,
+            response: commentsRawText.substring(0, 1000),
+          });
+        }
+      } catch (commentError) {
+        commentSync = {
+          attempted: true,
+          ok: false,
+          error: commentError instanceof Error ? commentError.message : 'Unknown note sync error',
+        };
+        console.error('❌ Portal api_update_folder_status note sync error', {
+          folderNumber,
+          error: commentError,
+        });
+      }
     }
 
     // Fetch folder details for verification
@@ -763,6 +904,7 @@ export async function POST(req: Request) {
         customerId,
         emailAddress,
         createFolderRaw: result,
+        commentSync,
         folderDetails,
       },
       { status: 200 }

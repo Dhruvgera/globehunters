@@ -445,6 +445,11 @@ function hotelOptionsMatchSegment(hotels: Hotel[] | undefined, segment: PackageD
 function hotelRecommendationScore(hotel: Hotel, context: HotelRecommendationContext) {
   const preference = context.stayPreference.toLowerCase();
   const total = hotel.price?.total || 0;
+  const raw =
+    hotel.rawSearchResult && typeof hotel.rawSearchResult === "object" && !Array.isArray(hotel.rawSearchResult)
+      ? (hotel.rawSearchResult as Record<string, unknown>)
+      : null;
+  const provider = String(raw?.provider || "").trim().toLowerCase();
   const luxuryMode = preference.includes("best") || preference.includes("luxury");
   const valueMode = preference.includes("budget") || preference.includes("value") || preference.includes("econom");
   const hotelBudgetShare = luxuryMode ? 0.76 : valueMode ? 0.45 : 0.58;
@@ -456,20 +461,21 @@ function hotelRecommendationScore(hotel: Hotel, context: HotelRecommendationCont
   const hasBreakfast = includesBreakfast(hotel.mealPlans || []) ? 1 : 0;
   const isOverBudget = perDestinationBudget > 0 && total > perDestinationBudget;
   const overBudgetPenalty = isOverBudget ? ((total - perDestinationBudget) / Math.max(perDestinationBudget, 1)) * 1800 : 0;
+  const providerFitPremium = provider === "vyspa" ? 1400 : provider === "hotelbeds" ? 0 : 300;
 
   if (luxuryMode) {
     const targetGapPenalty = perDestinationBudget > 0 ? Math.abs(total - perDestinationBudget) * 0.42 : 0;
-    return rating * 1050 + reviewScore * 85 + amenitiesCount * 10 + hasBreakfast * 70 - targetGapPenalty - overBudgetPenalty * 1.4;
+    return rating * 1050 + reviewScore * 85 + amenitiesCount * 10 + hasBreakfast * 70 + providerFitPremium - targetGapPenalty - overBudgetPenalty * 1.4;
   }
 
   const budgetUseRatio = perDestinationBudget > 0 ? Math.min(total / perDestinationBudget, 1.15) : 0;
   const budgetFitPremium = perDestinationBudget > 0 ? budgetUseRatio * (valueMode ? 250 : 850) : 0;
 
   if (valueMode) {
-    return rating * 350 + reviewScore * 70 + amenitiesCount * 8 + hasBreakfast * 80 + budgetFitPremium - total * 1.2 - overBudgetPenalty;
+    return rating * 350 + reviewScore * 70 + amenitiesCount * 8 + hasBreakfast * 80 + budgetFitPremium + providerFitPremium - total * 1.2 - overBudgetPenalty;
   }
 
-  return rating * 700 + reviewScore * 80 + amenitiesCount * 10 + hasBreakfast * 70 + budgetFitPremium - total * 0.25 - overBudgetPenalty;
+  return rating * 700 + reviewScore * 80 + amenitiesCount * 10 + hasBreakfast * 70 + budgetFitPremium + providerFitPremium - total * 0.25 - overBudgetPenalty;
 }
 
 function sortHotelsByRecommendation(hotels: Hotel[], context: HotelRecommendationContext) {

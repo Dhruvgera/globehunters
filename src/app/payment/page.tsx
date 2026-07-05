@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Suspense, useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Navbar from "@/components/navigation/Navbar";
@@ -20,6 +21,7 @@ import { getRegion } from "@/lib/utils/domainMapping";
 import { formatFareLabel } from "@/lib/utils";
 import { useAirportNames } from "@/hooks/useAirportNames";
 import { getJourneySegments } from "@/lib/flight/segments";
+import { formatShortDate } from "@/lib/utils/dateFormat";
 
 // Import new modular components
 import { PaymentHeader } from "@/components/payment/PaymentHeader";
@@ -45,6 +47,27 @@ import { FOLDER_STATUS_CODES } from "@/types/portal";
 import { countryCodes } from "@/lib/utils/countryCodes";
 import { convertHotelLocalTaxRows, convertHotelLocalTaxTotal } from "@/lib/currency/localTaxDisplay";
 import { calculateNights } from "@/lib/hotels/nights";
+
+type AiPaymentDestination = {
+  id?: string;
+  name?: string;
+  checkIn?: string;
+  checkOut?: string;
+  hotel?: {
+    name?: string;
+    imageSrc?: string;
+    distanceLabel?: string;
+    room?: { name?: string; highlights?: string[] };
+    price?: { total?: number; currency?: string };
+    rawSearchResult?: { address1?: string; address2?: string };
+  } | null;
+};
+
+type AiPaymentDraft = {
+  search?: { destination?: string; checkIn?: string; checkOut?: string; rooms?: number };
+  totals?: { package?: number; currency?: string };
+  destinations?: AiPaymentDestination[];
+};
 
 function parseMoneyString(value: string | undefined): { amount?: number; currency?: string } {
   if (!value) return { amount: undefined, currency: undefined };
@@ -119,6 +142,7 @@ function PaymentContent() {
   const { createSession, redirectToCheckout, loading: boxPayLoading, error: boxPayError } = useBoxPay();
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [packageTotalOverride, setPackageTotalOverride] = useState<{ amount?: number; currency?: string } | null>(null);
+  const [aiPaymentDraft, setAiPaymentDraft] = useState<AiPaymentDraft | null>(null);
 
   // Get affiliate phone number
   const { phoneNumber: affiliatePhone } = useAffiliatePhone();
@@ -179,7 +203,30 @@ function PaymentContent() {
   ]);
 
   useEffect(() => {
+    if (!isPackageMode || typeof window === "undefined") return;
+    const raw = window.sessionStorage.getItem("aiPackageBookingDraft");
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as AiPaymentDraft;
+      if (!parsed || !Array.isArray(parsed.destinations) || parsed.destinations.length === 0) return;
+      const location = searchParams?.get("location") || "";
+      const checkIn = searchParams?.get("checkIn") || "";
+      const checkOut = searchParams?.get("checkOut") || "";
+      if (
+        String(parsed.search?.destination || "").trim().toLowerCase() === location.trim().toLowerCase() &&
+        String(parsed.search?.checkIn || "") === checkIn &&
+        String(parsed.search?.checkOut || "") === checkOut
+      ) {
+        setAiPaymentDraft(parsed);
+      }
+    } catch {
+      setAiPaymentDraft(null);
+    }
+  }, [isPackageMode, searchParams]);
+
+  useEffect(() => {
     if (!isPackageMode || !packageFlightResultId || packageRoomIds.length === 0) return;
+    if (aiPaymentDraft?.totals?.package) return;
 
     let cancelled = false;
     const loadPackagePricing = async () => {
@@ -221,6 +268,7 @@ function PaymentContent() {
       cancelled = true;
     };
   }, [
+    aiPaymentDraft?.totals?.package,
     fallbackPackagePricing?.amount,
     fallbackPackagePricing?.currency,
     flight?.currency,
@@ -293,7 +341,7 @@ function PaymentContent() {
 
   // Price calculation - Use real pricing from selected upgrade, flight or hotel room
   const currency = isPackageMode
-    ? (packageTotalOverride?.currency || fallbackPackagePricing?.currency || selectedUpgrade?.currency || flight?.currency || hotelRoomSummary?.currency)
+    ? (aiPaymentDraft?.totals?.currency || packageTotalOverride?.currency || fallbackPackagePricing?.currency || selectedUpgrade?.currency || flight?.currency || hotelRoomSummary?.currency)
     : isHotelMode
       ? hotelRoomSummary?.currency
       : (selectedUpgrade ? selectedUpgrade.currency : flight?.currency);
@@ -308,7 +356,7 @@ function PaymentContent() {
     return c.toUpperCase();
   })();
   const baseFare = isPackageMode
-    ? (packageTotalOverride?.amount || fallbackPackagePricing?.amount || selectedUpgrade?.totalPrice || 0)
+    ? (aiPaymentDraft?.totals?.package || packageTotalOverride?.amount || fallbackPackagePricing?.amount || selectedUpgrade?.totalPrice || 0)
     : isHotelMode
       ? (hotelRoomSummary?.total || 0)
       : (selectedUpgrade ? selectedUpgrade.totalPrice : (priceDifference ? (priceCheckData?.priceOptions?.[0]?.totalPrice || flight?.price || 0) : (flight?.price || 0)));
@@ -537,7 +585,9 @@ function PaymentContent() {
 
     const roomNames: string[] = [];
     if (Array.isArray(cached?.rooms) && selectedHotelRoomIds.length > 0) {
-      const roomMap = new Map(cached!.rooms!.map((r: any) => [String(r.id), r.name || "Room"]));
+      const roomMap = new Map(
+        cached!.rooms!.map((room: { id?: string | number; name?: string }) => [String(room.id), room.name || "Room"])
+      );
       const counts: Record<string, number> = {};
       for (const rid of selectedHotelRoomIds) {
         const n = roomMap.get(String(rid)) || roomName;
@@ -555,8 +605,30 @@ function PaymentContent() {
     return { cancellationText, isRefundable, nightsCount, rooms, adults, children, roomNames, roomName };
   }, [isHotelMode, selectedHotel, hotelDetailsCache, hotelRoomSummary, hotelSearch, selectedHotelRoomIds]);
 
+  const aiHotelDisplays = useMemo(() => {
+    return (aiPaymentDraft?.destinations || [])
+      .filter((destination) => destination?.hotel)
+      .map((destination) => {
+        const hotel = destination.hotel!;
+        const address = [hotel.rawSearchResult?.address1, hotel.rawSearchResult?.address2].filter(Boolean).join(", ");
+        return {
+          id: destination.id || `${destination.name || hotel.name}-${destination.checkIn || ""}`,
+          destinationName: destination.name || "",
+          checkIn: destination.checkIn || "",
+          checkOut: destination.checkOut || "",
+          name: hotel.name || "Selected hotel",
+          imageSrc: hotel.imageSrc || "",
+          address,
+          roomName: hotel.room?.name || "Selected room",
+          mealName: hotel.room?.highlights?.join(" - ") || "",
+          total: Number(hotel.price?.total || 0),
+          currency: hotel.price?.currency || aiPaymentDraft?.totals?.currency || currency || "GBP",
+        };
+      });
+  }, [aiPaymentDraft?.destinations, aiPaymentDraft?.totals?.currency, currency]);
+
   // Web reference: prefer folder number, then search request ID, then fallbacks
-  const refNumber: string = vyspaFolderNumber || searchRequestId || flight?.webRef || '—';
+  const refNumber: string = vyspaFolderNumber || searchParams?.get("folderNumber") || searchRequestId || flight?.webRef || '—';
   const orderId = refNumber;
 
   // Show loading state while store is hydrating or no flight/hotel selected
@@ -612,7 +684,44 @@ function PaymentContent() {
           <div className="w-full lg:w-[70%] flex flex-col gap-4">
             {(isPackageMode || isHotelMode) && (
               <div className="flex flex-col gap-3">
-                <HotelSummaryCard isPackageMode={isPackageMode} />
+                {isPackageMode && aiHotelDisplays.length > 1 ? (
+                  <div className="bg-white border border-[#DFE0E4] rounded-xl p-4 flex flex-col gap-4">
+                    <div className="text-sm font-semibold text-[#010D50]">Your stays</div>
+                    {aiHotelDisplays.map((hotel) => (
+                      <div key={hotel.id} className="rounded-xl border border-[#DFE0E4] p-4">
+                        <div className="text-xs font-medium uppercase tracking-[0.08em] text-[#3A478A]">
+                          {hotel.destinationName || "Stay"}
+                        </div>
+                        <div className="mt-2 flex gap-3">
+                          <div className="relative h-[72px] w-[96px] overflow-hidden rounded-lg bg-gray-100 flex-shrink-0">
+                            {hotel.imageSrc ? (
+                              <Image src={hotel.imageSrc} alt={hotel.name} fill className="object-cover" />
+                            ) : null}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-semibold text-[#010D50]">{hotel.name}</div>
+                            <div className="truncate text-xs text-[#3A478A]">
+                              {hotel.address || "Content missing from API: address"}
+                            </div>
+                            <div className="mt-1 text-xs text-[#3A478A]">
+                              Check-In: {formatShortDate(hotel.checkIn)} | Check-Out: {formatShortDate(hotel.checkOut)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="mt-3 rounded-lg border border-[#DFE0E4] p-3">
+                          <div className="text-sm font-medium text-[#010D50]">{hotel.roomName}</div>
+                          {hotel.mealName ? <div className="mt-0.5 text-xs text-[#3A478A]">{hotel.mealName}</div> : null}
+                        </div>
+                        <div className="mt-3 flex items-end justify-between">
+                          <div className="text-xs text-[#3A478A]">Price</div>
+                          <div className="text-base font-semibold text-[#010D50]">Total: {formatPrice(hotel.total, hotel.currency)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <HotelSummaryCard isPackageMode={isPackageMode} />
+                )}
 
                 {/* Stay Details - hotel mode only */}
                 {isHotelMode && hotelDisplay && (
@@ -875,7 +984,7 @@ function PaymentContent() {
                         }
 
                         const insuranceFailed = Array.isArray(extrasResult?.results)
-                          ? extrasResult.results.some((row: any) => row?.type === 'insurance' && !row?.success)
+                          ? extrasResult.results.some((row: { type?: string; success?: boolean }) => row?.type === 'insurance' && !row?.success)
                           : false;
 
                         if (extrasResponse.ok && extrasResult.success) {
@@ -1043,7 +1152,7 @@ function PaymentContent() {
                 } else {
                   throw new Error(result.error || 'Failed to create payment session');
                 }
-              } catch (e: any) {
+              } catch (e: unknown) {
                 console.error('BoxPay error:', e);
 
                 // Update folder status to Payment Failed (56) on initial creation error
