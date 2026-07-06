@@ -1164,7 +1164,7 @@ function PaymentContent() {
                       body: JSON.stringify({
                         folderNumber: vyspaFolderNumber,
                         statusCode: FOLDER_STATUS_CODES.PAYMENT_FAILURE,
-                        comments: [`BoxPay Session Creation Failed: ${e?.message || 'Unknown error'}`]
+                        comments: [`BoxPay Session Creation Failed: ${e instanceof Error ? e.message : 'Unknown error'}`]
                       }),
                     });
                   } catch (err) {

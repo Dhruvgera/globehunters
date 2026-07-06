@@ -1317,7 +1317,10 @@ function AiPackageContent() {
     const cachedFlightRequestId = cached?.flightRequestId || null;
     const primaryIsActive = primarySegment?.id === activeDestinationId;
 
-    if (primaryIsActive && (existingPrimaryState?.hotelSearch || cached?.hotelSearch)) setHotelSearch(existingPrimaryState?.hotelSearch || cached?.hotelSearch);
+    if (primaryIsActive) {
+      const nextHotelSearch = existingPrimaryState?.hotelSearch || cached?.hotelSearch || null;
+      if (nextHotelSearch) setHotelSearch(nextHotelSearch);
+    }
     if (primaryIsActive) setHotelOptions(cachedHotelOptions);
     if (cachedFlightRequestId) setSearchRequestId(cachedFlightRequestId);
     if (cachedFlight) setSelectedFlight(cachedFlight, normalizeCabinClass(cachedFlight.outbound?.cabinClass));
@@ -2528,7 +2531,7 @@ function AiPackageContent() {
   const submitAiChat = async () => {
     const question = aiChatInput.trim().slice(0, 600);
     if (!question || aiChatLoading) return;
-    const nextMessages: AiChatMessage[] = [...aiChatMessages, { role: "user", content: question }].slice(-8);
+    const nextMessages: AiChatMessage[] = [...aiChatMessages, { role: "user", content: question } as AiChatMessage].slice(-8);
     setAiChatMessages(nextMessages);
     setAiChatInput("");
     setAiChatLoading(true);
@@ -2552,7 +2555,7 @@ function AiPackageContent() {
       });
       const data = (await response.json().catch(() => ({}))) as { text?: string; error?: string };
       if (!response.ok) throw new Error(data.error || "AI chat failed.");
-      setAiChatMessages((current) => [...current, { role: "assistant", content: data.text || "I could not answer from the current itinerary." }].slice(-8));
+      setAiChatMessages((current) => [...current, { role: "assistant", content: data.text || "I could not answer from the current itinerary." } as AiChatMessage].slice(-8));
     } catch (error) {
       setAiChatError(error instanceof Error ? error.message : "AI chat failed.");
     } finally {

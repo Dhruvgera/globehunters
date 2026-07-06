@@ -262,7 +262,7 @@ function sanitizeHistory(input: unknown): Array<{ role: "user" | "assistant"; co
   if (!Array.isArray(input)) return [];
   return input
     .slice(-MAX_CHAT_HISTORY)
-    .map((message) => {
+    .map((message): { role: "user" | "assistant"; content: string } => {
       const role = (message as AiChatMessageInput)?.role === "assistant" ? "assistant" : "user";
       return { role, content: textFrom((message as AiChatMessageInput)?.content, MAX_USER_CHARS) };
     })
