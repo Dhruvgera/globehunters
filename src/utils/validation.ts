@@ -26,7 +26,6 @@ export function validatePhone(phone: string): boolean {
   const cleaned = phone.replace(/[\s\-()]/g, '');
   const digits = cleaned.replace(/\D/g, '');
   if (!/^\d{10}$/.test(digits)) return false;
-  if (digits.startsWith('0')) return false;
   return true;
 }
 
@@ -352,7 +351,7 @@ export function validatePassenger(
   }
 
   if ((requireContactInfo || passenger.phone) && !validatePhone(passenger.phone)) {
-    errors.phone = 'Enter exactly 10 digits without leading zero (e.g. 7678452537)';
+    errors.phone = 'Enter exactly 10 digits (e.g. 0767845253)';
   }
 
   if (passenger.passportNumber && !validatePassport(passenger.passportNumber)) {

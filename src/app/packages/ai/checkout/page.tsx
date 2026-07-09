@@ -174,6 +174,40 @@ function roomHighlightsText(hotel?: Hotel | null) {
   return (hotel?.room?.highlights || []).map((value) => String(value || "").trim().toLowerCase()).join(" | ");
 }
 
+function toTitleCase(value: string | undefined | null) {
+  return String(value || "")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => (word.length <= 3 && /^[a-z0-9]+$/i.test(word) ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1)))
+    .join(" ");
+}
+
+function sanitizeRoomText(value: string | undefined | null) {
+  return String(value || "")
+    .replace(/\*+/g, "")
+    .replace(/\bnon[\s-]*refundable rate\b/gi, "")
+    .replace(/\bnon[\s-]*refundable\b/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function formatRoomName(value: string | undefined | null) {
+  const cleaned = sanitizeRoomText(value);
+  return cleaned ? toTitleCase(cleaned) : "";
+}
+
+function formatRoomHighlights(highlights: string[] | undefined | null) {
+  return Array.from(
+    new Set(
+      (highlights || [])
+        .map((value) => sanitizeRoomText(value))
+        .filter(Boolean)
+        .map((value) => toTitleCase(value))
+    )
+  );
+}
+
 async function stableRateSelectionId(rateKey: string) {
   const encoded = new TextEncoder().encode(rateKey);
   const digest = await crypto.subtle.digest("SHA-1", encoded);
@@ -1061,6 +1095,15 @@ function AiCheckoutContent() {
                       </div>
                       <h3 className="mt-1 text-xl font-bold text-[#010D50]">{destination.hotel?.name || "Selected hotel"}</h3>
                       <p className="mt-1 text-sm text-[#3A478A]">{destination.hotel?.distanceLabel}</p>
+                      {destination.hotel?.room?.name ? (
+                        <div className="mt-3 rounded-xl border border-[#DFE0E4] bg-[#F5F7FF] p-3">
+                          <div className="text-xs font-medium text-[#3A478A]">Selected room</div>
+                          <div className="mt-1 text-sm font-semibold text-[#010D50]">{formatRoomName(destination.hotel.room.name)}</div>
+                          {formatRoomHighlights(destination.hotel.room.highlights).length ? (
+                            <div className="mt-1 text-xs text-[#3A478A]">{formatRoomHighlights(destination.hotel.room.highlights).join(" · ")}</div>
+                          ) : null}
+                        </div>
+                      ) : null}
                       <div className="mt-3 font-semibold text-[#010D50]">{money(destination.hotel?.price?.total, destination.hotel?.price?.currency || currency)}</div>
                     </div>
                     <Button
@@ -1209,13 +1252,6 @@ function AiCheckoutContent() {
                 )}
               </Button>
             )}
-            <Button
-              variant="outline"
-              className="mt-3 h-11 w-full rounded-xl border-[#DFE0E4] text-[#010D50]"
-              onClick={() => router.push("/packages/ai")}
-            >
-              Back to AI planner
-            </Button>
           </aside>
         </div>
       </main>
@@ -1242,6 +1278,15 @@ function AiCheckoutContent() {
             ) : null}
             <div>
               <p className="text-sm text-[#3A478A]">{selectedHotelDestination?.hotel?.distanceLabel}</p>
+              {selectedHotelDestination?.hotel?.room?.name ? (
+                <div className="mt-3 rounded-xl border border-[#DFE0E4] bg-[#F5F7FF] p-3">
+                  <div className="text-xs font-medium text-[#3A478A]">Selected room</div>
+                  <div className="mt-1 text-sm font-semibold text-[#010D50]">{formatRoomName(selectedHotelDestination.hotel.room.name)}</div>
+                  {formatRoomHighlights(selectedHotelDestination.hotel.room.highlights).length ? (
+                    <div className="mt-1 text-xs text-[#3A478A]">{formatRoomHighlights(selectedHotelDestination.hotel.room.highlights).join(" · ")}</div>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-lg border border-[#DFE0E4] p-3">
                   <div className="text-xs text-[#3A478A]">Check-in</div>

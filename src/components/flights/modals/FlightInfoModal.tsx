@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { Flight, FlightSegment } from "@/types/flight";
 import { useTranslations } from "next-intl";
 import { formatPrice } from "@/lib/currency";
@@ -1117,7 +1118,10 @@ export default function FlightInfoModal({
                           {refundableStatus === 'fully-refundable' ? (
                             <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
                           ) : refundableStatus === 'refundable-with-penalty' || refundableStatus === 'refundable' ? (
-                            <Info className="w-5 h-5 sm:w-6 sm:h-6 text-[#F59E0B] shrink-0" />
+                            <Tooltip
+                              content={refundableText}
+                              icon={<Info className="w-5 h-5 sm:w-6 sm:h-6 text-[#F59E0B] shrink-0" />}
+                            />
                           ) : (
                             <XIcon className="w-5 h-5 sm:w-6 sm:h-6 text-[#DC2626] shrink-0" />
                           )}
@@ -1160,7 +1164,10 @@ export default function FlightInfoModal({
                             {isIncluded ? (
                               <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
                             ) : isChargeable ? (
-                              <Info className="w-5 h-5 sm:w-6 sm:h-6 text-[#F59E0B] shrink-0" />
+                              <Tooltip
+                                content={displayText || "Seat selection is available for this fare."}
+                                icon={<Info className="w-5 h-5 sm:w-6 sm:h-6 text-[#F59E0B] shrink-0" />}
+                              />
                             ) : (
                               <XIcon className="w-5 h-5 sm:w-6 sm:h-6 text-[#DC2626] shrink-0" />
                             )}
@@ -1258,7 +1265,10 @@ export default function FlightInfoModal({
                           {priceCheck?.flightDetails?.seatSelectionFree ? (
                             <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
                           ) : (
-                            <Info className="w-5 h-5 sm:w-6 sm:h-6 text-[#F59E0B] shrink-0" />
+                            <Tooltip
+                              content="Seat selection is available for a charge."
+                              icon={<Info className="w-5 h-5 sm:w-6 sm:h-6 text-[#F59E0B] shrink-0" />}
+                            />
                           )}
                         </div>
                       );

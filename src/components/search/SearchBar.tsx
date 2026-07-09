@@ -971,7 +971,7 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
                       className="w-full accent-[#3754ED]"
                     />
                     <span className="w-16 text-right text-sm font-semibold text-[#010D50]">
-                      ${aiBudget.toLocaleString()}
+                      £{aiBudget.toLocaleString()}
                     </span>
                   </div>
                 </label>

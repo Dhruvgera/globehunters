@@ -126,6 +126,7 @@ type RichHotelRoom = {
   price?: number;
   currency?: string;
   refundable?: boolean | null;
+  inclusions?: string[];
 };
 
 type RichHotelDetails = {
@@ -149,6 +150,11 @@ type HotelRecommendationContext = {
   stayPreference: string;
   budget: number;
   destinationCount: number;
+};
+
+type TripDayEntry = {
+  date: string;
+  activity: ActivityProduct | null;
 };
 
 function textValue(value: unknown): string {
@@ -245,14 +251,54 @@ function collectRooms(value: unknown, limit = 8): RichHotelRoom[] {
   const rooms: RichHotelRoom[] = [];
   const seen = new Set<unknown>();
   const seenRoomKeys = new Set<string>();
+  const toTitleCase = (input: string) =>
+    input
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((word) => (word.length <= 3 && /^[a-z0-9]+$/i.test(word) ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1)))
+      .join(" ");
+  const sanitizeRoomLabel = (input: string) => {
+    const cleaned = textValue(input)
+      .replace(/\*+/g, "")
+      .replace(/\bnon[\s-]*refundable rate\b/gi, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+    return cleaned ? toTitleCase(cleaned) : "";
+  };
+  const sanitizeInclusion = (input: string) => {
+    const cleaned = textValue(input).replace(/\*+/g, "").replace(/\s{2,}/g, " ").trim();
+    if (!cleaned) return "";
+    if (/^non[\s-]*refundable$/i.test(cleaned)) return "";
+    if (/^non[\s-]*refundable rate$/i.test(cleaned)) return "";
+    return toTitleCase(cleaned);
+  };
   const addRoom = (record: Record<string, unknown>) => {
-    const name = textValue(record.roomName ?? record.RoomName ?? record.room_name ?? record.name ?? record.Name ?? record.description ?? record.room_type);
+    const name = sanitizeRoomLabel(
+      textValue(record.roomName ?? record.RoomName ?? record.room_name ?? record.name ?? record.Name ?? record.description ?? record.room_type)
+    );
     if (!name) return;
-    const board = textValue(record.boardName ?? record.BoardName ?? record.mealPlan ?? record.meal_name ?? record.MealPlan ?? record.board ?? record.bedType);
+    const board = sanitizeInclusion(
+      textValue(record.boardName ?? record.BoardName ?? record.mealPlan ?? record.meal_name ?? record.MealPlan ?? record.board)
+    );
     const price = numberValue(record.total ?? record.Total ?? record.price ?? record.amount ?? record.net ?? record.net_price ?? record.cust_tot_sell_amt);
     const currency = textValue(record.currency ?? record.Currency ?? record.SellCur ?? record.sell_currency_code ?? record.currency_code);
     const refundableRaw = record.refundable ?? record.isRefundable;
     const nonRef = record.nonRef;
+    const inclusions = uniqueStrings(
+      [
+        sanitizeInclusion(textValue(record.bedType ?? record.bed_type ?? record.bedding)),
+        sanitizeInclusion(textValue(record.roomSize ?? record.room_size ?? record.size)),
+        sanitizeInclusion(textValue(record.roomView ?? record.room_view ?? record.view)),
+        sanitizeInclusion(textValue(record.rateDescription ?? record.rate_description)),
+        ...collectTextByKeys(
+          record,
+          ["bedType", "bed_type", "bedding", "roomSize", "room_size", "roomView", "room_view", "facility", "facilities", "feature", "features"],
+          12
+        ).map(sanitizeInclusion),
+      ].filter(Boolean),
+      6
+    );
     const refundable =
       typeof refundableRaw === "boolean"
         ? refundableRaw
@@ -268,6 +314,7 @@ function collectRooms(value: unknown, limit = 8): RichHotelRoom[] {
       price: price || undefined,
       currency: currency || undefined,
       refundable,
+      inclusions: inclusions.length > 0 ? inclusions : undefined,
     });
   };
   const walk = (node: unknown) => {
@@ -739,6 +786,39 @@ function money(value: number, currency = "GBP") {
   }).format(value);
 }
 
+function toTitleCase(value: string | undefined | null) {
+  return String(value || "")
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => (word.length <= 3 && /^[a-z0-9]+$/i.test(word) ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1)))
+    .join(" ");
+}
+
+function sanitizeRoomText(value: string | undefined | null) {
+  return String(value || "")
+    .replace(/\*+/g, "")
+    .replace(/\bnon[\s-]*refundable rate\b/gi, "")
+    .replace(/\bnon[\s-]*refundable\b/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function formatRoomName(value: string | undefined | null) {
+  const cleaned = sanitizeRoomText(value);
+  return cleaned ? toTitleCase(cleaned) : "";
+}
+
+function formatRoomHighlights(highlights: string[] | undefined | null) {
+  return uniqueStrings(
+    (highlights || [])
+      .map((entry) => sanitizeRoomText(entry))
+      .filter(Boolean)
+      .map((entry) => toTitleCase(entry)),
+    6
+  );
+}
+
 function durationToMinutes(value: string | undefined | null) {
   const text = String(value || "");
   const hours = Number(text.match(/(\d+)\s*[Hh]/)?.[1] || 0);
@@ -1114,6 +1194,7 @@ function AiPackageContent() {
   const [roomOptionsLoadingByHotelId, setRoomOptionsLoadingByHotelId] = useState<Record<string, boolean>>({});
   const [roomOptionsErrorByHotelId, setRoomOptionsErrorByHotelId] = useState<Record<string, string | null>>({});
   const [hotelImageLoadingById, setHotelImageLoadingById] = useState<Record<string, boolean>>({});
+  const [hotelImageFailedById, setHotelImageFailedById] = useState<Record<string, boolean>>({});
   const imageEnrichmentAttemptedRef = useRef<Set<string>>(new Set());
   const destinationHydrationAttemptedRef = useRef<Set<string>>(new Set());
   const [flightInfoOpen, setFlightInfoOpen] = useState(false);
@@ -1836,7 +1917,9 @@ function AiPackageContent() {
   }, [hotelDetailsOpen, liveSearch.hotel, storeHotelSearch?.searchCriteriaId]);
 
   useEffect(() => {
-    if (!liveSearch.hotel || isRealHotelImageUrl(liveSearch.hotel.imageSrc)) return;
+    if (!liveSearch.hotel) return;
+    const shouldRetryFailedImage = hotelImageFailedById[liveSearch.hotel.id];
+    if (!shouldRetryFailedImage && isRealHotelImageUrl(liveSearch.hotel.imageSrc)) return;
     let cancelled = false;
     const selectedHotel = liveSearch.hotel;
 
@@ -1862,13 +1945,14 @@ function AiPackageContent() {
           },
         };
       });
+      setHotelImageFailedById((current) => ({ ...current, [selectedHotel.id]: false }));
     }
 
     void enrichSelectedHotelImage();
     return () => {
       cancelled = true;
     };
-  }, [activeDestinationId, liveSearch.hotel, storeHotelSearch]);
+  }, [activeDestinationId, hotelImageFailedById, liveSearch.hotel, storeHotelSearch]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2088,8 +2172,21 @@ function AiPackageContent() {
     () => activities.filter((activity) => selectedActivityCodes.includes(activity.productCode)),
     [activities, selectedActivityCodes]
   );
-  const visibleActivities = selectedActivities.length > 0 ? selectedActivities : activities.slice(0, 2);
-  const activeDestinationCheckIn = activeDestination?.checkIn || checkIn;
+  const activeDestinationCheckIn = activeDestination?.checkIn || checkIn || formatIsoDate(new Date());
+  const activeDestinationCheckOut = activeDestination?.checkOut || checkOut || activeDestinationCheckIn;
+  const totalTripDays = Math.max(1, calculateNights(activeDestinationCheckIn, activeDestinationCheckOut) || 1);
+  const itineraryActivities = useMemo(
+    () => (selectedActivities.length > 0 ? selectedActivities : activities.slice(0, 2)).slice(0, totalTripDays),
+    [activities, selectedActivities, totalTripDays]
+  );
+  const tripDayEntries = useMemo<TripDayEntry[]>(
+    () =>
+      Array.from({ length: totalTripDays }, (_, index) => ({
+        date: addDaysIso(activeDestinationCheckIn, index),
+        activity: itineraryActivities[index] || null,
+      })),
+    [activeDestinationCheckIn, itineraryActivities, totalTripDays]
+  );
   const aiActivityContext = useMemo(() => {
     const selectedSet = new Set(selectedActivityCodes);
     return activities
@@ -2218,7 +2315,10 @@ function AiPackageContent() {
   }, 0);
   const packageCost = liveFlightTotal + liveHotelTotal + activityTotal + destinationAddOnTotal;
   const tripDates = `${shortDate(activeDestination?.checkIn || checkIn, "Select date")} - ${shortDate(activeDestination?.checkOut || checkOut, "Select date")}`;
-  const liveHotelImage = isRealHotelImageUrl(liveSearch.hotel?.imageSrc) ? liveSearch.hotel?.imageSrc : undefined;
+  const liveHotelImage =
+    liveSearch.hotel?.id && !hotelImageFailedById[liveSearch.hotel.id] && isRealHotelImageUrl(liveSearch.hotel?.imageSrc)
+      ? liveSearch.hotel?.imageSrc
+      : undefined;
   const destinationImageById = useMemo(() => {
     const images: Record<string, string | undefined> = {};
     for (const segment of destinationSegments) {
@@ -2493,19 +2593,135 @@ function AiPackageContent() {
     const used = new Set<string>();
     const images: Record<string, string> = {};
     for (const hotel of displayedHotelOptions) {
-      if (!isRealHotelImageUrl(hotel.imageSrc)) continue;
+      if (hotelImageFailedById[hotel.id] || !isRealHotelImageUrl(hotel.imageSrc)) continue;
       const key = hotelImageKey(hotel.imageSrc);
       if (!key || used.has(key)) continue;
       used.add(key);
       images[hotel.id] = hotel.imageSrc;
     }
     return images;
-  }, [displayedHotelOptions]);
+  }, [displayedHotelOptions, hotelImageFailedById]);
 
   useEffect(() => {
     if (!hotelChangeOpen) return;
     setVisibleHotelOptionCount(HOTEL_CHANGE_PAGE_SIZE);
   }, [activeDestinationId, hotelChangeOpen, hotelFilters, hotelSortMode]);
+
+  useEffect(() => {
+    if (!hotelChangeOpen || hotelOptions.length > 0 || !activeDestination) return;
+    let cancelled = false;
+
+    async function reloadHotelOptionsForActiveDestination() {
+      setLiveSearch((current) => ({
+        ...current,
+        hotelLoading: true,
+        hotelError: null,
+      }));
+      try {
+        const pickedCity =
+          activeDestination.hiddenId && activeDestination.hiddenKey
+            ? {
+                id: activeDestination.hiddenId,
+                label: activeDestination.name,
+                loc: activeDestination.hiddenKey,
+                arrival_point_code: activeDestination.airportCode || undefined,
+              }
+            : null;
+        const lookup = pickedCity ? [] : await hotelService.lookupCities(activeDestination.name);
+        const resolvedPick =
+          pickedCity ||
+          lookup.find((item) => String(item.loc).toLowerCase() === "city") ||
+          lookup.find((item) => item.arrival_point_code) ||
+          lookup[0];
+
+        if (!resolvedPick?.id || !resolvedPick?.loc) {
+          throw new Error("No matching live hotel destination was found.");
+        }
+
+        const availability = await withSearchTimeout(
+          hotelService.searchAvailabilityV3({
+            location: resolvedPick.label || activeDestination.name,
+            hidden_id: String(resolvedPick.id),
+            hidden_key: String(resolvedPick.loc),
+            checkIn: activeDestination.checkIn,
+            checkOut: activeDestination.checkOut,
+            rooms,
+            adults,
+            children,
+            branches: branchesParam,
+            timeout: VYSPA_SEARCH_TIMEOUT_SEC,
+            includeFeesInTotal: true,
+          }),
+          `Live hotels for ${resolvedPick.label || activeDestination.name}`
+        );
+        if (cancelled) return;
+
+        const nights = calculateNights(activeDestination.checkIn, activeDestination.checkOut) || 1;
+        const parsed = mapAvailability(availability, nights, rooms);
+        const stampedHotels = stampHotelsForSegment(parsed.mapped, activeDestination, resolvedPick.label || activeDestination.name);
+        const recommendedHotel = selectRecommendedHotel(stampedHotels, {
+          stayPreference,
+          budget,
+          destinationCount: destinationSegments.length,
+        });
+        const nextHotelSearch = {
+          provider:
+            parsed.criteriaProvider === "hotelbeds" || typeof parsed.criteriaId === "string"
+              ? "hotelbeds"
+              : "vyspa",
+          location: resolvedPick.label || activeDestination.name,
+          hidden_id: String(resolvedPick.id),
+          hidden_key: String(resolvedPick.loc),
+          checkIn: activeDestination.checkIn,
+          checkOut: activeDestination.checkOut,
+          rooms,
+          adults,
+          children,
+          branches: branchesParam,
+          searchCriteriaId:
+            typeof parsed.criteriaId === "string" || typeof parsed.criteriaId === "number"
+              ? parsed.criteriaId
+              : undefined,
+          arrivalPointCode: "arrival_point_code" in resolvedPick ? resolvedPick.arrival_point_code : activeDestination.airportCode,
+        } as const;
+
+        setHotelOptions(stampedHotels);
+        setHotelSearch(nextHotelSearch);
+        setLiveSearch((current) => ({
+          ...current,
+          hotel: recommendedHotel,
+          hotelLoading: false,
+          hotelError: recommendedHotel ? null : "No live hotels returned for this search.",
+        }));
+        setDestinationStateById((current) => ({
+          ...current,
+          [activeDestination.id]: {
+            ...(current[activeDestination.id] || {
+              activities: [],
+              selectedActivityCodes: [],
+            }),
+            hotel: recommendedHotel,
+            hotelLoading: false,
+            hotelError: recommendedHotel ? null : "No live hotels returned for this search.",
+            hotelOptions: stampedHotels,
+            hotelSearch: nextHotelSearch,
+          },
+        }));
+      } catch (error) {
+        if (cancelled) return;
+        setLiveSearch((current) => ({
+          ...current,
+          hotelLoading: false,
+          hotelError: error instanceof Error ? error.message : "Failed to load live hotels.",
+        }));
+      }
+    }
+
+    void reloadHotelOptionsForActiveDestination();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeDestination, adults, branchesParam, budget, children, destinationSegments.length, hotelChangeOpen, hotelOptions.length, rooms, setHotelSearch, stayPreference]);
 
   const toggleActivity = (productCode: string) => {
     setSelectedActivityCodes((current) => {
@@ -2822,7 +3038,7 @@ function AiPackageContent() {
     const targets = displayedHotelOptions
       .filter((hotel) => {
         if (imageEnrichmentAttemptedRef.current.has(hotel.id)) return false;
-        return !isRealHotelImageUrl(hotel.imageSrc) || duplicateHotelImageIds.has(hotel.id);
+        return hotelImageFailedById[hotel.id] || !isRealHotelImageUrl(hotel.imageSrc) || duplicateHotelImageIds.has(hotel.id);
       })
       .slice(0, HOTEL_CHANGE_PAGE_SIZE);
     if (targets.length === 0) return;
@@ -2874,7 +3090,7 @@ function AiPackageContent() {
     return () => {
       cancelled = true;
     };
-  }, [displayedHotelOptions, duplicateHotelImageIds, hotelChangeOpen, hotelOptions, storeHotelSearch]);
+  }, [displayedHotelOptions, duplicateHotelImageIds, hotelChangeOpen, hotelImageFailedById, hotelOptions, storeHotelSearch]);
 
   const loadHotelRoomOptions = async (hotel: Hotel) => {
     if (roomOptionsByHotelId[hotel.id]?.length || roomOptionsLoadingByHotelId[hotel.id]) return;
@@ -3112,7 +3328,7 @@ function AiPackageContent() {
                         <div>
                           <div className="text-sm font-bold text-[#010D50]">{liveHotelName}</div>
                           {liveSearch.hotel.room?.name ? (
-                            <div className="mt-1 text-xs text-[#3A478A]">{liveSearch.hotel.room.name}</div>
+                            <div className="mt-1 text-xs text-[#3A478A]">{formatRoomName(liveSearch.hotel.room.name)}</div>
                           ) : null}
                           {liveSearch.hotel.reviews?.score ? (
                             <div className="mt-3 inline-grid grid-cols-[auto_1fr] items-center gap-2">
@@ -3130,12 +3346,12 @@ function AiPackageContent() {
                     ) : null}
                   </div>
 
-                  {visibleActivities.map((activity, index) => {
-                    const activityDate = addDaysIso(activeDestination?.checkIn || checkIn, index);
-                    const dateParts = compactDateParts(activityDate, String(index + 1).padStart(2, "0"));
-                    const note = aiActivityNotes[activity.productCode];
+                  {tripDayEntries.map((entry, index) => {
+                    const activity = entry.activity;
+                    const dateParts = compactDateParts(entry.date, String(index + 1).padStart(2, "0"));
+                    const note = activity ? aiActivityNotes[activity.productCode] : null;
                     return (
-                      <Fragment key={activity.productCode}>
+                      <Fragment key={`${entry.date}-${activity?.productCode || "leisure"}`}>
                         <div className="flex flex-col items-center">
                           <div className="bg-[#EEF2FF] px-2 py-2 text-center text-xs font-bold leading-tight text-[#010D50]">
                             <div>{dateParts.month}</div>
@@ -3146,66 +3362,54 @@ function AiPackageContent() {
                         <div className="pb-5">
                           <div className="flex gap-3">
                             <span className="mt-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#010D50] text-white">
-                              <Sparkles className="h-4 w-4" />
+                              {activity ? <Sparkles className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
                             </span>
                             <div className="min-w-0">
-                              <div className="text-sm font-bold leading-snug text-[#010D50]">{activity.title}</div>
-                              <div className="mt-1 text-xs font-medium text-[#3A478A]">{itineraryLabelFor(index)}</div>
-                              <div className="mt-2 flex flex-wrap gap-2">
-                                {activity.duration ? (
-                                  <span className="rounded-full bg-[#F5F7FF] px-2 py-1 text-[11px] font-semibold text-[#3A478A]">
-                                    {activity.duration}
-                                  </span>
-                                ) : null}
-                                {activity.rating ? (
-                                  <span className="rounded-full bg-[#FFF7E0] px-2 py-1 text-[11px] font-semibold text-[#7A5200]">
-                                    {activity.rating.toFixed(1)} rated
-                                  </span>
-                                ) : null}
-                                {activity.price ? (
-                                  <span className="rounded-full bg-[#F5F7FF] px-2 py-1 text-[11px] font-semibold text-[#3A478A]">
-                                    {money(activity.price, activity.currency || "GBP")}
-                                  </span>
-                                ) : null}
+                              <div className="text-sm font-bold leading-snug text-[#010D50]">{activity ? activity.title : "Day at Leisure"}</div>
+                              <div className="mt-1 text-xs font-medium text-[#3A478A]">
+                                {activity ? itinerarySlots[index % itinerarySlots.length] : "Flexible time"}
                               </div>
-                              {note ? (
-                                <p className="mt-2 text-xs leading-relaxed text-[#3A478A]">{note}</p>
-                              ) : aiBriefLoading ? (
-                                <p className="mt-2 inline-flex items-center gap-2 text-xs text-[#3A478A]">
-                                  <Loader2 className="h-3.5 w-3.5 animate-spin text-[#3754ED]" />
-                                  Writing AI activity note...
+                              {activity ? (
+                                <>
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {activity.duration ? (
+                                      <span className="rounded-full bg-[#F5F7FF] px-2 py-1 text-[11px] font-semibold text-[#3A478A]">
+                                        {activity.duration}
+                                      </span>
+                                    ) : null}
+                                    {activity.rating ? (
+                                      <span className="rounded-full bg-[#FFF7E0] px-2 py-1 text-[11px] font-semibold text-[#7A5200]">
+                                        {activity.rating.toFixed(1)} rated
+                                      </span>
+                                    ) : null}
+                                    {activity.price ? (
+                                      <span className="rounded-full bg-[#F5F7FF] px-2 py-1 text-[11px] font-semibold text-[#3A478A]">
+                                        {money(activity.price, activity.currency || "GBP")}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  {note ? (
+                                    <p className="mt-2 text-xs leading-relaxed text-[#3A478A]">{note}</p>
+                                  ) : aiBriefLoading ? (
+                                    <p className="mt-2 inline-flex items-center gap-2 text-xs text-[#3A478A]">
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin text-[#3754ED]" />
+                                      Writing AI activity note...
+                                    </p>
+                                  ) : activity.description ? (
+                                    <p className="mt-2 text-xs leading-relaxed text-[#3A478A]">{truncateWords(activity.description, 64)}</p>
+                                  ) : null}
+                                </>
+                              ) : (
+                                <p className="mt-2 text-xs leading-relaxed text-[#3A478A]">
+                                  Free time for your own plans, rest, or any extra activity you add later.
                                 </p>
-                              ) : activity.description ? (
-                                <p className="mt-2 text-xs leading-relaxed text-[#3A478A]">{truncateWords(activity.description, 48)}</p>
-                              ) : null}
+                              )}
                             </div>
                           </div>
                         </div>
                       </Fragment>
                     );
                   })}
-
-                  {!activitiesLoading && visibleActivities.length === 0 ? (
-                    <>
-                      <div className="flex flex-col items-center">
-                        <div className="rounded-b-lg bg-[#EEF2FF] px-2 py-2 text-center text-xs font-bold leading-tight text-[#010D50]">
-                          <div>{compactDateParts(activeDestination?.checkOut || checkOut, "01").month}</div>
-                          <div>{compactDateParts(activeDestination?.checkOut || checkOut, "01").day}</div>
-                        </div>
-                      </div>
-                      <div className="pb-2">
-                        <div className="flex gap-3">
-                          <span className="mt-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[#010D50] text-white">
-                            <Sparkles className="h-4 w-4" />
-                          </span>
-                          <div>
-                            <div className="text-sm font-bold text-[#010D50]">Day at Leisure</div>
-                            <div className="mt-1 text-xs text-[#3A478A]">No live Viator activity is selected for this day.</div>
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  ) : null}
                 </div>
 
                 {activitiesLoading && <div className="rounded-lg bg-[#F5F7FF] px-3 py-2 text-sm text-[#3A478A]">Loading Viator activities...</div>}
@@ -3366,7 +3570,22 @@ function AiPackageContent() {
               <div className="grid gap-4 md:grid-cols-[290px_1fr]">
                 {liveHotelImage ? (
                   <div className="relative h-[210px] overflow-hidden rounded-xl bg-[#F5F7FF]">
-                    <Image src={liveHotelImage} alt={liveHotelName} fill className="object-cover" />
+                    <Image
+                      src={liveHotelImage}
+                      alt={liveHotelName}
+                      fill
+                      className="object-cover"
+                      onError={() => {
+                        imageEnrichmentAttemptedRef.current.delete(liveSearch.hotel?.id || "");
+                        setHotelImageFailedById((current) => ({ ...current, [liveSearch.hotel?.id || ""]: true }));
+                        setLiveSearch((current) =>
+                          current.hotel ? { ...current, hotel: { ...current.hotel, imageSrc: "" } } : current
+                        );
+                        setHotelOptions((current) =>
+                          current.map((hotel) => (hotel.id === liveSearch.hotel?.id ? { ...hotel, imageSrc: "" } : hotel))
+                        );
+                      }}
+                    />
                   </div>
                 ) : (
                   <div className="flex h-[210px] items-center justify-center rounded-xl bg-[#F5F7FF] text-xs font-medium text-[#3A478A]">
@@ -3380,7 +3599,6 @@ function AiPackageContent() {
                 )}
                 <div>
                   <h3 className="text-xl font-bold text-[#010D50]">{liveHotelName}</h3>
-                  <p className="mt-1 text-sm text-[#3A478A]">{liveSearch.hotel?.distanceLabel || stayPreference}</p>
                   <div className="mt-3 flex items-center gap-1">
                     {Array.from({ length: Math.max(1, liveHotelRating) }).map((_, index) => (
                       <Star key={index} className="h-4 w-4 fill-[#FFB800] text-[#FFB800]" />
@@ -3391,15 +3609,16 @@ function AiPackageContent() {
                       </span>
                     ) : null}
                   </div>
+                  <p className="mt-2 text-sm text-[#3A478A]">{liveSearch.hotel?.distanceLabel || stayPreference}</p>
                   <div className="mt-3 text-sm font-semibold text-[#010D50]">
                     {liveSearch.hotel?.price.total ? money(liveSearch.hotel.price.total, liveSearch.hotel.price.currency || "GBP") : null}
                   </div>
                   {liveSearch.hotel?.room?.name ? (
                     <div className="mt-3 rounded-xl border border-[#DFE0E4] bg-[#F5F7FF] p-3">
                       <div className="text-xs font-medium text-[#3A478A]">Selected room</div>
-                      <div className="mt-1 text-sm font-semibold text-[#010D50]">{liveSearch.hotel.room.name}</div>
-                      {liveSearch.hotel.room.highlights?.length ? (
-                        <div className="mt-1 text-xs text-[#3A478A]">{liveSearch.hotel.room.highlights.slice(0, 2).join(" - ")}</div>
+                      <div className="mt-1 text-sm font-semibold text-[#010D50]">{formatRoomName(liveSearch.hotel.room.name)}</div>
+                      {formatRoomHighlights(liveSearch.hotel.room.highlights).length ? (
+                        <div className="mt-1 text-xs text-[#3A478A]">{formatRoomHighlights(liveSearch.hotel.room.highlights).join(" · ")}</div>
                       ) : null}
                     </div>
                   ) : null}
@@ -3570,12 +3789,12 @@ function AiPackageContent() {
           </DialogHeader>
           {liveSearch.hotel ? (
             <div className="space-y-5">
-              <div className="grid gap-3 lg:grid-cols-[1.35fr_0.65fr]">
-                <div className="relative min-h-[260px] overflow-hidden rounded-xl bg-[#F5F7FF]">
-                  {(hotelDetails?.images?.[0] || liveHotelImage) ? (
-                    <Image src={hotelDetails?.images?.[0] || liveHotelImage || ""} alt={liveHotelName} fill className="object-cover" />
-                  ) : null}
-                </div>
+                <div className="grid gap-3 lg:grid-cols-[1.35fr_0.65fr]">
+                  <div className="relative min-h-[260px] overflow-hidden rounded-xl bg-[#F5F7FF]">
+                    {(hotelDetails?.images?.[0] || liveHotelImage) ? (
+                      <Image src={hotelDetails?.images?.[0] || liveHotelImage || ""} alt={liveHotelName} fill className="object-cover" />
+                    ) : null}
+                  </div>
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
                   {(hotelDetails?.images || []).slice(1, 3).map((image, index) => (
                     <div key={`${image}-${index}`} className="relative min-h-[124px] overflow-hidden rounded-xl bg-[#F5F7FF]">
@@ -3589,7 +3808,7 @@ function AiPackageContent() {
                           <Star key={index} className="h-4 w-4 fill-[#FFB800] text-[#FFB800]" />
                         ))}
                       </div>
-                      <p className="mt-3 text-sm text-[#3A478A]">{hotelDetails?.address || liveSearch.hotel.distanceLabel || stayPreference}</p>
+                      <p className="mt-3 text-sm text-[#3A478A]">{liveSearch.hotel.distanceLabel || stayPreference}</p>
                     </div>
                   ) : null}
                 </div>
@@ -3653,8 +3872,17 @@ function AiPackageContent() {
                         <div key={`${room.name}-${index}`} className="rounded-xl border border-[#DFE0E4] p-3">
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
-                              <div className="text-sm font-semibold text-[#010D50]">{room.name}</div>
+                              <div className="text-sm font-semibold text-[#010D50]">{formatRoomName(room.name)}</div>
                               {room.board ? <div className="mt-1 text-xs text-[#3A478A]">{room.board}</div> : null}
+                              {room.inclusions?.length ? (
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                  {room.inclusions.slice(0, 5).map((item) => (
+                                    <span key={item} className="rounded-full bg-[#F5F7FF] px-2 py-1 text-[11px] text-[#3A478A]">
+                                      {item}
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : null}
                               {room.refundable != null ? (
                                 <div className="mt-1 text-xs text-[#3A478A]">{room.refundable ? "Refundable" : "Non-refundable"}</div>
                               ) : null}
@@ -3687,7 +3915,10 @@ function AiPackageContent() {
                 <aside className="space-y-4">
                   <div className="rounded-xl border border-[#DFE0E4] p-4">
                     <div className="text-sm text-[#3A478A]">Selected package room</div>
-                    <div className="mt-1 text-base font-semibold text-[#010D50]">{liveSearch.hotel.room?.name || "Selected room"}</div>
+                    <div className="mt-1 text-base font-semibold text-[#010D50]">{formatRoomName(liveSearch.hotel.room?.name) || "Selected room"}</div>
+                    {formatRoomHighlights(liveSearch.hotel.room?.highlights).length ? (
+                      <div className="mt-1 text-xs text-[#3A478A]">{formatRoomHighlights(liveSearch.hotel.room?.highlights).join(" | ")}</div>
+                    ) : null}
                     <div className="mt-2 text-2xl font-bold text-[#010D50]">
                       {money(liveSearch.hotel.price.total, liveSearch.hotel.price.currency || "GBP")}
                     </div>
@@ -3730,7 +3961,9 @@ function AiPackageContent() {
             {liveSearch.hotelLoading && hotelOptions.length === 0 ? (
               <div className="col-span-full m-5 rounded-xl bg-[#F5F7FF] p-4 text-sm text-[#3A478A]">Loading hotel options...</div>
             ) : hotelOptions.length === 0 ? (
-              <div className="col-span-full m-5 rounded-xl bg-[#F5F7FF] p-4 text-sm text-[#3A478A]">No cached hotel options are available for this search.</div>
+              <div className="col-span-full m-5 rounded-xl bg-[#F5F7FF] p-4 text-sm text-[#3A478A]">
+                No live hotel options are available for this search yet.
+              </div>
             ) : (
               <>
                 <aside className="overflow-y-auto border-b border-[#DFE0E4] bg-[#F7F8FE] p-4 lg:border-b-0 lg:border-r">
@@ -3785,7 +4018,19 @@ function AiPackageContent() {
                             <div className="grid gap-3 sm:grid-cols-[120px_1fr_auto]">
                               <div className="relative h-[92px] overflow-hidden rounded-lg bg-[#F5F7FF]">
                                 {thumbnailSrc ? (
-                                  <Image src={thumbnailSrc} alt={hotel.name} fill className="object-cover" />
+                                  <Image
+                                    src={thumbnailSrc}
+                                    alt={hotel.name}
+                                    fill
+                                    className="object-cover"
+                                    onError={() => {
+                                      imageEnrichmentAttemptedRef.current.delete(hotel.id);
+                                      setHotelImageFailedById((current) => ({ ...current, [hotel.id]: true }));
+                                      setHotelOptions((current) =>
+                                        current.map((item) => (item.id === hotel.id ? { ...item, imageSrc: "" } : item))
+                                      );
+                                    }}
+                                  />
                                 ) : hotelImageLoadingById[hotel.id] ? (
                                   <div className="flex h-full w-full items-center justify-center text-[11px] font-medium text-[#3A478A]">
                                     <span className="inline-flex items-center gap-1.5">
@@ -3793,17 +4038,26 @@ function AiPackageContent() {
                                       Loading image
                                     </span>
                                   </div>
-                                ) : null}
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center px-3 text-center text-[11px] font-medium text-[#3A478A]">
+                                    No live image available
+                                  </div>
+                                )}
                               </div>
                               <div className="min-w-0">
                                 <div className="truncate text-sm font-semibold text-[#010D50]">{hotel.name}</div>
-                                <div className="mt-1 text-xs text-[#3A478A]">{hotel.distanceLabel || hotel.neighborhood || stayPreference}</div>
                                 <div className="mt-2 flex items-center gap-1">
                                   {Array.from({ length: Math.max(1, hotel.starRating || 0) }).map((_, index) => (
                                     <Star key={index} className="h-3.5 w-3.5 fill-[#FFB800] text-[#FFB800]" />
                                   ))}
                                 </div>
-                                <div className="mt-2 text-xs text-[#3A478A]">{hotel.room?.name || "Room returned by hotel search"}</div>
+                                <div className="mt-1 text-xs text-[#3A478A]">{hotel.distanceLabel || hotel.neighborhood || stayPreference}</div>
+                                <div className="mt-2 text-xs text-[#3A478A]">
+                                  {formatRoomName(hotel.room?.name) || "Room returned by hotel search"}
+                                </div>
+                                {formatRoomHighlights(hotel.room?.highlights).length ? (
+                                  <div className="mt-1 text-xs text-[#3A478A]">{formatRoomHighlights(hotel.room?.highlights).join(" · ")}</div>
+                                ) : null}
                                 {(hotel.amenities || []).length > 0 ? (
                                   <div className="mt-2 flex flex-wrap gap-1">
                                     {(hotel.amenities || []).slice(0, 3).map((amenity) => (
@@ -3848,8 +4102,17 @@ function AiPackageContent() {
                                     {roomOptions.map((room, index) => (
                                       <div key={`${hotel.id}-${room.name}-${index}`} className="flex flex-col gap-3 rounded-lg border border-[#DFE0E4] p-3 sm:flex-row sm:items-center sm:justify-between">
                                         <div>
-                                          <div className="text-sm font-semibold text-[#010D50]">{room.name}</div>
+                                          <div className="text-sm font-semibold text-[#010D50]">{formatRoomName(room.name)}</div>
                                           {room.board ? <div className="mt-1 text-xs text-[#3A478A]">{room.board}</div> : null}
+                                          {room.inclusions?.length ? (
+                                            <div className="mt-2 flex flex-wrap gap-1">
+                                              {room.inclusions.slice(0, 4).map((item) => (
+                                                <span key={item} className="rounded-full bg-[#F5F7FF] px-2 py-1 text-[11px] text-[#3A478A]">
+                                                  {item}
+                                                </span>
+                                              ))}
+                                            </div>
+                                          ) : null}
                                           {room.refundable != null ? (
                                             <div className="mt-1 text-xs text-[#3A478A]">{room.refundable ? "Refundable" : "Non-refundable"}</div>
                                           ) : null}
