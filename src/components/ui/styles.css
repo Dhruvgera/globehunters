@@ -1,4 +1,6 @@
 .HoverCardContent {
+    /* Hover cards are portalled to the document body; keep them above dialogs. */
+    z-index: 60;
     border-radius: 6px;
     padding: 20px;
     width: 300px;
