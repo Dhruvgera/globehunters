@@ -103,8 +103,12 @@ type LiveSearchState = {
 const AI_PACKAGE_CACHE_KEY = "aiPackageLiveSearchCache";
 const AI_PACKAGE_SELECTION_PATCH_KEY = "aiPackageSelectionPatch";
 const AI_PACKAGE_CACHE_TTL_MS = 5 * 60 * 1000;
-const AI_PACKAGE_CACHE_VERSION = 8;
+// Version 9 invalidates the former two-activity default stored in browser cache.
+const AI_PACKAGE_CACHE_VERSION = 9;
 const HOTEL_CHANGE_PAGE_SIZE = 20;
+// Changes to the automatic activity policy must invalidate prior two-item selections.
+const ACTIVITY_PLAN_VERSION = 4;
+const MAX_ACTIVITY_CANDIDATES = 24;
 
 type AiPackageLiveCache = {
   paramsKey: string;
@@ -156,6 +160,25 @@ type TripDayEntry = {
   date: string;
   activity: ActivityProduct | null;
 };
+
+function activityCandidateCount(checkIn: string | undefined, checkOut: string | undefined) {
+  const stayDays = Math.max(1, calculateNights(checkIn || "", checkOut || "") || 1);
+  return Math.min(MAX_ACTIVITY_CANDIDATES, Math.max(12, stayDays * 2));
+}
+
+function defaultActivityCodes(products: ActivityProduct[], checkIn: string | undefined, checkOut: string | undefined) {
+  const stayDays = Math.max(1, calculateNights(checkIn || "", checkOut || "") || 1);
+  const seen = new Set<string>();
+  return products
+    .filter((activity) => {
+      const code = String(activity.productCode || "").trim();
+      if (!code || seen.has(code)) return false;
+      seen.add(code);
+      return true;
+    })
+    .slice(0, stayDays)
+    .map((activity) => activity.productCode);
+}
 
 function textValue(value: unknown): string {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -1275,6 +1298,7 @@ function AiPackageContent() {
         adults,
         children,
         activityQuery,
+        ACTIVITY_PLAN_VERSION,
       ].join("|"),
     [activeDestination?.checkIn, activeDestination?.checkOut, activeDestination?.name, activeDestinationId, activityQuery, adults, checkIn, checkOut, children, destination]
   );
@@ -1731,7 +1755,7 @@ function AiPackageContent() {
             endDate: segment.checkOut || undefined,
             adults,
             children,
-            count: 6,
+            count: activityCandidateCount(segment.checkIn, segment.checkOut),
             query: activityQuery,
             currency: "GBP",
           }),
@@ -1740,8 +1764,8 @@ function AiPackageContent() {
         if (cancelled) return;
         const hotelPayload = hotelResult.status === "fulfilled" ? hotelResult.value : null;
         const activityProducts = activityResult.status === "fulfilled" ? activityResult.value.products : [];
-        const selectedCodes = activityProducts.slice(0, 2).map((activity) => activity.productCode);
-        const activitiesKey = [segment.id, segment.name, segment.checkIn, segment.checkOut, adults, children, activityQuery].join("|");
+        const selectedCodes = defaultActivityCodes(activityProducts, segment.checkIn, segment.checkOut);
+        const activitiesKey = [segment.id, segment.name, segment.checkIn, segment.checkOut, adults, children, activityQuery, ACTIVITY_PLAN_VERSION].join("|");
 
         setDestinationStateById((current) => ({
           ...current,
@@ -1978,7 +2002,7 @@ function AiPackageContent() {
           ? current.filter((code) => cached.activities?.some((product) => product.productCode === code))
           : cached.selectedActivityCodes?.length
             ? cached.selectedActivityCodes
-            : cached.activities!.slice(0, 2).map((product) => product.productCode)
+            : defaultActivityCodes(cached.activities!, activityStartDate, activityEndDate)
       );
       setActivitiesLoading(false);
       setActivitiesError(null);
@@ -2016,13 +2040,13 @@ function AiPackageContent() {
           endDate: activityEndDate || undefined,
           adults,
           children,
-          count: 6,
+          count: activityCandidateCount(activityStartDate, activityEndDate),
           query: activityQuery,
           currency: "GBP",
         });
 
         if (!cancelled) {
-          const defaultSelectedCodes = response.products.slice(0, 2).map((product) => product.productCode);
+          const defaultSelectedCodes = defaultActivityCodes(response.products, activityStartDate, activityEndDate);
           setActivities(response.products);
           setSelectedActivityCodes((current) => {
             if (current.length > 0) return current.filter((code) => response.products.some((product) => product.productCode === code));
@@ -2063,7 +2087,7 @@ function AiPackageContent() {
           setActivitiesError(message);
           if (cached?.activitiesKey === activitiesKey && cached.activities?.length) {
             setActivities(cached.activities);
-            setSelectedActivityCodes(cached.selectedActivityCodes?.length ? cached.selectedActivityCodes : cached.activities.slice(0, 2).map((product) => product.productCode));
+            setSelectedActivityCodes(cached.selectedActivityCodes?.length ? cached.selectedActivityCodes : defaultActivityCodes(cached.activities, activityStartDate, activityEndDate));
           } else {
             setActivities([]);
             setSelectedActivityCodes([]);
@@ -2084,7 +2108,7 @@ function AiPackageContent() {
                 cached?.activitiesKey === activitiesKey && cached.selectedActivityCodes?.length
                   ? cached.selectedActivityCodes
                   : cached?.activitiesKey === activitiesKey && cached.activities?.length
-                    ? cached.activities.slice(0, 2).map((product) => product.productCode)
+                    ? defaultActivityCodes(cached.activities, activityStartDate, activityEndDate)
                     : [],
               activitiesError: message,
               activitiesLoading: false,
@@ -2176,7 +2200,7 @@ function AiPackageContent() {
   const activeDestinationCheckOut = activeDestination?.checkOut || checkOut || activeDestinationCheckIn;
   const totalTripDays = Math.max(1, calculateNights(activeDestinationCheckIn, activeDestinationCheckOut) || 1);
   const itineraryActivities = useMemo(
-    () => (selectedActivities.length > 0 ? selectedActivities : activities.slice(0, 2)).slice(0, totalTripDays),
+    () => (selectedActivities.length > 0 ? selectedActivities : activities.slice(0, totalTripDays)).slice(0, totalTripDays),
     [activities, selectedActivities, totalTripDays]
   );
   const tripDayEntries = useMemo<TripDayEntry[]>(
@@ -2905,7 +2929,7 @@ function AiPackageContent() {
           endDate: nextCheckOut,
           adults,
           children,
-          count: 6,
+          count: activityCandidateCount(nextCheckIn, nextCheckOut),
           query: activityQuery,
           currency: "GBP",
         }),
@@ -2959,9 +2983,9 @@ function AiPackageContent() {
         };
       }
       const nextActivities = activityResult.status === "fulfilled" ? activityResult.value.products : [];
-      const nextSelectedActivityCodes = nextActivities.slice(0, 2).map((activity) => activity.productCode);
+      const nextSelectedActivityCodes = defaultActivityCodes(nextActivities, nextCheckIn, nextCheckOut);
       const nextIndex = destinationSegments.length;
-      const nextActivitiesKey = [nextDestination.id, name, nextCheckIn, nextCheckOut, adults, children, activityQuery].join("|");
+      const nextActivitiesKey = [nextDestination.id, name, nextCheckIn, nextCheckOut, adults, children, activityQuery, ACTIVITY_PLAN_VERSION].join("|");
       setChainedDestinations(nextDestinations);
       setDestinationStateById((current) => ({
         ...current,
