@@ -46,6 +46,22 @@ import { FOLDER_STATUS_CODES } from "@/types/portal";
 import { calculateNights } from "@/lib/hotels/nights";
 import { REFUNDABLE_TERMS_URL } from "@/config/constants";
 
+type ConfirmedActivity = {
+  productCode?: string;
+  title?: string;
+  price?: number;
+  currency?: string;
+  duration?: string;
+  itineraryDate?: string;
+  itineraryTime?: string;
+  destination?: string;
+};
+
+type ConfirmedDestination = {
+  name?: string;
+  activities?: ConfirmedActivity[];
+};
+
 const REFUNDABLE_CLAIMS_URL = "https://form.refundablebooking.com";
 
 // Confetti particle component
@@ -1048,6 +1064,22 @@ function PaymentCompleteContent() {
         });
       }
 
+      if (isPackageMode && Array.isArray(ctx?.aiPackageDraft?.destinations)) {
+        const emailDestinations = ctx.aiPackageDraft.destinations as ConfirmedDestination[];
+        emailData.activities = emailDestinations.flatMap((destination) =>
+          (Array.isArray(destination.activities) ? destination.activities : []).map((activity) => ({
+            productCode: String(activity?.productCode || ''),
+            title: String(activity?.title || 'Activity'),
+            destination: String(destination?.name || ''),
+            date: String(activity?.itineraryDate || ''),
+            time: String(activity?.itineraryTime || ''),
+            duration: String(activity?.duration || ''),
+            price: typeof activity?.price === 'number' ? activity.price : undefined,
+            currency: String(activity?.currency || currencyCode),
+          }))
+        );
+      }
+
       const result = await sendBookingConfirmationEmail(contactEmailForEmail, emailData);
 
       if (result.success) {
@@ -1062,7 +1094,7 @@ function PaymentCompleteContent() {
       setEmailError(error instanceof Error ? error.message : "Failed to send confirmation email");
       console.error('Error sending confirmation email:', error);
     }
-  }, [emailSent, isHotelMode, bookingContext, loadBookingContext, storeSelectedFlight, storePassengers, effectiveContactEmail, storeContactPhone, storeSelectedUpgrade, storeSelectedHotel, storeRoomSummary, storeHotelDetailsCache, storeHotelSearch]);
+  }, [emailSent, isHotelMode, isPackageMode, bookingContext, loadBookingContext, storeSelectedFlight, storePassengers, effectiveContactEmail, storeContactPhone, storeSelectedUpgrade, storeSelectedHotel, storeRoomSummary, storeHotelDetailsCache, storeHotelSearch]);
 
   // Send confirmation email when payment is successful and data is available
   useEffect(() => {
@@ -1109,6 +1141,17 @@ function PaymentCompleteContent() {
   const displayPhone =
     (ctx?.contactPhone || storeContactPhone || passengers?.[0]?.phone) || "—";
   const displayPassengers = (ctx?.passengers || passengers) || [];
+  const confirmationDestinations = isPackageMode && Array.isArray(ctx?.aiPackageDraft?.destinations)
+    ? ctx.aiPackageDraft.destinations as ConfirmedDestination[]
+    : [];
+  const confirmationActivities = confirmationDestinations.length > 0
+    ? confirmationDestinations.flatMap((destination) =>
+        (Array.isArray(destination.activities) ? destination.activities : []).map((activity) => ({
+          ...activity,
+          destination: destination?.name || '',
+        }))
+      )
+    : [];
   const chargedCurrency = paymentInfo?.currency || ctx?.pricing?.currency || (typeof window !== 'undefined' ? sessionStorage.getItem("pendingOrderCurrency") : null) || "GBP";
   const chargedAmount = (() => {
     const a = paymentInfo?.amount || (typeof window !== 'undefined' ? sessionStorage.getItem("pendingOrderAmount") : null) || (ctx?.pricing?.tripTotal != null ? String(ctx.pricing.tripTotal) : "0");
@@ -1379,6 +1422,30 @@ function PaymentCompleteContent() {
                     </p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {confirmationActivities.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-[#E5E7EB] p-6">
+                <h3 className="font-semibold text-[#3754ED] mb-4">Activities</h3>
+                <div className="divide-y divide-[#E5E7EB]">
+                  {confirmationActivities.map((activity, index) => (
+                    <div key={`${activity.productCode || 'activity'}-${index}`} className="py-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-[#010D50]">{activity.title || 'Activity'}</div>
+                        <div className="text-sm text-[#6B7280] mt-1">
+                          {[activity.destination, activity.itineraryDate, activity.itineraryTime, activity.duration].filter(Boolean).join(' | ')}
+                        </div>
+                        <div className="text-xs text-[#6B7280] mt-1">Viator product: {activity.productCode}</div>
+                      </div>
+                      {typeof activity.price === 'number' && (
+                        <div className="font-semibold text-[#010D50] whitespace-nowrap">
+                          {formatPrice(activity.price, activity.currency || chargedCurrency)}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

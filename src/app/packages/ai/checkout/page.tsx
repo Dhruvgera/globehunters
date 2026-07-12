@@ -179,7 +179,7 @@ function toTitleCase(value: string | undefined | null) {
     .toLowerCase()
     .split(/\s+/)
     .filter(Boolean)
-    .map((word) => (word.length <= 3 && /^[a-z0-9]+$/i.test(word) ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1)))
+    .map((word) => (["vip", "tv", "sqm", "sqft"].includes(word) ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1)))
     .join(" ");
 }
 
@@ -562,6 +562,15 @@ function AiCheckoutContent() {
   const router = useRouter();
   const params = useSearchParams();
   const paramsKey = params.toString();
+  const plannerHref = useMemo(() => {
+    const plannerParams = new URLSearchParams(paramsKey);
+    plannerParams.delete("type");
+    plannerParams.delete("folderNumber");
+    plannerParams.delete("flightResultId");
+    plannerParams.delete("hotelId");
+    plannerParams.delete("roomId");
+    return `/packages/ai?${plannerParams.toString()}`;
+  }, [paramsKey]);
   const [draft, setDraft] = useState<AiBookingDraft | null>(null);
   const [showTravellers, setShowTravellers] = useState(false);
   const [flightInfoOpen, setFlightInfoOpen] = useState(false);
@@ -1037,7 +1046,7 @@ function AiCheckoutContent() {
       <div className="min-h-screen bg-white">
         <Navbar />
         <main className="mx-auto max-w-4xl px-4 py-10">
-          <Link href="/packages/ai" className="inline-flex items-center gap-2 text-sm font-medium text-[#3754ED]">
+          <Link href={plannerHref} className="inline-flex items-center gap-2 text-sm font-medium text-[#3754ED]">
             <ArrowLeft className="h-4 w-4" />
             Back to AI planner
           </Link>
@@ -1054,7 +1063,7 @@ function AiCheckoutContent() {
     <div className="min-h-screen bg-white">
       <Navbar />
       <main className="mx-auto max-w-[1240px] px-4 py-6 sm:px-6 lg:px-8">
-        <Link href="/packages/ai" className="inline-flex items-center gap-2 text-sm font-medium text-[#3754ED]">
+        <Link href={plannerHref} className="inline-flex items-center gap-2 text-sm font-medium text-[#3754ED]">
           <ArrowLeft className="h-4 w-4" />
           Back to AI planner
         </Link>

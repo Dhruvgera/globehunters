@@ -25,8 +25,7 @@ export function validateEmail(email: string): boolean {
 export function validatePhone(phone: string): boolean {
   const cleaned = phone.replace(/[\s\-()]/g, '');
   const digits = cleaned.replace(/\D/g, '');
-  if (!/^\d{10}$/.test(digits)) return false;
-  return true;
+  return /^\d{10}$/.test(digits) || /^0\d{10}$/.test(digits);
 }
 
 /**
@@ -351,7 +350,7 @@ export function validatePassenger(
   }
 
   if ((requireContactInfo || passenger.phone) && !validatePhone(passenger.phone)) {
-    errors.phone = 'Enter exactly 10 digits (e.g. 0767845253)';
+    errors.phone = 'Enter 10 digits, or 11 digits starting with 0';
   }
 
   if (passenger.passportNumber && !validatePassport(passenger.passportNumber)) {

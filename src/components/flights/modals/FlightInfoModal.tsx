@@ -896,7 +896,10 @@ export default function FlightInfoModal({
                             {isIncluded ? (
                               <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
                             ) : (
-                              <Info className="w-5 h-5 sm:w-6 sm:h-6 text-[#F59E0B] shrink-0" />
+                              <Tooltip
+                                content="Checked baggage is available for an additional charge."
+                                icon={<Info className="w-5 h-5 sm:w-6 sm:h-6 text-[#F59E0B] shrink-0" />}
+                              />
                             )}
                           </div>
                         ));
@@ -925,7 +928,10 @@ export default function FlightInfoModal({
                             {svc.chargeable === 'included' ? (
                               <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
                             ) : (
-                              <Info className="w-5 h-5 sm:w-6 sm:h-6 text-[#F59E0B] shrink-0" />
+                              <Tooltip
+                                content={svc.text ? `${svc.text} is available for an additional charge.` : "Checked baggage is available for an additional charge."}
+                                icon={<Info className="w-5 h-5 sm:w-6 sm:h-6 text-[#F59E0B] shrink-0" />}
+                              />
                             )}
                           </div>
                         ));
@@ -995,7 +1001,10 @@ export default function FlightInfoModal({
                             {svc.chargeable === 'included' ? (
                               <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
                             ) : (
-                              <Info className="w-5 h-5 sm:w-6 sm:h-6 text-[#F59E0B] shrink-0" />
+                              <Tooltip
+                                content={svc.text ? `${svc.text} is available for an additional charge.` : "Hand baggage is available for an additional charge."}
+                                icon={<Info className="w-5 h-5 sm:w-6 sm:h-6 text-[#F59E0B] shrink-0" />}
+                              />
                             )}
                           </div>
                         ));
@@ -1080,7 +1089,10 @@ export default function FlightInfoModal({
                             {isIncluded ? (
                               <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
                             ) : isChargeable ? (
-                              <Info className="w-5 h-5 sm:w-6 sm:h-6 text-[#F59E0B] shrink-0" />
+                              <Tooltip
+                                content={displayText}
+                                icon={<Info className="w-5 h-5 sm:w-6 sm:h-6 text-[#F59E0B] shrink-0" />}
+                              />
                             ) : (
                               <XIcon className="w-5 h-5 sm:w-6 sm:h-6 text-[#DC2626] shrink-0" />
                             )}
@@ -1238,7 +1250,10 @@ export default function FlightInfoModal({
                             {isIncluded ? (
                               <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
                             ) : isChargeable ? (
-                              <Info className="w-5 h-5 sm:w-6 sm:h-6 text-[#F59E0B] shrink-0" />
+                              <Tooltip
+                                content={displayText || "Seat selection is available for an additional charge."}
+                                icon={<Info className="w-5 h-5 sm:w-6 sm:h-6 text-[#F59E0B] shrink-0" />}
+                              />
                             ) : (
                               <XIcon className="w-5 h-5 sm:w-6 sm:h-6 text-[#DC2626] shrink-0" />
                             )}
@@ -1298,7 +1313,10 @@ export default function FlightInfoModal({
                             {isIncluded ? (
                               <Check className="w-5 h-5 sm:w-6 sm:h-6 text-[#008234] shrink-0" />
                             ) : isChargeable ? (
-                              <Info className="w-5 h-5 sm:w-6 sm:h-6 text-[#F59E0B] shrink-0" />
+                              <Tooltip
+                                content="Meals and beverages are available for purchase."
+                                icon={<Info className="w-5 h-5 sm:w-6 sm:h-6 text-[#F59E0B] shrink-0" />}
+                              />
                             ) : (
                               <XIcon className="w-5 h-5 sm:w-6 sm:h-6 text-[#DC2626] shrink-0" />
                             )}

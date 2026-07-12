@@ -125,6 +125,8 @@ type AiPackageLiveCache = {
 };
 
 type RichHotelRoom = {
+  id?: string;
+  rateKey?: string;
   name: string;
   board?: string;
   price?: number;
@@ -279,7 +281,7 @@ function collectRooms(value: unknown, limit = 8): RichHotelRoom[] {
       .toLowerCase()
       .split(/\s+/)
       .filter(Boolean)
-      .map((word) => (word.length <= 3 && /^[a-z0-9]+$/i.test(word) ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1)))
+      .map((word) => (["vip", "tv", "sqm", "sqft"].includes(word) ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1)))
       .join(" ");
   const sanitizeRoomLabel = (input: string) => {
     const cleaned = textValue(input)
@@ -308,11 +310,15 @@ function collectRooms(value: unknown, limit = 8): RichHotelRoom[] {
     const currency = textValue(record.currency ?? record.Currency ?? record.SellCur ?? record.sell_currency_code ?? record.currency_code);
     const refundableRaw = record.refundable ?? record.isRefundable;
     const nonRef = record.nonRef;
+    const id = textValue(record.id ?? record.search_result_detail_id ?? record.roomId ?? record.room_id ?? record.roomCode ?? record.room_code);
+    const rateKey = textValue(record.rateKey ?? record.rate_key);
     const inclusions = uniqueStrings(
       [
+        ...Array.from(name.matchAll(/\b(king(?: size)? bed|queen(?: size)? bed|double bed|twin beds?|single bed|sofa bed)\b/gi)).map((match) => sanitizeInclusion(match[1])),
         sanitizeInclusion(textValue(record.bedType ?? record.bed_type ?? record.bedding)),
         sanitizeInclusion(textValue(record.roomSize ?? record.room_size ?? record.size)),
         sanitizeInclusion(textValue(record.roomView ?? record.room_view ?? record.view)),
+        sanitizeInclusion(textValue(record.maxOccupancy ?? record.max_occupancy ?? record.occupancy)),
         sanitizeInclusion(textValue(record.rateDescription ?? record.rate_description)),
         ...collectTextByKeys(
           record,
@@ -332,6 +338,8 @@ function collectRooms(value: unknown, limit = 8): RichHotelRoom[] {
     if (seenRoomKeys.has(key)) return;
     seenRoomKeys.add(key);
     rooms.push({
+      id: id || undefined,
+      rateKey: rateKey || undefined,
       name,
       board: board || undefined,
       price: price || undefined,
@@ -362,6 +370,18 @@ function collectRooms(value: unknown, limit = 8): RichHotelRoom[] {
   };
   walk(value);
   return rooms;
+}
+
+function groupRoomOptions(rooms: RichHotelRoom[]) {
+  const groups = new Map<string, { name: string; options: RichHotelRoom[] }>();
+  for (const room of rooms) {
+    const name = formatRoomName(room.name) || "Room";
+    const key = name.toLowerCase();
+    const group = groups.get(key);
+    if (group) group.options.push(room);
+    else groups.set(key, { name, options: [room] });
+  }
+  return Array.from(groups.values());
 }
 
 function parseIsoDate(value: string | null | undefined): Date | undefined {
@@ -641,6 +661,8 @@ function compactHotelForSession(hotel: Hotel | null): Hotel | null {
           geo_loc_latitude: raw.geo_loc_latitude,
           geo_loc_longitude: raw.geo_loc_longitude,
           suppliers: raw.suppliers,
+          selectedRoomId: raw.selectedRoomId,
+          selectedRateKey: raw.selectedRateKey,
           _hotelbeds: rawRecord(raw._hotelbeds)
             ? {
                 cheapest: rawRecord((raw._hotelbeds as Record<string, unknown>).cheapest)
@@ -791,6 +813,11 @@ function addDaysIso(value: string | null, days: number) {
   return formatIsoDate(date);
 }
 
+function itineraryDateForIndex(checkIn: string | null | undefined, checkOut: string | null | undefined, index: number) {
+  const tripDays = Math.max(1, calculateNights(checkIn || "", checkOut || "") || 1);
+  return addDaysIso(checkIn || null, Math.max(0, index) % tripDays);
+}
+
 function money(value: number, currency = "GBP") {
   const normalizedCurrency = (() => {
     const raw = String(currency || "GBP").trim().toUpperCase();
@@ -814,7 +841,7 @@ function toTitleCase(value: string | undefined | null) {
     .toLowerCase()
     .split(/\s+/)
     .filter(Boolean)
-    .map((word) => (word.length <= 3 && /^[a-z0-9]+$/i.test(word) ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1)))
+    .map((word) => (["vip", "tv", "sqm", "sqft"].includes(word) ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1)))
     .join(" ");
 }
 
@@ -2222,12 +2249,12 @@ function AiPackageContent() {
         rating: activity.rating,
         price: activity.price,
         currency: activity.currency || "GBP",
-        dateLabel: `${formatDate(addDaysIso(activeDestinationCheckIn, index), `Day ${index + 1}`)} - ${itinerarySlots[index % itinerarySlots.length]}`,
+        dateLabel: `${formatDate(itineraryDateForIndex(activeDestinationCheckIn, activeDestinationCheckOut, index), `Day ${(index % totalTripDays) + 1}`)} - ${itinerarySlots[index % itinerarySlots.length]}`,
         selected: selectedSet.has(activity.productCode),
       }))
       .sort((first, second) => Number(second.selected) - Number(first.selected))
       .slice(0, 12);
-  }, [activeDestinationCheckIn, activities, itinerarySlots, selectedActivityCodes]);
+  }, [activeDestinationCheckIn, activeDestinationCheckOut, activities, itinerarySlots, selectedActivityCodes, totalTripDays]);
   const aiHotelContext = useMemo(() => {
     const hotel = liveSearch.hotel;
     if (!hotel || (activeDestination && !hotelMatchesSegment(hotel, activeDestination, destinationSegments))) return null;
@@ -2306,8 +2333,9 @@ function AiPackageContent() {
     [destinationSegments, effectiveDestinationStateById]
   );
   const itineraryLabelFor = (index: number) => {
-    const date = addDaysIso(activeDestination?.checkIn || checkIn, index);
-    const dayLabel = date ? formatDate(date, `Day ${index + 1}`) : `Day ${index + 1}`;
+    const date = itineraryDateForIndex(activeDestination?.checkIn || checkIn, activeDestination?.checkOut || checkOut, index);
+    const dayNumber = (index % totalTripDays) + 1;
+    const dayLabel = date ? formatDate(date, `Day ${dayNumber}`) : `Day ${dayNumber}`;
     return `${dayLabel} - ${itinerarySlots[index % itinerarySlots.length]}`;
   };
 
@@ -2812,12 +2840,14 @@ function AiPackageContent() {
         state?.hotel ||
         null;
       const segmentActivities = (state?.activities || []).filter((activity) => (state?.selectedActivityCodes || []).includes(activity.productCode));
+      const segmentHotelRaw = rawRecord(segmentHotel?.rawSearchResult);
       return {
         ...segment,
         hotel: compactHotelForSession(segmentHotel),
+        selectedRoomIds: segmentHotelRaw?.selectedRoomId ? [String(segmentHotelRaw.selectedRoomId)] : [],
         activities: segmentActivities.map((activity, index) => ({
           ...activity,
-          itineraryDate: addDaysIso(segment.checkIn, index),
+          itineraryDate: itineraryDateForIndex(segment.checkIn, segment.checkOut, index),
           itineraryTime: itinerarySlots[index % itinerarySlots.length],
         })),
         order: segmentIndex + 1,
@@ -3166,13 +3196,36 @@ function AiPackageContent() {
   };
 
   const selectHotelOption = (hotel: Hotel, room?: RichHotelRoom) => {
+    const raw = rawRecord(hotel.rawSearchResult);
+    const hotelbeds = rawRecord(raw?._hotelbeds);
+    const cheapest = rawRecord(hotelbeds?.cheapest);
     const nextHotel: Hotel = room
       ? {
           ...hotel,
           room: {
             name: room.name,
-            highlights: [room.board, room.refundable === true ? "Refundable" : room.refundable === false ? "Non-refundable" : ""].filter(Boolean) as string[],
+            highlights: [room.board, ...(room.inclusions || []), room.refundable === true ? "Refundable" : room.refundable === false ? "Non-refundable" : ""].filter(Boolean) as string[],
           },
+          rawSearchResult: raw
+            ? {
+                ...raw,
+                selectedRoomId: room.id,
+                selectedRateKey: room.rateKey,
+                _hotelbeds: hotelbeds
+                  ? {
+                      ...hotelbeds,
+                      cheapest: cheapest
+                        ? {
+                            ...cheapest,
+                            roomName: room.name,
+                            boardName: room.board,
+                            rateKey: room.rateKey || cheapest.rateKey,
+                          }
+                        : hotelbeds.cheapest,
+                    }
+                  : raw._hotelbeds,
+              }
+            : hotel.rawSearchResult,
           refundable: room.refundable ?? hotel.refundable,
           price: room.price
             ? {
@@ -3225,6 +3278,29 @@ function AiPackageContent() {
     setHotelChangeOpen(false);
     setExpandedHotelRoomsId(null);
   };
+
+  useEffect(() => {
+    const hotel = liveSearch.hotel;
+    if (!hotel || liveSearch.hotelLoading || liveSearch.hotelError) return;
+    const raw = rawRecord(hotel.rawSearchResult);
+    const hotelbeds = rawRecord(raw?._hotelbeds);
+    const cheapest = rawRecord(hotelbeds?.cheapest);
+    const roomName = String(hotel.room?.name || "");
+    const needsSpecificRoom =
+      !raw?.selectedRoomId &&
+      !cheapest?.rateKey &&
+      (/^meal plans?:/i.test(roomName) || /^room options? available$/i.test(roomName));
+    if (!needsSpecificRoom) return;
+
+    const options = roomOptionsByHotelId[hotel.id] || [];
+    if (options.length > 0) {
+      selectHotelOption(hotel, options[0]);
+      return;
+    }
+    if (!roomOptionsLoadingByHotelId[hotel.id]) void loadHotelRoomOptions(hotel);
+    // Functions intentionally excluded: this effect is keyed to selected hotel and room-load state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveSearch.hotel?.id, liveSearch.hotelLoading, liveSearch.hotelError, roomOptionsByHotelId, roomOptionsLoadingByHotelId]);
 
   const applyFlightUpgrade = (option: TransformedPriceOption, priceCheck: PriceCheckResult | null) => {
     if (!liveSearch.flight) return;
@@ -3892,43 +3968,33 @@ function AiPackageContent() {
                   <section>
                     <h3 className="text-base font-semibold text-[#010D50]">Room Options</h3>
                     <div className="mt-3 space-y-2">
-                      {(hotelDetails?.rooms || []).slice(0, 5).map((room, index) => (
-                        <div key={`${room.name}-${index}`} className="rounded-xl border border-[#DFE0E4] p-3">
-                          <div className="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                              <div className="text-sm font-semibold text-[#010D50]">{formatRoomName(room.name)}</div>
-                              {room.board ? <div className="mt-1 text-xs text-[#3A478A]">{room.board}</div> : null}
-                              {room.inclusions?.length ? (
-                                <div className="mt-2 flex flex-wrap gap-1">
-                                  {room.inclusions.slice(0, 5).map((item) => (
-                                    <span key={item} className="rounded-full bg-[#F5F7FF] px-2 py-1 text-[11px] text-[#3A478A]">
-                                      {item}
-                                    </span>
-                                  ))}
+                      {groupRoomOptions(hotelDetails?.rooms || []).slice(0, 5).map((group) => (
+                        <div key={group.name} className="rounded-xl border border-[#DFE0E4] p-3">
+                          <div className="text-sm font-semibold text-[#010D50]">{group.name}</div>
+                          <div className="mt-2 divide-y divide-[#EEF0F7]">
+                            {group.options.map((room, index) => (
+                              <div key={`${room.board || "rate"}-${room.price || index}`} className="flex flex-col gap-3 py-3 first:pt-1 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                  <div className="text-xs font-medium text-[#3A478A]">{room.board || "Room only"}</div>
+                                  {room.inclusions?.length ? (
+                                    <div className="mt-2 flex flex-wrap gap-1">
+                                      {room.inclusions.slice(0, 5).map((item) => (
+                                        <span key={item} className="rounded-full bg-[#F5F7FF] px-2 py-1 text-[11px] text-[#3A478A]">{item}</span>
+                                      ))}
+                                    </div>
+                                  ) : null}
+                                  {room.refundable != null ? <div className="mt-1 text-xs text-[#3A478A]">{room.refundable ? "Refundable" : "Non-refundable"}</div> : null}
                                 </div>
-                              ) : null}
-                              {room.refundable != null ? (
-                                <div className="mt-1 text-xs text-[#3A478A]">{room.refundable ? "Refundable" : "Non-refundable"}</div>
-                              ) : null}
-                            </div>
-                            <div className="flex items-center gap-3">
-                              {room.price ? (
-                                <div className="text-sm font-bold text-[#010D50]">{money(room.price, room.currency || liveSearch.hotel?.price.currency || "GBP")}</div>
-                              ) : null}
-                              {liveSearch.hotel ? (
-                                <Button
-                                  type="button"
-                                  onClick={() => {
-                                    if (!liveSearch.hotel) return;
-                                    selectHotelOption(liveSearch.hotel, room);
-                                    setHotelDetailsOpen(false);
-                                  }}
-                                  className="h-8 rounded-full bg-[#3754ED] px-4 text-xs font-semibold text-white hover:bg-[#2942D1]"
-                                >
-                                  Select room
-                                </Button>
-                              ) : null}
-                            </div>
+                                <div className="flex items-center gap-3">
+                                  {room.price ? <div className="text-sm font-bold text-[#010D50]">{money(room.price, room.currency || liveSearch.hotel?.price.currency || "GBP")}</div> : null}
+                                  {liveSearch.hotel ? (
+                                    <Button type="button" onClick={() => { if (!liveSearch.hotel) return; selectHotelOption(liveSearch.hotel, room); setHotelDetailsOpen(false); }} className="h-8 rounded-full bg-[#3754ED] px-4 text-xs font-semibold text-white hover:bg-[#2942D1]">
+                                      Select
+                                    </Button>
+                                  ) : null}
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       ))}
@@ -4123,35 +4189,27 @@ function AiPackageContent() {
                                 ) : null}
                                 {roomOptions.length > 0 ? (
                                   <div className="grid gap-2">
-                                    {roomOptions.map((room, index) => (
-                                      <div key={`${hotel.id}-${room.name}-${index}`} className="flex flex-col gap-3 rounded-lg border border-[#DFE0E4] p-3 sm:flex-row sm:items-center sm:justify-between">
-                                        <div>
-                                          <div className="text-sm font-semibold text-[#010D50]">{formatRoomName(room.name)}</div>
-                                          {room.board ? <div className="mt-1 text-xs text-[#3A478A]">{room.board}</div> : null}
-                                          {room.inclusions?.length ? (
-                                            <div className="mt-2 flex flex-wrap gap-1">
-                                              {room.inclusions.slice(0, 4).map((item) => (
-                                                <span key={item} className="rounded-full bg-[#F5F7FF] px-2 py-1 text-[11px] text-[#3A478A]">
-                                                  {item}
-                                                </span>
-                                              ))}
+                                    {groupRoomOptions(roomOptions).map((group) => (
+                                      <div key={`${hotel.id}-${group.name}`} className="rounded-lg border border-[#DFE0E4] p-3">
+                                        <div className="text-sm font-semibold text-[#010D50]">{group.name}</div>
+                                        <div className="mt-2 divide-y divide-[#EEF0F7]">
+                                          {group.options.map((room, index) => (
+                                            <div key={`${room.board || "rate"}-${room.price || index}`} className="flex flex-col gap-3 py-3 first:pt-1 sm:flex-row sm:items-center sm:justify-between">
+                                              <div>
+                                                <div className="text-xs font-medium text-[#3A478A]">{room.board || "Room only"}</div>
+                                                {room.inclusions?.length ? (
+                                                  <div className="mt-2 flex flex-wrap gap-1">
+                                                    {room.inclusions.slice(0, 4).map((item) => <span key={item} className="rounded-full bg-[#F5F7FF] px-2 py-1 text-[11px] text-[#3A478A]">{item}</span>)}
+                                                  </div>
+                                                ) : null}
+                                                {room.refundable != null ? <div className="mt-1 text-xs text-[#3A478A]">{room.refundable ? "Refundable" : "Non-refundable"}</div> : null}
+                                              </div>
+                                              <div className="flex items-center gap-3 sm:justify-end">
+                                                {room.price ? <div className="text-sm font-bold text-[#010D50]">{money(room.price, room.currency || hotel.price.currency || "GBP")}</div> : null}
+                                                <Button type="button" onClick={() => selectHotelOption(hotel, room)} className="h-9 rounded-full bg-[#3754ED] px-4 text-xs font-semibold text-white hover:bg-[#2942D1]">Select</Button>
+                                              </div>
                                             </div>
-                                          ) : null}
-                                          {room.refundable != null ? (
-                                            <div className="mt-1 text-xs text-[#3A478A]">{room.refundable ? "Refundable" : "Non-refundable"}</div>
-                                          ) : null}
-                                        </div>
-                                        <div className="flex items-center gap-3 sm:justify-end">
-                                          {room.price ? (
-                                            <div className="text-sm font-bold text-[#010D50]">{money(room.price, room.currency || hotel.price.currency || "GBP")}</div>
-                                          ) : null}
-                                          <Button
-                                            type="button"
-                                            onClick={() => selectHotelOption(hotel, room)}
-                                            className="h-9 rounded-full bg-[#3754ED] px-4 text-xs font-semibold text-white hover:bg-[#2942D1]"
-                                          >
-                                            Select room
-                                          </Button>
+                                          ))}
                                         </div>
                                       </div>
                                     ))}

@@ -80,14 +80,15 @@ export function PassengerForm({
       }
     }
 
-    // Real-time validation for phone: must be exactly 10 digits
+    // Accept 10 digits, or a UK-style 11-digit local number beginning with trunk zero.
     if (field === 'phone' && value) {
       const digits = value.replace(/\D/g, '');
-      if (digits.length > 10) {
-        setErrors((prev) => ({ ...prev, phone: 'Enter exactly 10 digits (e.g. 0767845253)' }));
+      const validLocalNumber = /^\d{10}$/.test(digits) || /^0\d{10}$/.test(digits);
+      if (digits.length > 11 || (digits.length === 11 && !digits.startsWith('0'))) {
+        setErrors((prev) => ({ ...prev, phone: 'Enter 10 digits, or 11 digits starting with 0' }));
         return;
       }
-      if (digits.length === 10) {
+      if (validLocalNumber) {
         setErrors((prev) => ({ ...prev, phone: undefined }));
       }
     }

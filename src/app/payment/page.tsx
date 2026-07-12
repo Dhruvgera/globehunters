@@ -61,11 +61,20 @@ type AiPaymentDestination = {
     price?: { total?: number; currency?: string };
     rawSearchResult?: { address1?: string; address2?: string };
   } | null;
+  activities?: Array<{
+    productCode: string;
+    title: string;
+    price?: number;
+    currency?: string;
+    duration?: string;
+    itineraryDate?: string;
+    itineraryTime?: string;
+  }>;
 };
 
 type AiPaymentDraft = {
   search?: { destination?: string; checkIn?: string; checkOut?: string; rooms?: number };
-  totals?: { package?: number; currency?: string };
+  totals?: { flight?: number; hotel?: number; activities?: number; package?: number; currency?: string };
   destinations?: AiPaymentDestination[];
 };
 
@@ -374,13 +383,20 @@ function PaymentContent() {
     const dialDigits = fallback.replace(/[^\d]/g, "");
     const strippedLocal = digits.length > 10 ? digits.slice(-10) : digits;
 
-    if (input.startsWith("+") && digits.length > 10) return `+${digits}`;
+    if (input.startsWith("+") && digits.length > 10) {
+      if (digits.startsWith("0") && dialDigits) {
+        return `+${dialDigits}${digits.replace(/^0+/, "")}`;
+      }
+      if (dialDigits && digits.startsWith(`${dialDigits}0`)) {
+        return `+${dialDigits}${digits.slice(dialDigits.length + 1)}`;
+      }
+      return `+${digits}`;
+    }
     if (digits.length > 10) return `+${digits}`;
-    if (strippedLocal.length === 10) return strippedLocal;
     if (dialDigits) {
       return `+${dialDigits}${strippedLocal.replace(/^0+/, "")}`;
     }
-    return "";
+    return strippedLocal.length === 10 ? strippedLocal : "";
   };
 
   const dialFromBillingCountry = (country: string) => {
@@ -497,6 +513,19 @@ function PaymentContent() {
       });
     }
 
+    if (aiPaymentDraft?.totals?.package) {
+      const aiRows = [
+        { label: "Flights", amount: Number(aiPaymentDraft.totals.flight || 0) },
+        { label: "Hotels", amount: Number(aiPaymentDraft.totals.hotel || 0) },
+        { label: "Activities", amount: Number(aiPaymentDraft.totals.activities || 0) },
+      ]
+        .filter((row) => row.amount > 0)
+        .map((row) => ({ label: row.label, value: formatPrice(row.amount, currency || "GBP") }));
+      if (baggageCost > 0) aiRows.push({ label: `Additional baggage (${additionalBaggage})`, value: formatPrice(baggageCost, currency || "GBP") });
+      if (protectionPlanCost > 0) aiRows.push({ label: "Refund Shield", value: formatPrice(protectionPlanCost, currency || "GBP") });
+      return aiRows;
+    }
+
     return buildSummaryRows({
       mode: "package",
       baggageCost,
@@ -511,6 +540,10 @@ function PaymentContent() {
     });
   }, [
     baseFare,
+    aiPaymentDraft?.totals?.activities,
+    aiPaymentDraft?.totals?.flight,
+    aiPaymentDraft?.totals?.hotel,
+    aiPaymentDraft?.totals?.package,
     currency,
     hotelSearch?.adults,
     hotelSearch?.children,
@@ -1138,6 +1171,7 @@ function PaymentContent() {
                         currency: chargedCurrency,
                         localTaxesAdded: Number(result.localTaxesAdded || 0),
                       },
+                      aiPackageDraft: isPackageMode ? aiPaymentDraft : null,
                     };
                     sessionStorage.setItem(
                       `bookingContext_${orderId}`,

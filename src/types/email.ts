@@ -57,6 +57,17 @@ export interface HotelEmailData {
   amenities?: string[];
 }
 
+export interface ActivityEmailData {
+  productCode: string;
+  title: string;
+  destination?: string;
+  date?: string;
+  time?: string;
+  duration?: string;
+  price?: number;
+  currency?: string;
+}
+
 export interface BookingConfirmationEmailData {
   orderNumber: string;
   travelerName: string;
@@ -70,5 +81,6 @@ export interface BookingConfirmationEmailData {
   }[];
   journeys?: JourneyEmail[];
   hotel?: HotelEmailData;
+  activities?: ActivityEmailData[];
   payment: PaymentDetailsEmail;
 }

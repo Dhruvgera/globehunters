@@ -25,17 +25,26 @@ function normalizeKey(value: string): string {
     .trim();
 }
 
-function normalizeBoxPayPhoneNumber(input: string): string {
+export function normalizeBoxPayPhoneNumber(input: string, fallbackDialCode = ''): string {
   const raw = String(input || '').trim();
   if (!raw) return '';
 
-  const hasPlusPrefix = raw.startsWith('+');
-  const digits = String(input || '').replace(/\D/g, '');
+  const digits = raw.replace(/\D/g, '');
   if (!digits) return '';
 
-  if (hasPlusPrefix) return `+${digits}`;
-  if (digits.length > 10) return `+${digits}`;
-
+  // BoxPay accepts international numbers in E.164 form. Do not strip the
+  // country code from values already normalized by the checkout page.
+  if (raw.startsWith('+')) {
+    const dialDigits = fallbackDialCode.replace(/\D/g, '');
+    const normalizedDigits = digits.startsWith('0') && dialDigits
+      ? `${dialDigits}${digits.replace(/^0+/, '')}`
+      : digits;
+    return normalizedDigits.length >= 8 && normalizedDigits.length <= 15 ? `+${normalizedDigits}` : '';
+  }
+  if (raw.startsWith('00')) {
+    const internationalDigits = digits.slice(2);
+    return internationalDigits.length >= 8 && internationalDigits.length <= 15 ? `+${internationalDigits}` : '';
+  }
   return digits.length === 10 ? digits : '';
 }
 
@@ -158,7 +167,10 @@ class BoxPayService {
         firstName: params.shopper.firstName,
         lastName: params.shopper.lastName,
         email: params.shopper.email,
-        phoneNumber: normalizeBoxPayPhoneNumber(params.shopper.phone),
+        phoneNumber: normalizeBoxPayPhoneNumber(
+          params.shopper.phone,
+          BOXPAY_CONFIG.defaultContext.countryCode === 'GB' ? '+44' : ''
+        ),
         uniqueReference: params.orderId,
         deliveryAddress: params.shopper.address
           ? (() => {

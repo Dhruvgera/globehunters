@@ -29,7 +29,14 @@ const createTransporter = () => {
  * Generate the HTML email template matching Figma design
  */
 export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData): string {
-  const { orderNumber, travelerName, travelerEmail, travelerPhone, passengers, journeys, hotel, payment } = data;
+  const { orderNumber, travelerName, travelerEmail, travelerPhone, passengers, journeys, hotel, activities, payment } = data;
+
+  const escapeHtml = (value: unknown) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 
   // Generate passenger sections using tables for email client compatibility
   const passengerSections = passengers.map((passenger, index) => `
@@ -59,6 +66,25 @@ export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData
   // Generate main content sections (journeys or hotel)
   const journeySections = (journeys || []).map((journey) => generateJourneySection(journey)).join('');
   const hotelSection = hotel ? generateHotelSection(hotel) : '';
+  const activitiesSection = activities?.length ? `
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F8F9FA; border-radius: 12px; margin-bottom: 24px;">
+      <tr><td style="padding: 16px;">
+        <div style="font-family: 'Inter', Arial, sans-serif; font-weight: 700; font-size: 14px; color: #3754ED; margin-bottom: 12px;">Activities</div>
+        ${activities.map((activity) => `
+          <table width="100%" cellpadding="0" cellspacing="0" style="border-top: 1px solid #E5E7EB;">
+            <tr>
+              <td style="padding: 12px 0; font-family: 'Inter', Arial, sans-serif; vertical-align: top;">
+                <div style="font-weight: 600; font-size: 13px; color: #010D50;">${escapeHtml(activity.title)}</div>
+                <div style="font-size: 12px; color: #555555; margin-top: 4px;">${escapeHtml([activity.destination, activity.date, activity.time, activity.duration].filter(Boolean).join(' | '))}</div>
+                <div style="font-size: 11px; color: #6B7280; margin-top: 4px;">Viator product: ${escapeHtml(activity.productCode)}</div>
+              </td>
+              ${typeof activity.price === 'number' ? `<td style="padding: 12px 0; font-family: 'Inter', Arial, sans-serif; font-weight: 600; font-size: 13px; color: #010D50; text-align: right; vertical-align: top;">${escapeHtml(activity.currency || 'GBP')} ${activity.price.toFixed(2)}</td>` : ''}
+            </tr>
+          </table>
+        `).join('')}
+      </td></tr>
+    </table>
+  ` : '';
 
   // Format currency
   const formatCurrency = (amount: number) => `${payment.currencySymbol}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${payment.currency}`;
@@ -194,6 +220,7 @@ export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData
               <!-- Journey or Hotel Sections -->
               ${journeySections}
               ${hotelSection}
+              ${activitiesSection}
 
               <!-- Payment Details Section -->
               <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F8F9FA; border-radius: 12px; margin-bottom: 24px;">
