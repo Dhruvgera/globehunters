@@ -168,18 +168,30 @@ function activityCandidateCount(checkIn: string | undefined, checkOut: string | 
   return Math.min(MAX_ACTIVITY_CANDIDATES, Math.max(12, stayDays * 2));
 }
 
-function defaultActivityCodes(products: ActivityProduct[], checkIn: string | undefined, checkOut: string | undefined) {
+function defaultActivityCodes(
+  products: ActivityProduct[],
+  checkIn: string | undefined,
+  checkOut: string | undefined,
+  maxTotal?: number
+) {
   const stayDays = Math.max(1, calculateNights(checkIn || "", checkOut || "") || 1);
   const seen = new Set<string>();
-  return products
-    .filter((activity) => {
-      const code = String(activity.productCode || "").trim();
-      if (!code || seen.has(code)) return false;
-      seen.add(code);
-      return true;
-    })
-    .slice(0, stayDays)
-    .map((activity) => activity.productCode);
+  const selected: string[] = [];
+  let selectedTotal = 0;
+  const budgetLimit = typeof maxTotal === "number" && Number.isFinite(maxTotal) ? Math.max(0, maxTotal) : null;
+
+  for (const activity of products) {
+    const code = String(activity.productCode || "").trim();
+    if (!code || seen.has(code)) continue;
+    seen.add(code);
+    const price = Math.max(0, Number(activity.price || 0));
+    if (budgetLimit != null && selectedTotal + price > budgetLimit) continue;
+    selected.push(code);
+    selectedTotal += price;
+    if (selected.length >= stayDays) break;
+  }
+
+  return selected;
 }
 
 function textValue(value: unknown): string {
@@ -813,9 +825,37 @@ function addDaysIso(value: string | null, days: number) {
   return formatIsoDate(date);
 }
 
+function activityStartDateForSegment(segment: PackageDestinationSegment | null | undefined, flight: Flight | null | undefined) {
+  const checkIn = segment?.checkIn || "";
+  if (!checkIn || !flight) return checkIn;
+  const airportCode = String(segment?.airportCode || "").toUpperCase();
+  const segments = flight.tripType === "multi-city" && flight.segments?.length
+    ? flight.segments
+    : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
+  const arrivalSegment =
+    segments.find((item) => String(item.arrivalAirport?.code || "").toUpperCase() === airportCode) ||
+    segments.find((item) => item.arrivalDate === checkIn || item.date === checkIn);
+  if (!arrivalSegment) return checkIn;
+
+  const lastFlight = arrivalSegment.individualFlights?.[arrivalSegment.individualFlights.length - 1];
+  const arrivalDate = lastFlight?.arrivalDate || arrivalSegment.arrivalDate || arrivalSegment.date || checkIn;
+  const arrivalTime = lastFlight?.arrivalTime || arrivalSegment.arrivalTime || "";
+  const arrivalHour = Number.parseInt(arrivalTime.split(":")[0] || "", 10);
+  const shouldStartNextDay = Number.isFinite(arrivalHour) && arrivalHour >= 12;
+  const proposed = shouldStartNextDay ? addDaysIso(arrivalDate, 1) : arrivalDate;
+  return proposed && proposed >= checkIn ? proposed : checkIn;
+}
+
 function itineraryDateForIndex(checkIn: string | null | undefined, checkOut: string | null | undefined, index: number) {
   const tripDays = Math.max(1, calculateNights(checkIn || "", checkOut || "") || 1);
   return addDaysIso(checkIn || null, Math.max(0, index) % tripDays);
+}
+
+function normalizeStayPreference(value: string | null | undefined) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized.includes("luxury") || normalized.includes("only the best")) return "Luxury hotels";
+  if (normalized.includes("budget") || normalized.includes("value")) return "Budget friendly";
+  return "Comfort stay";
 }
 
 function money(value: number, currency = "GBP") {
@@ -1173,7 +1213,7 @@ function AiPackageContent() {
   const children = Number(params.get("children") || "0") || 0;
   const rooms = Number(params.get("rooms") || "1") || 1;
   const lookingFor = params.get("lookingFor") || "A bit of everything";
-  const stayPreference = params.get("stayPreference") || "At only the best";
+  const stayPreference = normalizeStayPreference(params.get("stayPreference"));
   const budget = Number(params.get("budget") || "0") || 0;
   const paramsKey = params.toString();
   const toParam = params.get("to") || "";
@@ -1254,6 +1294,9 @@ function AiPackageContent() {
   const [newDestination, setNewDestination] = useState<HolidayDestination | null>(null);
   const [newDestinationCheckIn, setNewDestinationCheckIn] = useState(checkOut || checkIn || "");
   const [newDestinationCheckOut, setNewDestinationCheckOut] = useState("");
+  const [newDestinationDatesDone, setNewDestinationDatesDone] = useState(false);
+  const [budgetNotice, setBudgetNotice] = useState<string | null>(null);
+  const manuallyEditedActivitiesRef = useRef<Set<string>>(new Set());
   const [chainedDestinations, setChainedDestinations] = useState<ChainedDestination[]>(() => {
     const raw = params.get("destinations");
     if (!raw) return [];
@@ -1315,19 +1358,23 @@ function AiPackageContent() {
   );
   const activeDestination = destinationSegments[Math.min(activeDestinationIndex, Math.max(0, destinationSegments.length - 1))] || destinationSegments[0];
   const activeDestinationId = activeDestination?.id || primaryDestinationId;
+  const activeActivityStartDate = useMemo(
+    () => activityStartDateForSegment(activeDestination, liveSearch.flight) || activeDestination?.checkIn || checkIn || "",
+    [activeDestination, checkIn, liveSearch.flight]
+  );
   const activeActivitiesKey = useMemo(
     () =>
       [
         activeDestinationId,
         activeDestination?.name || destination,
-        activeDestination?.checkIn || checkIn || "",
+        activeActivityStartDate,
         activeDestination?.checkOut || checkOut || "",
         adults,
         children,
         activityQuery,
         ACTIVITY_PLAN_VERSION,
       ].join("|"),
-    [activeDestination?.checkIn, activeDestination?.checkOut, activeDestination?.name, activeDestinationId, activityQuery, adults, checkIn, checkOut, children, destination]
+    [activeActivityStartDate, activeDestination?.checkOut, activeDestination?.name, activeDestinationId, activityQuery, adults, checkOut, children, destination]
   );
 
   useEffect(() => {
@@ -1699,6 +1746,7 @@ function AiPackageContent() {
     if (segmentsToHydrate.length === 0) return;
 
     for (const segment of segmentsToHydrate) {
+      const segmentActivityStartDate = activityStartDateForSegment(segment, liveSearch.flight) || segment.checkIn;
       destinationHydrationAttemptedRef.current.add(segment.id);
       setDestinationStateById((current) => ({
         ...current,
@@ -1778,11 +1826,11 @@ function AiPackageContent() {
           })(),
           activityService.searchActivities({
             destinationName: segment.name,
-            startDate: segment.checkIn || undefined,
+            startDate: segmentActivityStartDate || undefined,
             endDate: segment.checkOut || undefined,
             adults,
             children,
-            count: activityCandidateCount(segment.checkIn, segment.checkOut),
+            count: activityCandidateCount(segmentActivityStartDate, segment.checkOut),
             query: activityQuery,
             currency: "GBP",
           }),
@@ -1791,8 +1839,8 @@ function AiPackageContent() {
         if (cancelled) return;
         const hotelPayload = hotelResult.status === "fulfilled" ? hotelResult.value : null;
         const activityProducts = activityResult.status === "fulfilled" ? activityResult.value.products : [];
-        const selectedCodes = defaultActivityCodes(activityProducts, segment.checkIn, segment.checkOut);
-        const activitiesKey = [segment.id, segment.name, segment.checkIn, segment.checkOut, adults, children, activityQuery, ACTIVITY_PLAN_VERSION].join("|");
+        const selectedCodes = defaultActivityCodes(activityProducts, segmentActivityStartDate, segment.checkOut);
+        const activitiesKey = [segment.id, segment.name, segmentActivityStartDate, segment.checkOut, adults, children, activityQuery, ACTIVITY_PLAN_VERSION].join("|");
 
         setDestinationStateById((current) => ({
           ...current,
@@ -1853,7 +1901,7 @@ function AiPackageContent() {
     return () => {
       cancelled = true;
     };
-  }, [activeDestinationId, activityQuery, adults, branchesParam, budget, children, destinationSegments, rooms, setHotelSearch, stayPreference]);
+  }, [activeDestinationId, activityQuery, adults, branchesParam, budget, children, destinationSegments, liveSearch.flight, rooms, setHotelSearch, stayPreference]);
 
   useEffect(() => {
     if (!hotelDetailsOpen || !liveSearch.hotel) return;
@@ -2008,7 +2056,7 @@ function AiPackageContent() {
   useEffect(() => {
     let cancelled = false;
     const activityDestinationName = activeDestination?.name || destination;
-    const activityStartDate = activeDestination?.checkIn || checkIn || "";
+    const activityStartDate = activeActivityStartDate;
     const activityEndDate = activeDestination?.checkOut || checkOut || "";
     const activitiesKey = activeActivitiesKey;
     const savedDestinationState = destinationStateByIdRef.current[activeDestinationId];
@@ -2151,7 +2199,7 @@ function AiPackageContent() {
     return () => {
       cancelled = true;
     };
-  }, [activeActivitiesKey, activeDestination?.checkIn, activeDestination?.checkOut, activeDestination?.name, activeDestinationId, activityQuery, adults, checkIn, checkOut, children, destination, hotelOptions, liveSearch.flight, liveSearch.flightRequestId, liveSearch.hotel, liveSearch.hotelError, liveSearch.hotelLoading, paramsKey, storeHotelSearch]);
+  }, [activeActivitiesKey, activeActivityStartDate, activeDestination?.checkOut, activeDestination?.name, activeDestinationId, activityQuery, adults, checkOut, children, destination, hotelOptions, liveSearch.flight, liveSearch.flightRequestId, liveSearch.hotel, liveSearch.hotelError, liveSearch.hotelLoading, paramsKey, storeHotelSearch]);
 
   useEffect(() => {
     const activeMatchedHotel =
@@ -2224,19 +2272,20 @@ function AiPackageContent() {
     [activities, selectedActivityCodes]
   );
   const activeDestinationCheckIn = activeDestination?.checkIn || checkIn || formatIsoDate(new Date());
+  const activeItineraryStartDate = activeActivityStartDate || activeDestinationCheckIn;
   const activeDestinationCheckOut = activeDestination?.checkOut || checkOut || activeDestinationCheckIn;
-  const totalTripDays = Math.max(1, calculateNights(activeDestinationCheckIn, activeDestinationCheckOut) || 1);
+  const totalTripDays = Math.max(1, calculateNights(activeItineraryStartDate, activeDestinationCheckOut) || 1);
   const itineraryActivities = useMemo(
-    () => (selectedActivities.length > 0 ? selectedActivities : activities.slice(0, totalTripDays)).slice(0, totalTripDays),
-    [activities, selectedActivities, totalTripDays]
+    () => selectedActivities.slice(0, totalTripDays),
+    [selectedActivities, totalTripDays]
   );
   const tripDayEntries = useMemo<TripDayEntry[]>(
     () =>
       Array.from({ length: totalTripDays }, (_, index) => ({
-        date: addDaysIso(activeDestinationCheckIn, index),
+        date: addDaysIso(activeItineraryStartDate, index),
         activity: itineraryActivities[index] || null,
       })),
-    [activeDestinationCheckIn, itineraryActivities, totalTripDays]
+    [activeItineraryStartDate, itineraryActivities, totalTripDays]
   );
   const aiActivityContext = useMemo(() => {
     const selectedSet = new Set(selectedActivityCodes);
@@ -2249,12 +2298,12 @@ function AiPackageContent() {
         rating: activity.rating,
         price: activity.price,
         currency: activity.currency || "GBP",
-        dateLabel: `${formatDate(itineraryDateForIndex(activeDestinationCheckIn, activeDestinationCheckOut, index), `Day ${(index % totalTripDays) + 1}`)} - ${itinerarySlots[index % itinerarySlots.length]}`,
+        dateLabel: `${formatDate(itineraryDateForIndex(activeItineraryStartDate, activeDestinationCheckOut, index), `Day ${(index % totalTripDays) + 1}`)} - ${itinerarySlots[index % itinerarySlots.length]}`,
         selected: selectedSet.has(activity.productCode),
       }))
       .sort((first, second) => Number(second.selected) - Number(first.selected))
       .slice(0, 12);
-  }, [activeDestinationCheckIn, activeDestinationCheckOut, activities, itinerarySlots, selectedActivityCodes, totalTripDays]);
+  }, [activeDestinationCheckOut, activeItineraryStartDate, activities, itinerarySlots, selectedActivityCodes, totalTripDays]);
   const aiHotelContext = useMemo(() => {
     const hotel = liveSearch.hotel;
     if (!hotel || (activeDestination && !hotelMatchesSegment(hotel, activeDestination, destinationSegments))) return null;
@@ -2333,7 +2382,7 @@ function AiPackageContent() {
     [destinationSegments, effectiveDestinationStateById]
   );
   const itineraryLabelFor = (index: number) => {
-    const date = itineraryDateForIndex(activeDestination?.checkIn || checkIn, activeDestination?.checkOut || checkOut, index);
+    const date = itineraryDateForIndex(activeItineraryStartDate, activeDestination?.checkOut || checkOut, index);
     const dayNumber = (index % totalTripDays) + 1;
     const dayLabel = date ? formatDate(date, `Day ${dayNumber}`) : `Day ${dayNumber}`;
     return `${dayLabel} - ${itinerarySlots[index % itinerarySlots.length]}`;
@@ -2366,6 +2415,72 @@ function AiPackageContent() {
     return sum + ((matchedLiveHotel || stateHotel)?.price.total || 0);
   }, 0);
   const packageCost = liveFlightTotal + liveHotelTotal + activityTotal + destinationAddOnTotal;
+  useEffect(() => {
+    if (!packagePricingReady || budget <= 0) return;
+
+    let remainingForActivities = Math.max(0, budget - liveFlightTotal - liveHotelTotal);
+    const updates: Record<string, string[]> = {};
+    for (const segment of destinationSegments) {
+      const state = effectiveDestinationStateById[segment.id];
+      if (!state) continue;
+      const currentCodes = state.selectedActivityCodes || [];
+      const currentSelected = state.activities.filter((activity) => currentCodes.includes(activity.productCode));
+      if (manuallyEditedActivitiesRef.current.has(segment.id)) {
+        remainingForActivities = Math.max(
+          0,
+          remainingForActivities - currentSelected.reduce((sum, activity) => sum + Number(activity.price || 0), 0)
+        );
+        continue;
+      }
+
+      const activityStart = activityStartDateForSegment(segment, liveSearch.flight) || segment.checkIn;
+      const nextCodes = defaultActivityCodes(state.activities, activityStart, segment.checkOut, remainingForActivities);
+      const nextSelected = state.activities.filter((activity) => nextCodes.includes(activity.productCode));
+      remainingForActivities = Math.max(
+        0,
+        remainingForActivities - nextSelected.reduce((sum, activity) => sum + Number(activity.price || 0), 0)
+      );
+      if (nextCodes.join("|") !== currentCodes.join("|")) updates[segment.id] = nextCodes;
+    }
+
+    const fixedCost = liveFlightTotal + liveHotelTotal;
+    if (fixedCost > budget) {
+      setBudgetNotice(
+        `Flights and stays already exceed your ${money(budget, liveSearch.flight?.currency || liveSearch.hotel?.price.currency || "GBP")} budget. Change selections or increase budget before adding activities.`
+      );
+    } else if (Object.keys(updates).length > 0) {
+      setBudgetNotice("Activities were limited to keep this trip within your budget. You can still add more manually.");
+    } else if (packageCost > budget) {
+      setBudgetNotice(
+        `This trip is ${money(packageCost - budget, liveSearch.flight?.currency || liveSearch.hotel?.price.currency || "GBP")} over budget after your manual selections.`
+      );
+    } else {
+      setBudgetNotice(null);
+    }
+
+    if (Object.keys(updates).length === 0) return;
+    setDestinationStateById((current) => {
+      const next = { ...current };
+      for (const [destinationId, nextCodes] of Object.entries(updates)) {
+        const state = next[destinationId];
+        if (state) next[destinationId] = { ...state, selectedActivityCodes: nextCodes };
+      }
+      return next;
+    });
+    const activeCodes = updates[activeDestinationId];
+    if (activeCodes) setSelectedActivityCodes(activeCodes);
+  }, [
+    activeDestinationId,
+    budget,
+    destinationSegments,
+    effectiveDestinationStateById,
+    liveFlightTotal,
+    liveHotelTotal,
+    liveSearch.flight,
+    liveSearch.hotel?.price.currency,
+    packageCost,
+    packagePricingReady,
+  ]);
   const tripDates = `${shortDate(activeDestination?.checkIn || checkIn, "Select date")} - ${shortDate(activeDestination?.checkOut || checkOut, "Select date")}`;
   const liveHotelImage =
     liveSearch.hotel?.id && !hotelImageFailedById[liveSearch.hotel.id] && isRealHotelImageUrl(liveSearch.hotel?.imageSrc)
@@ -2776,6 +2891,7 @@ function AiPackageContent() {
   }, [activeDestination, adults, branchesParam, budget, children, destinationSegments.length, hotelChangeOpen, hotelOptions.length, rooms, setHotelSearch, stayPreference]);
 
   const toggleActivity = (productCode: string) => {
+    manuallyEditedActivitiesRef.current.add(activeDestinationId);
     setSelectedActivityCodes((current) => {
       const next = current.includes(productCode)
         ? current.filter((code) => code !== productCode)
@@ -2841,13 +2957,14 @@ function AiPackageContent() {
         null;
       const segmentActivities = (state?.activities || []).filter((activity) => (state?.selectedActivityCodes || []).includes(activity.productCode));
       const segmentHotelRaw = rawRecord(segmentHotel?.rawSearchResult);
+      const segmentActivityStartDate = activityStartDateForSegment(segment, liveSearch.flight) || segment.checkIn;
       return {
         ...segment,
         hotel: compactHotelForSession(segmentHotel),
         selectedRoomIds: segmentHotelRaw?.selectedRoomId ? [String(segmentHotelRaw.selectedRoomId)] : [],
         activities: segmentActivities.map((activity, index) => ({
           ...activity,
-          itineraryDate: itineraryDateForIndex(segment.checkIn, segment.checkOut, index),
+          itineraryDate: itineraryDateForIndex(segmentActivityStartDate, segment.checkOut, index),
           itineraryTime: itinerarySlots[index % itinerarySlots.length],
         })),
         order: segmentIndex + 1,
@@ -3394,6 +3511,11 @@ function AiPackageContent() {
                 <div>Activities: {activitiesPricingReady ? money(activityTotal, "GBP") : "Calculating"}</div>
                 <div>Live sources only</div>
               </div>
+              {budgetNotice ? (
+                <div className="mt-3 rounded-lg border border-[#F5D9B3] bg-[#FFF8F0] px-3 py-2 text-xs leading-5 text-[#8B5E20]">
+                  {budgetNotice}
+                </div>
+              ) : null}
             </section>
 
             <section className="rounded-xl border border-[#DFE0E4] bg-white p-4">
@@ -3594,7 +3716,10 @@ function AiPackageContent() {
               <div className="mb-3 text-sm font-semibold text-[#010D50]">Your trip ends here</div>
               <Button
                 type="button"
-                onClick={() => setAddDestinationOpen(true)}
+                onClick={() => {
+                  setNewDestinationDatesDone(false);
+                  setAddDestinationOpen(true);
+                }}
                 className="w-full rounded-xl bg-[#3754ED] text-white hover:bg-[#2942D1]"
               >
                 Click here to add destination
@@ -3847,7 +3972,10 @@ function AiPackageContent() {
                 ))}
                 <button
                   type="button"
-                  onClick={() => setAddDestinationOpen(true)}
+                  onClick={() => {
+                    setNewDestinationDatesDone(false);
+                    setAddDestinationOpen(true);
+                  }}
                   className="flex min-h-[150px] items-center justify-center gap-2 rounded-xl border border-dashed border-[#B7BFEA] text-sm font-semibold text-[#3754ED]"
                 >
                   <Plus className="h-4 w-4" />
@@ -4073,6 +4201,7 @@ function AiPackageContent() {
                     availableAmenities={availableHotelAmenities}
                     minPriceByStarRating={hotelMinPriceByStarRating}
                     refundableFilterEnabled={hotelRefundableFilterEnabled}
+                    showNightlyPrice={false}
                   />
                 </aside>
 
@@ -4297,7 +4426,13 @@ function AiPackageContent() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={addDestinationOpen} onOpenChange={setAddDestinationOpen}>
+      <Dialog
+        open={addDestinationOpen}
+        onOpenChange={(open) => {
+          setAddDestinationOpen(open);
+          if (open) setNewDestinationDatesDone(false);
+        }}
+      >
         <DialogContent className="max-w-[min(100vw-24px,680px)] bg-white">
           <DialogHeader>
             <DialogTitle className="text-[#010D50]">Add a destination</DialogTitle>
@@ -4313,24 +4448,37 @@ function AiPackageContent() {
             </label>
             <div className="grid gap-2">
               <span className="text-sm font-medium text-[#010D50]">Stay dates</span>
-              <DatePicker
-                startDate={parseIsoDate(newDestinationCheckIn)}
-                endDate={parseIsoDate(newDestinationCheckOut)}
-                minDate={nextDestinationMinDate}
-                onStartDateChange={(date) => {
-                  if (!date || isBeforeDateOnly(date, nextDestinationMinDate)) return;
-                  const nextStart = formatIsoDate(date);
-                  setNewDestinationCheckIn(nextStart);
-                  const currentEnd = parseIsoDate(newDestinationCheckOut);
-                  if (currentEnd && isBeforeDateOnly(currentEnd, date)) setNewDestinationCheckOut("");
-                }}
-                onEndDateChange={(date) => {
-                  if (!date || isBeforeDateOnly(date, nextDestinationMinDate)) return;
-                  setNewDestinationCheckOut(formatIsoDate(date));
-                }}
-                onDone={() => undefined}
-                className="max-w-none border border-[#DFE0E4] shadow-none"
-              />
+              {newDestinationDatesDone ? (
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-[#DFE0E4] bg-[#F5F7FF] px-4 py-3">
+                  <div className="text-sm font-semibold text-[#010D50]">
+                    {shortDate(newDestinationCheckIn, "Start date")} - {shortDate(newDestinationCheckOut, "End date")}
+                  </div>
+                  <Button type="button" variant="outline" className="h-8 rounded-full px-4 text-xs" onClick={() => setNewDestinationDatesDone(false)}>
+                    Change dates
+                  </Button>
+                </div>
+              ) : (
+                <DatePicker
+                  startDate={parseIsoDate(newDestinationCheckIn)}
+                  endDate={parseIsoDate(newDestinationCheckOut)}
+                  minDate={nextDestinationMinDate}
+                  onStartDateChange={(date) => {
+                    if (!date || isBeforeDateOnly(date, nextDestinationMinDate)) return;
+                    const nextStart = formatIsoDate(date);
+                    setNewDestinationCheckIn(nextStart);
+                    setNewDestinationDatesDone(false);
+                    const currentEnd = parseIsoDate(newDestinationCheckOut);
+                    if (currentEnd && isBeforeDateOnly(currentEnd, date)) setNewDestinationCheckOut("");
+                  }}
+                  onEndDateChange={(date) => {
+                    if (!date || isBeforeDateOnly(date, nextDestinationMinDate)) return;
+                    setNewDestinationCheckOut(formatIsoDate(date));
+                    setNewDestinationDatesDone(false);
+                  }}
+                  onDone={() => setNewDestinationDatesDone(true)}
+                  className="max-w-none border border-[#DFE0E4] shadow-none"
+                />
+              )}
               <p className="text-xs text-[#5E6B8A]">
                 Next stays start from {shortDate(formatIsoDate(nextDestinationMinDate), "the current trip end date")} or later.
               </p>

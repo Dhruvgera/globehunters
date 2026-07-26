@@ -745,10 +745,6 @@ function PaymentContent() {
                           <div className="text-sm font-medium text-[#010D50]">{hotel.roomName}</div>
                           {hotel.mealName ? <div className="mt-0.5 text-xs text-[#3A478A]">{hotel.mealName}</div> : null}
                         </div>
-                        <div className="mt-3 flex items-end justify-between">
-                          <div className="text-xs text-[#3A478A]">Price</div>
-                          <div className="text-base font-semibold text-[#010D50]">Total: {formatPrice(hotel.total, hotel.currency)}</div>
-                        </div>
                       </div>
                     ))}
                   </div>

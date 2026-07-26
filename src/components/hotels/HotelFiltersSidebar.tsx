@@ -48,6 +48,7 @@ export function HotelFiltersSidebar({
   availableAmenities = [],
   minPriceByStarRating = {},
   refundableFilterEnabled = false,
+  showNightlyPrice = true,
 }: {
   resultCount: number;
   value: HotelFiltersState;
@@ -69,6 +70,8 @@ export function HotelFiltersSidebar({
   minPriceByStarRating?: Record<number, number>;
   /** Enable refundable filter only when provider returns refundable flags in list results */
   refundableFilterEnabled?: boolean;
+  /** Hide nightly mode when result cards only expose total prices. */
+  showNightlyPrice?: boolean;
 }) {
   const unsupportedNote =
     "Note: Property name, Price, Star rating, Amenities, Meal plans, and Breakfast are powered by the hotel list. Neighborhood is available when present in results. Other filters are shown for UI parity but may not affect results yet.";
@@ -185,18 +188,20 @@ export function HotelFiltersSidebar({
               />
               <span className="text-sm text-[#010D50]">Total price</span>
             </label>
-            <label className="flex items-center gap-3">
-              <input
-                type="radio"
-                name="priceMode"
-                checked={value.priceMode === "nightly"}
-                onChange={() =>
-                  onPriceModeChange ? onPriceModeChange("nightly") : onChange({ ...value, priceMode: "nightly" })
-                }
-                className="h-4 w-4 accent-[#3754ED]"
-              />
-              <span className="text-sm text-[#010D50]">Nightly price</span>
-            </label>
+            {showNightlyPrice && (
+              <label className="flex items-center gap-3">
+                <input
+                  type="radio"
+                  name="priceMode"
+                  checked={value.priceMode === "nightly"}
+                  onChange={() =>
+                    onPriceModeChange ? onPriceModeChange("nightly") : onChange({ ...value, priceMode: "nightly" })
+                  }
+                  className="h-4 w-4 accent-[#3754ED]"
+                />
+                <span className="text-sm text-[#010D50]">Nightly price</span>
+              </label>
+            )}
           </div>
 
           <Slider
@@ -223,36 +228,6 @@ export function HotelFiltersSidebar({
             </span>
           </div>
         </div>
-      </FilterSection>
-
-      {/* Neighborhood */}
-      <FilterSection
-        title="Neighborhood"
-        isExpanded={!!expanded.neighborhood}
-        onToggle={() => onToggleExpanded("neighborhood")}
-      >
-        {availableNeighborhoods.length === 0 ? (
-          <div className="text-xs text-[#3A478A]">No neighborhood/city labels available in current results</div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {availableNeighborhoods.map((n) => (
-              <label key={n} className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    checked={value.neighborhoods.includes(n)}
-                    onCheckedChange={(c) => {
-                      const next = Boolean(c)
-                        ? Array.from(new Set([...value.neighborhoods, n]))
-                        : value.neighborhoods.filter((x) => x !== n);
-                      onChange({ ...value, neighborhoods: next });
-                    }}
-                  />
-                  <span className="text-sm text-[#010D50]">{n}</span>
-                </div>
-              </label>
-            ))}
-          </div>
-        )}
       </FilterSection>
 
       {/* Star rating */}
@@ -293,6 +268,36 @@ export function HotelFiltersSidebar({
             );
           })}
         </div>
+      </FilterSection>
+
+      {/* Neighborhood */}
+      <FilterSection
+        title="Neighborhood"
+        isExpanded={!!expanded.neighborhood}
+        onToggle={() => onToggleExpanded("neighborhood")}
+      >
+        {availableNeighborhoods.length === 0 ? (
+          <div className="text-xs text-[#3A478A]">No neighborhood/city labels available in current results</div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {availableNeighborhoods.map((n) => (
+              <label key={n} className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={value.neighborhoods.includes(n)}
+                    onCheckedChange={(c) => {
+                      const next = Boolean(c)
+                        ? Array.from(new Set([...value.neighborhoods, n]))
+                        : value.neighborhoods.filter((x) => x !== n);
+                      onChange({ ...value, neighborhoods: next });
+                    }}
+                  />
+                  <span className="text-sm text-[#010D50]">{n}</span>
+                </div>
+              </label>
+            ))}
+          </div>
+        )}
       </FilterSection>
 
       {/* Refundable */}

@@ -58,6 +58,13 @@ interface SearchBarProps {
 
 type Product = "flight" | "hotel" | "package" | "ai";
 
+function normalizeAiStayPreference(value: string | null | undefined) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized.includes("luxury") || normalized.includes("only the best")) return "Luxury hotels";
+  if (normalized.includes("budget") || normalized.includes("value")) return "Budget friendly";
+  return "Comfort stay";
+}
+
 function isSamePackageDestination(
   current: HolidayDestination | null,
   next: HolidayDestination | null
@@ -166,7 +173,7 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
   const [isHotelGuestsOpen, setIsHotelGuestsOpen] = useState(false);
   const [openMultiCityDateIndex, setOpenMultiCityDateIndex] = useState<number | null>(null);
   const [aiLookingFor, setAiLookingFor] = useState("A bit of everything");
-  const [aiStayPreference, setAiStayPreference] = useState("At only the best");
+  const [aiStayPreference, setAiStayPreference] = useState("Comfort stay");
   const [aiBudget, setAiBudget] = useState(3000);
 
   const savedHotelLocation = useBookingStore((s) => s.hotelLocationSelection);
@@ -333,7 +340,7 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
       const nextStayPreference = currentUrlParams.get("stayPreference");
       const nextBudget = Number(currentUrlParams.get("budget") || "");
       if (nextLookingFor) setAiLookingFor(nextLookingFor);
-      if (nextStayPreference) setAiStayPreference(nextStayPreference);
+      if (nextStayPreference) setAiStayPreference(normalizeAiStayPreference(nextStayPreference));
       if (Number.isFinite(nextBudget) && nextBudget > 0) setAiBudget(nextBudget);
     }
   }, [pathname, savedHotelLocation, savedHotelSearch, savedPackageDestination, savedPackageSearch, setFrom, urlParamsKey]);
@@ -950,10 +957,9 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
                     onChange={(event) => setAiStayPreference(event.target.value)}
                     className="h-[46px] rounded-xl border border-[#D3D3D3] bg-white px-4 text-sm font-medium text-[#010D50] outline-none focus:border-[#3754ED]"
                   >
-                    <option>At only the best</option>
-                    <option>Balanced comfort</option>
-                    <option>Value stays</option>
                     <option>Luxury hotels</option>
+                    <option>Comfort stay</option>
+                    <option>Budget friendly</option>
                   </select>
                 </label>
                 <label className="flex flex-col gap-1">

@@ -181,8 +181,21 @@ export function transformBookingToEmailData(params: {
   // Transform journeys
   const journeys: JourneyEmail[] = [];
 
-  // Outbound journey
-  if (flight.outbound) {
+  if (flight.tripType === 'multi-city' && flight.segments?.length) {
+    flight.segments.forEach((segment, index) => {
+      journeys.push({
+        type: 'segment',
+        label: `Flight ${index + 1}`,
+        route: `${segment.departureAirport?.city || segment.departureAirport?.code} - ${segment.arrivalAirport?.city || segment.arrivalAirport?.code}`,
+        date: formatEmailDate(segment.date),
+        arrivalDate: formatArrivalDate(segment.arrivalDate),
+        totalDuration: segment.totalJourneyTime || segment.duration || '',
+        segments: transformSegmentToEmail(segment, cabinClass, flight.airline?.name, flight.airline?.code),
+        stopovers: transformLayoversToEmail(segment),
+      });
+    });
+  } else if (flight.outbound) {
+    // Outbound journey
     const outboundSegments = transformSegmentToEmail(flight.outbound, cabinClass, flight.airline?.name, flight.airline?.code);
     const outboundStopovers = transformLayoversToEmail(flight.outbound);
 
@@ -198,7 +211,7 @@ export function transformBookingToEmailData(params: {
   }
 
   // Inbound journey (if round trip)
-  if (flight.inbound) {
+  if (flight.tripType !== 'multi-city' && flight.inbound) {
     const inboundSegments = transformSegmentToEmail(flight.inbound, cabinClass, flight.airline?.name, flight.airline?.code);
     const inboundStopovers = transformLayoversToEmail(flight.inbound);
 

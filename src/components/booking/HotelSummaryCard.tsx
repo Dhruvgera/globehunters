@@ -127,25 +127,25 @@ export function HotelSummaryCard(props: HotelSummaryCardProps) {
         </div>
       </div>
 
-      <div className="flex items-end justify-between">
-        <div className="text-xs text-[#3A478A]">Price</div>
-        <div className="text-right">
-          {!isPackageMode && (
+      {!isPackageMode && (
+        <div className="flex items-end justify-between">
+          <div className="text-xs text-[#3A478A]">Price</div>
+          <div className="text-right">
             <div className="text-xs text-[#3A478A]">
               Nightly: {formatMoneyFromSymbol(display.currency, display.nightly)}
             </div>
-          )}
-          <div className="text-base font-semibold text-[#010D50]">
-            Total: {formatMoneyFromSymbol(
-              display.currency,
-              (display.total || 0) +
-                (convertedLocalTaxRows.length > 0
-                  ? convertedLocalTaxRows.reduce((sum, row) => sum + Number(row.amount || 0), 0)
-                  : 0)
-            )}
+            <div className="text-base font-semibold text-[#010D50]">
+              Total: {formatMoneyFromSymbol(
+                display.currency,
+                (display.total || 0) +
+                  (convertedLocalTaxRows.length > 0
+                    ? convertedLocalTaxRows.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+                    : 0)
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {display.localTaxes.length > 0 && (
         <div className="bg-[#FFF8F0] border border-[#F5D9B3] rounded-lg p-3 flex flex-col gap-1.5">

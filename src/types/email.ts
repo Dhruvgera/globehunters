@@ -2,8 +2,6 @@
  * Email Types
  */
 
-import { Passenger } from './booking';
-
 export interface FlightSegmentEmail {
   from: string;
   fromCode: string;
@@ -27,7 +25,8 @@ export interface StopoverEmail {
 }
 
 export interface JourneyEmail {
-  type: 'outbound' | 'inbound';
+  type: 'outbound' | 'inbound' | 'segment';
+  label?: string;
   route: string;
   date: string;
   arrivalDate?: string;
@@ -69,6 +68,7 @@ export interface ActivityEmailData {
 }
 
 export interface BookingConfirmationEmailData {
+  bookingType?: 'flight' | 'hotel' | 'package';
   orderNumber: string;
   travelerName: string;
   travelerEmail: string;

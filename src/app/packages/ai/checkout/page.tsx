@@ -1089,7 +1089,12 @@ function AiCheckoutContent() {
             </section>
 
             <section className="rounded-xl border border-[#DFE0E4] bg-white p-5">
-              <h2 className="mb-4 text-lg font-semibold text-[#010D50]">Stays</h2>
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <h2 className="text-lg font-semibold text-[#010D50]">Stays</h2>
+                <div className="text-sm font-semibold text-[#010D50]">
+                  Total stay price: {money(draft.totals?.hotel, currency)}
+                </div>
+              </div>
               <div className="grid gap-4">
                 {destinationDrafts.map((destination, index) => (
                   <div key={destination.id || `${destination.name}-${index}`} className="grid gap-4 rounded-xl border border-[#DFE0E4] p-3 md:grid-cols-[220px_1fr_auto]">
@@ -1137,16 +1142,21 @@ function AiCheckoutContent() {
                   <h2 className="text-lg font-semibold text-[#010D50]">Flight</h2>
                   <div className="mt-1 text-sm font-semibold text-[#010D50]">{draft.flight?.airline?.name}</div>
                 </div>
-                {draft.flight ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setFlightInfoOpen(true)}
-                    className="h-9 rounded-full border-[#DFE0E4] px-4 text-xs font-semibold text-[#3754ED]"
-                  >
-                    View flight info
-                  </Button>
-                ) : null}
+                <div className="flex flex-col items-end gap-2">
+                  <div className="text-sm font-semibold text-[#010D50]">
+                    Total flight price: {money(draft.totals?.flight, currency)}
+                  </div>
+                  {draft.flight ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setFlightInfoOpen(true)}
+                      className="h-9 rounded-full border-[#DFE0E4] px-4 text-xs font-semibold text-[#3754ED]"
+                    >
+                      View flight info
+                    </Button>
+                  ) : null}
+                </div>
               </div>
               <div className="grid gap-3">
                 {flightSummaryLegs.map((leg, index) => (
@@ -1162,7 +1172,12 @@ function AiCheckoutContent() {
             </section>
 
             <section className="rounded-xl border border-[#DFE0E4] bg-white p-5">
-              <h2 className="mb-4 text-lg font-semibold text-[#010D50]">Itinerary</h2>
+              <div className="mb-4 flex items-center justify-between gap-4">
+                <h2 className="text-lg font-semibold text-[#010D50]">Itinerary</h2>
+                <div className="text-sm font-semibold text-[#010D50]">
+                  Total itinerary price: {money(draft.totals?.activities, currency)}
+                </div>
+              </div>
               <div className="grid gap-5">
                 {destinationDrafts.map((destination, destinationIndex) => (
                   <div key={destination.id || `${destination.name}-activities-${destinationIndex}`} className="space-y-3">
@@ -1229,9 +1244,9 @@ function AiCheckoutContent() {
             <h2 className="text-lg font-semibold text-[#010D50]">Trip total</h2>
             <div className="mt-3 text-3xl font-bold text-[#010D50]">{money(draft.totals?.package, currency)}</div>
             <div className="mt-4 grid gap-2 text-sm text-[#3A478A]">
-              <div className="flex justify-between"><span>Flight</span><span>{money(draft.totals?.flight, currency)}</span></div>
-              <div className="flex justify-between"><span>Hotel</span><span>{money(draft.totals?.hotel, currency)}</span></div>
-              <div className="flex justify-between"><span>Activities</span><span>{money(draft.totals?.activities, currency)}</span></div>
+              <div className="flex justify-between"><span>Total flight price</span><span>{money(draft.totals?.flight, currency)}</span></div>
+              <div className="flex justify-between"><span>Total stay price</span><span>{money(draft.totals?.hotel, currency)}</span></div>
+              <div className="flex justify-between"><span>Total itinerary price</span><span>{money(draft.totals?.activities, currency)}</span></div>
             </div>
             {!showTravellers ? (
               <Button

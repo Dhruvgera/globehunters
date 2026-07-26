@@ -30,6 +30,7 @@ const createTransporter = () => {
  */
 export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData): string {
   const { orderNumber, travelerName, travelerEmail, travelerPhone, passengers, journeys, hotel, activities, payment } = data;
+  const bookingLabel = data.bookingType === 'package' ? 'Package' : hotel ? 'Hotel' : 'Flight';
 
   const escapeHtml = (value: unknown) => String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -141,7 +142,7 @@ export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Globehunters: ${hotel ? 'Hotel' : 'Flight'} Booking Confirmation</title>
+  <title>Globehunters: ${bookingLabel} Booking Confirmation</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -333,7 +334,7 @@ function generateHotelSection(hotel: any): string {
  */
 function generateJourneySection(journey: JourneyEmail): string {
   const isOutbound = journey.type === 'outbound';
-  const label = isOutbound ? 'Outbound' : 'Inbound';
+  const label = journey.label || (isOutbound ? 'Outbound' : journey.type === 'inbound' ? 'Inbound' : 'Flight');
 
   // Generate flight segments with stopovers
   let segmentsHTML = '';
@@ -427,7 +428,7 @@ export async function sendConfirmationEmail(
       from: `"${EMAIL_CONFIG.from.name}" <${EMAIL_CONFIG.from.email}>`,
       to,
       replyTo: EMAIL_CONFIG.replyTo,
-      subject: `Globehunters: ${data.hotel ? 'Hotel' : 'Flight'} Booking Confirmation - Order #${data.orderNumber}`,
+      subject: `Globehunters: ${data.bookingType === 'package' ? 'Package' : data.hotel ? 'Hotel' : 'Flight'} Booking Confirmation - Order #${data.orderNumber}`,
       html,
     };
 

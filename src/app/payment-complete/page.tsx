@@ -9,6 +9,7 @@ import { useBookingStore, useSelectedFlight } from "@/store/bookingStore";
 import { useBoxPay } from "@/hooks/useBoxPay";
 import { PaymentCompletionInfo } from "@/types/boxpay";
 import { Flight, FlightSegment } from "@/types/flight";
+import type { Hotel } from "@/types/hotel";
 import { PriceCheckResult, TransformedPriceOption } from "@/types/priceCheck";
 import FlightDetailedInfo from "@/components/flights/FlightDetailedInfo";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
@@ -59,6 +60,9 @@ type ConfirmedActivity = {
 
 type ConfirmedDestination = {
   name?: string;
+  checkIn?: string;
+  checkOut?: string;
+  hotel?: Hotel | null;
   activities?: ConfirmedActivity[];
 };
 
@@ -775,7 +779,7 @@ function PaymentCompleteContent() {
   // Get email from store or vyspa - use vyspaEmailAddress as fallback
   const effectiveContactEmail = storeContactEmail || storeVyspaEmailAddress;
 
-  const flight = storeSelectedFlight;
+  const flight = bookingContext?.flight || storeSelectedFlight;
   const passengers = storePassengers;
   const vyspaFolderNumber = storeVyspaFolderNumber;
 
@@ -1014,7 +1018,45 @@ function PaymentCompleteContent() {
       console.log("Building email data for:", contactEmailForEmail);
 
       let emailData;
-      if (isHotelMode) {
+      if (isPackageMode) {
+        const flightForEmail = ctx?.flight || storeSelectedFlight;
+        if (!flightForEmail) {
+          console.error("Cannot send package email - missing flight data");
+          return;
+        }
+        emailData = transformBookingToEmailData({
+          orderNumber: orderId,
+          flight: flightForEmail,
+          passengers: passengersForEmail,
+          contactEmail: contactEmailForEmail,
+          contactPhone: contactPhoneForEmail,
+          totalAmount: totalPaid,
+          protectionPlanAmount,
+          baggageAmount,
+          creditCardFeesAmount: otherFees,
+          baseFareAmount: baseFareAdjusted,
+          currency: currencyCode,
+          cabinClass: (ctx?.selectedUpgradeOption?.cabinClassDisplay || storeSelectedUpgrade?.cabinClassDisplay || "Economy"),
+        });
+        emailData.bookingType = "package";
+
+        const firstDestination = Array.isArray(ctx?.aiPackageDraft?.destinations)
+          ? (ctx.aiPackageDraft.destinations as ConfirmedDestination[])[0]
+          : undefined;
+        const packageHotel = firstDestination?.hotel;
+        if (packageHotel) {
+          emailData.hotel = {
+            hotelName: packageHotel.name || "Hotel",
+            address: packageHotel.distanceLabel || "",
+            checkIn: firstDestination?.checkIn || "",
+            checkOut: firstDestination?.checkOut || "",
+            nights: calculateNights(firstDestination?.checkIn || "", firstDestination?.checkOut || "") || 1,
+            rooms: Number(packageHotel.price?.rooms || 1),
+            roomType: packageHotel.room?.name || "Selected room",
+            amenities: packageHotel.amenities || [],
+          };
+        }
+      } else if (isHotelMode) {
         const hotelSummary = ctx?.hotelSummary || storeSelectedHotel;
         const roomSummaryForEmail = ctx?.hotelRoomSummary || storeRoomSummary;
         const hotelDetails =
@@ -1152,6 +1194,12 @@ function PaymentCompleteContent() {
         }))
       )
     : [];
+  const confirmationFlightSegments = flight
+    ? flight.tripType === "multi-city" && flight.segments?.length
+      ? flight.segments
+      : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])]
+    : [];
+  const packageTotals = isPackageMode ? ctx?.aiPackageDraft?.totals : null;
   const chargedCurrency = paymentInfo?.currency || ctx?.pricing?.currency || (typeof window !== 'undefined' ? sessionStorage.getItem("pendingOrderCurrency") : null) || "GBP";
   const chargedAmount = (() => {
     const a = paymentInfo?.amount || (typeof window !== 'undefined' ? sessionStorage.getItem("pendingOrderAmount") : null) || (ctx?.pricing?.tripTotal != null ? String(ctx.pricing.tripTotal) : "0");
@@ -1321,6 +1369,30 @@ function PaymentCompleteContent() {
               </div>
             </div>
 
+            {packageTotals && (
+              <div className="bg-white rounded-xl shadow-sm border border-[#E5E7EB] p-6">
+                <h3 className="font-semibold text-[#3754ED] mb-4">Package price breakdown</h3>
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[#6B7280]">Total flight price</span>
+                    <span className="font-semibold text-[#010D50]">{formatPrice(Number(packageTotals.flight || 0), chargedCurrency)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[#6B7280]">Total stay price</span>
+                    <span className="font-semibold text-[#010D50]">{formatPrice(Number(packageTotals.hotel || 0), chargedCurrency)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-[#6B7280]">Total itinerary price</span>
+                    <span className="font-semibold text-[#010D50]">{formatPrice(Number(packageTotals.activities || 0), chargedCurrency)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 border-t border-[#E5E7EB] pt-3">
+                    <span className="font-semibold text-[#010D50]">Trip total</span>
+                    <span className="font-bold text-[#010D50]">{formatPrice(Number(packageTotals.package || chargedAmount), chargedCurrency)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Passenger details */}
             {displayPassengers.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-[#E5E7EB] p-6">
@@ -1450,45 +1522,27 @@ function PaymentCompleteContent() {
             )}
 
             {/* Flight Cards */}
-            {flight && (
-              <div className="flex flex-col lg:flex-row gap-6">
-                {/* Departing Flight */}
-                <FlightConfirmationCard
-                  title="Departing Flight"
-                  date={flight.outbound.date}
-                  passengerCount={passengers.length || 2}
-                  cabinClass={flight.outbound.cabinClass || "Economy"}
-                  airlineName={flight.airline.name}
-                  airlineCode={flight.airline.code}
-                  flightNumber={flight.outbound.flightNumber || "AT555"}
-                  distance={String(flight.outbound.distance || "3123")}
-                  aircraftType={flight.outbound.aircraftType || "Airbus A330-200"}
-                  segment={flight.outbound}
-                  fullFlight={flight}
-                  priceCheck={storePriceCheckData}
-                  selectedUpgradeOption={storeSelectedUpgrade}
-                  onViewDetails={() => { }}
-                />
-
-                {/* Returning Flight (if round trip) */}
-                {flight.inbound && (
+            {flight && confirmationFlightSegments.length > 0 && (
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                {confirmationFlightSegments.map((segment: FlightSegment, index: number) => (
                   <FlightConfirmationCard
-                    title="Returning Flight"
-                    date={flight.inbound.date}
+                    key={`${segment.departureAirport?.code}-${segment.arrivalAirport?.code}-${segment.date}-${index}`}
+                    title={confirmationFlightSegments.length > 2 ? `Flight ${index + 1}` : index === 0 ? "Departing Flight" : "Returning Flight"}
+                    date={segment.date}
                     passengerCount={passengers.length || 2}
-                    cabinClass={flight.inbound.cabinClass || "Economy"}
+                    cabinClass={segment.cabinClass || "Economy"}
                     airlineName={flight.airline.name}
                     airlineCode={flight.airline.code}
-                    flightNumber={flight.inbound.flightNumber || "AT555"}
-                    distance={String(flight.inbound.distance || "3123")}
-                    aircraftType={flight.inbound.aircraftType || "Airbus A330-200"}
-                    segment={flight.inbound}
+                    flightNumber={segment.flightNumber || ""}
+                    distance={String(segment.distance || "")}
+                    aircraftType={segment.aircraftType || ""}
+                    segment={segment}
                     fullFlight={flight}
                     priceCheck={storePriceCheckData}
                     selectedUpgradeOption={storeSelectedUpgrade}
                     onViewDetails={() => { }}
                   />
-                )}
+                ))}
               </div>
             )}
 
