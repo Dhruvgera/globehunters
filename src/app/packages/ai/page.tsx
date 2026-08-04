@@ -37,6 +37,7 @@ import {
 } from "@/app/hotels/hotelUtils";
 import {
   ArrowRight,
+  AlertTriangle,
   BedDouble,
   CalendarDays,
   Car,
@@ -47,12 +48,13 @@ import {
   Dumbbell,
   Edit3,
   Loader2,
+  Mail,
   MapPin,
   Plus,
   SendHorizontal,
+  Share2,
   Sparkles,
   Star,
-  Trash2,
   Utensils,
   Users,
   Waves,
@@ -590,7 +592,14 @@ function sortHotelsByRecommendation(hotels: Hotel[], context: HotelRecommendatio
 
 function selectRecommendedHotel(hotels: Hotel[], context: HotelRecommendationContext) {
   if (hotels.length === 0) return null;
-  return sortHotelsByRecommendation(hotels, context)[0] || hotels[0];
+  const preference = context.stayPreference.toLowerCase();
+  const preferredPool = preference.includes("luxury") || preference.includes("best")
+    ? hotels.filter((hotel) => hotel.starRating >= 4)
+    : preference.includes("budget") || preference.includes("value")
+      ? hotels.filter((hotel) => hotel.starRating <= 3)
+      : hotels.filter((hotel) => hotel.starRating >= 3 && hotel.starRating <= 4);
+  const candidates = preferredPool.length > 0 ? preferredPool : hotels;
+  return sortHotelsByRecommendation(candidates, context)[0] || candidates[0];
 }
 
 function withSearchTimeout<T>(promise: Promise<T>, label: string, timeoutSeconds = VYSPA_SEARCH_TIMEOUT_SEC + 10): Promise<T> {
@@ -932,26 +941,50 @@ function flightStopCount(flight: Flight) {
 
 function selectRecommendedFlight(flights: Flight[], context: { budget: number; stayPreference: string }) {
   if (flights.length === 0) return null;
-  const preference = context.stayPreference.toLowerCase();
-  const luxuryMode = preference.includes("best") || preference.includes("luxury");
-  const valueMode = preference.includes("budget") || preference.includes("value") || preference.includes("econom");
-  const flightBudgetShare = luxuryMode ? 0.32 : valueMode ? 0.42 : 0.36;
-  const flightBudget = context.budget > 0 ? context.budget * flightBudgetShare : 0;
+  void context;
   return [...flights].sort((a, b) => {
-    const score = (flight: Flight) => {
-      const price = Number(flight.price || 0);
-      const overBudgetPenalty =
-        flightBudget > 0 && price > flightBudget ? ((price - flightBudget) / Math.max(flightBudget, 1)) * 1600 : 0;
-      const budgetFitPremium = flightBudget > 0 ? Math.min(price / flightBudget, 1.1) * (luxuryMode ? 700 : 120) : 0;
-      const durationPenalty = flightJourneyMinutes(flight) * (luxuryMode ? 0.35 : 0.18);
-      const stopPenalty = flightStopCount(flight) * (luxuryMode ? 220 : 120);
-      const pricePenalty = valueMode ? price * 1.1 : price * 0.35;
-      return budgetFitPremium - overBudgetPenalty - durationPenalty - stopPenalty - pricePenalty;
-    };
-    const scoreDelta = score(b) - score(a);
-    if (Math.abs(scoreDelta) > 0.01) return scoreDelta;
-    return (a.price || 0) - (b.price || 0);
+    const priceDelta = Number(a.price || 0) - Number(b.price || 0);
+    if (Math.abs(priceDelta) > 0.01) return priceDelta;
+    const stopsDelta = flightStopCount(a) - flightStopCount(b);
+    if (stopsDelta !== 0) return stopsDelta;
+    return flightJourneyMinutes(a) - flightJourneyMinutes(b);
   })[0];
+}
+
+function flightMatchesSearch(flight: Flight | null, search: SearchParams) {
+  if (!flight) return false;
+  const expected = search.tripType === "multi-city" && search.segments?.length
+    ? search.segments.map((segment) => `${segment.from}-${segment.to}-${formatIsoDate(segment.departureDate)}`)
+    : [
+        `${search.from}-${search.to}-${formatIsoDate(search.departureDate)}`,
+        ...(search.returnDate ? [`${search.to}-${search.from}-${formatIsoDate(search.returnDate)}`] : []),
+      ];
+  const actualSegments = flight.tripType === "multi-city" && flight.segments?.length
+    ? flight.segments
+    : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
+  const actual = actualSegments.map((segment) =>
+    `${segment.departureAirport.code}-${segment.arrivalAirport.code}-${segment.date || ""}`
+  );
+  return expected.length === actual.length && expected.every((entry, index) => entry === actual[index]);
+}
+
+function currencySymbol(value: string | null | undefined) {
+  const normalized = String(value || "GBP").trim().toUpperCase();
+  if (normalized === "GBP" || normalized === "£") return "£";
+  if (normalized === "EUR" || normalized === "€") return "€";
+  if (normalized === "USD" || normalized === "$") return "$";
+  return normalized;
+}
+
+function flightArrivalDateForSegment(segment: PackageDestinationSegment | null | undefined, flight: Flight | null | undefined) {
+  if (!segment || !flight) return "";
+  const airportCode = String(segment.airportCode || "").toUpperCase();
+  const segments = flight.tripType === "multi-city" && flight.segments?.length
+    ? flight.segments
+    : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
+  const arrivalSegment = segments.find((item) => String(item.arrivalAirport?.code || "").toUpperCase() === airportCode);
+  const lastFlight = arrivalSegment?.individualFlights?.[arrivalSegment.individualFlights.length - 1];
+  return lastFlight?.arrivalDate || arrivalSegment?.arrivalDate || arrivalSegment?.date || "";
 }
 
 function destinationAirportCodeFromParams(params: { get(name: string): string | null }) {
@@ -1142,12 +1175,20 @@ function ActivityRow({
   activity,
   selected,
   itineraryLabel,
+  itineraryDate,
+  minDate,
+  maxDate,
+  onDateChange,
   onToggle,
   onDetails,
 }: {
   activity: ActivityProduct;
   selected: boolean;
   itineraryLabel: string;
+  itineraryDate: string;
+  minDate: string;
+  maxDate: string;
+  onDateChange: (date: string) => void;
   onToggle: () => void;
   onDetails: () => void;
 }) {
@@ -1173,7 +1214,18 @@ function ActivityRow({
               {activity.duration}
             </span>
           )}
-          <span>{itineraryLabel}</span>
+          <label className="inline-flex items-center gap-1">
+            <span className="sr-only">Activity date</span>
+            <input
+              type="date"
+              value={itineraryDate}
+              min={minDate}
+              max={maxDate}
+              onChange={(event) => onDateChange(event.target.value)}
+              className="h-7 rounded-md border border-[#DFE0E4] bg-white px-1.5 text-xs text-[#010D50]"
+            />
+            <span>{itineraryLabel.split(" - ").at(-1)}</span>
+          </label>
           {activity.rating && (
             <span className="inline-flex items-center gap-1">
               <Star className="h-3.5 w-3.5 fill-[#FFB800] text-[#FFB800]" />
@@ -1241,6 +1293,7 @@ function AiPackageContent() {
   const [selectedActivityCodes, setSelectedActivityCodes] = useState<string[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(true);
   const [activitiesError, setActivitiesError] = useState<string | null>(null);
+  const [activityDatesByCode, setActivityDatesByCode] = useState<Record<string, string>>({});
   const [aiBrief, setAiBrief] = useState("");
   const [aiBriefLoading, setAiBriefLoading] = useState(false);
   const [aiBriefError, setAiBriefError] = useState<string | null>(null);
@@ -1475,10 +1528,7 @@ function AiPackageContent() {
     const cached = readAiPackageLiveCache(paramsKey);
     const patch = consumeAiSelectionPatch();
     const cachedFlightCandidate = patch?.type === "flight" && patch.flight ? patch.flight : cached?.flight || null;
-    const cachedFlight =
-      flightSearch.tripType === "multi-city" && cachedFlightCandidate?.tripType !== "multi-city"
-        ? null
-        : cachedFlightCandidate;
+    const cachedFlight = flightMatchesSearch(cachedFlightCandidate, flightSearch) ? cachedFlightCandidate : null;
     const primarySegment = destinationSegments[0];
     const existingPrimaryState = primarySegment ? destinationStateByIdRef.current[primarySegment.id] : undefined;
     const existingPrimaryHotel =
@@ -2275,17 +2325,18 @@ function AiPackageContent() {
   const activeItineraryStartDate = activeActivityStartDate || activeDestinationCheckIn;
   const activeDestinationCheckOut = activeDestination?.checkOut || checkOut || activeDestinationCheckIn;
   const totalTripDays = Math.max(1, calculateNights(activeItineraryStartDate, activeDestinationCheckOut) || 1);
-  const itineraryActivities = useMemo(
-    () => selectedActivities.slice(0, totalTripDays),
-    [selectedActivities, totalTripDays]
-  );
   const tripDayEntries = useMemo<TripDayEntry[]>(
-    () =>
-      Array.from({ length: totalTripDays }, (_, index) => ({
-        date: addDaysIso(activeItineraryStartDate, index),
-        activity: itineraryActivities[index] || null,
-      })),
-    [activeItineraryStartDate, itineraryActivities, totalTripDays]
+    () => {
+      const datedActivities = selectedActivities.slice(0, totalTripDays).map((activity, index) => ({
+        activity,
+        date: activityDatesByCode[activity.productCode] || addDaysIso(activeItineraryStartDate, index),
+      }));
+      return Array.from({ length: totalTripDays }, (_, index) => {
+        const date = addDaysIso(activeItineraryStartDate, index);
+        return { date, activity: datedActivities.find((entry) => entry.date === date)?.activity || null };
+      });
+    },
+    [activeItineraryStartDate, activityDatesByCode, selectedActivities, totalTripDays]
   );
   const aiActivityContext = useMemo(() => {
     const selectedSet = new Set(selectedActivityCodes);
@@ -2298,12 +2349,12 @@ function AiPackageContent() {
         rating: activity.rating,
         price: activity.price,
         currency: activity.currency || "GBP",
-        dateLabel: `${formatDate(itineraryDateForIndex(activeItineraryStartDate, activeDestinationCheckOut, index), `Day ${(index % totalTripDays) + 1}`)} - ${itinerarySlots[index % itinerarySlots.length]}`,
+        dateLabel: `${formatDate(activityDatesByCode[activity.productCode] || itineraryDateForIndex(activeItineraryStartDate, activeDestinationCheckOut, index), `Day ${(index % totalTripDays) + 1}`)} - ${itinerarySlots[index % itinerarySlots.length]}`,
         selected: selectedSet.has(activity.productCode),
       }))
       .sort((first, second) => Number(second.selected) - Number(first.selected))
       .slice(0, 12);
-  }, [activeDestinationCheckOut, activeItineraryStartDate, activities, itinerarySlots, selectedActivityCodes, totalTripDays]);
+  }, [activeDestinationCheckOut, activeItineraryStartDate, activities, activityDatesByCode, itinerarySlots, selectedActivityCodes, totalTripDays]);
   const aiHotelContext = useMemo(() => {
     const hotel = liveSearch.hotel;
     if (!hotel || (activeDestination && !hotelMatchesSegment(hotel, activeDestination, destinationSegments))) return null;
@@ -2395,7 +2446,6 @@ function AiPackageContent() {
     const state = effectiveDestinationStateById[segment.id];
     return Boolean(
       state &&
-        state.activitiesLoading !== true &&
         state.hotelLoading !== true &&
         (state.hotel || state.hotelError || state.hotelOptions.length === 0)
     );
@@ -2407,8 +2457,7 @@ function AiPackageContent() {
   const packagePricingReady =
     !liveSearch.flightLoading &&
     Boolean(liveSearch.flight || liveSearch.flightError) &&
-    destinationPricingReady &&
-    activitiesPricingReady;
+    destinationPricingReady;
   const liveHotelTotal = destinationSegments.reduce((sum, segment) => {
     const stateHotel = effectiveDestinationStateById[segment.id]?.hotel;
     const matchedLiveHotel = hotelMatchesSegment(liveSearch.hotel, segment, destinationSegments) ? liveSearch.hotel : null;
@@ -2486,20 +2535,18 @@ function AiPackageContent() {
     liveSearch.hotel?.id && !hotelImageFailedById[liveSearch.hotel.id] && isRealHotelImageUrl(liveSearch.hotel?.imageSrc)
       ? liveSearch.hotel?.imageSrc
       : undefined;
-  const destinationImageById = useMemo(() => {
-    const images: Record<string, string | undefined> = {};
-    for (const segment of destinationSegments) {
-      const state = effectiveDestinationStateById[segment.id];
-      images[segment.id] = firstRealImage([
-        isRealHotelImageUrl(state?.hotel?.imageSrc) ? state?.hotel?.imageSrc : undefined,
-        ...(state?.activities || []).map((activity) => activity.imageUrl),
-      ]);
-    }
-    return images;
-  }, [destinationSegments, effectiveDestinationStateById]);
   const liveHotelName = liveSearch.hotel?.name || "Live hotel search";
   const liveHotelRating = liveSearch.hotel?.starRating || 0;
   const liveFlight = liveSearch.flight;
+  const liveHotelAddress = collectTextByKeys(
+    liveSearch.hotel?.rawSearchResult,
+    ["address", "addressline1", "address_line_1", "location"],
+    1
+  )[0] || liveSearch.hotel?.distanceLabel || "";
+  const activeArrivalDate = flightArrivalDateForSegment(activeDestination, liveFlight);
+  const hasArrivalCheckInMismatch = Boolean(
+    activeArrivalDate && activeDestination?.checkIn && activeArrivalDate !== activeDestination.checkIn
+  );
   const nextDestinationMinDate = useMemo(() => {
     const lastDestination = chainedDestinations[chainedDestinations.length - 1];
     return parseIsoDate(lastDestination?.checkOut || checkOut || checkIn) || new Date();
@@ -2964,7 +3011,7 @@ function AiPackageContent() {
         selectedRoomIds: segmentHotelRaw?.selectedRoomId ? [String(segmentHotelRaw.selectedRoomId)] : [],
         activities: segmentActivities.map((activity, index) => ({
           ...activity,
-          itineraryDate: itineraryDateForIndex(segmentActivityStartDate, segment.checkOut, index),
+          itineraryDate: activityDatesByCode[activity.productCode] || itineraryDateForIndex(segmentActivityStartDate, segment.checkOut, index),
           itineraryTime: itinerarySlots[index % itinerarySlots.length],
         })),
         order: segmentIndex + 1,
@@ -3454,6 +3501,21 @@ function AiPackageContent() {
       ).map((segment) => flightSegmentToSummaryLeg(liveFlight, segment))
     : [];
   const passengerLabel = `${adults + children} passenger${adults + children === 1 ? "" : "s"}`;
+  const tripShareData = {
+    title: `GlobeHunters trip to ${destinationSegments.map((segment) => segment.name).join(" and ")}`,
+    text: `${tripDates} · ${passengerLabel} · ${packageCost > 0 ? money(packageCost, liveSearch.flight?.currency || "GBP") : "Live pricing"}`,
+    url: typeof window !== "undefined" ? window.location.href : "",
+  };
+  const shareTrip = async () => {
+    if (navigator.share) {
+      await navigator.share(tripShareData).catch(() => undefined);
+      return;
+    }
+    await navigator.clipboard.writeText(`${tripShareData.text}\n${tripShareData.url}`);
+  };
+  const emailTrip = () => {
+    window.location.href = `mailto:?subject=${encodeURIComponent(tripShareData.title)}&body=${encodeURIComponent(`${tripShareData.text}\n\n${tripShareData.url}`)}`;
+  };
 
   return (
     <div className="min-h-screen bg-white">
@@ -3464,37 +3526,70 @@ function AiPackageContent() {
           <SearchBar compact embedded defaultProduct="ai" />
         </div>
 
-        <div className="mb-5">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <TripStepper />
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" onClick={emailTrip} className="h-9 rounded-lg border-[#DFE0E4] px-3 text-xs font-semibold text-[#010D50]">
+              <Mail className="h-4 w-4" /> Email
+            </Button>
+            <Button type="button" variant="outline" onClick={shareTrip} className="h-9 rounded-lg border-[#DFE0E4] px-3 text-xs font-semibold text-[#010D50]">
+              <Share2 className="h-4 w-4" /> Share
+            </Button>
+            <Button
+              type="button"
+              onClick={() => { setNewDestinationDatesDone(false); setAddDestinationOpen(true); }}
+              className="h-9 rounded-lg bg-[#3754ED] px-3 text-xs font-semibold text-white hover:bg-[#2942D1]"
+            >
+              <Plus className="h-4 w-4" /> Add destination
+            </Button>
+          </div>
         </div>
 
         {destinationSegments.length > 1 ? (
           <div className="mb-5 flex flex-wrap gap-2">
             {destinationSegments.map((segment, index) => (
-              <button
-                key={segment.id}
-                type="button"
-                onClick={() => showDestinationState(index)}
-                className={[
-                  "rounded-full border px-4 py-2 text-sm font-semibold transition-colors",
-                  index === activeDestinationIndex
-                    ? "border-[#3754ED] bg-[#3754ED] text-white"
-                    : "border-[#DFE0E4] bg-white text-[#010D50] hover:border-[#3754ED]",
-                ].join(" ")}
-              >
-                {segment.name}
-                <span className={index === activeDestinationIndex ? "ml-2 text-white/80" : "ml-2 text-[#3A478A]"}>
-                  {shortDate(segment.checkIn, "Date")} - {shortDate(segment.checkOut, "Date")}
-                </span>
-              </button>
+              <div key={segment.id} className="inline-flex overflow-hidden rounded-lg border border-[#DFE0E4] bg-white">
+                <button
+                  type="button"
+                  onClick={() => showDestinationState(index)}
+                  className={[
+                    "px-4 py-2 text-sm font-semibold transition-colors",
+                    index === activeDestinationIndex ? "bg-[#3754ED] text-white" : "text-[#010D50] hover:bg-[#F5F7FF]",
+                  ].join(" ")}
+                >
+                  {segment.name}
+                  <span className={index === activeDestinationIndex ? "ml-2 text-white/80" : "ml-2 text-[#3A478A]"}>
+                    {shortDate(segment.checkIn, "Date")} - {shortDate(segment.checkOut, "Date")}
+                  </span>
+                </button>
+                {index > 0 ? (
+                  <button
+                    type="button"
+                    aria-label={`Remove ${segment.name}`}
+                    onClick={() => {
+                      const nextIndex = activeDestinationIndex >= index ? Math.max(0, activeDestinationIndex - 1) : activeDestinationIndex;
+                      setChainedDestinations((current) => current.filter((row) => row.id !== segment.id));
+                      setDestinationStateById((current) => {
+                        const next = { ...current };
+                        delete next[segment.id];
+                        return next;
+                      });
+                      setActiveDestinationIndex(nextIndex);
+                    }}
+                    className="border-l border-[#DFE0E4] px-3 text-sm font-semibold text-red-600 hover:bg-red-50"
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </div>
             ))}
           </div>
         ) : null}
 
-        <div className="grid gap-5 lg:grid-cols-[430px_1fr]">
-          <aside className="flex flex-col gap-4">
+        <div className="grid gap-5 lg:grid-cols-[1fr_430px]">
+          <aside className="flex flex-col gap-4 lg:order-2">
             <section className="rounded-xl border border-[#DFE0E4] bg-white p-4">
-              <h2 className="mb-4 text-lg font-semibold text-[#010D50]">Package Cost</h2>
+              <h2 className="mb-4 text-lg font-semibold text-[#010D50]">Trip total</h2>
               {packagePricingReady ? (
                 <div className="text-3xl font-bold text-[#010D50]">
                   {packageCost > 0 ? money(packageCost, liveSearch.flight?.currency || liveSearch.hotel?.price.currency || "GBP") : "Live price unavailable"}
@@ -3505,10 +3600,9 @@ function AiPackageContent() {
                   <span className="animate-pulse">Calculating the best price for you...</span>
                 </div>
               )}
-              <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-[#3A478A]">
-                <div>Flight: {liveSearch.flightLoading ? "Loading" : liveFlightTotal ? money(liveFlightTotal, liveSearch.flight?.currency || "GBP") : "Unavailable"}</div>
-                <div>Hotel: {destinationPricingReady ? liveHotelTotal ? money(liveHotelTotal, liveSearch.hotel?.price.currency || "GBP") : "Unavailable" : "Calculating"}</div>
-                <div>Activities: {activitiesPricingReady ? money(activityTotal, "GBP") : "Calculating"}</div>
+              <div className="mt-3 grid gap-2 text-xs text-[#3A478A]">
+                <div>Flights and stays included</div>
+                {activityTotal > 0 ? <div>Extra activities: {activitiesPricingReady ? money(activityTotal, "GBP") : "Calculating"}</div> : null}
                 <div>Live sources only</div>
               </div>
               {budgetNotice ? (
@@ -3712,22 +3806,9 @@ function AiPackageContent() {
               </div>
             </section>
 
-            <div className="rounded-xl border border-[#DFE0E4] bg-white p-4 text-center">
-              <div className="mb-3 text-sm font-semibold text-[#010D50]">Your trip ends here</div>
-              <Button
-                type="button"
-                onClick={() => {
-                  setNewDestinationDatesDone(false);
-                  setAddDestinationOpen(true);
-                }}
-                className="w-full rounded-xl bg-[#3754ED] text-white hover:bg-[#2942D1]"
-              >
-                Click here to add destination
-              </Button>
-            </div>
           </aside>
 
-          <div className="flex min-w-0 flex-col gap-5">
+          <div className="flex min-w-0 flex-col gap-5 lg:order-1">
             <section className="rounded-xl border border-[#DFE0E4] bg-white p-4">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold text-[#010D50]">Flight Details</h2>
@@ -3745,9 +3826,6 @@ function AiPackageContent() {
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
                       <div className="text-sm font-semibold text-[#010D50]">{liveFlight.airline.name}</div>
-                      <div className="text-xs text-[#3A478A]">
-                        {money(liveFlight.pricePerPerson || liveFlight.price / Math.max(1, adults + children), liveFlight.currency)} per person
-                      </div>
                     </div>
                     <Button
                       type="button"
@@ -3778,6 +3856,15 @@ function AiPackageContent() {
                 Curated for your perfect {lookingFor.toLowerCase()} getaway
               </div>
             </section>
+
+            {hasArrivalCheckInMismatch ? (
+              <div className="flex items-start gap-3 border border-[#F4B8D9] bg-[#FFF5FB] px-4 py-3 text-sm text-[#6B2151]">
+                <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                <span>
+                  Your flight arrives on {formatDate(activeArrivalDate, activeArrivalDate)}, but hotel check-in starts on {formatDate(activeDestination?.checkIn, activeDestination?.checkIn || "")}. Review flight or hotel dates before booking.
+                </span>
+              </div>
+            ) : null}
 
             <section className="rounded-xl border border-[#DFE0E4] bg-white p-4">
               <div className="mb-4 flex items-center justify-between gap-3">
@@ -3835,9 +3922,16 @@ function AiPackageContent() {
                     ) : null}
                   </div>
                   <p className="mt-2 text-sm text-[#3A478A]">{liveSearch.hotel?.distanceLabel || stayPreference}</p>
-                  <div className="mt-3 text-sm font-semibold text-[#010D50]">
-                    {liveSearch.hotel?.price.total ? money(liveSearch.hotel.price.total, liveSearch.hotel.price.currency || "GBP") : null}
-                  </div>
+                  {liveHotelAddress ? (
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${liveHotelName} ${liveHotelAddress}`)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[#3754ED]"
+                    >
+                      <MapPin className="h-3.5 w-3.5" /> {liveHotelAddress} · Show on map
+                    </a>
+                  ) : null}
                   {liveSearch.hotel?.room?.name ? (
                     <div className="mt-3 rounded-xl border border-[#DFE0E4] bg-[#F5F7FF] p-3">
                       <div className="text-xs font-medium text-[#3A478A]">Selected room</div>
@@ -3922,65 +4016,14 @@ function AiPackageContent() {
                     activity={activity}
                     selected={selectedActivityCodes.includes(activity.productCode)}
                     itineraryLabel={itineraryLabelFor(index)}
+                    itineraryDate={activityDatesByCode[activity.productCode] || itineraryDateForIndex(activeItineraryStartDate, activeDestinationCheckOut, index)}
+                    minDate={activeItineraryStartDate}
+                    maxDate={addDaysIso(activeDestinationCheckOut, -1) || activeDestinationCheckOut}
+                    onDateChange={(date) => setActivityDatesByCode((current) => ({ ...current, [activity.productCode]: date }))}
                     onToggle={() => toggleActivity(activity.productCode)}
                     onDetails={() => setSelectedActivityDetails(activity)}
                   />
                 ))}
-              </div>
-            </section>
-
-            <section className="rounded-xl border border-[#DFE0E4] bg-white p-4">
-              <h2 className="mb-4 text-lg font-semibold text-[#010D50]">Add more destinations</h2>
-              <div className="grid gap-4 sm:grid-cols-[320px_1fr]">
-                {destinationSegments.map((item, index) => (
-                  <div key={item.id} className="grid min-h-[150px] overflow-hidden rounded-xl border border-[#DFE0E4] bg-[#F5F7FF] sm:grid-cols-[160px_1fr]">
-                    <div className="relative min-h-[150px] bg-[#F5F7FF]">
-                      {destinationImageById[item.id] ? (
-                        <Image src={destinationImageById[item.id] || ""} alt={item.name} fill className="object-cover" />
-                      ) : null}
-                    </div>
-                    <div>
-                      <div className="flex h-full min-h-[150px] flex-col justify-between p-4">
-                        <div>
-                          <div className="text-sm font-semibold text-[#010D50]">{item.name}</div>
-                          <div className="mt-1 text-xs text-[#3A478A]">
-                            {shortDate(item.checkIn, "Add date")} - {shortDate(item.checkOut, "Add date")}
-                          </div>
-                        </div>
-                        {index > 0 ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const nextIndex = activeDestinationIndex >= index ? Math.max(0, activeDestinationIndex - 1) : activeDestinationIndex;
-                              setChainedDestinations((current) => current.filter((row) => row.id !== item.id));
-                              setDestinationStateById((current) => {
-                                const next = { ...current };
-                                delete next[item.id];
-                                return next;
-                              });
-                              setActiveDestinationIndex(nextIndex);
-                            }}
-                            className="inline-flex items-center gap-1 text-xs font-medium text-red-600"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            Remove
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNewDestinationDatesDone(false);
-                    setAddDestinationOpen(true);
-                  }}
-                  className="flex min-h-[150px] items-center justify-center gap-2 rounded-xl border border-dashed border-[#B7BFEA] text-sm font-semibold text-[#3754ED]"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add a destination
-                </button>
               </div>
             </section>
 
@@ -4014,6 +4057,23 @@ function AiPackageContent() {
         <DialogContent className="max-h-[min(92vh,860px)] max-w-[min(100vw-24px,1080px)] overflow-y-auto bg-white">
           <DialogHeader>
             <DialogTitle className="pr-6 text-[#010D50]">{liveHotelName}</DialogTitle>
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-[#3A478A]">
+              <span className="inline-flex items-center gap-1" aria-label={`${liveHotelRating} star hotel`}>
+                {Array.from({ length: Math.max(1, liveHotelRating) }).map((_, index) => (
+                  <Star key={index} className="h-4 w-4 fill-[#FFB800] text-[#FFB800]" />
+                ))}
+              </span>
+              {(hotelDetails?.address || liveHotelAddress) ? (
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${liveHotelName} ${hotelDetails?.address || liveHotelAddress}`)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 font-medium text-[#3754ED]"
+                >
+                  <MapPin className="h-4 w-4" /> {hotelDetails?.address || liveHotelAddress} · Show on map
+                </a>
+              ) : null}
+            </div>
           </DialogHeader>
           {liveSearch.hotel ? (
             <div className="space-y-5">
@@ -4070,12 +4130,14 @@ function AiPackageContent() {
                     <SummaryTile label="Rooms" value={`${rooms} room${rooms === 1 ? "" : "s"}`} icon={<BedDouble className="h-4 w-4" />} />
                   </div>
 
-                  <section>
-                    <h3 className="text-base font-semibold text-[#010D50]">About</h3>
-                    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[#3A478A]">
-                      {hotelDetails?.description || liveSearch.hotel.description || "Detailed supplier description is not available for this hotel yet."}
-                    </p>
-                  </section>
+                  {(hotelDetails?.description || liveSearch.hotel.description) ? (
+                    <section>
+                      <h3 className="text-base font-semibold text-[#010D50]">About</h3>
+                      <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[#3A478A]">
+                        {hotelDetails?.description || liveSearch.hotel.description}
+                      </p>
+                    </section>
+                  ) : null}
 
                   <section>
                     <h3 className="text-base font-semibold text-[#010D50]">Amenities</h3>
@@ -4193,7 +4255,7 @@ function AiPackageContent() {
                     onPriceRangeChange={(range) => setHotelFilters((current) => ({ ...current, priceRange: range }))}
                     minPrice={hotelFilterPriceBounds.min}
                     maxPrice={hotelFilterPriceBounds.max}
-                    currencySymbol={liveSearch.hotel?.price.currency || hotelOptions[0]?.price.currency || String.fromCharCode(163)}
+                    currencySymbol={currencySymbol(liveSearch.hotel?.price.currency || hotelOptions[0]?.price.currency || "GBP")}
                     expanded={hotelFiltersExpanded}
                     onToggleExpanded={(key) => setHotelFiltersExpanded((current) => ({ ...current, [key]: !current[key] }))}
                     availableMealPlans={availableHotelMealPlans}

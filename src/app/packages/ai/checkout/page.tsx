@@ -1091,9 +1091,6 @@ function AiCheckoutContent() {
             <section className="rounded-xl border border-[#DFE0E4] bg-white p-5">
               <div className="mb-4 flex items-center justify-between gap-4">
                 <h2 className="text-lg font-semibold text-[#010D50]">Stays</h2>
-                <div className="text-sm font-semibold text-[#010D50]">
-                  Total stay price: {money(draft.totals?.hotel, currency)}
-                </div>
               </div>
               <div className="grid gap-4">
                 {destinationDrafts.map((destination, index) => (
@@ -1118,7 +1115,6 @@ function AiCheckoutContent() {
                           ) : null}
                         </div>
                       ) : null}
-                      <div className="mt-3 font-semibold text-[#010D50]">{money(destination.hotel?.price?.total, destination.hotel?.price?.currency || currency)}</div>
                     </div>
                     <Button
                       type="button"
@@ -1143,9 +1139,6 @@ function AiCheckoutContent() {
                   <div className="mt-1 text-sm font-semibold text-[#010D50]">{draft.flight?.airline?.name}</div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
-                  <div className="text-sm font-semibold text-[#010D50]">
-                    Total flight price: {money(draft.totals?.flight, currency)}
-                  </div>
                   {draft.flight ? (
                     <Button
                       type="button"
@@ -1174,9 +1167,6 @@ function AiCheckoutContent() {
             <section className="rounded-xl border border-[#DFE0E4] bg-white p-5">
               <div className="mb-4 flex items-center justify-between gap-4">
                 <h2 className="text-lg font-semibold text-[#010D50]">Itinerary</h2>
-                <div className="text-sm font-semibold text-[#010D50]">
-                  Total itinerary price: {money(draft.totals?.activities, currency)}
-                </div>
               </div>
               <div className="grid gap-5">
                 {destinationDrafts.map((destination, destinationIndex) => (
@@ -1244,9 +1234,10 @@ function AiCheckoutContent() {
             <h2 className="text-lg font-semibold text-[#010D50]">Trip total</h2>
             <div className="mt-3 text-3xl font-bold text-[#010D50]">{money(draft.totals?.package, currency)}</div>
             <div className="mt-4 grid gap-2 text-sm text-[#3A478A]">
-              <div className="flex justify-between"><span>Total flight price</span><span>{money(draft.totals?.flight, currency)}</span></div>
-              <div className="flex justify-between"><span>Total stay price</span><span>{money(draft.totals?.hotel, currency)}</span></div>
-              <div className="flex justify-between"><span>Total itinerary price</span><span>{money(draft.totals?.activities, currency)}</span></div>
+              <div>Flights and stays included</div>
+              {Number(draft.totals?.activities || 0) > 0 ? (
+                <div className="flex justify-between"><span>Extra activities</span><span>{money(draft.totals?.activities, currency)}</span></div>
+              ) : null}
             </div>
             {!showTravellers ? (
               <Button

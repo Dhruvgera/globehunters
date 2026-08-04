@@ -968,7 +968,10 @@ function PaymentCompleteContent() {
 
   // Send confirmation email async
   const sendConfirmationEmailAsync = useCallback(async (orderId: string, amount?: string, currency?: string) => {
-    if (emailSent) return;
+    const emailSentKey = `emailSent_${orderId}`;
+    if (emailSent || sessionStorage.getItem(emailSentKey)) return;
+    // Claim order before awaiting network work. Prevents duplicate sends from effect reruns/Strict Mode remounts.
+    sessionStorage.setItem(emailSentKey, "sending");
 
     try {
       setEmailError(null);
@@ -1126,13 +1129,15 @@ function PaymentCompleteContent() {
 
       if (result.success) {
         setEmailSent(true);
-        sessionStorage.setItem(`emailSent_${orderId}`, "true");
+        sessionStorage.setItem(emailSentKey, "true");
         console.log("Confirmation email sent successfully to:", contactEmailForEmail);
       } else {
+        sessionStorage.removeItem(emailSentKey);
         setEmailError(result.error || "Failed to send confirmation email");
         console.error("Failed to send confirmation email:", result.error);
       }
     } catch (error) {
+      sessionStorage.removeItem(emailSentKey);
       setEmailError(error instanceof Error ? error.message : "Failed to send confirmation email");
       console.error('Error sending confirmation email:', error);
     }
