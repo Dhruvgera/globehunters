@@ -44,14 +44,12 @@ import {
   CheckCircle2,
   Clock,
   Coffee,
-  MessageCircle,
   Dumbbell,
   Edit3,
   Loader2,
   Mail,
   MapPin,
   Plus,
-  SendHorizontal,
   Share2,
   Sparkles,
   Star,
@@ -148,11 +146,6 @@ type RichHotelDetails = {
 };
 
 type HotelChangeSortMode = "recommended" | "price_low" | "review_score";
-
-type AiChatMessage = {
-  role: "user" | "assistant";
-  content: string;
-};
 
 type HotelRecommendationContext = {
   stayPreference: string;
@@ -1294,15 +1287,6 @@ function AiPackageContent() {
   const [activitiesLoading, setActivitiesLoading] = useState(true);
   const [activitiesError, setActivitiesError] = useState<string | null>(null);
   const [activityDatesByCode, setActivityDatesByCode] = useState<Record<string, string>>({});
-  const [aiBrief, setAiBrief] = useState("");
-  const [aiBriefLoading, setAiBriefLoading] = useState(false);
-  const [aiBriefError, setAiBriefError] = useState<string | null>(null);
-  const [aiActivityNotes, setAiActivityNotes] = useState<Record<string, string>>({});
-  const [aiChatMessages, setAiChatMessages] = useState<AiChatMessage[]>([]);
-  const [aiChatInput, setAiChatInput] = useState("");
-  const [aiChatLoading, setAiChatLoading] = useState(false);
-  const [aiChatError, setAiChatError] = useState<string | null>(null);
-  const aiChatScrollRef = useRef<HTMLDivElement | null>(null);
   const [hotelOptions, setHotelOptions] = useState<Hotel[]>([]);
   const [destinationStateById, setDestinationStateById] = useState<Record<string, DestinationLiveState>>({});
   const destinationStateByIdRef = useRef<Record<string, DestinationLiveState>>({});
@@ -2338,71 +2322,6 @@ function AiPackageContent() {
     },
     [activeItineraryStartDate, activityDatesByCode, selectedActivities, totalTripDays]
   );
-  const aiActivityContext = useMemo(() => {
-    const selectedSet = new Set(selectedActivityCodes);
-    return activities
-      .map((activity, index) => ({
-        productCode: activity.productCode,
-        title: activity.title,
-        description: activity.description,
-        duration: activity.duration,
-        rating: activity.rating,
-        price: activity.price,
-        currency: activity.currency || "GBP",
-        dateLabel: `${formatDate(activityDatesByCode[activity.productCode] || itineraryDateForIndex(activeItineraryStartDate, activeDestinationCheckOut, index), `Day ${(index % totalTripDays) + 1}`)} - ${itinerarySlots[index % itinerarySlots.length]}`,
-        selected: selectedSet.has(activity.productCode),
-      }))
-      .sort((first, second) => Number(second.selected) - Number(first.selected))
-      .slice(0, 12);
-  }, [activeDestinationCheckOut, activeItineraryStartDate, activities, activityDatesByCode, itinerarySlots, selectedActivityCodes, totalTripDays]);
-  const aiHotelContext = useMemo(() => {
-    const hotel = liveSearch.hotel;
-    if (!hotel || (activeDestination && !hotelMatchesSegment(hotel, activeDestination, destinationSegments))) return null;
-    return {
-      name: hotel.name,
-      city: hotel.cityName || activeDestination?.name || destination,
-      room: hotel.room?.name,
-      board: hotel.room?.highlights?.join(", "),
-      checkIn: activeDestination?.checkIn || checkIn,
-      checkOut: activeDestination?.checkOut || checkOut,
-      price: hotel.price?.total,
-      currency: hotel.price?.currency || "GBP",
-      starRating: hotel.starRating,
-      reviewScore: hotel.reviews?.score,
-      reviewLabel: hotel.reviews?.label,
-      reviewCount: hotel.reviews?.count,
-      distanceLabel: hotel.distanceLabel,
-      amenities: hotel.amenities,
-    };
-  }, [activeDestination, checkIn, checkOut, destination, destinationSegments, liveSearch.hotel]);
-  const aiFlightContext = useMemo(() => {
-    const flight = liveSearch.flight;
-    if (!flight) return null;
-    const segments = flight.tripType === "multi-city" && flight.segments?.length
-      ? flight.segments
-      : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
-    const legs = segments.map((segment) => flightSegmentToSummaryLeg(flight, segment));
-    return {
-      airline: flight.airline?.name,
-      price: flight.price,
-      pricePerPerson: flight.pricePerPerson || flight.price / Math.max(1, adults + children),
-      currency: flight.currency || "GBP",
-      cabinClass: legs.find((leg) => leg.cabinClass)?.cabinClass,
-      legs,
-    };
-  }, [adults, children, liveSearch.flight]);
-  const aiContextKey = useMemo(
-    () =>
-      [
-        activeDestinationId,
-        activeActivitiesKey,
-        selectedActivityCodes.join(","),
-        aiActivityContext.map((activity) => `${activity.productCode}:${activity.dateLabel}`).join("|"),
-        aiHotelContext ? `${aiHotelContext.name}:${aiHotelContext.room}:${aiHotelContext.price}` : "no-hotel",
-        aiFlightContext ? `${aiFlightContext.airline}:${aiFlightContext.price}:${aiFlightContext.legs.map((leg) => `${leg.fromCode}-${leg.toCode}-${leg.date}`).join("|")}` : "no-flight",
-      ].join("::"),
-    [activeActivitiesKey, activeDestinationId, aiActivityContext, aiFlightContext, aiHotelContext, selectedActivityCodes]
-  );
   const activeMatchedHotel =
     activeDestination && hotelMatchesSegment(liveSearch.hotel, activeDestination, destinationSegments) ? liveSearch.hotel : null;
   const effectiveDestinationStateById = useMemo(
@@ -2551,82 +2470,6 @@ function AiPackageContent() {
     const lastDestination = chainedDestinations[chainedDestinations.length - 1];
     return parseIsoDate(lastDestination?.checkOut || checkOut || checkIn) || new Date();
   }, [chainedDestinations, checkIn, checkOut]);
-
-  useEffect(() => {
-    setAiChatMessages([]);
-    setAiChatInput("");
-    setAiChatError(null);
-  }, [activeDestinationId]);
-
-  useEffect(() => {
-    const container = aiChatScrollRef.current;
-    if (!container) return;
-    window.requestAnimationFrame(() => {
-      container.scrollTop = container.scrollHeight;
-    });
-  }, [aiBrief, aiBriefError, aiBriefLoading, aiChatLoading, aiChatMessages.length]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    if (activitiesLoading) {
-      setAiBriefLoading(true);
-      setAiBriefError(null);
-      return () => controller.abort();
-    }
-    if (aiActivityContext.length === 0) {
-      setAiBrief("");
-      setAiActivityNotes({});
-      setAiBriefLoading(false);
-      setAiBriefError(activitiesError ? "AI brief unavailable until live activities return." : null);
-      return () => controller.abort();
-    }
-
-    async function loadAiBrief() {
-      setAiBriefLoading(true);
-      setAiBriefError(null);
-      try {
-        const response = await fetch("/api/packages/ai/assistant", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: controller.signal,
-          body: JSON.stringify({
-            mode: "itinerary",
-            destination: activeDestination?.name || destination,
-            dateRange: tripDates,
-            lookingFor,
-            stayPreference,
-            hotel: aiHotelContext,
-            flight: aiFlightContext,
-            activities: aiActivityContext,
-          }),
-        });
-        const data = (await response.json().catch(() => ({}))) as {
-          text?: string;
-          error?: string;
-          notes?: Array<{ productCode?: string; note?: string }>;
-        };
-        if (!response.ok) throw new Error(data.error || "AI brief failed.");
-        setAiBrief(data.text || "");
-        setAiActivityNotes(
-          Object.fromEntries(
-            (data.notes || [])
-              .filter((note) => note.productCode && note.note)
-              .map((note) => [String(note.productCode), String(note.note)])
-          )
-        );
-      } catch (error) {
-        if (controller.signal.aborted) return;
-        setAiBrief("");
-        setAiActivityNotes({});
-        setAiBriefError(error instanceof Error ? error.message : "AI brief failed.");
-      } finally {
-        if (!controller.signal.aborted) setAiBriefLoading(false);
-      }
-    }
-
-    loadAiBrief();
-    return () => controller.abort();
-  }, [activeDestination?.name, activitiesError, activitiesLoading, aiActivityContext, aiContextKey, aiFlightContext, aiHotelContext, destination, lookingFor, stayPreference, tripDates]);
 
   useEffect(() => {
     if (!addDestinationOpen) return;
@@ -2957,41 +2800,6 @@ function AiPackageContent() {
       });
       return next;
     });
-  };
-
-  const submitAiChat = async () => {
-    const question = aiChatInput.trim().slice(0, 600);
-    if (!question || aiChatLoading) return;
-    const nextMessages: AiChatMessage[] = [...aiChatMessages, { role: "user", content: question } as AiChatMessage].slice(-8);
-    setAiChatMessages(nextMessages);
-    setAiChatInput("");
-    setAiChatLoading(true);
-    setAiChatError(null);
-    try {
-      const response = await fetch("/api/packages/ai/assistant", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: "chat",
-          destination: activeDestination?.name || destination,
-          dateRange: tripDates,
-          lookingFor,
-          stayPreference,
-          hotel: aiHotelContext,
-          flight: aiFlightContext,
-          activities: aiActivityContext,
-          history: nextMessages,
-          question,
-        }),
-      });
-      const data = (await response.json().catch(() => ({}))) as { text?: string; error?: string };
-      if (!response.ok) throw new Error(data.error || "AI chat failed.");
-      setAiChatMessages((current) => [...current, { role: "assistant", content: data.text || "I could not answer from the current itinerary." } as AiChatMessage].slice(-8));
-    } catch (error) {
-      setAiChatError(error instanceof Error ? error.message : "AI chat failed.");
-    } finally {
-      setAiChatLoading(false);
-    }
   };
 
   const continueToNextStep = () => {
@@ -3665,7 +3473,6 @@ function AiPackageContent() {
                   {tripDayEntries.map((entry, index) => {
                     const activity = entry.activity;
                     const dateParts = compactDateParts(entry.date, String(index + 1).padStart(2, "0"));
-                    const note = activity ? aiActivityNotes[activity.productCode] : null;
                     return (
                       <Fragment key={`${entry.date}-${activity?.productCode || "leisure"}`}>
                         <div className="flex flex-col items-center">
@@ -3704,14 +3511,7 @@ function AiPackageContent() {
                                       </span>
                                     ) : null}
                                   </div>
-                                  {note ? (
-                                    <p className="mt-2 text-xs leading-relaxed text-[#3A478A]">{note}</p>
-                                  ) : aiBriefLoading ? (
-                                    <p className="mt-2 inline-flex items-center gap-2 text-xs text-[#3A478A]">
-                                      <Loader2 className="h-3.5 w-3.5 animate-spin text-[#3754ED]" />
-                                      Writing AI activity note...
-                                    </p>
-                                  ) : activity.description ? (
+                                  {activity.description ? (
                                     <p className="mt-2 text-xs leading-relaxed text-[#3A478A]">{truncateWords(activity.description, 64)}</p>
                                   ) : null}
                                 </>
@@ -3734,75 +3534,6 @@ function AiPackageContent() {
                     {activitiesError}
                   </div>
                 )}
-              </div>
-            </section>
-
-            <section className="rounded-xl border border-[#DFE0E4] bg-white p-4">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="inline-flex items-center gap-2 text-lg font-semibold text-[#010D50]">
-                  <MessageCircle className="h-4 w-4 text-[#3754ED]" />
-                  AI Activity Guide
-                </h2>
-                <span className="rounded-full bg-[#F5F7FF] px-2 py-1 text-[11px] font-semibold text-[#3A478A]">120 words</span>
-              </div>
-              <div ref={aiChatScrollRef} className="max-h-72 space-y-2 overflow-auto pr-1">
-                <div className="mr-6 whitespace-pre-line rounded-xl bg-[#F5F7FF] px-4 py-3 text-sm leading-6 text-[#26356F]">
-                  {aiBriefLoading ? (
-                    <span className="inline-flex items-center gap-2 text-[#3A478A]">
-                      <Loader2 className="h-4 w-4 animate-spin text-[#3754ED]" />
-                      Writing activity brief...
-                    </span>
-                  ) : aiBriefError ? (
-                    <span className="break-words text-red-600">{aiBriefError}</span>
-                  ) : aiBrief ? (
-                    aiBrief
-                  ) : (
-                    "Select live activities to generate a trip brief."
-                  )}
-                </div>
-                {aiChatMessages.map((message, index) => (
-                  <div
-                    key={`${message.role}-${index}`}
-                    className={[
-                      "whitespace-pre-line rounded-xl px-3 py-2 text-xs leading-relaxed",
-                      message.role === "user"
-                        ? "ml-6 bg-[#3754ED] text-white"
-                        : "mr-6 bg-[#F5F7FF] text-[#010D50]",
-                    ].join(" ")}
-                  >
-                    {message.content}
-                  </div>
-                ))}
-                {aiChatLoading ? (
-                  <div className="mr-6 inline-flex items-center gap-2 rounded-xl bg-[#F5F7FF] px-3 py-2 text-xs text-[#3A478A]">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-[#3754ED]" />
-                    Checking itinerary...
-                  </div>
-                ) : null}
-              </div>
-              {aiChatError ? <div className="mt-2 break-words text-xs text-red-600">{aiChatError}</div> : null}
-              <div className="mt-3 flex gap-2">
-                <input
-                  value={aiChatInput}
-                  onChange={(event) => setAiChatInput(event.target.value.slice(0, 600))}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !event.shiftKey) {
-                      event.preventDefault();
-                      submitAiChat();
-                    }
-                  }}
-                  placeholder="Ask about the itinerary"
-                  className="h-10 min-w-0 flex-1 rounded-xl border border-[#DFE0E4] px-3 text-sm text-[#010D50] outline-none placeholder:text-[#98A0C2] focus:border-[#3754ED]"
-                />
-                <Button
-                  type="button"
-                  onClick={submitAiChat}
-                  disabled={aiChatLoading || !aiChatInput.trim() || (!aiActivityContext.length && !aiHotelContext && !aiFlightContext)}
-                  className="h-10 rounded-xl bg-[#3754ED] px-3 text-white hover:bg-[#2942D1] disabled:bg-[#AEB8F8]"
-                  aria-label="Send AI itinerary question"
-                >
-                  <SendHorizontal className="h-4 w-4" />
-                </Button>
               </div>
             </section>
 
@@ -4089,16 +3820,6 @@ function AiPackageContent() {
                       <Image src={image} alt="" fill className="object-cover" />
                     </div>
                   ))}
-                  {(hotelDetails?.images || []).length <= 1 ? (
-                    <div className="rounded-xl border border-[#DFE0E4] p-4">
-                      <div className="flex items-center gap-1">
-                        {Array.from({ length: Math.max(1, liveHotelRating) }).map((_, index) => (
-                          <Star key={index} className="h-4 w-4 fill-[#FFB800] text-[#FFB800]" />
-                        ))}
-                      </div>
-                      <p className="mt-3 text-sm text-[#3A478A]">{liveSearch.hotel.distanceLabel || stayPreference}</p>
-                    </div>
-                  ) : null}
                 </div>
               </div>
 
@@ -4110,17 +3831,6 @@ function AiPackageContent() {
                       {hotelDetailsLoading ? <span>Fetching full hotel details...</span> : null}
                       {hotelDetailsError ? <span className="text-[#B42318]">{hotelDetailsError}</span> : null}
                     </div>
-                    <div className="mt-2 flex items-center gap-1">
-                      {Array.from({ length: Math.max(1, liveHotelRating) }).map((_, index) => (
-                        <Star key={index} className="h-4 w-4 fill-[#FFB800] text-[#FFB800]" />
-                      ))}
-                    </div>
-                    {hotelDetails?.address ? (
-                      <div className="mt-2 flex items-start gap-2 text-sm text-[#3A478A]">
-                        <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#3754ED]" />
-                        <span>{hotelDetails.address}</span>
-                      </div>
-                    ) : null}
                   </div>
 
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
