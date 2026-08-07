@@ -46,6 +46,7 @@ export interface PaymentDetailsEmail {
 }
 
 export interface HotelEmailData {
+  destination?: string;
   hotelName: string;
   address: string;
   checkIn: string;
@@ -81,6 +82,7 @@ export interface BookingConfirmationEmailData {
   }[];
   journeys?: JourneyEmail[];
   hotel?: HotelEmailData;
+  hotels?: HotelEmailData[];
   activities?: ActivityEmailData[];
   payment: PaymentDetailsEmail;
 }

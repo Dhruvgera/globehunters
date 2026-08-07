@@ -5,7 +5,7 @@
 
 import nodemailer from 'nodemailer';
 import { EMAIL_CONFIG } from '@/config/email';
-import { BookingConfirmationEmailData, JourneyEmail, FlightSegmentEmail } from '@/types/email';
+import { BookingConfirmationEmailData, JourneyEmail, FlightSegmentEmail, HotelEmailData } from '@/types/email';
 
 // Hosted logo URL - works better across email clients than embedded images
 const LOGO_URL = 'https://www.globehunters.com/assets/newimages/gh-logo.png';
@@ -29,7 +29,7 @@ const createTransporter = () => {
  * Generate the HTML email template matching Figma design
  */
 export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData): string {
-  const { orderNumber, travelerName, travelerEmail, travelerPhone, passengers, journeys, hotel, activities, payment } = data;
+  const { orderNumber, travelerName, travelerEmail, travelerPhone, passengers, journeys, hotel, hotels, activities, payment } = data;
   const bookingLabel = data.bookingType === 'package' ? 'Package' : hotel ? 'Hotel' : 'Flight';
 
   const escapeHtml = (value: unknown) => String(value ?? '')
@@ -66,7 +66,8 @@ export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData
 
   // Generate main content sections (journeys or hotel)
   const journeySections = (journeys || []).map((journey) => generateJourneySection(journey)).join('');
-  const hotelSection = hotel ? generateHotelSection(hotel) : '';
+  const hotelEntries = hotels?.length ? hotels : hotel ? [hotel] : [];
+  const hotelSection = hotelEntries.map((entry) => generateHotelSection(entry)).join('');
   const activitiesSection = activities?.length ? `
     <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F8F9FA; border-radius: 12px; margin-bottom: 24px;">
       <tr><td style="padding: 16px;">
@@ -292,12 +293,12 @@ export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData
 /**
  * Generate a hotel details section
  */
-function generateHotelSection(hotel: any): string {
+function generateHotelSection(hotel: HotelEmailData): string {
   return `
     <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #F8F9FA; border-radius: 12px; margin-bottom: 24px;">
       <tr>
         <td style="padding: 16px;">
-          <div style="font-family: 'Inter', Arial, sans-serif; font-weight: 700; font-size: 14px; color: #3754ED; margin-bottom: 12px;">Hotel Information</div>
+          <div style="font-family: 'Inter', Arial, sans-serif; font-weight: 700; font-size: 14px; color: #3754ED; margin-bottom: 12px;">${hotel.destination ? `${hotel.destination} Hotel` : 'Hotel Information'}</div>
           <div style="font-family: 'Inter', Arial, sans-serif; font-weight: 600; font-size: 15px; color: #0A0A0A; margin-bottom: 8px;">${hotel.hotelName}</div>
           <div style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #555555; margin-bottom: 8px;">${hotel.address}</div>
           
@@ -318,7 +319,7 @@ function generateHotelSection(hotel: any): string {
           <div style="margin-top: 4px; font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A;">
             <strong>Room:</strong> ${hotel.roomType}
           </div>
-          ${hotel.amenities?.length > 0 ? `
+          ${hotel.amenities && hotel.amenities.length > 0 ? `
             <div style="margin-top: 8px; font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 12px; color: #555555;">
               Amenities: ${hotel.amenities.join(', ')}
             </div>

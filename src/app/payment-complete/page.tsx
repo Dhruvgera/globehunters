@@ -1043,21 +1043,27 @@ function PaymentCompleteContent() {
         });
         emailData.bookingType = "package";
 
-        const firstDestination = Array.isArray(ctx?.aiPackageDraft?.destinations)
-          ? (ctx.aiPackageDraft.destinations as ConfirmedDestination[])[0]
-          : undefined;
-        const packageHotel = firstDestination?.hotel;
-        if (packageHotel) {
-          emailData.hotel = {
+        const packageDestinations = Array.isArray(ctx?.aiPackageDraft?.destinations)
+          ? (ctx.aiPackageDraft.destinations as ConfirmedDestination[])
+          : [];
+        const packageHotels = packageDestinations.flatMap((destination) => {
+          const packageHotel = destination?.hotel;
+          if (!packageHotel) return [];
+          return [{
+            destination: destination.name || packageHotel.cityName || "Destination",
             hotelName: packageHotel.name || "Hotel",
             address: packageHotel.distanceLabel || "",
-            checkIn: firstDestination?.checkIn || "",
-            checkOut: firstDestination?.checkOut || "",
-            nights: calculateNights(firstDestination?.checkIn || "", firstDestination?.checkOut || "") || 1,
+            checkIn: destination.checkIn || "",
+            checkOut: destination.checkOut || "",
+            nights: calculateNights(destination.checkIn || "", destination.checkOut || "") || 1,
             rooms: Number(packageHotel.price?.rooms || 1),
             roomType: packageHotel.room?.name || "Selected room",
             amenities: packageHotel.amenities || [],
-          };
+          }];
+        });
+        if (packageHotels.length > 0) {
+          emailData.hotel = packageHotels[0];
+          emailData.hotels = packageHotels;
         }
       } else if (isHotelMode) {
         const hotelSummary = ctx?.hotelSummary || storeSelectedHotel;
@@ -1422,18 +1428,46 @@ function PaymentCompleteContent() {
               </div>
             )}
 
-            {/* Package: hotel summary (best-effort from store/cache) */}
             {(isPackageMode || isHotelMode) && (
               <div className="bg-white rounded-xl shadow-sm border border-[#E5E7EB] p-6 flex flex-col gap-4">
-                <h3 className="font-semibold text-[#3754ED]">Hotel Details</h3>
-                <HotelSummaryCard
-                  hotelSearch={ctx?.hotelSearch}
-                  selectedHotel={ctx?.hotelSummary}
-                  selectedRoomIds={ctx?.selectedHotelRoomIds}
-                  roomSummary={ctx?.hotelRoomSummary}
-                  detailsCache={hotelDetailsCacheForDisplay}
-                  isPackageMode={isPackageMode}
-                />
+                <h3 className="font-semibold text-[#3754ED]">{isPackageMode ? "Stays" : "Hotel Details"}</h3>
+                {isPackageMode ? (
+                  <div className="divide-y divide-[#E5E7EB] border border-[#E5E7EB] rounded-xl px-4">
+                    {confirmationDestinations.filter((destination) => destination.hotel).map((destination, index) => {
+                      const hotel = destination.hotel!;
+                      const formatStayDate = (value?: string) => value
+                        ? new Date(`${value}T12:00:00`).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" })
+                        : "—";
+                      return (
+                        <div key={`${destination.name || hotel.name}-${index}`} className="grid gap-4 py-4 sm:grid-cols-[112px_1fr]">
+                          {hotel.imageSrc ? (
+                            <div className="relative h-24 overflow-hidden rounded-lg bg-[#F5F7FF]">
+                              <Image src={hotel.imageSrc} alt={hotel.name || "Hotel"} fill className="object-cover" />
+                            </div>
+                          ) : null}
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold text-[#3A478A]">Destination {index + 1}: {destination.name || hotel.cityName || "Stay"}</div>
+                            <div className="mt-1 text-base font-semibold text-[#010D50]">{hotel.name || "Selected hotel"}</div>
+                            {hotel.distanceLabel ? <div className="mt-1 text-xs text-[#6B7280]">{hotel.distanceLabel}</div> : null}
+                            <div className="mt-2 text-sm text-[#3A478A]">
+                              {formatStayDate(destination.checkIn)} – {formatStayDate(destination.checkOut)}
+                            </div>
+                            <div className="mt-1 text-sm font-medium text-[#010D50]">{hotel.room?.name || "Selected room"}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <HotelSummaryCard
+                    hotelSearch={ctx?.hotelSearch}
+                    selectedHotel={ctx?.hotelSummary}
+                    selectedRoomIds={ctx?.selectedHotelRoomIds}
+                    roomSummary={ctx?.hotelRoomSummary}
+                    detailsCache={hotelDetailsCacheForDisplay}
+                    isPackageMode={false}
+                  />
+                )}
 
                 {/* Stay Details - hotel mode only */}
                 {isHotelMode && hotelConfirmDisplay && (
