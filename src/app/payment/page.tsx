@@ -514,16 +514,7 @@ function PaymentContent() {
     }
 
     if (aiPaymentDraft?.totals?.package) {
-      const aiRows = [
-        { label: "Flights", amount: Number(aiPaymentDraft.totals.flight || 0) },
-        { label: "Hotels", amount: Number(aiPaymentDraft.totals.hotel || 0) },
-        { label: "Activities", amount: Number(aiPaymentDraft.totals.activities || 0) },
-      ]
-        .filter((row) => row.amount > 0)
-        .map((row) => ({ label: row.label, value: formatPrice(row.amount, currency || "GBP") }));
-      if (baggageCost > 0) aiRows.push({ label: `Additional baggage (${additionalBaggage})`, value: formatPrice(baggageCost, currency || "GBP") });
-      if (protectionPlanCost > 0) aiRows.push({ label: "Refund Shield", value: formatPrice(protectionPlanCost, currency || "GBP") });
-      return aiRows;
+      return [];
     }
 
     return buildSummaryRows({
@@ -540,9 +531,6 @@ function PaymentContent() {
     });
   }, [
     baseFare,
-    aiPaymentDraft?.totals?.activities,
-    aiPaymentDraft?.totals?.flight,
-    aiPaymentDraft?.totals?.hotel,
     aiPaymentDraft?.totals?.package,
     currency,
     hotelSearch?.adults,

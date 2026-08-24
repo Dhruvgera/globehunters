@@ -47,14 +47,14 @@ export function PackageStepProgress({ currentStep, labelOverrides, stepLinks }: 
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 text-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex items-center gap-1 overflow-x-auto pb-1 text-sm sm:gap-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {STEPS.map((step, index) => {
           const isActive = index === currentIndex;
           const isCompleted = index < currentIndex;
           const href = stepLinks?.[step.key] || defaultStepLinks[step.key];
           const isNavigable = Boolean(href) && (isCompleted || isActive);
           const content = (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <div
                 className={[
                   "w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium border-2",
@@ -85,7 +85,7 @@ export function PackageStepProgress({ currentStep, labelOverrides, stepLinks }: 
               </div>
               <span
                 className={[
-                  "text-xs sm:text-sm whitespace-nowrap",
+                  "whitespace-nowrap text-xs",
                   isActive ? "inline text-[#010D50] font-medium" : "hidden sm:inline text-[#3A478A]",
                   isNavigable ? "underline-offset-2" : "",
                 ].join(" ")}
@@ -96,7 +96,7 @@ export function PackageStepProgress({ currentStep, labelOverrides, stepLinks }: 
           );
 
           return (
-            <div key={step.key} className="flex items-center gap-2 flex-shrink-0">
+            <div key={step.key} className="flex flex-shrink-0 items-center gap-1.5">
               {isNavigable && href ? (
                 <Link
                   href={href}
@@ -109,7 +109,7 @@ export function PackageStepProgress({ currentStep, labelOverrides, stepLinks }: 
               )}
 
               {index < STEPS.length - 1 && (
-                <ChevronRight className="hidden sm:block h-5 w-5 text-[#DFE0E4]" />
+                <ChevronRight className="hidden h-4 w-4 text-[#DFE0E4] sm:block" />
               )}
             </div>
           );
