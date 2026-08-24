@@ -1142,7 +1142,6 @@ function PaymentCompleteContent() {
             title: String(activity?.title || 'Activity'),
             destination: String(destination?.name || ''),
             date: String(activity?.itineraryDate || ''),
-            time: String(activity?.itineraryTime || ''),
             duration: String(activity?.duration || ''),
             price: typeof activity?.price === 'number' ? activity.price : undefined,
             currency: String(activity?.currency || currencyCode),
@@ -1539,7 +1538,7 @@ function PaymentCompleteContent() {
                       <div>
                         <div className="font-semibold text-[#010D50]">{activity.title || 'Activity'}</div>
                         <div className="text-sm text-[#6B7280] mt-1">
-                          {[activity.destination, activity.itineraryDate, activity.itineraryTime, activity.duration].filter(Boolean).join(' | ')}
+                          {[activity.destination, activity.itineraryDate, activity.duration].filter(Boolean).join(' | ')}
                         </div>
                         <div className="text-xs text-[#6B7280] mt-1">Viator product: {activity.productCode}</div>
                       </div>

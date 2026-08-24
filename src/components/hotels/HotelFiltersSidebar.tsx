@@ -306,21 +306,21 @@ export function HotelFiltersSidebar({
         )}
       </FilterSection>
 
-      {/* Refundable */}
-      <FilterSection
-        title="Property cancellation options"
-        isExpanded={!!expanded.refund}
-        onToggle={() => onToggleExpanded("refund")}
-      >
-        <label className="flex items-center gap-3">
-          <Checkbox
-            disabled={!refundableFilterEnabled}
-            checked={value.fullyRefundableOnly}
-            onCheckedChange={(c) => onChange({ ...value, fullyRefundableOnly: Boolean(c) })}
-          />
-          <span className="text-sm text-[#010D50]">Fully refundable property</span>
-        </label>
-      </FilterSection>
+      {refundableFilterEnabled ? (
+        <FilterSection
+          title="Property cancellation options"
+          isExpanded={!!expanded.refund}
+          onToggle={() => onToggleExpanded("refund")}
+        >
+          <label className="flex items-center gap-3">
+            <Checkbox
+              checked={value.fullyRefundableOnly}
+              onCheckedChange={(c) => onChange({ ...value, fullyRefundableOnly: Boolean(c) })}
+            />
+            <span className="text-sm text-[#010D50]">Fully refundable property</span>
+          </label>
+        </FilterSection>
+      ) : null}
 
       <FilterSection
         title="Amenities"

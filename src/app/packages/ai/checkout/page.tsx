@@ -461,7 +461,6 @@ function buildAiPackageNotes(draft: AiBookingDraft, currency: string) {
           activity.productCode,
           activity.title,
           activity.itineraryDate ? `date=${activity.itineraryDate}` : "",
-          activity.itineraryTime ? `time=${activity.itineraryTime}` : "",
           activity.duration ? `duration=${activity.duration}` : "",
           Number.isFinite(activity.price) ? `price=${money(Number(activity.price || 0), activity.currency || normalizedCurrency)}` : "",
           activity.rating ? `rating=${activity.rating.toFixed(1)}` : "",
@@ -1186,7 +1185,7 @@ function AiCheckoutContent() {
                           <div>
                             <div className="font-semibold text-[#010D50]">{activity.title}</div>
                             <div className="text-xs text-[#3A478A]">
-                              {longDate(activity.itineraryDate)} at {activity.itineraryTime}
+                              Suggested: {longDate(activity.itineraryDate)}
                               {activity.duration ? ` - ${activity.duration}` : ""}
                               {activity.rating ? ` - ${activity.rating.toFixed(1)} rating` : ""}
                             </div>
