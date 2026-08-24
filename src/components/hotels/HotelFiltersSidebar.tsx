@@ -49,6 +49,8 @@ export function HotelFiltersSidebar({
   minPriceByStarRating = {},
   refundableFilterEnabled = false,
   showNightlyPrice = true,
+  priceLabel = "Total price",
+  showStarPrices = true,
 }: {
   resultCount: number;
   value: HotelFiltersState;
@@ -72,6 +74,10 @@ export function HotelFiltersSidebar({
   refundableFilterEnabled?: boolean;
   /** Hide nightly mode when result cards only expose total prices. */
   showNightlyPrice?: boolean;
+  /** Label for package-relative pricing. */
+  priceLabel?: string;
+  /** Hide per-star prices when cards use package-relative deltas. */
+  showStarPrices?: boolean;
 }) {
   const unsupportedNote =
     "Note: Property name, Price, Star rating, Amenities, Meal plans, and Breakfast are powered by the hotel list. Neighborhood is available when present in results. Other filters are shown for UI parity but may not affect results yet.";
@@ -186,7 +192,7 @@ export function HotelFiltersSidebar({
                 }
                 className="h-4 w-4 accent-[#3754ED]"
               />
-              <span className="text-sm text-[#010D50]">Total price</span>
+              <span className="text-sm text-[#010D50]">{priceLabel}</span>
             </label>
             {showNightlyPrice && (
               <label className="flex items-center gap-3">
@@ -259,7 +265,7 @@ export function HotelFiltersSidebar({
                     {s} star{s === 1 ? "" : "s"}
                   </span>
                 </div>
-                {minPriceForRating !== undefined && (
+                {showStarPrices && minPriceForRating !== undefined && (
                 <span className="text-sm font-medium text-[#010D50]">
                     from {currencySymbol}{Math.round(minPriceForRating).toLocaleString()} per night
                 </span>

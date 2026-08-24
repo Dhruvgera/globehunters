@@ -45,7 +45,7 @@ import Image from "next/image";
 import { useMemo } from "react";
 import { FOLDER_STATUS_CODES } from "@/types/portal";
 import { calculateNights } from "@/lib/hotels/nights";
-import { REFUNDABLE_TERMS_URL } from "@/config/constants";
+import { CONTACT_US_URL, REFUNDABLE_TERMS_URL, TERMS_AND_CONDITIONS_URL } from "@/config/constants";
 
 type ConfirmedActivity = {
   productCode?: string;
@@ -65,6 +65,23 @@ type ConfirmedDestination = {
   hotel?: Hotel | null;
   activities?: ConfirmedActivity[];
 };
+
+function selectedHotelMealPlan(hotel: Hotel) {
+  const raw = hotel.rawSearchResult && typeof hotel.rawSearchResult === "object" && !Array.isArray(hotel.rawSearchResult)
+    ? hotel.rawSearchResult as Record<string, unknown>
+    : null;
+  const hotelbeds = raw?._hotelbeds && typeof raw._hotelbeds === "object" && !Array.isArray(raw._hotelbeds)
+    ? raw._hotelbeds as Record<string, unknown>
+    : null;
+  const cheapest = hotelbeds?.cheapest && typeof hotelbeds.cheapest === "object" && !Array.isArray(hotelbeds.cheapest)
+    ? hotelbeds.cheapest as Record<string, unknown>
+    : null;
+  const selectedBoard = String(cheapest?.boardName || "").trim();
+  if (selectedBoard) return selectedBoard;
+  const listedPlan = String(hotel.mealPlans?.[0] || "").trim();
+  if (listedPlan) return listedPlan;
+  return (hotel.room?.highlights || []).find((value) => !/refund/i.test(value)) || "Room only";
+}
 
 const REFUNDABLE_CLAIMS_URL = "https://form.refundablebooking.com";
 
@@ -1058,6 +1075,8 @@ function PaymentCompleteContent() {
             nights: calculateNights(destination.checkIn || "", destination.checkOut || "") || 1,
             rooms: Number(packageHotel.price?.rooms || 1),
             roomType: packageHotel.room?.name || "Selected room",
+            mealPlan: selectedHotelMealPlan(packageHotel),
+            refundable: packageHotel.refundable ?? null,
             amenities: packageHotel.amenities || [],
           }];
         });
@@ -1210,7 +1229,6 @@ function PaymentCompleteContent() {
       ? flight.segments
       : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])]
     : [];
-  const packageTotals = isPackageMode ? ctx?.aiPackageDraft?.totals : null;
   const chargedCurrency = paymentInfo?.currency || ctx?.pricing?.currency || (typeof window !== 'undefined' ? sessionStorage.getItem("pendingOrderCurrency") : null) || "GBP";
   const chargedAmount = (() => {
     const a = paymentInfo?.amount || (typeof window !== 'undefined' ? sessionStorage.getItem("pendingOrderAmount") : null) || (ctx?.pricing?.tripTotal != null ? String(ctx.pricing.tripTotal) : "0");
@@ -1380,30 +1398,6 @@ function PaymentCompleteContent() {
               </div>
             </div>
 
-            {packageTotals && (
-              <div className="bg-white rounded-xl shadow-sm border border-[#E5E7EB] p-6">
-                <h3 className="font-semibold text-[#3754ED] mb-4">Package price breakdown</h3>
-                <div className="space-y-3 text-sm">
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-[#6B7280]">Total flight price</span>
-                    <span className="font-semibold text-[#010D50]">{formatPrice(Number(packageTotals.flight || 0), chargedCurrency)}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-[#6B7280]">Total stay price</span>
-                    <span className="font-semibold text-[#010D50]">{formatPrice(Number(packageTotals.hotel || 0), chargedCurrency)}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-[#6B7280]">Total itinerary price</span>
-                    <span className="font-semibold text-[#010D50]">{formatPrice(Number(packageTotals.activities || 0), chargedCurrency)}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4 border-t border-[#E5E7EB] pt-3">
-                    <span className="font-semibold text-[#010D50]">Trip total</span>
-                    <span className="font-bold text-[#010D50]">{formatPrice(Number(packageTotals.package || chargedAmount), chargedCurrency)}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Passenger details */}
             {displayPassengers.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-[#E5E7EB] p-6">
@@ -1416,7 +1410,7 @@ function PaymentCompleteContent() {
                 <div className="divide-y divide-[#E5E7EB]">
                   {displayPassengers.map((p: any, idx: number) => (
                     <div key={`${p?.firstName || "p"}-${idx}`} className="py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                      <div className="font-semibold text-[#010D50]">
+                      <div className="break-words font-semibold text-[#010D50] sm:max-w-[70%]">
                         {[p?.title, p?.firstName, p?.middleName, p?.lastName].filter(Boolean).join(" ") || `Passenger ${idx + 1}`}
                       </div>
                       <div className="text-sm text-[#6B7280]">
@@ -1625,7 +1619,7 @@ function PaymentCompleteContent() {
                 </div>
                 <p className="text-xs text-[#4B5563] leading-relaxed">
                   {termsText} At the time of booking you confirmed that you have read and agreed to our General Terms and Conditions of Carriage. Please{" "}
-                  <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-[#3754ED] hover:underline font-medium">
+                  <a href={TERMS_AND_CONDITIONS_URL} target="_blank" rel="noopener noreferrer" className="text-[#3754ED] hover:underline font-medium">
                     Click Here
                   </a>{" "}
                   to review these again if necessary.
@@ -1670,7 +1664,7 @@ function PaymentCompleteContent() {
               <p className="text-xs text-[#6B7280]">
                 *Flight schedule and aircraft type are subject to change per the
                 Contract of Carriage.{" "}
-                <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-[#3754ED] hover:underline">More</a>
+                <a href={TERMS_AND_CONDITIONS_URL} target="_blank" rel="noopener noreferrer" className="text-[#3754ED] hover:underline">More</a>
               </p>
             </div>
 
@@ -1699,6 +1693,9 @@ function PaymentCompleteContent() {
                     documents@globehunters.com
                   </a>
                 </div>
+                <a href={CONTACT_US_URL} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-[#3754ED] hover:underline">
+                  Contact Us
+                </a>
               </div>
             </div>
           </div>

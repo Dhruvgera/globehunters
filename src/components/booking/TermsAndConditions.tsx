@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useBookingStore } from "@/store/bookingStore";
+import { TERMS_AND_CONDITIONS_URL } from "@/config/constants";
 
 interface TermsAndConditionsProps {
   onUpgradeClick: () => void;
@@ -362,7 +363,7 @@ export function TermsAndConditions({
         <p className="text-xs leading-relaxed text-[#010D50]">
           {t.rich('acceptTerms', {
             termsLink: (chunks) => (
-              <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-[#3754ED] hover:underline font-medium">
+              <a href={TERMS_AND_CONDITIONS_URL} target="_blank" rel="noopener noreferrer" className="text-[#3754ED] hover:underline font-medium">
                 {chunks}
               </a>
             ),

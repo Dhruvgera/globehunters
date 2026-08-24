@@ -1320,9 +1320,7 @@ function AiCheckoutContent() {
                   <div className="text-sm font-semibold text-[#010D50]">{draft.search?.rooms || 1} room</div>
                 </div>
               </div>
-              <div className="mt-4 text-base font-bold text-[#010D50]">
-                {money(selectedHotelDestination?.hotel?.price?.total, selectedHotelDestination?.hotel?.price?.currency || currency)}
-              </div>
+              <div className="mt-4 text-base font-bold text-[#010D50]">Included in trip total</div>
             </div>
           </div>
         </DialogContent>

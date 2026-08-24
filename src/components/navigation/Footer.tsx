@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Shield, CreditCard } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { CONTACT_US_URL, TERMS_AND_CONDITIONS_URL } from "@/config/constants";
 
 export default function Footer() {
   const t = useTranslations('common.footer');
@@ -51,8 +52,8 @@ export default function Footer() {
   const footerLinks = [
     { key: "aboutUs", href: "/about" },
     { key: "siteMap", href: "/sitemap" },
-    { key: "terms", href: "/terms" },
-    { key: "contactUs", href: "/contact" },
+    { key: "terms", href: TERMS_AND_CONDITIONS_URL },
+    { key: "contactUs", href: CONTACT_US_URL },
     { key: "cookiePolicy", href: "/cookies" },
     { key: "blog", href: "/blog" },
     { key: "privacyPolicy", href: "/privacy" },

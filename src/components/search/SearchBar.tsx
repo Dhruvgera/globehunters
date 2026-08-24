@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useSearchForm } from "@/hooks/useSearchForm";
 import { TripTypeSelector } from "./search-bar/TripTypeSelector";
@@ -54,6 +54,8 @@ interface SearchBarProps {
   defaultProduct?: "flight" | "hotel" | "package" | "ai";
   /** When provided, called instead of navigating for package searches */
   onPackageSearch?: (data: PackageSearchFormData) => void;
+  /** Optional action shown beside product tabs while AI Mode is active. */
+  aiHeaderAction?: ReactNode;
 }
 
 type Product = "flight" | "hotel" | "package" | "ai";
@@ -127,7 +129,7 @@ function ProductTab({
   );
 }
 
-export default function SearchBar({ compact = false, embedded = false, defaultProduct, onPackageSearch }: SearchBarProps) {
+export default function SearchBar({ compact = false, embedded = false, defaultProduct, onPackageSearch, aiHeaderAction }: SearchBarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const urlParams = useSearchParams();
@@ -561,6 +563,7 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
             label="AI Mode"
             compact={compact}
           />
+          {activeProduct === "ai" && aiHeaderAction ? <div className="ml-auto">{aiHeaderAction}</div> : null}
         </div>
       </div>
 

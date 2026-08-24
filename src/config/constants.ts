@@ -84,6 +84,8 @@ export const REFUND_SHIELD_PRICING = {
 } as const;
 
 export const REFUNDABLE_TERMS_URL = "https://refundablebooking.com/refundable-terms";
+export const TERMS_AND_CONDITIONS_URL = "https://packages.globehunters.com/termsAndConditions.html";
+export const CONTACT_US_URL = "https://www.globehunters.com/info/contactus.htm";
 
 
 

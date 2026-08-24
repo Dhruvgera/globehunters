@@ -30,6 +30,8 @@ describe("package confirmation email", () => {
           nights: 4,
           rooms: 1,
           roomType: "Deluxe room",
+          mealPlan: "Bed and breakfast",
+          refundable: false,
         },
         {
           destination: "Bangkok",
@@ -59,6 +61,9 @@ describe("package confirmation email", () => {
     expect(html).toContain("Bangkok Hotel");
     expect(html.indexOf("Dubai Hotel")).toBeLessThan(html.indexOf("Bangkok Hotel"));
     expect(html).toContain("Bangkok Hotel</div>");
+    expect(html).toContain("<strong>Meal plan:</strong> Bed and breakfast");
+    expect(html).toContain("<strong>Cancellation:</strong> Non-refundable");
+    expect(html).toContain("https://packages.globehunters.com/termsAndConditions.html");
+    expect(html).toContain("https://www.globehunters.com/info/contactus.htm");
   });
 });
-

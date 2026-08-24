@@ -5,6 +5,7 @@
 
 import nodemailer from 'nodemailer';
 import { EMAIL_CONFIG } from '@/config/email';
+import { CONTACT_US_URL, TERMS_AND_CONDITIONS_URL } from '@/config/constants';
 import { BookingConfirmationEmailData, JourneyEmail, FlightSegmentEmail, HotelEmailData } from '@/types/email';
 
 // Hosted logo URL - works better across email clients than embedded images
@@ -25,19 +26,19 @@ const createTransporter = () => {
   });
 };
 
+const escapeHtml = (value: unknown) => String(value ?? '')
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#039;');
+
 /**
  * Generate the HTML email template matching Figma design
  */
 export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData): string {
   const { orderNumber, travelerName, travelerEmail, travelerPhone, passengers, journeys, hotel, hotels, activities, payment } = data;
   const bookingLabel = data.bookingType === 'package' ? 'Package' : hotel ? 'Hotel' : 'Flight';
-
-  const escapeHtml = (value: unknown) => String(value ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
 
   // Generate passenger sections using tables for email client compatibility
   const passengerSections = passengers.map((passenger, index) => `
@@ -263,7 +264,7 @@ export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData
                 <tr>
                   <td style="padding: 16px;">
                     <div style="font-family: 'Inter', Arial, sans-serif; font-weight: 700; font-size: 14px; color: #3754ED; margin-bottom: 12px;">Terms and Conditions</div>
-                    <p style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 12px; color: #0A0A0A; line-height: 1.6; margin: 0;">I acknowledge that ${hotel ? 'guest' : 'passenger'} information matches the passport or official ID for travel, and that name changes are not allowed. I confirm that I have reviewed the ${hotel ? 'hotel details' : 'flight itinerary'} and agree to the Refund &amp; Cancellation Policy. I understand ${hotel ? 'bookings' : 'tickets'} are non-transferable and non-changeable unless stated otherwise. I accept full responsibility for valid travel documentation and understand Globehunters cannot be held responsible for denied boarding due to passport or visa validity. At the time of booking you confirmed that you have read and agreed to our General Terms and Conditions of Carriage. Please <a href="https://www.globehunters.com/terms" style="color: #3754ED; font-weight: 600;">Click Here</a> to review these again if necessary.</p>
+                    <p style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 12px; color: #0A0A0A; line-height: 1.6; margin: 0;">I acknowledge that ${hotel ? 'guest' : 'passenger'} information matches the passport or official ID for travel, and that name changes are not allowed. I confirm that I have reviewed the ${hotel ? 'hotel details' : 'flight itinerary'} and agree to the Refund &amp; Cancellation Policy. I understand ${hotel ? 'bookings' : 'tickets'} are non-transferable and non-changeable unless stated otherwise. I accept full responsibility for valid travel documentation and understand Globehunters cannot be held responsible for denied boarding due to passport or visa validity. At the time of booking you confirmed that you have read and agreed to our General Terms and Conditions of Carriage. Please <a href="${TERMS_AND_CONDITIONS_URL}" style="color: #3754ED; font-weight: 600;">Click Here</a> to review these again if necessary.</p>
                   </td>
                 </tr>
               </table>
@@ -273,7 +274,7 @@ export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData
                 <tr>
                   <td style="padding: 16px;">
                     <div style="font-family: 'Inter', Arial, sans-serif; font-weight: 700; font-size: 14px; color: #3754ED; margin-bottom: 12px;">Contact Us</div>
-                    <p style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; margin: 0; line-height: 1.5;">For details on how to contact us via phone, fax, letter or via our email contact form, <a href="https://www.globehunters.com/contact" style="color: #3754ED; font-weight: 600;">Click Here</a>.</p>
+                    <p style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; margin: 0; line-height: 1.5;">For details on how to contact us via phone, fax, letter or via our email contact form, <a href="${CONTACT_US_URL}" style="color: #3754ED; font-weight: 600;">Click Here</a>.</p>
                     <p style="font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A; margin: 12px 0 0 0; line-height: 1.5;">Or call us on: <strong style="color: #3754ED;">${EMAIL_CONFIG.supportPhone}</strong></p>
                   </td>
                 </tr>
@@ -319,6 +320,16 @@ function generateHotelSection(hotel: HotelEmailData): string {
           <div style="margin-top: 4px; font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A;">
             <strong>Room:</strong> ${hotel.roomType}
           </div>
+          ${hotel.mealPlan ? `
+            <div style="margin-top: 4px; font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A;">
+              <strong>Meal plan:</strong> ${escapeHtml(hotel.mealPlan)}
+            </div>
+          ` : ''}
+          ${hotel.refundable != null ? `
+            <div style="margin-top: 4px; font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 13px; color: #0A0A0A;">
+              <strong>Cancellation:</strong> ${hotel.refundable ? 'Refundable' : 'Non-refundable'}
+            </div>
+          ` : ''}
           ${hotel.amenities && hotel.amenities.length > 0 ? `
             <div style="margin-top: 8px; font-family: 'Inter', Arial, sans-serif; font-weight: 500; font-size: 12px; color: #555555;">
               Amenities: ${hotel.amenities.join(', ')}

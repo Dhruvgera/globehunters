@@ -131,6 +131,12 @@ export default function FlightInfoModal({
 
   // Price check integration
   const { priceCheck, isLoading, error, checkPrice, clearError } = usePriceCheck();
+  const packageBasePricePerPerson = Number(flight.pricePerPerson || priceCheck?.priceOptions?.[0]?.pricePerPerson || 0);
+  const packageFareLabel = (option: TransformedPriceOption | null) => {
+    if (!option) return "Included";
+    const extra = Math.max(0, Number(option.pricePerPerson || 0) - packageBasePricePerPerson);
+    return extra > 0.5 ? `+${formatPrice(extra, option.currency)} pp` : "Included";
+  };
 
   const hasUpgradeOptions = !!(priceCheck && priceCheck.priceOptions && priceCheck.priceOptions.some((opt) => opt.isUpgrade));
 
@@ -347,7 +353,7 @@ export default function FlightInfoModal({
 
   function cabinClassName(code?: string) {
     if (selectedUpgradeOption?.cabinClassDisplay)
-      return selectedUpgradeOption.cabinClassDisplay.toLowerCase();
+      return prettifyCabinName(selectedUpgradeOption.cabinClassDisplay);
 
     if (!code) return undefined;
     const m = String(code).toUpperCase();
@@ -853,7 +859,7 @@ export default function FlightInfoModal({
                       {prettifyCabinName(option.cabinClassDisplay)}
                       {/* Show per-person price */}
                       <span className="ml-2 text-xs opacity-80">
-                        {formatPrice(option.pricePerPerson, option.currency)}
+                        {isPackageMode ? packageFareLabel(option) : formatPrice(option.pricePerPerson, option.currency)}
                       </span>
                     </Button>
                   ))}
@@ -1344,18 +1350,14 @@ export default function FlightInfoModal({
               <div className="flex flex-col gap-1">
                 <span className="text-sm sm:text-lg font-medium text-[#3754ED] whitespace-nowrap">
                   {isPackageMode
-                    ? selectedUpgradeOption
-                      ? formatPrice(selectedUpgradeOption.totalPrice, selectedUpgradeOption.currency)
-                      : formatPrice(flight.price, flight.currency)
+                    ? packageFareLabel(selectedUpgradeOption)
                     : selectedUpgradeOption
                       ? formatPrice(selectedUpgradeOption.totalPrice, selectedUpgradeOption.currency)
                       : formatPrice(flight.price, flight.currency)}
                 </span>
                 <span className="text-xs text-[#3A478A]">
                   {isPackageMode
-                    ? selectedUpgradeOption
-                      ? `${formatPrice(selectedUpgradeOption.pricePerPerson, selectedUpgradeOption.currency)} per person`
-                      : `${formatPrice(flight.pricePerPerson, flight.currency)} per person`
+                    ? "Package adjustment"
                     : selectedUpgradeOption
                       ? `${formatPrice(selectedUpgradeOption.pricePerPerson, selectedUpgradeOption.currency)} per person`
                       : `${formatPrice(flight.pricePerPerson, flight.currency)} per person`}
@@ -1391,10 +1393,10 @@ export default function FlightInfoModal({
             <div className="sticky bottom-0 z-20 bg-white rounded-xl px-3 sm:px-4 py-2 sm:py-3 flex items-center justify-between gap-3 border border-[#EEF0F7] shadow-[0_-8px_24px_-12px_rgba(2,6,23,0.35)]">
               <div className="flex flex-col gap-1">
                 <span className="text-sm sm:text-lg font-medium text-[#3754ED] whitespace-nowrap">
-                  {formatPrice(selectedUpgradeOption.totalPrice, selectedUpgradeOption.currency)}
+                  {isPackageMode ? packageFareLabel(selectedUpgradeOption) : formatPrice(selectedUpgradeOption.totalPrice, selectedUpgradeOption.currency)}
                 </span>
                 <span className="text-xs text-[#3A478A]">
-                  {`${formatPrice(selectedUpgradeOption.pricePerPerson, selectedUpgradeOption.currency)} per person`}
+                  {isPackageMode ? "Package adjustment" : `${formatPrice(selectedUpgradeOption.pricePerPerson, selectedUpgradeOption.currency)} per person`}
                 </span>
               </div>
               <Button

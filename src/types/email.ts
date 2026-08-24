@@ -54,6 +54,8 @@ export interface HotelEmailData {
   nights: number;
   rooms: number;
   roomType: string;
+  mealPlan?: string;
+  refundable?: boolean | null;
   amenities?: string[];
 }
 

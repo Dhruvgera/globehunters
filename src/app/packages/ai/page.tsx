@@ -469,9 +469,6 @@ async function fetchSelectedHotelImage(
   hotel: Hotel,
   hotelSearch?: ReturnType<typeof useBookingStore.getState>["hotelSearch"]
 ) {
-  const contentImage = await fetchPropertyContentImage(hotel).catch(() => null);
-  if (contentImage) return contentImage;
-
   const raw = rawRecord(hotel.rawSearchResult);
   const rawCriteriaId = raw?.searchCriteriaId ?? hotelSearch?.searchCriteriaId;
   const criteriaId =
@@ -486,13 +483,14 @@ async function fetchSelectedHotelImage(
       : vMapId && vMapId > 0
         ? [0, { vMapId }]
         : null;
-  if (!criteriaId && !detailPayload) return null;
-
   const settled = await Promise.allSettled([
+    fetchPropertyContentImage(hotel),
     detailPayload ? hotelService.hotelSearchDetails(detailPayload) : Promise.resolve(null),
     criteriaId ? hotelService.getRoomsV3(criteriaId, roomHotelId || hotel.id, srId || undefined) : Promise.resolve(null),
   ]);
-  const payloads = settled.flatMap((result) => (result.status === "fulfilled" && result.value ? [result.value] : []));
+  const contentImage = settled[0]?.status === "fulfilled" ? settled[0].value : null;
+  if (contentImage) return contentImage;
+  const payloads = settled.slice(1).flatMap((result) => (result.status === "fulfilled" && result.value ? [result.value] : []));
   return firstRealImage(collectImageUrls(payloads, 12)) || null;
 }
 
@@ -830,13 +828,7 @@ function addDaysIso(value: string | null, days: number) {
 function activityStartDateForSegment(segment: PackageDestinationSegment | null | undefined, flight: Flight | null | undefined) {
   const checkIn = segment?.checkIn || "";
   if (!checkIn || !flight) return checkIn;
-  const airportCode = String(segment?.airportCode || "").toUpperCase();
-  const segments = flight.tripType === "multi-city" && flight.segments?.length
-    ? flight.segments
-    : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
-  const arrivalSegment =
-    segments.find((item) => String(item.arrivalAirport?.code || "").toUpperCase() === airportCode) ||
-    segments.find((item) => item.arrivalDate === checkIn || item.date === checkIn);
+  const arrivalSegment = matchingArrivalSegment(segment, flight);
   if (!arrivalSegment) return checkIn;
 
   const lastFlight = arrivalSegment.individualFlights?.[arrivalSegment.individualFlights.length - 1];
@@ -876,6 +868,10 @@ function money(value: number, currency = "GBP") {
     currency: normalizedCurrency,
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+function packageDeltaLabel(value: number, currency = "GBP") {
+  return value > 0.5 ? `+${money(value, currency)} pp` : "Included";
 }
 
 function toTitleCase(value: string | undefined | null) {
@@ -969,13 +965,21 @@ function currencySymbol(value: string | null | undefined) {
   return normalized;
 }
 
-function flightArrivalDateForSegment(segment: PackageDestinationSegment | null | undefined, flight: Flight | null | undefined) {
-  if (!segment || !flight) return "";
+function matchingArrivalSegment(segment: PackageDestinationSegment | null | undefined, flight: Flight | null | undefined) {
+  if (!segment || !flight) return undefined;
   const airportCode = String(segment.airportCode || "").toUpperCase();
   const segments = flight.tripType === "multi-city" && flight.segments?.length
     ? flight.segments
     : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
-  const arrivalSegment = segments.find((item) => String(item.arrivalAirport?.code || "").toUpperCase() === airportCode);
+  return (
+    segments.find((item) => airportCode && String(item.arrivalAirport?.code || "").toUpperCase() === airportCode) ||
+    segments.find((item) => item.arrivalDate === segment.checkIn || item.date === segment.checkIn) ||
+    segments[0]
+  );
+}
+
+function flightArrivalDateForSegment(segment: PackageDestinationSegment | null | undefined, flight: Flight | null | undefined) {
+  const arrivalSegment = matchingArrivalSegment(segment, flight);
   const lastFlight = arrivalSegment?.individualFlights?.[arrivalSegment.individualFlights.length - 1];
   return lastFlight?.arrivalDate || arrivalSegment?.arrivalDate || arrivalSegment?.date || "";
 }
@@ -1324,6 +1328,7 @@ function AiPackageContent() {
   const [hotelImageFailedById, setHotelImageFailedById] = useState<Record<string, boolean>>({});
   const imageEnrichmentAttemptedRef = useRef<Set<string>>(new Set());
   const destinationHydrationAttemptedRef = useRef<Set<string>>(new Set());
+  const previousStayPreferenceRef = useRef(stayPreference);
   const [flightInfoOpen, setFlightInfoOpen] = useState(false);
   const [addDestinationOpen, setAddDestinationOpen] = useState(false);
   const [addDestinationLoading, setAddDestinationLoading] = useState(false);
@@ -2256,6 +2261,33 @@ function AiPackageContent() {
   }, [activeActivitiesKey, activeDestination, activeDestinationId, activities, activitiesError, activitiesLoading, destinationSegments, hotelOptions, liveSearch.hotel, liveSearch.hotelError, liveSearch.hotelLoading, selectedActivityCodes, storeHotelSearch]);
 
   useEffect(() => {
+    if (previousStayPreferenceRef.current === stayPreference) return;
+    previousStayPreferenceRef.current = stayPreference;
+    const recommendationContext = { stayPreference, budget, destinationCount: destinationSegments.length };
+    setDestinationStateById((current) =>
+      Object.fromEntries(
+        Object.entries(current).map(([id, state]) => [
+          id,
+          {
+            ...state,
+            hotel: selectRecommendedHotel(state.hotelOptions, recommendationContext),
+          },
+        ])
+      )
+    );
+    const activeOptions = activeDestination
+      ? hotelOptionsMatchSegment(hotelOptions, activeDestination, destinationSegments)
+      : hotelOptions;
+    const recommendedHotel = selectRecommendedHotel(activeOptions, recommendationContext);
+    setLiveSearch((current) => ({
+      ...current,
+      hotel: recommendedHotel,
+      hotelLoading: !recommendedHotel,
+      hotelError: recommendedHotel ? null : current.hotelError,
+    }));
+  }, [activeDestination, budget, destinationSegments, hotelOptions, stayPreference]);
+
+  useEffect(() => {
     const state = destinationStateById[activeDestinationId];
     const activeCheckIn = activeDestination?.checkIn;
     const activeCheckOut = activeDestination?.checkOut;
@@ -2484,16 +2516,31 @@ function AiPackageContent() {
       return "";
     });
   }, [addDestinationOpen, nextDestinationMinDate]);
+  const packageTravellerCount = Math.max(1, adults + children);
+  const selectedHotelPackageTotal = Number(liveSearch.hotel?.price.total || 0);
+  const hotelExtraPerPerson = useCallback(
+    (hotel: Hotel) => Math.max(0, (Number(hotel.price.total || 0) - selectedHotelPackageTotal) / packageTravellerCount),
+    [packageTravellerCount, selectedHotelPackageTotal]
+  );
+  const roomExtraPerPerson = useCallback(
+    (roomPrice: number | undefined) => Math.max(0, (Number(roomPrice || selectedHotelPackageTotal) - selectedHotelPackageTotal) / packageTravellerCount),
+    [packageTravellerCount, selectedHotelPackageTotal]
+  );
   const hotelFilterPriceBounds = useMemo(() => {
     const values = hotelOptions
-      .map((hotel) => (hotelFilters.priceMode === "nightly" ? hotel.price.nightly : hotel.price.total))
-      .filter((value) => Number.isFinite(value) && value > 0);
+      .map(hotelExtraPerPerson)
+      .filter((value) => Number.isFinite(value) && value >= 0)
+      .sort((a, b) => a - b);
     if (values.length === 0) return { min: 0, max: 1 };
+    const rawMax = values[values.length - 1] || 0;
+    const median = values[Math.floor((values.length - 1) * 0.5)] || 0;
+    const upperPercentile = values[Math.floor((values.length - 1) * 0.95)] || rawMax;
+    const robustMax = values.length >= 8 ? Math.min(rawMax, Math.max(upperPercentile, median * 4, 1)) : rawMax;
     return {
-      min: Math.floor(Math.min(...values)),
-      max: Math.ceil(Math.max(...values)),
+      min: 0,
+      max: Math.max(1, Math.ceil(robustMax)),
     };
-  }, [hotelFilters.priceMode, hotelOptions]);
+  }, [hotelExtraPerPerson, hotelOptions]);
 
   useEffect(() => {
     if (hotelOptions.length === 0) return;
@@ -2617,7 +2664,7 @@ function AiPackageContent() {
         if (!hotelFilters.mealPlans.some((plan) => hotelMealKeys.has(mealPlanKey(plan)))) return false;
       }
       if (hotelFilters.popular.breakfastIncluded && !includesBreakfast(hotel.mealPlans || [])) return false;
-      const priceValue = hotelFilters.priceMode === "nightly" ? hotel.price.nightly : hotel.price.total;
+      const priceValue = hotelExtraPerPerson(hotel);
       return priceValue >= minPrice && priceValue <= maxPrice;
     });
 
@@ -2640,7 +2687,7 @@ function AiPackageContent() {
       });
     }
     return sorted;
-  }, [activeDestination?.name, budget, destination, destinationSegments.length, hotelFilters, hotelOptions, hotelSortMode, stayPreference]);
+  }, [activeDestination?.name, budget, destination, destinationSegments.length, hotelExtraPerPerson, hotelFilters, hotelOptions, hotelSortMode, stayPreference]);
   const displayedHotelOptions = useMemo(
     () => filteredHotelOptions.slice(0, visibleHotelOptionCount),
     [filteredHotelOptions, visibleHotelOptionCount]
@@ -3331,7 +3378,20 @@ function AiPackageContent() {
 
       <main className="mx-auto max-w-[1564px] px-4 py-6 sm:px-6 lg:px-8">
         <div className="mb-7 rounded-[28px] border border-[#DFE0E4] bg-white p-4 shadow-[0_8px_28px_rgba(1,13,80,0.08)]">
-          <SearchBar compact embedded defaultProduct="ai" />
+          <SearchBar
+            compact
+            embedded
+            defaultProduct="ai"
+            aiHeaderAction={(
+              <Button
+                type="button"
+                onClick={() => { setNewDestinationDatesDone(false); setAddDestinationOpen(true); }}
+                className="h-9 rounded-lg bg-[#3754ED] px-3 text-xs font-semibold text-white hover:bg-[#2942D1]"
+              >
+                <Plus className="h-4 w-4" /> Add destination
+              </Button>
+            )}
+          />
         </div>
 
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -3342,13 +3402,6 @@ function AiPackageContent() {
             </Button>
             <Button type="button" variant="outline" onClick={shareTrip} className="h-9 rounded-lg border-[#DFE0E4] px-3 text-xs font-semibold text-[#010D50]">
               <Share2 className="h-4 w-4" /> Share
-            </Button>
-            <Button
-              type="button"
-              onClick={() => { setNewDestinationDatesDone(false); setAddDestinationOpen(true); }}
-              className="h-9 rounded-lg bg-[#3754ED] px-3 text-xs font-semibold text-white hover:bg-[#2942D1]"
-            >
-              <Plus className="h-4 w-4" /> Add destination
             </Button>
           </div>
         </div>
@@ -3886,7 +3939,7 @@ function AiPackageContent() {
                                   {room.refundable != null ? <div className="mt-1 text-xs text-[#3A478A]">{room.refundable ? "Refundable" : "Non-refundable"}</div> : null}
                                 </div>
                                 <div className="flex items-center gap-3">
-                                  {room.price ? <div className="text-sm font-bold text-[#010D50]">{money(room.price, room.currency || liveSearch.hotel?.price.currency || "GBP")}</div> : null}
+                                  {room.price ? <div className="text-sm font-bold text-[#010D50]">{packageDeltaLabel(roomExtraPerPerson(room.price), room.currency || liveSearch.hotel?.price.currency || "GBP")}</div> : null}
                                   {liveSearch.hotel ? (
                                     <Button type="button" onClick={() => { if (!liveSearch.hotel) return; selectHotelOption(liveSearch.hotel, room); setHotelDetailsOpen(false); }} className="h-8 rounded-full bg-[#3754ED] px-4 text-xs font-semibold text-white hover:bg-[#2942D1]">
                                       Select
@@ -3909,15 +3962,13 @@ function AiPackageContent() {
                     {formatRoomHighlights(liveSearch.hotel.room?.highlights).length ? (
                       <div className="mt-1 text-xs text-[#3A478A]">{formatRoomHighlights(liveSearch.hotel.room?.highlights).join(" | ")}</div>
                     ) : null}
-                    <div className="mt-2 text-2xl font-bold text-[#010D50]">
-                      {money(liveSearch.hotel.price.total, liveSearch.hotel.price.currency || "GBP")}
-                    </div>
+                    <div className="mt-2 text-2xl font-bold text-[#010D50]">Included</div>
                     <div className="mt-1 text-xs text-[#3A478A]">
-                      Total for {liveSearch.hotel.price.nights} nights, {liveSearch.hotel.price.rooms} room{liveSearch.hotel.price.rooms === 1 ? "" : "s"}.
+                      {liveSearch.hotel.price.nights} nights, {liveSearch.hotel.price.rooms} room{liveSearch.hotel.price.rooms === 1 ? "" : "s"} included with this package.
                     </div>
                     <div className="mt-3 rounded-lg bg-[#F5F7FF] p-3 text-xs leading-5 text-[#3A478A]">
                       Default selection is ranked from live availability using stay preference, star rating, reviews,
-                      amenities, meal plan, and budget fit. Pricing uses the provider total with fees included when returned.
+                      amenities, meal plan, and budget fit. Alternate options show only extra cost per person.
                     </div>
                   </div>
 
@@ -3974,6 +4025,8 @@ function AiPackageContent() {
                     minPriceByStarRating={hotelMinPriceByStarRating}
                     refundableFilterEnabled={hotelRefundableFilterEnabled}
                     showNightlyPrice={false}
+                    priceLabel="Extra per person"
+                    showStarPrices={false}
                   />
                 </aside>
 
@@ -4060,7 +4113,7 @@ function AiPackageContent() {
                                 ) : null}
                               </div>
                               <div className="flex flex-col items-start justify-between gap-3 sm:items-end">
-                                <div className="text-base font-bold text-[#010D50]">{money(hotel.price.total, hotel.price.currency || "GBP")}</div>
+                                <div className="text-base font-bold text-[#010D50]">{packageDeltaLabel(hotelExtraPerPerson(hotel), hotel.price.currency || "GBP")}</div>
                                 <div className="flex flex-wrap gap-2 sm:justify-end">
                                   <Button
                                     type="button"
@@ -4106,7 +4159,7 @@ function AiPackageContent() {
                                                 {room.refundable != null ? <div className="mt-1 text-xs text-[#3A478A]">{room.refundable ? "Refundable" : "Non-refundable"}</div> : null}
                                               </div>
                                               <div className="flex items-center gap-3 sm:justify-end">
-                                                {room.price ? <div className="text-sm font-bold text-[#010D50]">{money(room.price, room.currency || hotel.price.currency || "GBP")}</div> : null}
+                                                {room.price ? <div className="text-sm font-bold text-[#010D50]">{packageDeltaLabel(roomExtraPerPerson(room.price), room.currency || hotel.price.currency || "GBP")}</div> : null}
                                                 <Button type="button" onClick={() => selectHotelOption(hotel, room)} className="h-9 rounded-full bg-[#3754ED] px-4 text-xs font-semibold text-white hover:bg-[#2942D1]">Select</Button>
                                               </div>
                                             </div>
