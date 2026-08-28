@@ -4,8 +4,10 @@ import createNextIntlPlugin from 'next-intl/plugin';
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 const nextConfig: NextConfig = {
-  // Output standalone for Docker deployment
-  output: 'standalone',
+  // Vercel's Next 16.3 adapter does not emit the root NFT traces that
+  // standalone finalization expects. Keep standalone output for Docker,
+  // while allowing Vercel to use its native build output.
+  output: process.env.VERCEL ? undefined : 'standalone',
   images: {
     remotePatterns: [
       {
