@@ -138,15 +138,29 @@ function buildPersistedStateFallbacks(value: string): string[] {
   }
 }
 
+const unavailableStateStorage: StateStorage = {
+  getItem: () => null,
+  setItem: () => undefined,
+  removeItem: () => undefined,
+};
+
 function createQuotaSafeStateStorage(storage: Storage): StateStorage {
   return {
-    getItem: (name) => storage.getItem(name),
+    getItem: (name) => {
+      try {
+        return storage.getItem(name);
+      } catch {
+        return null;
+      }
+    },
     setItem: (name, value) => {
       try {
         storage.setItem(name, value);
         return;
       } catch (error) {
-        if (!isQuotaExceededError(error)) throw error;
+        // Some privacy modes expose sessionStorage but deny every operation.
+        // Persistence is optional, so keep the runtime store working.
+        if (!isQuotaExceededError(error)) return;
       }
 
       for (const fallbackValue of buildPersistedStateFallbacks(value)) {
@@ -154,14 +168,32 @@ function createQuotaSafeStateStorage(storage: Storage): StateStorage {
           storage.setItem(name, fallbackValue);
           return;
         } catch (error) {
-          if (!isQuotaExceededError(error)) throw error;
+          if (!isQuotaExceededError(error)) return;
         }
       }
 
-      storage.removeItem(name);
+      try {
+        storage.removeItem(name);
+      } catch {
+        // Storage is unavailable; the in-memory Zustand state remains valid.
+      }
     },
-    removeItem: (name) => storage.removeItem(name),
+    removeItem: (name) => {
+      try {
+        storage.removeItem(name);
+      } catch {
+        // Storage is unavailable; there is nothing persisted to remove.
+      }
+    },
   };
+}
+
+export function createResilientSessionStateStorage(storageProvider: () => Storage): StateStorage {
+  try {
+    return createQuotaSafeStateStorage(storageProvider());
+  } catch {
+    return unavailableStateStorage;
+  }
 }
 
 interface AffiliateData {
@@ -712,7 +744,7 @@ export const useBookingStore = create<BookingState & HydrationState>()(
     }),
     {
       name: 'globehunters-booking-storage', // Storage key
-      storage: createJSONStorage(() => createQuotaSafeStateStorage(sessionStorage)), // Use sessionStorage instead of localStorage
+      storage: createJSONStorage(() => createResilientSessionStateStorage(() => sessionStorage)),
       // Only persist certain fields
       partialize: (state) => ({
         // Remove heavy raw payloads before persisting to avoid storage quota issues.

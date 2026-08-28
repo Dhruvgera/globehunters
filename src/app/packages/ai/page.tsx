@@ -789,11 +789,12 @@ function writeAiPackageLiveCache(cache: Omit<AiPackageLiveCache, "expiresAt">) {
       try {
         window.sessionStorage.setItem(AI_PACKAGE_CACHE_KEY, JSON.stringify(fallback));
       } catch {
-        window.sessionStorage.removeItem(AI_PACKAGE_CACHE_KEY);
+        // Storage can be disabled by browser privacy settings. The live state
+        // remains available in memory for the current page.
       }
       return;
     }
-    throw error;
+    // Treat blocked storage as a cache miss, not a failed package search.
   }
 }
 
@@ -2986,9 +2987,10 @@ function AiPackageContent() {
         selectedActivityCodes,
         destinationStates: effectiveDestinationStateById,
       });
-      window.sessionStorage.setItem(
-        "aiPackageBookingDraft",
-        JSON.stringify({
+      try {
+        window.sessionStorage.setItem(
+          "aiPackageBookingDraft",
+          JSON.stringify({
           search: {
             destination,
             fromCode,
@@ -3013,8 +3015,11 @@ function AiPackageContent() {
           },
           chainedDestinations,
           destinations: destinationDrafts,
-        })
-      );
+          })
+        );
+      } catch {
+        // Checkout can rebuild this draft from the URL and runtime store.
+      }
     }
 
     router.push(`/packages/ai/checkout?${next.toString()}`);
