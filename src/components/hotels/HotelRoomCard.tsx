@@ -1,9 +1,101 @@
 "use client";
 
-import { formatDisplayPrice, getAmenityIcon, RoomCardData } from '@/app/hotels/[id]/page';
-import { Check, ChevronRight, X } from 'lucide-react';
+import {
+    Bath,
+    Bed,
+    Building,
+    Bus,
+    Check,
+    ChevronRight,
+    Dumbbell,
+    Maximize,
+    PawPrint,
+    Sparkles,
+    Trees,
+    Users,
+    Wifi,
+    Wind,
+    X,
+} from 'lucide-react';
 import { Button } from '../ui/button';
-import { Dispatch, SetStateAction, useMemo, useState } from 'react';
+import { Dispatch, SetStateAction, useMemo, useState, type ComponentType } from 'react';
+import type { ViewRoomOption } from '@/types/holidayPackage';
+
+type UnknownRecord = Record<string, unknown>;
+
+export interface RoomAmenity {
+    label: string;
+    icon: string;
+}
+
+export interface RoomCardData {
+    id: string;
+    sourceRoomOptionId?: string;
+    name: string;
+    bedType: string;
+    reviews: {
+        score: number;
+        label: string;
+        count: number;
+    };
+    isRefundable: boolean;
+    paymentType: string;
+    amenities: RoomAmenity[];
+    price: {
+        currency: string;
+        nightly: number;
+        total: number;
+    };
+    _raw: UnknownRecord;
+    roomGroupSources?: Record<string, ViewRoomOption>;
+}
+
+export function formatDisplayPrice(currency: string | undefined, amount: number | undefined): string {
+    if (typeof amount !== 'number' || !Number.isFinite(amount)) return '';
+    const normalizedCurrency = String(currency || '').trim().toUpperCase();
+    if (/^[A-Z]{3}$/.test(normalizedCurrency)) {
+        try {
+            return new Intl.NumberFormat('en-GB', {
+                style: 'currency',
+                currency: normalizedCurrency,
+                maximumFractionDigits: 2,
+            }).format(amount);
+        } catch {
+            // Fall back to prefix formatting below.
+        }
+    }
+
+    const prefix = String(currency || '').trim() || '£';
+    return `${prefix}${amount.toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    })}`;
+}
+
+const amenityIcons: Record<string, ComponentType<{ className?: string }>> = {
+    pets: PawPrint,
+    shuttle: Bus,
+    gym: Dumbbell,
+    spa: Sparkles,
+    ac: Wind,
+    hot_tub: Bath,
+    pool: Bath,
+    wifi: Wifi,
+    restaurant: Building,
+    parking: Building,
+    fullscreen: Maximize,
+    group: Users,
+    bed: Bed,
+    nature: Trees,
+    city: Building,
+    bathtub: Bath,
+    kitchen: Building,
+};
+
+export function getAmenityIcon(iconName: string) {
+    const Icon = amenityIcons[iconName];
+    return Icon ? <Icon className="w-[18px] h-[18px] text-[#010D50]" /> : null;
+}
 
 interface HotelRoomCardPropsType {
     room: RoomCardData;

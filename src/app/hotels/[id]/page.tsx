@@ -12,19 +12,6 @@ import {
   Plane,
   Users,
   SlidersHorizontal,
-  Wifi,
-  Maximize,
-  Users as UsersIcon,
-  Bed,
-  Trees,
-  Building,
-  PawPrint,
-  Bus,
-  Dumbbell,
-  Sparkles,
-  Wind,
-  Bath,
-  X,
   Loader2,
   MapPin,
 } from "lucide-react";
@@ -44,7 +31,7 @@ import { FlightSummaryCard, type FlightLeg } from "@/components/booking/FlightSu
 import type { Flight, FlightSegment } from "@/types/flight";
 import { resolveTrustYouHotelId } from "@/lib/trustyou/hotelMapping";
 import type { TrustYouHotelReviewSummary } from "@/types/trustyou";
-import type { HolidayPackageViewResponse, AccommodationViewResponse, ViewRoomOption } from "@/types/holidayPackage";
+import type { HolidayPackageViewResponse } from "@/types/holidayPackage";
 import { resolvePackagePricing } from "@/lib/package/pricing";
 import { calculatePackagePerPersonPrice } from "@/lib/package/passengers";
 import {
@@ -59,7 +46,13 @@ import { convertHotelLocalTaxTotal, formatMoneyFromCode, normalizeCurrencyCode }
 import { parsePackageHotelContent, type PackageHotelNearbyPlace } from "@/lib/package/hotelContent";
 import { usePackageDeeplink } from "@/hooks/usePackageDeeplink";
 import { buildPackageRoomConfigurations, shortWebRefFromToken, toPositiveNumericId } from "../hotelUtils";
-import { HotelRoomCard } from "@/components/hotels/HotelRoomCard";
+import {
+  HotelRoomCard,
+  formatDisplayPrice,
+  getAmenityIcon,
+  type RoomCardData,
+  type RoomAmenity,
+} from "@/components/hotels/HotelRoomCard";
 import { airportCache } from "@/lib/cache/airportCache";
 
 function LoadingBlock({ className }: { className: string }) {
@@ -101,28 +94,6 @@ function shiftIsoDateByDays(isoDate: string, days: number): string {
   return `${y}-${m}-${dd}`;
 }
 
-export function formatDisplayPrice(currency: string | undefined, amount: number | undefined): string {
-  if (typeof amount !== "number" || !Number.isFinite(amount)) return "";
-  const normalizedCurrency = String(currency || "").trim().toUpperCase();
-  if (/^[A-Z]{3}$/.test(normalizedCurrency)) {
-    try {
-      return new Intl.NumberFormat("en-GB", {
-        style: "currency",
-        currency: normalizedCurrency,
-        maximumFractionDigits: 2,
-      }).format(amount);
-    } catch {
-      // Fall back to prefix formatting below.
-    }
-  }
-
-  const prefix = String(currency || "").trim() || "£";
-  return `${prefix}${amount.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
 function parsePositivePriceCandidate(value: unknown): number | null {
   const raw = String(value ?? "").trim();
   if (!raw) return null;
@@ -152,33 +123,6 @@ function formatMinutesToDuration(totalMinutes: number | undefined): string {
 }
 
 type UnknownRecord = Record<string, unknown>;
-
-interface RoomAmenity {
-  label: string;
-  icon: string;
-}
-
-export interface RoomCardData {
-  id: string;
-  sourceRoomOptionId?: string;
-  name: string;
-  bedType: string;
-  reviews: {
-    score: number;
-    label: string;
-    count: number;
-  };
-  isRefundable: boolean;
-  paymentType: string;
-  amenities: RoomAmenity[];
-  price: {
-    currency: string;
-    nightly: number;
-    total: number;
-  };
-  _raw: UnknownRecord;
-  roomGroupSources?: Record<string, ViewRoomOption>;
-}
 
 function selectedRoomCountsFromIds(ids: string[]): Record<string, number> {
   const counts: Record<string, number> = {};
@@ -569,32 +513,6 @@ function toErrorMessage(error: unknown, fallback: string): string {
   const maybeRecord = asRecord(error);
   if (typeof maybeRecord.message === "string" && maybeRecord.message.trim()) return maybeRecord.message.trim();
   return fallback;
-}
-
-// Icon mapping for amenities
-const amenityIcons: Record<string, React.ComponentType<{ className?: string }>> = {
-  pets: PawPrint,
-  shuttle: Bus,
-  gym: Dumbbell,
-  spa: Sparkles,
-  ac: Wind,
-  hot_tub: Bath,
-  pool: Bath,
-  wifi: Wifi,
-  restaurant: Building,
-  parking: Building,
-  fullscreen: Maximize,
-  group: UsersIcon,
-  bed: Bed,
-  nature: Trees,
-  city: Building,
-  bathtub: Bath,
-  kitchen: Building,
-};
-
-export function getAmenityIcon(iconName: string) {
-  const Icon = amenityIcons[iconName];
-  return Icon ? <Icon className="w-[18px] h-[18px] text-[#010D50]" /> : null;
 }
 
 function normalizeAmenityLabel(value: unknown): string {
