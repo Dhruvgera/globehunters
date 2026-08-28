@@ -468,7 +468,8 @@ async function fetchPropertyContentImage(hotel: Hotel) {
 
 async function fetchSelectedHotelImage(
   hotel: Hotel,
-  hotelSearch?: ReturnType<typeof useBookingStore.getState>["hotelSearch"]
+  hotelSearch?: ReturnType<typeof useBookingStore.getState>["hotelSearch"],
+  excludedImageKeys: ReadonlySet<string> = new Set()
 ) {
   const raw = rawRecord(hotel.rawSearchResult);
   const rawCriteriaId = raw?.searchCriteriaId ?? hotelSearch?.searchCriteriaId;
@@ -485,14 +486,21 @@ async function fetchSelectedHotelImage(
         ? [0, { vMapId }]
         : null;
   const settled = await Promise.allSettled([
-    fetchPropertyContentImage(hotel),
-    detailPayload ? hotelService.hotelSearchDetails(detailPayload) : Promise.resolve(null),
-    criteriaId ? hotelService.getRoomsV3(criteriaId, roomHotelId || hotel.id, srId || undefined) : Promise.resolve(null),
+    withSearchTimeout(fetchPropertyContentImage(hotel), `Hotel image for ${hotel.name}`),
+    detailPayload
+      ? withSearchTimeout(hotelService.hotelSearchDetails(detailPayload), `Hotel details for ${hotel.name}`)
+      : Promise.resolve(null),
+    criteriaId
+      ? withSearchTimeout(
+          hotelService.getRoomsV3(criteriaId, roomHotelId || hotel.id, srId || undefined),
+          `Hotel rooms for ${hotel.name}`
+        )
+      : Promise.resolve(null),
   ]);
   const contentImage = settled[0]?.status === "fulfilled" ? settled[0].value : null;
-  if (contentImage) return contentImage;
   const payloads = settled.slice(1).flatMap((result) => (result.status === "fulfilled" && result.value ? [result.value] : []));
-  return firstRealImage(collectImageUrls(payloads, 12)) || null;
+  const candidates = uniqueStrings([contentImage || undefined, ...collectImageUrls(payloads, 12)], 12);
+  return candidates.find((image) => isRealHotelImageUrl(image) && !excludedImageKeys.has(hotelImageKey(image))) || null;
 }
 
 function normalizedPlaceName(value: string | undefined | null) {
@@ -1331,6 +1339,8 @@ function AiPackageContent() {
   const [hotelImageLoadingById, setHotelImageLoadingById] = useState<Record<string, boolean>>({});
   const [hotelImageFailedById, setHotelImageFailedById] = useState<Record<string, boolean>>({});
   const imageEnrichmentAttemptedRef = useRef<Set<string>>(new Set());
+  const selectedImageEnrichmentAttemptedRef = useRef<Set<string>>(new Set());
+  const failedHotelImageKeysRef = useRef<Map<string, Set<string>>>(new Map());
   const destinationHydrationAttemptedRef = useRef<Set<string>>(new Set());
   const previousStayPreferenceRef = useRef(stayPreference);
   const [flightInfoOpen, setFlightInfoOpen] = useState(false);
@@ -1425,6 +1435,8 @@ function AiPackageContent() {
 
   useEffect(() => {
     imageEnrichmentAttemptedRef.current.clear();
+    selectedImageEnrichmentAttemptedRef.current.clear();
+    failedHotelImageKeysRef.current.clear();
     destinationHydrationAttemptedRef.current.clear();
     setHotelOptions([]);
     setDestinationStateById({});
@@ -2024,8 +2036,19 @@ function AiPackageContent() {
 
     async function loadRichHotelDetails() {
       const requests: Promise<unknown>[] = [];
-      if (criteriaId) requests.push(hotelService.getRoomsV3(criteriaId, roomHotelId || selectedHotel.id, srId || undefined));
-      if (detailPayload) requests.push(hotelService.hotelSearchDetails(detailPayload));
+      if (criteriaId) {
+        requests.push(
+          withSearchTimeout(
+            hotelService.getRoomsV3(criteriaId, roomHotelId || selectedHotel.id, srId || undefined),
+            `Hotel rooms for ${selectedHotel.name}`
+          )
+        );
+      }
+      if (detailPayload) {
+        requests.push(
+          withSearchTimeout(hotelService.hotelSearchDetails(detailPayload), `Hotel details for ${selectedHotel.name}`)
+        );
+      }
 
       const settled = await Promise.allSettled(requests);
       if (cancelled) return;
@@ -2043,7 +2066,10 @@ function AiPackageContent() {
         32
       );
       const detailRooms = collectRooms(payloads, 48);
-      const detailImages = collectImageUrls(payloads, 10);
+      const failedImageKeys = failedHotelImageKeysRef.current.get(selectedHotel.id) || new Set<string>();
+      const detailImages = collectImageUrls(payloads, 10).filter(
+        (image) => !failedImageKeys.has(hotelImageKey(image))
+      );
       const promotedImage = !isRealHotelImageUrl(selectedHotel.imageSrc) ? firstRealImage(detailImages) : undefined;
       const detailCoordinates = extractCoordinates(payloads);
 
@@ -2074,7 +2100,34 @@ function AiPackageContent() {
     return () => {
       cancelled = true;
     };
-  }, [hotelDetailsOpen, liveSearch.hotel, storeHotelSearch?.searchCriteriaId]);
+    // Hotel image enrichment changes the hotel object; the supplier detail request is keyed to the hotel itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hotelDetailsOpen, liveSearch.hotel?.id, storeHotelSearch?.searchCriteriaId]);
+
+  const markHotelImageFailed = useCallback((hotelId: string, imageSrc: string | undefined | null) => {
+    if (!hotelId) return;
+    const imageKey = hotelImageKey(imageSrc);
+    if (imageKey) {
+      const failedKeys = failedHotelImageKeysRef.current.get(hotelId) || new Set<string>();
+      failedKeys.add(imageKey);
+      failedHotelImageKeysRef.current.set(hotelId, failedKeys);
+    }
+    setHotelImageFailedById((current) => ({ ...current, [hotelId]: true }));
+    setLiveSearch((current) =>
+      current.hotel?.id === hotelId ? { ...current, hotel: { ...current.hotel, imageSrc: "" } } : current
+    );
+    setHotelOptions((current) =>
+      current.map((hotel) => (hotel.id === hotelId ? { ...hotel, imageSrc: "" } : hotel))
+    );
+    setHotelDetails((current) =>
+      current
+        ? {
+            ...current,
+            images: current.images.filter((image) => hotelImageKey(image) !== imageKey),
+          }
+        : current
+    );
+  }, []);
 
   useEffect(() => {
     if (!liveSearch.hotel) return;
@@ -2082,10 +2135,17 @@ function AiPackageContent() {
     if (!shouldRetryFailedImage && isRealHotelImageUrl(liveSearch.hotel.imageSrc)) return;
     let cancelled = false;
     const selectedHotel = liveSearch.hotel;
+    const failedImageKeys = failedHotelImageKeysRef.current.get(selectedHotel.id) || new Set<string>();
+    const attemptKey = `${selectedHotel.id}:${Array.from(failedImageKeys).sort().join("|")}`;
+    if (selectedImageEnrichmentAttemptedRef.current.has(attemptKey) || failedImageKeys.size >= 3) return;
+    selectedImageEnrichmentAttemptedRef.current.add(attemptKey);
+    setHotelImageLoadingById((current) => ({ ...current, [selectedHotel.id]: true }));
 
     async function enrichSelectedHotelImage() {
-      const imageSrc = await fetchSelectedHotelImage(selectedHotel, storeHotelSearch).catch(() => null);
-      if (cancelled || !imageSrc) return;
+      const imageSrc = await fetchSelectedHotelImage(selectedHotel, storeHotelSearch, failedImageKeys).catch(() => null);
+      if (cancelled) return;
+      setHotelImageLoadingById((current) => ({ ...current, [selectedHotel.id]: false }));
+      if (!imageSrc) return;
       setLiveSearch((current) => {
         if (!current.hotel || current.hotel.id !== selectedHotel.id) return current;
         return { ...current, hotel: { ...current.hotel, imageSrc } };
@@ -3158,14 +3218,18 @@ function AiPackageContent() {
   useEffect(() => {
     if (!hotelChangeOpen || hotelOptions.length === 0) return;
     let cancelled = false;
+    const failedKeysFor = (hotelId: string) => failedHotelImageKeysRef.current.get(hotelId) || new Set<string>();
+    const attemptKeyFor = (hotel: Hotel) =>
+      `${hotel.id}:${Array.from(failedKeysFor(hotel.id)).sort().join("|")}`;
     const targets = displayedHotelOptions
       .filter((hotel) => {
-        if (imageEnrichmentAttemptedRef.current.has(hotel.id)) return false;
+        const failedKeys = failedKeysFor(hotel.id);
+        if (failedKeys.size >= 3 || imageEnrichmentAttemptedRef.current.has(attemptKeyFor(hotel))) return false;
         return hotelImageFailedById[hotel.id] || !isRealHotelImageUrl(hotel.imageSrc) || duplicateHotelImageIds.has(hotel.id);
       })
       .slice(0, HOTEL_CHANGE_PAGE_SIZE);
     if (targets.length === 0) return;
-    targets.forEach((hotel) => imageEnrichmentAttemptedRef.current.add(hotel.id));
+    targets.forEach((hotel) => imageEnrichmentAttemptedRef.current.add(attemptKeyFor(hotel)));
     setHotelImageLoadingById((current) => ({
       ...current,
       ...Object.fromEntries(targets.map((hotel) => [hotel.id, true])),
@@ -3179,7 +3243,10 @@ function AiPackageContent() {
           .filter(Boolean)
       );
       const enriched = await Promise.allSettled(
-        targets.map(async (hotel) => ({ id: hotel.id, imageSrc: await fetchSelectedHotelImage(hotel, storeHotelSearch) }))
+        targets.map(async (hotel) => ({
+          id: hotel.id,
+          imageSrc: await fetchSelectedHotelImage(hotel, storeHotelSearch, failedKeysFor(hotel.id)),
+        }))
       );
       if (cancelled) return;
       setHotelImageLoadingById((current) => ({
@@ -3196,6 +3263,10 @@ function AiPackageContent() {
         }
       });
       if (imageByHotelId.size === 0) return;
+      setHotelImageFailedById((current) => ({
+        ...current,
+        ...Object.fromEntries(Array.from(imageByHotelId.keys()).map((hotelId) => [hotelId, false])),
+      }));
       setHotelOptions((current) =>
         current.map((hotel) => {
           const imageSrc = imageByHotelId.get(hotel.id);
@@ -3722,25 +3793,18 @@ function AiPackageContent() {
                       alt={liveHotelName}
                       fill
                       className="object-cover"
-                      onError={() => {
-                        imageEnrichmentAttemptedRef.current.delete(liveSearch.hotel?.id || "");
-                        setHotelImageFailedById((current) => ({ ...current, [liveSearch.hotel?.id || ""]: true }));
-                        setLiveSearch((current) =>
-                          current.hotel ? { ...current, hotel: { ...current.hotel, imageSrc: "" } } : current
-                        );
-                        setHotelOptions((current) =>
-                          current.map((hotel) => (hotel.id === liveSearch.hotel?.id ? { ...hotel, imageSrc: "" } : hotel))
-                        );
-                      }}
+                      onError={() => markHotelImageFailed(liveSearch.hotel?.id || "", liveHotelImage)}
                     />
                   </div>
                 ) : (
                   <div className="flex h-[210px] items-center justify-center rounded-xl bg-[#F5F7FF] text-xs font-medium text-[#3A478A]">
-                    {liveSearch.hotel ? (
+                    {liveSearch.hotel && hotelImageLoadingById[liveSearch.hotel.id] ? (
                       <span className="inline-flex items-center gap-2">
                         <Loader2 className="h-4 w-4 animate-spin text-[#3754ED]" />
                         Loading hotel image
                       </span>
+                    ) : liveSearch.hotel ? (
+                      <span>No live image available</span>
                     ) : null}
                   </div>
                 )}
@@ -3911,8 +3975,30 @@ function AiPackageContent() {
                 <div className="grid gap-3 lg:grid-cols-[1.35fr_0.65fr]">
                   <div className="relative min-h-[260px] overflow-hidden rounded-xl bg-[#F5F7FF]">
                     {(hotelDetails?.images?.[0] || liveHotelImage) ? (
-                      <Image src={hotelDetails?.images?.[0] || liveHotelImage || ""} alt={liveHotelName} fill className="object-cover" />
-                    ) : null}
+                      <Image
+                        src={hotelDetails?.images?.[0] || liveHotelImage || ""}
+                        alt={liveHotelName}
+                        fill
+                        className="object-cover"
+                        onError={() =>
+                          markHotelImageFailed(
+                            liveSearch.hotel?.id || "",
+                            hotelDetails?.images?.[0] || liveHotelImage
+                          )
+                        }
+                      />
+                    ) : (
+                      <div className="flex h-full min-h-[260px] items-center justify-center text-xs font-medium text-[#3A478A]">
+                        {liveSearch.hotel && hotelImageLoadingById[liveSearch.hotel.id] ? (
+                          <span className="inline-flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin text-[#3754ED]" />
+                            Loading hotel image
+                          </span>
+                        ) : (
+                          <span>No live image available</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
                   {(hotelDetails?.images || []).slice(1, 3).map((image, index) => (
@@ -4114,13 +4200,7 @@ function AiPackageContent() {
                                     alt={hotel.name}
                                     fill
                                     className="object-cover"
-                                    onError={() => {
-                                      imageEnrichmentAttemptedRef.current.delete(hotel.id);
-                                      setHotelImageFailedById((current) => ({ ...current, [hotel.id]: true }));
-                                      setHotelOptions((current) =>
-                                        current.map((item) => (item.id === hotel.id ? { ...item, imageSrc: "" } : item))
-                                      );
-                                    }}
+                                    onError={() => markHotelImageFailed(hotel.id, thumbnailSrc)}
                                   />
                                 ) : hotelImageLoadingById[hotel.id] ? (
                                   <div className="flex h-full w-full items-center justify-center text-[11px] font-medium text-[#3A478A]">
