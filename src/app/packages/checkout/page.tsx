@@ -352,6 +352,7 @@ function PackageTravellerDetailsInner() {
       departureTime: seg.departureTime,
       arrivalTime: seg.arrivalTime,
       date: seg.date,
+      arrivalDate: seg.arrivalDate || seg.date,
       duration: seg.totalJourneyTime || seg.duration,
       stops: seg.stopDetails || `${seg.stops} Stop${seg.stops !== 1 ? "s" : ""}`,
       airline: seg.carrierName || flight.airline.name,

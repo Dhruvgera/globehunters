@@ -206,6 +206,7 @@ function PackageReviewPageInner() {
       departureTime: segment.departureTime,
       arrivalTime: segment.arrivalTime,
       date: segment.date,
+      arrivalDate: segment.arrivalDate || segment.date,
       duration: segment.totalJourneyTime || segment.duration,
       stops: segment.stopDetails || `${segment.stops} Stop${segment.stops !== 1 ? "s" : ""}`,
       airline: segment.carrierName || selectedFlight.airline.name,

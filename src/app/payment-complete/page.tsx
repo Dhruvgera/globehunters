@@ -46,6 +46,7 @@ import { useMemo } from "react";
 import { FOLDER_STATUS_CODES } from "@/types/portal";
 import { calculateNights } from "@/lib/hotels/nights";
 import { CONTACT_US_URL, REFUNDABLE_TERMS_URL, TERMS_AND_CONDITIONS_URL } from "@/config/constants";
+import { getSessionItem, removeSessionItem, setSessionItem } from "@/lib/storage/safeSessionStorage";
 
 type ConfirmedActivity = {
   productCode?: string;
@@ -671,7 +672,7 @@ function PaymentCompleteContent() {
 
   const loadBookingContext = useCallback((id: string) => {
     try {
-      const raw = sessionStorage.getItem(`bookingContext_${id}`);
+      const raw = getSessionItem(`bookingContext_${id}`);
       if (!raw) return null;
       return JSON.parse(raw);
     } catch (e) {
@@ -836,14 +837,14 @@ function PaymentCompleteContent() {
 	          if (result.payment.status === "success") {
 	            setShowConfetti(true);
 	            // Mark as completed to prevent double charging
-	            sessionStorage.setItem(
+	            setSessionItem(
 	              "paymentCompletedOrderId",
 	              result.payment.orderId
 	            );
             // Clear pending order info
-	            sessionStorage.removeItem("pendingOrderId");
-	            sessionStorage.removeItem("pendingOrderAmount");
-	            sessionStorage.removeItem("pendingOrderCurrency");
+	            removeSessionItem("pendingOrderId");
+	            removeSessionItem("pendingOrderAmount");
+	            removeSessionItem("pendingOrderCurrency");
 
 	            // Hotels and packages: confirm itinerary only after successful payment so extras can be added before payment.
 	            if (isHotelMode || isPackageMode) {
@@ -851,10 +852,10 @@ function PaymentCompleteContent() {
 	                String(result.payment.orderId || vyspaFolderNumber || orderId || "").trim();
 	              if (folderNumberForConfirm) {
 	                const confirmGuardKey = `${isPackageMode ? "package" : "hotel"}ItineraryConfirmed_${folderNumberForConfirm}`;
-	                if (sessionStorage.getItem(confirmGuardKey) !== "1") {
+	                if (getSessionItem(confirmGuardKey) !== "1") {
 	                  try {
 	                    await confirmVyspaItinerary(folderNumberForConfirm);
-	                    sessionStorage.setItem(confirmGuardKey, "1");
+	                    setSessionItem(confirmGuardKey, "1");
 	                    console.log("✅ Itinerary confirmed after payment", {
 	                      folderNumber: folderNumberForConfirm,
                         flow: isPackageMode ? "package" : "hotel",
@@ -869,8 +870,8 @@ function PaymentCompleteContent() {
 	            // Record payment to Vyspa Portal (non-blocking)
 	            recordPaymentToVyspa(
 	              result.payment.transactionId || result.payment.orderId,
-              parseFloat(result.payment.amount || sessionStorage.getItem("pendingOrderAmount") || '0'),
-              result.payment.currency || sessionStorage.getItem("pendingOrderCurrency") || 'GBP'
+              parseFloat(result.payment.amount || getSessionItem("pendingOrderAmount") || '0'),
+              result.payment.currency || getSessionItem("pendingOrderCurrency") || 'GBP'
             );
 
             // Email sending is handled by separate useEffect to ensure data is available
@@ -893,8 +894,8 @@ function PaymentCompleteContent() {
         }
       } else {
         // If no redirectionResult, check for stored order info
-        const pendingOrderId = sessionStorage.getItem("pendingOrderId");
-        const completedOrderId = sessionStorage.getItem(
+        const pendingOrderId = getSessionItem("pendingOrderId");
+        const completedOrderId = getSessionItem(
           "paymentCompletedOrderId"
         );
 
@@ -932,7 +933,7 @@ function PaymentCompleteContent() {
   useEffect(() => {
     const id =
       paymentInfo?.orderId ||
-      sessionStorage.getItem("pendingOrderId") ||
+      getSessionItem("pendingOrderId") ||
       storeVyspaFolderNumber ||
       orderId ||
       "";
@@ -951,12 +952,12 @@ function PaymentCompleteContent() {
 
   const handleGoHome = useCallback(() => {
     // Clear all payment-related sessionStorage items to allow new bookings
-    sessionStorage.removeItem("paymentCompletedOrderId");
-    sessionStorage.removeItem("pendingOrderId");
-    sessionStorage.removeItem("pendingOrderAmount");
-    sessionStorage.removeItem("pendingOrderCurrency");
-    sessionStorage.removeItem("paymentSessionStart");
-    sessionStorage.removeItem("paymentVisited");
+    removeSessionItem("paymentCompletedOrderId");
+    removeSessionItem("pendingOrderId");
+    removeSessionItem("pendingOrderAmount");
+    removeSessionItem("pendingOrderCurrency");
+    removeSessionItem("paymentSessionStart");
+    removeSessionItem("paymentVisited");
 
     resetBooking();
     router.push("/");
@@ -964,11 +965,11 @@ function PaymentCompleteContent() {
 
   const handleNewSearch = useCallback(() => {
     // Clear session-related items (but keep paymentCompletedOrderId for duplicate protection)
-    sessionStorage.removeItem("pendingOrderId");
-    sessionStorage.removeItem("pendingOrderAmount");
-    sessionStorage.removeItem("pendingOrderCurrency");
-    sessionStorage.removeItem("paymentSessionStart");
-    sessionStorage.removeItem("paymentVisited");
+    removeSessionItem("pendingOrderId");
+    removeSessionItem("pendingOrderAmount");
+    removeSessionItem("pendingOrderCurrency");
+    removeSessionItem("paymentSessionStart");
+    removeSessionItem("paymentVisited");
 
     resetBooking();
     router.push("/search");
@@ -980,15 +981,23 @@ function PaymentCompleteContent() {
   }, []);
 
   const handleDownloadReceipt = useCallback(() => {
+    const previousTitle = document.title;
+    document.title = `Globehunters booking receipt ${paymentInfo?.orderId || orderId || "receipt"}`;
+    const restoreTitle = () => {
+      document.title = previousTitle;
+      window.removeEventListener("afterprint", restoreTitle);
+    };
+    window.addEventListener("afterprint", restoreTitle);
     window.print();
-  }, []);
+    window.setTimeout(restoreTitle, 1000);
+  }, [orderId, paymentInfo?.orderId]);
 
   // Send confirmation email async
   const sendConfirmationEmailAsync = useCallback(async (orderId: string, amount?: string, currency?: string) => {
     const emailSentKey = `emailSent_${orderId}`;
-    if (emailSent || sessionStorage.getItem(emailSentKey)) return;
+    if (emailSent || getSessionItem(emailSentKey)) return;
     // Claim order before awaiting network work. Prevents duplicate sends from effect reruns/Strict Mode remounts.
-    sessionStorage.setItem(emailSentKey, "sending");
+    setSessionItem(emailSentKey, "sending");
 
     try {
       setEmailError(null);
@@ -996,12 +1005,12 @@ function PaymentCompleteContent() {
       const ctx = bookingContext || loadBookingContext(orderId);
       const totalPaid = parseFloat(
         amount ||
-        sessionStorage.getItem("pendingOrderAmount") ||
+        getSessionItem("pendingOrderAmount") ||
         String(ctx?.pricing?.tripTotal || "0")
       );
       const currencyCode =
         currency ||
-        sessionStorage.getItem("pendingOrderCurrency") ||
+        getSessionItem("pendingOrderCurrency") ||
         ctx?.pricing?.currency ||
         "GBP";
 
@@ -1153,15 +1162,15 @@ function PaymentCompleteContent() {
 
       if (result.success) {
         setEmailSent(true);
-        sessionStorage.setItem(emailSentKey, "true");
+        setSessionItem(emailSentKey, "true");
         console.log("Confirmation email sent successfully to:", contactEmailForEmail);
       } else {
-        sessionStorage.removeItem(emailSentKey);
+        removeSessionItem(emailSentKey);
         setEmailError(result.error || "Failed to send confirmation email");
         console.error("Failed to send confirmation email:", result.error);
       }
     } catch (error) {
-      sessionStorage.removeItem(emailSentKey);
+      removeSessionItem(emailSentKey);
       setEmailError(error instanceof Error ? error.message : "Failed to send confirmation email");
       console.error('Error sending confirmation email:', error);
     }
@@ -1171,7 +1180,7 @@ function PaymentCompleteContent() {
   useEffect(() => {
     const hasData = (bookingContext?.flight || storeSelectedFlight) || (bookingContext?.hotelRoomSummary || storeRoomSummary);
     if (paymentInfo?.status === "success" && hasData && (bookingContext?.contactEmail || effectiveContactEmail) && !emailSent) {
-      const emailAlreadySent = sessionStorage.getItem(`emailSent_${paymentInfo.orderId}`);
+      const emailAlreadySent = getSessionItem(`emailSent_${paymentInfo.orderId}`);
       if (!emailAlreadySent) {
         console.log('Triggering confirmation email:', {
           orderId: paymentInfo.orderId,
@@ -1228,9 +1237,9 @@ function PaymentCompleteContent() {
       ? flight.segments
       : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])]
     : [];
-  const chargedCurrency = paymentInfo?.currency || ctx?.pricing?.currency || (typeof window !== 'undefined' ? sessionStorage.getItem("pendingOrderCurrency") : null) || "GBP";
+  const chargedCurrency = paymentInfo?.currency || ctx?.pricing?.currency || (typeof window !== 'undefined' ? getSessionItem("pendingOrderCurrency") : null) || "GBP";
   const chargedAmount = (() => {
-    const a = paymentInfo?.amount || (typeof window !== 'undefined' ? sessionStorage.getItem("pendingOrderAmount") : null) || (ctx?.pricing?.tripTotal != null ? String(ctx.pricing.tripTotal) : "0");
+    const a = paymentInfo?.amount || (typeof window !== 'undefined' ? getSessionItem("pendingOrderAmount") : null) || (ctx?.pricing?.tripTotal != null ? String(ctx.pricing.tripTotal) : "0");
     const n = parseFloat(a || "0");
     return Number.isFinite(n) ? n : 0;
   })();
@@ -1251,11 +1260,11 @@ function PaymentCompleteContent() {
     <div className="min-h-screen bg-[#F9FAFB]">
       {showConfetti && <ConfettiExplosion />}
 
-      <Navbar />
+      <div className="print:hidden"><Navbar /></div>
 
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8">
         {isPackageMode && (
-          <div className="mb-6">
+          <div className="mb-6 print:hidden">
             <PackageStepProgress currentStep="confirmation" />
           </div>
         )}
@@ -1330,7 +1339,7 @@ function PaymentCompleteContent() {
               )}
 
               {/* Action buttons */}
-              <div className="flex items-center justify-center gap-3">
+              <div className="flex items-center justify-center gap-3 print:hidden">
                 <Button
                   onClick={handleDownloadReceipt}
                   className="bg-[#3754ED] hover:bg-[#2942D1] text-white px-6"
@@ -1413,7 +1422,7 @@ function PaymentCompleteContent() {
                         {[p?.title, p?.firstName, p?.middleName, p?.lastName].filter(Boolean).join(" ") || `Passenger ${idx + 1}`}
                       </div>
                       <div className="text-sm text-[#6B7280]">
-                        {p?.dateOfBirth ? `DOB: ${p.dateOfBirth}` : ""}
+                        {p?.dateOfBirth ? `DOB: ${p.dateOfBirth.split("-").reverse().join("/")}` : ""}
                       </div>
                     </div>
                   ))}
@@ -1829,7 +1838,7 @@ function PaymentCompleteContent() {
         )}
       </div>
 
-      <Footer />
+      <div className="print:hidden"><Footer /></div>
     </div>
   );
 }

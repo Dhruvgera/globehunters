@@ -14,6 +14,7 @@ export interface FlightLeg {
   departureTime: string;
   arrivalTime: string;
   date: string;
+  arrivalDate?: string;
   duration: string;
   stops: string;
   airline: string;
@@ -95,6 +96,7 @@ export function FlightSummaryCard({
             <span className="text-sm font-semibold text-[#010D50]">
               {leg.departureTime}
             </span>
+            <span className="text-[11px] text-[#5E6B8A]">{leg.date}</span>
           </div>
           <span className="text-xs text-[#3A478A]">→</span>
           <div className="flex flex-col">
@@ -102,6 +104,7 @@ export function FlightSummaryCard({
             <span className="text-sm font-semibold text-[#010D50]">
               {leg.arrivalTime}
             </span>
+            <span className="text-[11px] text-[#5E6B8A]">{leg.arrivalDate || leg.date}</span>
           </div>
         </div>
         <div className="flex flex-col items-end">
@@ -126,11 +129,12 @@ export function FlightSummaryCard({
           {leg.from} <span className="px-2">{t('to')}</span> {leg.to}
         </span>
         <div className="flex items-center gap-3 flex-wrap w-full">
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-[#010D50]">{leg.fromCode}</span>
-            <span className="text-sm font-semibold text-[#010D50]">
-              {leg.departureTime}
-            </span>
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-[#010D50]">{leg.fromCode}</span>
+              <span className="text-sm font-semibold text-[#010D50]">{leg.departureTime}</span>
+            </div>
+            <span className="text-[11px] text-[#5E6B8A]">{leg.date}</span>
           </div>
           <svg width="61" height="5" viewBox="0 0 61 5" fill="none">
             <circle cx="20" cy="2.5" r="2.5" fill="#010D50" />
@@ -143,18 +147,17 @@ export function FlightSummaryCard({
               strokeDasharray="4 4"
             />
           </svg>
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-[#010D50]">
-              {leg.arrivalTime}
-            </span>
-            <span className="text-sm text-[#010D50]">{leg.toCode}</span>
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-semibold text-[#010D50]">{leg.arrivalTime}</span>
+              <span className="text-sm text-[#010D50]">{leg.toCode}</span>
+            </div>
+            <span className="text-[11px] text-[#5E6B8A]">{leg.arrivalDate || leg.date}</span>
           </div>
           <div className="flex items-center gap-3 text-sm text-[#010D50] ml-auto">
             <span>{leg.stops}</span>
             <div className="w-1 h-1 rounded-full bg-[#010D50]" />
             <span>{leg.duration}</span>
-            <div className="w-1 h-1 rounded-full bg-[#010D50]" />
-            <span>{leg.date}</span>
           </div>
         </div>
       </div>

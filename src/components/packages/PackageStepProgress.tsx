@@ -47,7 +47,7 @@ export function PackageStepProgress({ currentStep, labelOverrides, stepLinks }: 
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-1 overflow-x-auto pb-1 text-sm sm:gap-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex flex-wrap items-center gap-1 pb-1 pr-4 text-sm sm:gap-1.5">
         {STEPS.map((step, index) => {
           const isActive = index === currentIndex;
           const isCompleted = index < currentIndex;

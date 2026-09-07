@@ -12,7 +12,6 @@ import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
 import { FlightSummaryCard, type FlightLeg } from "@/components/booking/FlightSummaryCard";
 import { HotelFiltersSidebar, type HotelAmenityOption, type HotelFiltersState } from "@/components/hotels/HotelFiltersSidebar";
 import { Button } from "@/components/ui/button";
-import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { activityService } from "@/services/api/activityService";
 import { flightService } from "@/services/api/flightService";
@@ -1133,6 +1132,7 @@ function flightSegmentToSummaryLeg(flight: Flight, segment: Flight["outbound"]):
     departureTime: segment.departureTime || "",
     arrivalTime: segment.arrivalTime || "",
     date: segment.date || "",
+    arrivalDate: segment.arrivalDate || segment.date || "",
     duration: segment.totalJourneyTime || segment.duration || "",
     stops: Number(segment.stops || 0) > 0
       ? `${segment.stops} stop${Number(segment.stops || 0) === 1 ? "" : "s"}`
@@ -1351,7 +1351,7 @@ function AiPackageContent() {
   const [newDestination, setNewDestination] = useState<HolidayDestination | null>(null);
   const [newDestinationCheckIn, setNewDestinationCheckIn] = useState(checkOut || checkIn || "");
   const [newDestinationCheckOut, setNewDestinationCheckOut] = useState("");
-  const [newDestinationDatesDone, setNewDestinationDatesDone] = useState(false);
+  const [newTripBudget, setNewTripBudget] = useState(budget || 3000);
   const [budgetNotice, setBudgetNotice] = useState<string | null>(null);
   const manuallyEditedActivitiesRef = useRef<Set<string>>(new Set());
   const [chainedDestinations, setChainedDestinations] = useState<ChainedDestination[]>(() => {
@@ -1478,7 +1478,6 @@ function AiPackageContent() {
     setHotelDetailsOpen(false);
     setHotelChangeOpen(false);
     setExpandedHotelRoomsId(null);
-    if (!nextHotelOptions.length) destinationHydrationAttemptedRef.current.delete(nextSegment.id);
     setHotelOptions(nextHotelOptions);
     setActivities(nextState?.activities || []);
     setSelectedActivityCodes(nextState?.selectedActivityCodes || []);
@@ -1488,8 +1487,8 @@ function AiPackageContent() {
     setLiveSearch((current) => ({
       ...current,
       hotel: nextHotel,
-      hotelLoading: !nextHotel && !nextHotelOptions.length,
-      hotelError: null,
+      hotelLoading: !nextState ? true : Boolean(nextState.hotelLoading && !nextHotel),
+      hotelError: nextState?.hotelError || null,
     }));
   }, [activeDestinationId, budget, destinationSegments, persistVisibleDestinationState, setHotelSearch, stayPreference]);
 
@@ -2492,14 +2491,9 @@ function AiPackageContent() {
         (state.hotel || state.hotelError || (state.hotelLoading !== true && state.hotelOptions.length === 0))
     );
   });
-  const activitiesPricingReady = destinationSegments.every((segment) => {
-    const state = effectiveDestinationStateById[segment.id];
-    return Boolean(state && (state.activitiesLoading !== true || state.activities.length > 0 || state.activitiesError));
-  });
   const packagePricingReady =
     Boolean(liveSearch.flight || (!liveSearch.flightLoading && liveSearch.flightError)) &&
-    destinationPricingReady &&
-    activitiesPricingReady;
+    destinationPricingReady;
   const liveHotelTotal = destinationSegments.reduce((sum, segment) => {
     const stateHotel = effectiveDestinationStateById[segment.id]?.hotel;
     const matchedLiveHotel = hotelMatchesSegment(liveSearch.hotel, segment, destinationSegments) ? liveSearch.hotel : null;
@@ -2585,10 +2579,13 @@ function AiPackageContent() {
     ["address", "addressline1", "address_line_1", "location"],
     1
   )[0] || liveSearch.hotel?.distanceLabel || "";
-  const activeArrivalDate = flightArrivalDateForSegment(activeDestination, liveFlight);
-  const hasArrivalCheckInMismatch = Boolean(
-    activeArrivalDate && activeDestination?.checkIn && activeArrivalDate !== activeDestination.checkIn
-  );
+  const arrivalCheckInMismatches = destinationSegments.filter((segment) => {
+    const arrivalDate = flightArrivalDateForSegment(segment, liveFlight);
+    return Boolean(arrivalDate && segment.checkIn && arrivalDate > segment.checkIn);
+  });
+  const hasArrivalCheckInMismatch = arrivalCheckInMismatches.length > 0;
+  const firstArrivalMismatch = arrivalCheckInMismatches[0];
+  const firstMismatchArrivalDate = flightArrivalDateForSegment(firstArrivalMismatch, liveFlight);
   const nextDestinationMinDate = useMemo(() => {
     const lastDestination = chainedDestinations[chainedDestinations.length - 1];
     return parseIsoDate(lastDestination?.checkOut || checkOut || checkIn) || new Date();
@@ -2596,17 +2593,13 @@ function AiPackageContent() {
 
   useEffect(() => {
     if (!addDestinationOpen) return;
-    const minIso = formatIsoDate(nextDestinationMinDate);
+    const minIso = String(formatIsoDate(nextDestinationMinDate) || checkOut || checkIn || "");
     setAddDestinationError(null);
-    setNewDestinationCheckIn((current) => {
-      if (current && current >= minIso) return current;
-      return minIso;
-    });
-    setNewDestinationCheckOut((current) => {
-      if (current && current >= minIso) return current;
-      return "";
-    });
-  }, [addDestinationOpen, nextDestinationMinDate]);
+    const stayLength = Math.max(1, calculateNights(checkIn || "", checkOut || ""));
+    setNewDestinationCheckIn(minIso);
+    setNewDestinationCheckOut(addDaysIso(minIso, stayLength));
+    setNewTripBudget(budget || 3000);
+  }, [addDestinationOpen, budget, checkIn, checkOut, nextDestinationMinDate]);
   const packageTravellerCount = Math.max(1, adults + children);
   const selectedHotelPackageTotal = Number(liveSearch.hotel?.price.total || 0);
   const hotelExtraPerPerson = useCallback(
@@ -2704,7 +2697,7 @@ function AiPackageContent() {
   }, [hotelOptions]);
 
   const hotelRefundableFilterEnabled = useMemo(
-    () => hotelOptions.some((hotel) => hotel.refundable === true || hotel.refundable === false),
+    () => hotelOptions.some((hotel) => hotel.refundable === true),
     [hotelOptions]
   );
   useEffect(() => {
@@ -3107,7 +3100,7 @@ function AiPackageContent() {
             destinations: [...destinationSegments, nextSegment],
           });
           if (!chainedFlightSearch) return null;
-          chainedFlightSearch.aiBudget = budget;
+          chainedFlightSearch.aiBudget = newTripBudget;
           setStoreSearchParams(chainedFlightSearch);
           return flightService.searchFlights(chainedFlightSearch);
         })(),
@@ -3122,7 +3115,7 @@ function AiPackageContent() {
         nextHotelOptions = stampHotelsForSegment(parsed.mapped, nextSegment, resolvedPick.label || name);
         nextHotel = selectRecommendedHotel(nextHotelOptions, {
           stayPreference,
-          budget,
+          budget: newTripBudget,
           destinationCount: nextDestinations.length + 1,
         });
         nextHotelSearch = {
@@ -3177,7 +3170,7 @@ function AiPackageContent() {
         ...current,
         flight:
           flightResult.status === "fulfilled" && flightResult.value?.flights?.[0]
-            ? selectRecommendedFlight(flightResult.value.flights, { budget, stayPreference })
+            ? selectRecommendedFlight(flightResult.value.flights, { budget: newTripBudget, stayPreference })
             : current.flight,
         flightRequestId:
           flightResult.status === "fulfilled" && flightResult.value?.requestId
@@ -3196,12 +3189,13 @@ function AiPackageContent() {
       }));
       if (flightResult.status === "fulfilled" && flightResult.value?.requestId) setSearchRequestId(flightResult.value.requestId);
       if (flightResult.status === "fulfilled" && flightResult.value?.flights?.[0]) {
-        const recommendedFlight = selectRecommendedFlight(flightResult.value.flights, { budget, stayPreference });
+        const recommendedFlight = selectRecommendedFlight(flightResult.value.flights, { budget: newTripBudget, stayPreference });
         if (recommendedFlight) setSelectedFlight(recommendedFlight, normalizeCabinClass(recommendedFlight.outbound?.cabinClass));
       }
       if (typeof window !== "undefined") {
         const nextParams = new URLSearchParams(window.location.search);
         nextParams.set("destinations", JSON.stringify(nextDestinations));
+        nextParams.set("budget", String(newTripBudget));
         window.history.replaceState(null, "", `${window.location.pathname}?${nextParams.toString()}`);
       }
       setNewDestination(null);
@@ -3511,10 +3505,10 @@ function AiPackageContent() {
             aiHeaderAction={(
               <Button
                 type="button"
-                onClick={() => { setNewDestinationDatesDone(false); setAddDestinationOpen(true); }}
+                onClick={() => setAddDestinationOpen(true)}
                 className="h-9 rounded-lg bg-[#3754ED] px-3 text-xs font-semibold text-white hover:bg-[#2942D1]"
               >
-                <Plus className="h-4 w-4" /> Add destination
+                <Plus className="h-4 w-4" /> Add to Trip
               </Button>
             )}
           />
@@ -3577,20 +3571,17 @@ function AiPackageContent() {
           <aside className="flex flex-col gap-4 lg:order-2">
             <section className="rounded-xl border border-[#DFE0E4] bg-white p-4">
               <h2 className="mb-4 text-lg font-semibold text-[#010D50]">Trip total</h2>
-              {packagePricingReady ? (
+              {packageCost > 0 ? (
                 <div className="text-3xl font-bold text-[#010D50]">
-                  {packageCost > 0 ? money(packageCost, liveSearch.flight?.currency || liveSearch.hotel?.price.currency || "GBP") : "Live price unavailable"}
+                  {money(packageCost, liveSearch.flight?.currency || liveSearch.hotel?.price.currency || "GBP")}
                 </div>
               ) : (
-                <div className="flex items-center gap-2 text-base font-semibold text-[#3754ED]">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  <span className="animate-pulse">Calculating the best price for you...</span>
-                </div>
+                <div className="text-base font-semibold text-[#3A478A]">Price unavailable</div>
               )}
-              {packagePricingReady ? (
+              {packageCost > 0 ? (
                 <div className="mt-3 grid gap-2 text-xs text-[#3A478A]">
-                  <div>Flights and stays included</div>
-                  {activityTotal > 0 ? <div>Extra activities: {money(activityTotal, "GBP")}</div> : null}
+                  <div>Flights and stays <span className="font-semibold text-[#010D50]">Included</span></div>
+                  {activityTotal > 0 ? <div>Activities <span className="font-semibold text-[#010D50]">Included · {money(activityTotal, "GBP")}</span></div> : null}
                 </div>
               ) : null}
               {packagePricingReady && budgetNotice ? (
@@ -3772,7 +3763,7 @@ function AiPackageContent() {
               <div className="flex items-start gap-3 border border-[#F4B8D9] bg-[#FFF5FB] px-4 py-3 text-sm text-[#6B2151]">
                 <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
                 <span>
-                  Your flight arrives on {formatDate(activeArrivalDate, activeArrivalDate)}, but hotel check-in starts on {formatDate(activeDestination?.checkIn, activeDestination?.checkIn || "")}. Review flight or hotel dates before booking.
+                  Your flight reaches {firstArrivalMismatch?.name} on {formatDate(firstMismatchArrivalDate, firstMismatchArrivalDate)}, after check-in starts on {formatDate(firstArrivalMismatch?.checkIn, firstArrivalMismatch?.checkIn || "")}. Change the flight or trip dates before booking.
                 </span>
               </div>
             ) : null}
@@ -3931,7 +3922,7 @@ function AiPackageContent() {
               <Button
                 type="button"
                 onClick={continueToNextStep}
-                disabled={!packagePricingReady || !liveSearch.hotel || !liveSearch.flight}
+                disabled={!packagePricingReady || !liveSearch.hotel || !liveSearch.flight || hasArrivalCheckInMismatch}
                 className="h-12 w-full rounded-xl bg-[#3754ED] text-white hover:bg-[#2942D1] sm:w-[360px]"
               >
                 Book this AI trip
@@ -4016,13 +4007,7 @@ function AiPackageContent() {
 
               <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
                 <div className="space-y-4">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2 text-sm text-[#3A478A]">
-                      <span>{hotelDetails?.sourceLabel || "Live availability result"}</span>
-                      {hotelDetailsLoading ? <span>Fetching full hotel details...</span> : null}
-                      {hotelDetailsError ? <span className="text-[#B42318]">{hotelDetailsError}</span> : null}
-                    </div>
-                  </div>
+                  {hotelDetailsError ? <div className="text-sm text-[#B42318]">{hotelDetailsError}</div> : null}
 
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     <SummaryTile label="Check-in" value={formatDate(activeDestination?.checkIn || checkIn, "Select date")} icon={<CalendarDays className="h-4 w-4" />} />
@@ -4387,7 +4372,6 @@ function AiPackageContent() {
         open={addDestinationOpen}
         onOpenChange={(open) => {
           setAddDestinationOpen(open);
-          if (open) setNewDestinationDatesDone(false);
         }}
       >
         <DialogContent className="max-w-[min(100vw-24px,680px)] bg-white">
@@ -4405,41 +4389,20 @@ function AiPackageContent() {
             </label>
             <div className="grid gap-2">
               <span className="text-sm font-medium text-[#010D50]">Stay dates</span>
-              {newDestinationDatesDone ? (
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-[#DFE0E4] bg-[#F5F7FF] px-4 py-3">
-                  <div className="text-sm font-semibold text-[#010D50]">
-                    {shortDate(newDestinationCheckIn, "Start date")} - {shortDate(newDestinationCheckOut, "End date")}
-                  </div>
-                  <Button type="button" variant="outline" className="h-8 rounded-full px-4 text-xs" onClick={() => setNewDestinationDatesDone(false)}>
-                    Change dates
-                  </Button>
-                </div>
-              ) : (
-                <DatePicker
-                  startDate={parseIsoDate(newDestinationCheckIn)}
-                  endDate={parseIsoDate(newDestinationCheckOut)}
-                  minDate={nextDestinationMinDate}
-                  onStartDateChange={(date) => {
-                    if (!date || isBeforeDateOnly(date, nextDestinationMinDate)) return;
-                    const nextStart = formatIsoDate(date);
-                    setNewDestinationCheckIn(nextStart);
-                    setNewDestinationDatesDone(false);
-                    const currentEnd = parseIsoDate(newDestinationCheckOut);
-                    if (currentEnd && isBeforeDateOnly(currentEnd, date)) setNewDestinationCheckOut("");
-                  }}
-                  onEndDateChange={(date) => {
-                    if (!date || isBeforeDateOnly(date, nextDestinationMinDate)) return;
-                    setNewDestinationCheckOut(formatIsoDate(date));
-                    setNewDestinationDatesDone(false);
-                  }}
-                  onDone={() => setNewDestinationDatesDone(true)}
-                  className="max-w-none border border-[#DFE0E4] shadow-none"
-                />
-              )}
+              <div className="rounded-xl border border-[#DFE0E4] bg-[#F5F7FF] px-4 py-3 text-sm font-semibold text-[#010D50]">
+                {shortDate(newDestinationCheckIn, "Start date")} - {shortDate(newDestinationCheckOut, "End date")}
+              </div>
               <p className="text-xs text-[#5E6B8A]">
-                Next stays start from {shortDate(formatIsoDate(nextDestinationMinDate), "the current trip end date")} or later.
+                This stop starts when the current stay ends and keeps the same stay length.
               </p>
             </div>
+            <label className="grid gap-2">
+              <span className="text-sm font-medium text-[#010D50]">Updated trip budget</span>
+              <div className="flex items-center gap-3 rounded-xl border border-[#DFE0E4] px-4 py-3">
+                <input type="range" min={500} max={20000} step={100} value={newTripBudget} onChange={(event) => setNewTripBudget(Number(event.target.value))} className="w-full accent-[#3754ED]" />
+                <span className="w-20 text-right text-sm font-semibold text-[#010D50]">£{newTripBudget.toLocaleString()}</span>
+              </div>
+            </label>
             {addDestinationError && (
               <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 {addDestinationError}
@@ -4451,7 +4414,7 @@ function AiPackageContent() {
               disabled={addDestinationLoading || !newDestination || !newDestinationCheckIn || !newDestinationCheckOut}
               className="h-11 rounded-xl bg-[#3754ED] text-white hover:bg-[#2942D1]"
             >
-              {addDestinationLoading ? "Refreshing search..." : "Add destination"}
+              {addDestinationLoading ? "Adding to trip..." : "Add to Trip"}
             </Button>
           </div>
         </DialogContent>

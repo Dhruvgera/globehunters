@@ -19,6 +19,7 @@ import { folderService } from "@/services/api/folderService";
 import type { AddToFolderRequest } from "@/types/folder";
 import { useAffiliatePhone } from "@/lib/AffiliateContext";
 import { CountryCodeSelector } from "@/components/booking/CountryCodeSelector";
+import { DateOfBirthInput } from "@/components/booking/DateOfBirthInput";
 import type { Passenger, PassengerType, PassengerTitle } from "@/types/booking";
 import { countryCodes } from "@/lib/utils/countryCodes";
 import { flattenHotelChildAges } from "@/lib/hotels/childAges";
@@ -728,7 +729,11 @@ export default function HotelCheckoutPage() {
 
                 {/* DOB + Email */}
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <InputField label="Date of Birth" placeholder="DD/MM/YYYY" value={dateOfBirth} onChange={setDateOfBirth} type="date" className="flex-1" error={formErrors.dateOfBirth} />
+                  <div className="flex flex-1 flex-col gap-1.5">
+                    <label className="text-xs font-medium text-[#010D50]">Date of Birth</label>
+                    <DateOfBirthInput value={dateOfBirth} onChange={setDateOfBirth} className={formErrors.dateOfBirth ? "h-12 rounded-xl border-red-500" : "h-12 rounded-xl border-[#DFE0E4]"} />
+                    {formErrors.dateOfBirth && <p className="text-xs text-red-600">{formErrors.dateOfBirth}</p>}
+                  </div>
                   <InputField label="Email ID" placeholder="xyz123@gmail.com" value={email} onChange={setEmail} type="email" className="flex-1" error={formErrors.email} />
                 </div>
 
@@ -860,15 +865,15 @@ export default function HotelCheckoutPage() {
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3">
-                      <InputField
-                        label="Date of Birth"
-                        placeholder="DD/MM/YYYY"
-                        value={traveller.dateOfBirth}
-                        onChange={(value) => updateOtherTraveller(idx, { dateOfBirth: value })}
-                        type="date"
-                        className="flex-1"
-                        error={formErrors[`traveller_${idx}_dateOfBirth`]}
-                      />
+                      <div className="flex flex-1 flex-col gap-1.5">
+                        <label className="text-xs font-medium text-[#010D50]">Date of Birth</label>
+                        <DateOfBirthInput
+                          value={traveller.dateOfBirth}
+                          onChange={(value) => updateOtherTraveller(idx, { dateOfBirth: value })}
+                          className={formErrors[`traveller_${idx}_dateOfBirth`] ? "h-12 rounded-xl border-red-500" : "h-12 rounded-xl border-[#DFE0E4]"}
+                        />
+                        {formErrors[`traveller_${idx}_dateOfBirth`] && <p className="text-xs text-red-600">{formErrors[`traveller_${idx}_dateOfBirth`]}</p>}
+                      </div>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-3">
                       <InputField

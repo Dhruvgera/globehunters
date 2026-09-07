@@ -973,7 +973,7 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
                     <input
                       type="range"
                       min={500}
-                      max={10000}
+                      max={20000}
                       step={100}
                       value={aiBudget}
                       onChange={(event) => setAiBudget(Number(event.target.value))}

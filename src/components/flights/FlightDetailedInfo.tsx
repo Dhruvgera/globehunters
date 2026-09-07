@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { Flight, FlightSegment } from "@/types/flight";
 import { PriceCheckResult, TransformedPriceOption } from "@/types/priceCheck";
+import { resolveRefundability } from "@/lib/flights/refundability";
 
 interface FlightDetailedInfoProps {
   flight: Flight;
@@ -118,21 +119,8 @@ export default function FlightDetailedInfo({
       )}
 
       {/* Refundable and Meals (Extras) */}
-      {(flight.refundable !== null || flight.meals !== undefined) && (
+      {flight.meals !== undefined && (
         <div className="flex flex-col md:flex-row gap-3">
-          {flight.refundable !== null && (
-            <div className="flex-1 bg-[#F5F7FF] rounded-xl p-3 flex items-start gap-3">
-              <Info className={`w-5 h-5 ${flight.refundable ? 'text-[#008234]' : 'text-[#FF0202]'} shrink-0`} />
-              <div className="flex flex-col gap-0.5">
-                <span className="text-sm font-medium text-[#010D50]">
-                  {flight.refundable ? 'Refundable' : 'Non-Refundable'}
-                </span>
-                {flight.refundableText && (
-                  <span className="text-xs text-[#3A478A] break-words">{flight.refundableText}</span>
-                )}
-              </div>
-            </div>
-          )}
           {flight.meals !== undefined && (
             <div className="flex-1 bg-[#F5F7FF] rounded-xl p-3 flex items-start gap-3">
               <UtensilsCrossed className="w-5 h-5 text-[#010D50] shrink-0" />
@@ -371,13 +359,12 @@ export default function FlightDetailedInfo({
                 );
               }
               // Use selected option's refundable status first, then fallback to priceCheck.flightDetails or flight data
-              const isRefundable = selectedUpgradeOption?.refundable ?? priceCheck?.flightDetails?.refundable ?? flight.refundable ?? false;
-              const refundableStatus = selectedUpgradeOption?.refundableStatus ?? priceCheck?.flightDetails?.refundableStatus;
-              const refundableText = selectedUpgradeOption?.refundableText ?? priceCheck?.flightDetails?.refundableText ?? flight.refundableText ?? (isRefundable ? 'Ticket can be refunded (fees may apply)' : 'Ticket can\'t be refunded');
-              let displayLabel = 'Non-Refundable';
-              if (refundableStatus === 'fully-refundable') displayLabel = 'Fully Refundable';
-              else if (refundableStatus === 'refundable-with-penalty') displayLabel = 'Refundable with Penalty';
-              else if (isRefundable) displayLabel = 'Refundable';
+              const resolved = resolveRefundability({
+                refundable: selectedUpgradeOption?.refundable ?? priceCheck?.flightDetails?.refundable ?? flight.refundable,
+                status: selectedUpgradeOption?.refundableStatus ?? priceCheck?.flightDetails?.refundableStatus,
+                text: selectedUpgradeOption?.refundableText ?? priceCheck?.flightDetails?.refundableText ?? flight.refundableText,
+              });
+              const { status: refundableStatus, description: refundableText, label: displayLabel } = resolved;
 
               return (
                 <div className="flex items-start justify-between gap-2">
@@ -564,5 +551,3 @@ export default function FlightDetailedInfo({
     </div>
   );
 }
-
-

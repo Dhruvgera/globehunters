@@ -69,7 +69,8 @@ export async function POST(request: NextRequest) {
 
     const gatewayCurrency = normalizeCurrencyCode(body.currency) || 'GBP';
     const localTaxesConverted = await convertLocalTaxesToCurrency(body.localPayableTaxes, gatewayCurrency);
-    const finalAmount = Number(body.amount || 0) + localTaxesConverted;
+    // Supplier-marked local taxes are paid at the property, not collected by BoxPay.
+    const finalAmount = Number(body.amount || 0);
     const orderItems =
       body.order?.items
         ?.filter((item) => item && item.itemName && Number(item.quantity) > 0 && Number.isFinite(Number(item.amountWithoutTax)))
@@ -120,7 +121,6 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
 
 
 

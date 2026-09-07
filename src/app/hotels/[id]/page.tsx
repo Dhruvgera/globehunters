@@ -3801,6 +3801,7 @@ export default function HotelRoomsPage() {
                       departureTime: formatFlightClock(firstLeg?.departure_time),
                       arrivalTime: formatFlightClock(lastLeg?.arrival_time),
                       date: String(firstLeg?.departure_date || ""),
+                      arrivalDate: String(lastLeg?.arrival_date || firstLeg?.departure_date || ""),
                       duration: formatMinutesToDuration(seg.Total_travel_time || seg.Flying_time),
                       stops: Number(seg.Stops || 0) > 0
                         ? `${seg.Stops} stop${Number(seg.Stops) > 1 ? "s" : ""}`
@@ -3822,6 +3823,7 @@ export default function HotelRoomsPage() {
                     departureTime: seg.departureTime || "",
                     arrivalTime: seg.arrivalTime || "",
                     date: seg.date || "",
+                    arrivalDate: seg.arrivalDate || seg.date || "",
                     duration: seg.totalJourneyTime || seg.duration || "—",
                     stops: seg.stopDetails || `${seg.stops || 0} stop${Number(seg.stops || 0) === 1 ? "" : "s"}`,
                     airline: seg.carrierName || fallbackFlight.airline.name || "Selected airline",

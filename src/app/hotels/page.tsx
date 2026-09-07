@@ -1511,7 +1511,7 @@ function HotelsPageInner() {
   }, [hotelsWithSelectedMealPricing, resolvedSearch.location]);
 
   const refundableFilterEnabled = useMemo(
-    () => hotelsWithSelectedMealPricing.some((h) => h.refundable === true || h.refundable === false),
+    () => hotelsWithSelectedMealPricing.some((h) => h.refundable === true),
     [hotelsWithSelectedMealPricing]
   );
 

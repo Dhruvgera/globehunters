@@ -46,6 +46,7 @@ import { buildSummaryRows } from "@/lib/utils/buildSummaryRows";
 import { FOLDER_STATUS_CODES } from "@/types/portal";
 import { countryCodes } from "@/lib/utils/countryCodes";
 import { convertHotelLocalTaxRows, convertHotelLocalTaxTotal } from "@/lib/currency/localTaxDisplay";
+import { getSessionItem, setSessionItem } from "@/lib/storage/safeSessionStorage";
 import { calculateNights } from "@/lib/hotels/nights";
 
 type AiPaymentDestination = {
@@ -213,7 +214,7 @@ function PaymentContent() {
 
   useEffect(() => {
     if (!isPackageMode || typeof window === "undefined") return;
-    const raw = window.sessionStorage.getItem("aiPackageBookingDraft");
+    const raw = getSessionItem("aiPackageBookingDraft");
     if (!raw) return;
     try {
       const parsed = JSON.parse(raw) as AiPaymentDraft;
@@ -294,7 +295,7 @@ function PaymentContent() {
   useEffect(() => {
     // Skip session expiry check if we just came back from a payment redirect
     // (indicated by pendingOrderId or error query param)
-    const pendingOrderId = sessionStorage.getItem('pendingOrderId');
+    const pendingOrderId = getSessionItem('pendingOrderId');
     const hasPaymentError = searchParams?.get('error') === 'payment_failed';
     if (pendingOrderId || hasPaymentError) {
       // Don't trigger session expired on payment redirect returns
@@ -303,8 +304,8 @@ function PaymentContent() {
 
     const key = 'paymentSessionStart';
     const orderKey = 'paymentSessionOrderId';
-    const existed = sessionStorage.getItem(key);
-    const previousOrderId = sessionStorage.getItem(orderKey);
+    const existed = getSessionItem(key);
+    const previousOrderId = getSessionItem(orderKey);
     const now = Date.now();
 
     // Get current order ID from store
@@ -312,24 +313,24 @@ function PaymentContent() {
 
     // Reset session if this is a different order (new booking flow)
     if (previousOrderId && currentOrderId && previousOrderId !== currentOrderId) {
-      sessionStorage.setItem(key, String(now));
-      sessionStorage.setItem(orderKey, currentOrderId);
-      sessionStorage.setItem('paymentVisited', '1');
+      setSessionItem(key, String(now));
+      setSessionItem(orderKey, currentOrderId);
+      setSessionItem('paymentVisited', '1');
       return;
     }
 
     if (!existed) {
-      sessionStorage.setItem(key, String(now));
+      setSessionItem(key, String(now));
       if (currentOrderId) {
-        sessionStorage.setItem(orderKey, currentOrderId);
+        setSessionItem(orderKey, currentOrderId);
       }
-      sessionStorage.setItem('paymentVisited', '1');
+      setSessionItem('paymentVisited', '1');
       return;
     }
 
     const startedAt = parseInt(existed, 10);
     const elapsed = now - startedAt;
-    const visitedBefore = sessionStorage.getItem('paymentVisited') === '1';
+    const visitedBefore = getSessionItem('paymentVisited') === '1';
 
     // Detect reload if possible
     const nav = (performance.getEntriesByType('navigation') as PerformanceNavigationTiming[])[0];
@@ -340,9 +341,9 @@ function PaymentContent() {
     }
 
     // Keep visited flag and update order ID
-    sessionStorage.setItem('paymentVisited', '1');
+    setSessionItem('paymentVisited', '1');
     if (currentOrderId) {
-      sessionStorage.setItem(orderKey, currentOrderId);
+      setSessionItem(orderKey, currentOrderId);
     }
   }, [searchParams, vyspaFolderNumber, searchRequestId]);
 
@@ -482,7 +483,7 @@ function PaymentContent() {
             ? "All Included"
             : "None";
 
-  const paymentSummaryRows = useMemo(() => {
+  const basePaymentSummaryRows = useMemo(() => {
     if (isHotelMode) {
       const totalGuests = (hotelSearch?.adults || 0) + (hotelSearch?.children || 0);
       return buildSummaryRows({
@@ -549,6 +550,14 @@ function PaymentContent() {
     fareAdjustmentDiscount,
     tCost,
   ]);
+  const paymentSummaryRows = useMemo(() => {
+    if (convertedLocalTaxTotalForDisplay <= 0) return basePaymentSummaryRows;
+    return [
+      ...basePaymentSummaryRows,
+      { label: "Pay now", value: formatPrice(tripTotal, currency || "GBP") },
+      { label: "Pay at property", value: formatPrice(convertedLocalTaxTotalForDisplay, currency || "GBP") },
+    ];
+  }, [basePaymentSummaryRows, convertedLocalTaxTotalForDisplay, currency, tripTotal]);
   const paymentTotalSubtext = useMemo(() => {
     if (!isPackageMode) {
       const paxLabel = formatPassengerLabel({
@@ -576,6 +585,7 @@ function PaymentContent() {
       departureTime: seg.departureTime,
       arrivalTime: seg.arrivalTime,
       date: seg.date,
+      arrivalDate: seg.arrivalDate || seg.date,
       duration: seg.totalJourneyTime || seg.duration,
       stops: seg.stopDetails || `${seg.stops} Stop${seg.stops !== 1 ? 's' : ''}`,
       airline: flight?.airline?.name || "",
@@ -892,7 +902,7 @@ function PaymentContent() {
             {/* Billing Address Form */}
             <PaymentForm onSubmit={async (billingAddress) => {
               // Block duplicate payment attempts if the SAME order was already processed
-              const completedOrderId = sessionStorage.getItem('paymentCompletedOrderId');
+              const completedOrderId = getSessionItem('paymentCompletedOrderId');
               if (completedOrderId && completedOrderId === orderId) {
                 setPaymentErrorMessage(`This order has already been processed, please call on ${affiliatePhone} quoting your reference number ${completedOrderId}. Please DO NOT book alternative travel arrangements as this may result in a duplicate booking - charges will apply.`);
                 setPaymentErrorOpen(true);
@@ -1102,9 +1112,9 @@ function PaymentContent() {
                   const chargedCurrency = result.currency || currencyForGateway;
 
                   // Store order info before redirect
-                  sessionStorage.setItem('pendingOrderId', orderId);
-                  sessionStorage.setItem('pendingOrderAmount', chargedTripTotal.toString());
-                  sessionStorage.setItem('pendingOrderCurrency', chargedCurrency);
+                  setSessionItem('pendingOrderId', orderId);
+                  setSessionItem('pendingOrderAmount', chargedTripTotal.toString());
+                  setSessionItem('pendingOrderCurrency', chargedCurrency);
 
                   // Persist a per-order snapshot so the confirmation page/email can't pick up stale store data
                   // (e.g. multi-tab or navigating around during payment redirects).
@@ -1157,7 +1167,7 @@ function PaymentContent() {
                       },
                       aiPackageDraft: isPackageMode ? aiPaymentDraft : null,
                     };
-                    sessionStorage.setItem(
+                    setSessionItem(
                       `bookingContext_${orderId}`,
                       JSON.stringify(bookingContext)
                     );

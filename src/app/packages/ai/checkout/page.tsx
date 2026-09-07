@@ -111,6 +111,7 @@ function flightSegmentToSummaryLeg(flight: Flight, segment: Flight["outbound"]):
     departureTime: segment.departureTime || "",
     arrivalTime: segment.arrivalTime || "",
     date: segment.date || "",
+    arrivalDate: segment.arrivalDate || segment.date || "",
     duration: segment.totalJourneyTime || segment.duration || "",
     stops: Number(segment.stops || 0) > 0
       ? `${segment.stops} stop${Number(segment.stops || 0) === 1 ? "" : "s"}`
@@ -119,6 +120,18 @@ function flightSegmentToSummaryLeg(flight: Flight, segment: Flight["outbound"]):
     airlineCode: segment.carrierCode || flight.airline.code,
     cabinClass: segment.cabinClass || "Economy",
   };
+}
+
+function arrivalDateForDestination(destination: AiDestinationDraft, flight?: Flight | null) {
+  if (!flight) return "";
+  const segments = flight.tripType === "multi-city" && flight.segments?.length
+    ? flight.segments
+    : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
+  const airportCode = String(destination.airportCode || "").toUpperCase();
+  const segment = segments.find((item) => airportCode && item.arrivalAirport.code.toUpperCase() === airportCode)
+    || segments.find((item) => item.arrivalDate === destination.checkIn || item.date === destination.checkIn);
+  const lastFlight = segment?.individualFlights?.[segment.individualFlights.length - 1];
+  return lastFlight?.arrivalDate || segment?.arrivalDate || segment?.date || "";
 }
 
 function parseCheckoutDestinations(raw: string | null): AiDestinationDraft[] {
@@ -656,6 +669,10 @@ function AiCheckoutContent() {
       },
     ];
   }, [draft]);
+  const dateMismatch = destinationDrafts.find((destination) => {
+    const arrivalDate = arrivalDateForDestination(destination, draft?.flight);
+    return Boolean(arrivalDate && destination.checkIn && arrivalDate > destination.checkIn);
+  });
   const requiredPassengerTypes = useMemo<PassengerType[]>(() => {
     const adults = Number(draft?.search?.adults || 0);
     const children = Number(draft?.search?.children || 0);
@@ -816,6 +833,10 @@ function AiCheckoutContent() {
 
   const proceedToPayment = async () => {
     if (!draft) return;
+    if (dateMismatch) {
+      setSubmitError(`The flight reaches ${dateMismatch.name || "the destination"} after hotel check-in starts. Change the flight or trip dates before booking.`);
+      return;
+    }
     let effectivePassengers = passengers;
     let effectivePassengersSaved = passengersSaved;
 
@@ -1201,13 +1222,19 @@ function AiCheckoutContent() {
               </div>
             </section>
 
+            {dateMismatch ? (
+              <div className="rounded-xl border border-[#F4B8D9] bg-[#FFF5FB] px-4 py-3 text-sm text-[#6B2151]">
+                The flight reaches {dateMismatch.name || "this destination"} after hotel check-in starts. Change the flight or trip dates before booking.
+              </div>
+            ) : null}
+
             {showTravellers ? (
               <section id="traveller-details">
                 <PassengerFormsSection showPassportFields requireContactInfoForAll={false} />
                 <div className="mt-5 flex justify-end">
                   <Button
                     className="h-11 min-w-[220px] rounded-xl bg-[#010D50] px-6 text-white hover:bg-[#0B1C73] disabled:opacity-50"
-                    disabled={submitting}
+                    disabled={submitting || Boolean(dateMismatch)}
                     onClick={proceedToPayment}
                   >
                     {submitting ? (
@@ -1233,9 +1260,9 @@ function AiCheckoutContent() {
             <h2 className="text-lg font-semibold text-[#010D50]">Trip total</h2>
             <div className="mt-3 text-3xl font-bold text-[#010D50]">{money(draft.totals?.package, currency)}</div>
             <div className="mt-4 grid gap-2 text-sm text-[#3A478A]">
-              <div>Flights and stays included</div>
+              <div>Flights and stays <span className="font-semibold text-[#010D50]">Included</span></div>
               {Number(draft.totals?.activities || 0) > 0 ? (
-                <div className="flex justify-between"><span>Extra activities</span><span>{money(draft.totals?.activities, currency)}</span></div>
+                <div className="flex justify-between"><span>Activities</span><span className="font-semibold text-[#010D50]">Included · {money(draft.totals?.activities, currency)}</span></div>
               ) : null}
             </div>
             {!showTravellers ? (
@@ -1253,7 +1280,7 @@ function AiCheckoutContent() {
             ) : (
               <Button
                 className="mt-5 h-11 w-full rounded-xl bg-[#010D50] text-white hover:bg-[#0B1C73] disabled:opacity-50"
-                disabled={submitting}
+                disabled={submitting || Boolean(dateMismatch)}
                 onClick={proceedToPayment}
               >
                 {submitting ? (

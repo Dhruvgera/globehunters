@@ -16,6 +16,7 @@ import {
 import { useTranslations } from "next-intl";
 import { countryCodes } from "@/lib/utils/countryCodes";
 import { CountryCodeSelector } from "./CountryCodeSelector";
+import { DateOfBirthInput } from "./DateOfBirthInput";
 
 
 interface PassengerFormProps {
@@ -212,7 +213,7 @@ export function PassengerForm({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor={`email-${passengerIndex}`}>
-                {t('email')} {requireContactInfo ? t('required') : "(Optional)"}
+                {t('email')} ({requireContactInfo ? t('required') : "Optional"})
               </Label>
               <Input
                 id={`email-${passengerIndex}`}
@@ -230,12 +231,10 @@ export function PassengerForm({
 
             <div className="space-y-2">
               <Label htmlFor={`dob-${passengerIndex}`}>{t('dateOfBirth')} ({t('required')})</Label>
-              <Input
+              <DateOfBirthInput
                 id={`dob-${passengerIndex}`}
-                type="date"
-                value={formData.dateOfBirth}
-                onChange={(e) => handleChange("dateOfBirth", e.target.value)}
-                max={new Date().toISOString().split('T')[0]}
+                value={formData.dateOfBirth || ""}
+                onChange={(value) => handleChange("dateOfBirth", value)}
                 className={errors.dateOfBirth ? "border-red-500" : ""}
                 disabled={disabled}
               />
@@ -248,7 +247,7 @@ export function PassengerForm({
           {/* Phone with Country Code */}
           <div className="space-y-2">
             <Label htmlFor={`phone-${passengerIndex}`}>
-              {t('phone')} {requireContactInfo ? t('required') : "(Optional)"}
+              {t('phone')} ({requireContactInfo ? t('required') : "Optional"})
             </Label>
             <div className="flex gap-2">
               <CountryCodeSelector
