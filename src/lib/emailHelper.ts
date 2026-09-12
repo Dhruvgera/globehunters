@@ -309,6 +309,7 @@ export function transformHotelBookingToEmailData(params: {
       nights: hotel.nights || 1,
       rooms: hotel.rooms || 1,
       roomType: roomSummary?.roomName || roomSummary?.description || 'Standard Room',
+      refundable: typeof roomSummary?.isRefundable === 'boolean' ? roomSummary.isRefundable : null,
       amenities: hotel.amenities || [],
     },
     payment: {
@@ -351,7 +352,6 @@ export async function sendBookingConfirmationEmail(
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
-
 
 
 

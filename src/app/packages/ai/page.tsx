@@ -3744,13 +3744,15 @@ function AiPackageContent() {
               )}
               {packageCost > 0 ? (
                 <div className="mt-3 grid gap-2 text-xs text-[#3A478A]">
-                  <div>Flights and stays <span className="font-semibold text-[#010D50]">Included</span></div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span>Flights and stays</span>
+                    <span className="font-semibold text-[#010D50]">Included</span>
+                  </div>
                   {activityTotal > 0 ? (
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center justify-between gap-3">
                       <span>Activities</span>
-                      <span className="flex flex-col items-end leading-tight">
-                        <span>Included</span>
-                        <span className="font-semibold text-[#010D50]">{money(activityTotal, "GBP")}</span>
+                      <span className="whitespace-nowrap">
+                        Included <span className="font-semibold text-[#010D50]">({money(activityTotal, "GBP")})</span>
                       </span>
                     </div>
                   ) : null}

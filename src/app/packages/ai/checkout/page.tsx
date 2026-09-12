@@ -1276,13 +1276,15 @@ function AiCheckoutContent() {
             <h2 className="text-lg font-semibold text-[#010D50]">Trip total</h2>
             <div className="mt-3 text-3xl font-bold text-[#010D50]">{money(draft.totals?.package, currency)}</div>
             <div className="mt-4 grid gap-2 text-sm text-[#3A478A]">
-              <div>Flights and stays <span className="font-semibold text-[#010D50]">Included</span></div>
+              <div className="flex items-center justify-between gap-3">
+                <span>Flights and stays</span>
+                <span className="font-semibold text-[#010D50]">Included</span>
+              </div>
               {Number(draft.totals?.activities || 0) > 0 ? (
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center justify-between gap-3">
                   <span>Activities</span>
-                  <span className="flex flex-col items-end leading-tight">
-                    <span>Included</span>
-                    <span className="font-semibold text-[#010D50]">{money(draft.totals?.activities, currency)}</span>
+                  <span className="whitespace-nowrap">
+                    Included <span className="font-semibold text-[#010D50]">({money(draft.totals?.activities, currency)})</span>
                   </span>
                 </div>
               ) : null}
@@ -1290,7 +1292,12 @@ function AiCheckoutContent() {
             {!showTravellers ? (
               <Button
                 className="mt-5 h-11 w-full rounded-xl bg-[#3754ED] text-white hover:bg-[#2942D1]"
-                onClick={() => setShowTravellers(true)}
+                onClick={() => {
+                  setShowTravellers(true);
+                  window.requestAnimationFrame(() => {
+                    document.getElementById("traveller-details")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                  });
+                }}
               >
                 Continue to traveller details
               </Button>

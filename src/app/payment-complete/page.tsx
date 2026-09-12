@@ -980,18 +980,6 @@ function PaymentCompleteContent() {
     // Could navigate to a trip details page
   }, []);
 
-  const handleDownloadReceipt = useCallback(() => {
-    const previousTitle = document.title;
-    document.title = `Globehunters booking receipt ${paymentInfo?.orderId || orderId || "receipt"}`;
-    const restoreTitle = () => {
-      document.title = previousTitle;
-      window.removeEventListener("afterprint", restoreTitle);
-    };
-    window.addEventListener("afterprint", restoreTitle);
-    window.print();
-    window.setTimeout(restoreTitle, 1000);
-  }, [orderId, paymentInfo?.orderId]);
-
   // Send confirmation email async
   const sendConfirmationEmailAsync = useCallback(async (orderId: string, amount?: string, currency?: string) => {
     const emailSentKey = `emailSent_${orderId}`;
@@ -1256,6 +1244,84 @@ function PaymentCompleteContent() {
     ? "I acknowledge that guest information matches the passport or official ID for travel, and that name changes are not allowed. I confirm that I have reviewed the hotel details and agree to the Refund & Cancellation Policy. I understand bookings are non-transferable and non-changeable unless stated otherwise. I accept full responsibility for valid travel documentation and understand Globehunters cannot be held responsible for denied boarding due to passport or visa validity."
     : "I acknowledge that passenger information matches the passport or official ID for travel, and that name changes are not allowed. I confirm that I have reviewed the flight itinerary and agree to the Refund & Cancellation Policy. I understand tickets are non-transferable and non-changeable unless stated otherwise. I accept full responsibility for valid travel documentation and understand Globehunters cannot be held responsible for denied boarding due to passport or visa validity.";
 
+  const handleDownloadReceipt = useCallback(async () => {
+    const { jsPDF } = await import("jspdf");
+    const receipt = new jsPDF({ unit: "mm", format: "a4" });
+    const pageWidth = receipt.internal.pageSize.getWidth();
+    const pageHeight = receipt.internal.pageSize.getHeight();
+    const margin = 18;
+    let cursor = 24;
+
+    const ensureSpace = (height: number) => {
+      if (cursor + height <= pageHeight - 20) return;
+      receipt.addPage();
+      cursor = 20;
+    };
+    const addSection = (title: string, lines: string[]) => {
+      if (!lines.length) return;
+      const wrapped = lines.flatMap((line) => receipt.splitTextToSize(line, pageWidth - margin * 2));
+      ensureSpace(10 + wrapped.length * 6 + 8);
+      receipt.setFillColor(248, 249, 250);
+      receipt.rect(margin, cursor, pageWidth - margin * 2, 10 + wrapped.length * 6, "F");
+      receipt.setTextColor(55, 84, 237);
+      receipt.setFont("helvetica", "bold");
+      receipt.setFontSize(11);
+      receipt.text(title, margin + 5, cursor + 7);
+      receipt.setTextColor(10, 10, 10);
+      receipt.setFont("helvetica", "normal");
+      receipt.setFontSize(9.5);
+      receipt.text(wrapped, margin + 5, cursor + 14);
+      cursor += 18 + wrapped.length * 6;
+    };
+
+    receipt.setTextColor(55, 84, 237);
+    receipt.setFont("helvetica", "bold");
+    receipt.setFontSize(22);
+    receipt.text("Globehunters", margin, cursor);
+    cursor += 8;
+    receipt.setTextColor(85, 85, 85);
+    receipt.setFont("helvetica", "normal");
+    receipt.setFontSize(11);
+    receipt.text("Booking receipt", margin, cursor);
+    cursor += 10;
+
+    addSection("Booking", [
+      `Booking reference: ${refNumber}`,
+      `Date issued: ${new Date().toLocaleDateString("en-GB")}`,
+      ...(paymentInfo?.transactionId ? [`Transaction ID: ${paymentInfo.transactionId}`] : []),
+    ]);
+    addSection("Traveller", [
+      `Email: ${displayEmail}`,
+      `Telephone: ${displayPhone}`,
+      ...displayPassengers.map((passenger: any, index: number) => {
+        const name = [passenger?.title, passenger?.firstName, passenger?.middleName, passenger?.lastName].filter(Boolean).join(" ") || `Passenger ${index + 1}`;
+        return `Passenger ${index + 1}: ${name}`;
+      }),
+    ]);
+    addSection("Flights", confirmationFlightSegments.map((segment: any) => {
+      const from = segment?.departureAirport?.city || segment?.departureAirport?.code || "Departure";
+      const to = segment?.arrivalAirport?.city || segment?.arrivalAirport?.code || "Arrival";
+      return `${from} to ${to}${segment?.date ? ` - ${segment.date}` : ""}`;
+    }));
+    addSection("Hotel stay", [
+      ...confirmationDestinations.filter((destination) => destination.hotel).map((destination) => {
+        const hotel = destination.hotel!;
+        const dates = [destination.checkIn, destination.checkOut].filter(Boolean).join(" to ");
+        const cancellation = typeof hotel.refundable === "boolean" ? `, ${hotel.refundable ? "Refundable" : "Non-refundable"}` : "";
+        return `${hotel.name || "Hotel"} - ${hotel.room?.name || "Selected room"}${dates ? `, ${dates}` : ""}${cancellation}`;
+      }),
+      ...(!confirmationDestinations.length && hotelConfirmDisplay ? [
+        `${(ctx?.hotelSummary || storeSelectedHotel)?.hotelName || "Hotel"} - ${hotelConfirmDisplay.roomName}${typeof hotelConfirmDisplay.isRefundable === "boolean" ? `, ${hotelConfirmDisplay.isRefundable ? "Refundable" : "Non-refundable"}` : ""}`,
+      ] : []),
+    ]);
+    addSection("Payment", [`Amount paid: ${formatPrice(chargedAmount, chargedCurrency)}`]);
+
+    receipt.setTextColor(85, 85, 85);
+    receipt.setFontSize(8);
+    receipt.text("Thank you for booking with Globehunters.", margin, pageHeight - 12);
+    receipt.save(`Globehunters-receipt-${String(refNumber).replace(/[^a-z0-9_-]/gi, "-")}.pdf`);
+  }, [chargedAmount, chargedCurrency, confirmationDestinations, confirmationFlightSegments, ctx?.hotelSummary, displayEmail, displayPassengers, displayPhone, hotelConfirmDisplay, paymentInfo?.transactionId, refNumber, storeSelectedHotel]);
+
   return (
     <div className="min-h-screen bg-[#F9FAFB]">
       {showConfetti && <ConfettiExplosion />}
@@ -1455,6 +1521,11 @@ function PaymentCompleteContent() {
                               {formatStayDate(destination.checkIn)} – {formatStayDate(destination.checkOut)}
                             </div>
                             <div className="mt-1 text-sm font-medium text-[#010D50]">{hotel.room?.name || "Selected room"}</div>
+                            {typeof hotel.refundable === "boolean" ? (
+                              <div className="mt-1 text-xs text-[#3A478A]">
+                                Cancellation: {hotel.refundable ? "Refundable" : "Non-refundable"}
+                              </div>
+                            ) : null}
                           </div>
                         </div>
                       );
@@ -1523,6 +1594,11 @@ function PaymentCompleteContent() {
                         ))}
                       </div>
                     )}
+                    {typeof hotelConfirmDisplay.isRefundable === "boolean" ? (
+                      <div className="text-xs text-[#3A478A]">
+                        Cancellation: {hotelConfirmDisplay.isRefundable ? "Refundable" : "Non-refundable"}
+                      </div>
+                    ) : null}
                   </div>
                 )}
 
