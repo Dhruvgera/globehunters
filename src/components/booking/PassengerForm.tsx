@@ -18,6 +18,12 @@ import { countryCodes } from "@/lib/utils/countryCodes";
 import { CountryCodeSelector } from "./CountryCodeSelector";
 import { DateOfBirthInput } from "./DateOfBirthInput";
 
+function formatPhoneNumber(value: string | undefined) {
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
 
 interface PassengerFormProps {
   passengerIndex: number;
@@ -69,12 +75,13 @@ export function PassengerForm({
   }, [formData.dateOfBirth, passengerType]);
 
   const handleChange = (field: keyof Passenger, value: string) => {
-    const newFormData = { ...formData, [field]: value };
+    const nextValue = field === "phone" ? value.replace(/\D/g, "").slice(0, 11) : value;
+    const newFormData = { ...formData, [field]: nextValue };
     setFormData(newFormData);
 
     // Real-time validation for date of birth
-    if (field === 'dateOfBirth' && value) {
-      const dobValidation = validateDateOfBirthForType(value, passengerType);
+    if (field === 'dateOfBirth' && nextValue) {
+      const dobValidation = validateDateOfBirthForType(nextValue, passengerType);
       if (!dobValidation.valid) {
         setErrors((prev) => ({ ...prev, dateOfBirth: dobValidation.error }));
         return;
@@ -82,8 +89,8 @@ export function PassengerForm({
     }
 
     // Accept 10 digits, or a UK-style 11-digit local number beginning with trunk zero.
-    if (field === 'phone' && value) {
-      const digits = value.replace(/\D/g, '');
+    if (field === 'phone' && nextValue) {
+      const digits = nextValue.replace(/\D/g, '');
       const validLocalNumber = /^\d{10}$/.test(digits) || /^0\d{10}$/.test(digits);
       if (digits.length > 11 || (digits.length === 11 && !digits.startsWith('0'))) {
         setErrors((prev) => ({ ...prev, phone: 'Enter 10 digits, or 11 digits starting with 0' }));
@@ -104,7 +111,7 @@ export function PassengerForm({
       ? ['title', 'firstName', 'lastName', 'dateOfBirth', 'email', 'phone']
       : ['title', 'firstName', 'lastName', 'dateOfBirth'];
     const allFieldsFilled = requiredFields.every(f => {
-      const val = f === field ? value : formData[f];
+      const val = f === field ? nextValue : formData[f];
       return val && String(val).trim() !== '';
     });
 
@@ -258,7 +265,7 @@ export function PassengerForm({
               <Input
                 id={`phone-${passengerIndex}`}
                 type="tel"
-                value={formData.phone}
+                value={formatPhoneNumber(formData.phone)}
                 onChange={(e) => handleChange("phone", e.target.value)}
                 placeholder={t('phonePlaceholder')}
                 className={`flex-1 ${errors.phone ? "border-red-500" : ""}`}

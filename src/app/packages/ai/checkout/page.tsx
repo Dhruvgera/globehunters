@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -595,6 +595,7 @@ function AiCheckoutContent() {
   }, [paramsKey]);
   const [draft, setDraft] = useState<AiBookingDraft | null>(null);
   const [showTravellers, setShowTravellers] = useState(false);
+  const travellerDetailsRef = useRef<HTMLElement | null>(null);
   const [flightInfoOpen, setFlightInfoOpen] = useState(false);
   const [hotelDetailsOpen, setHotelDetailsOpen] = useState(false);
   const [hotelDetailsDestinationIndex, setHotelDetailsDestinationIndex] = useState(0);
@@ -681,8 +682,17 @@ function AiCheckoutContent() {
   }, [draft]);
   const dateMismatch = destinationDrafts.find((destination) => {
     const arrivalDate = arrivalDateForDestination(destination, draft?.flight);
-    return Boolean(arrivalDate && destination.checkIn && arrivalDate > destination.checkIn);
+    const hotelCheckIn = hotelCheckInForDestination(destination);
+    return Boolean(arrivalDate && hotelCheckIn && arrivalDate > hotelCheckIn);
   });
+
+  useEffect(() => {
+    if (!showTravellers) return;
+    const frame = window.requestAnimationFrame(() => {
+      travellerDetailsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [showTravellers]);
   const requiredPassengerTypes = useMemo<PassengerType[]>(() => {
     const adults = Number(draft?.search?.adults || 0);
     const children = Number(draft?.search?.children || 0);
@@ -843,10 +853,6 @@ function AiCheckoutContent() {
 
   const proceedToPayment = async () => {
     if (!draft) return;
-    if (dateMismatch) {
-      setSubmitError(`The flight reaches ${dateMismatch.name || "the destination"} after hotel check-in starts. Change the flight or trip dates before booking.`);
-      return;
-    }
     let effectivePassengers = passengers;
     let effectivePassengersSaved = passengersSaved;
 
@@ -1234,17 +1240,17 @@ function AiCheckoutContent() {
 
             {dateMismatch ? (
               <div className="rounded-xl border border-[#F4B8D9] bg-[#FFF5FB] px-4 py-3 text-sm text-[#6B2151]">
-                The flight reaches {dateMismatch.name || "this destination"} after hotel check-in starts. Change the flight or trip dates before booking.
+                The flight reaches {dateMismatch.name || "this destination"} after hotel check-in starts. Review the dates before booking.
               </div>
             ) : null}
 
             {showTravellers ? (
-              <section id="traveller-details">
+              <section id="traveller-details" ref={travellerDetailsRef} className="scroll-mt-24">
                 <PassengerFormsSection showPassportFields requireContactInfoForAll={false} />
                 <div className="mt-5 flex justify-end">
                   <Button
                     className="h-11 min-w-[220px] rounded-xl bg-[#010D50] px-6 text-white hover:bg-[#0B1C73] disabled:opacity-50"
-                    disabled={submitting || Boolean(dateMismatch)}
+                    disabled={submitting}
                     onClick={proceedToPayment}
                   >
                     {submitting ? (
@@ -1272,25 +1278,26 @@ function AiCheckoutContent() {
             <div className="mt-4 grid gap-2 text-sm text-[#3A478A]">
               <div>Flights and stays <span className="font-semibold text-[#010D50]">Included</span></div>
               {Number(draft.totals?.activities || 0) > 0 ? (
-                <div className="flex justify-between"><span>Activities</span><span className="font-semibold text-[#010D50]">Included · {money(draft.totals?.activities, currency)}</span></div>
+                <div className="flex items-start justify-between gap-3">
+                  <span>Activities</span>
+                  <span className="flex flex-col items-end leading-tight">
+                    <span>Included</span>
+                    <span className="font-semibold text-[#010D50]">{money(draft.totals?.activities, currency)}</span>
+                  </span>
+                </div>
               ) : null}
             </div>
             {!showTravellers ? (
               <Button
                 className="mt-5 h-11 w-full rounded-xl bg-[#3754ED] text-white hover:bg-[#2942D1]"
-                onClick={() => {
-                  setShowTravellers(true);
-                  window.setTimeout(() => {
-                    document.getElementById("traveller-details")?.scrollIntoView({ behavior: "smooth", block: "start" });
-                  }, 50);
-                }}
+                onClick={() => setShowTravellers(true)}
               >
                 Continue to traveller details
               </Button>
             ) : (
               <Button
                 className="mt-5 h-11 w-full rounded-xl bg-[#010D50] text-white hover:bg-[#0B1C73] disabled:opacity-50"
-                disabled={submitting || Boolean(dateMismatch)}
+                disabled={submitting}
                 onClick={proceedToPayment}
               >
                 {submitting ? (

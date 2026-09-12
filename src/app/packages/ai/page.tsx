@@ -2606,7 +2606,8 @@ function AiPackageContent() {
   )[0] || liveSearch.hotel?.distanceLabel || "";
   const arrivalCheckInMismatches = destinationSegments.filter((segment) => {
     const arrivalDate = flightArrivalDateForSegment(segment, liveFlight);
-    return Boolean(arrivalDate && segment.checkIn && arrivalDate > segment.checkIn);
+    const hotelCheckIn = hotelCheckInForSegment(segment);
+    return Boolean(arrivalDate && hotelCheckIn && arrivalDate > hotelCheckIn);
   });
   const hasArrivalCheckInMismatch = arrivalCheckInMismatches.length > 0;
   const firstArrivalMismatch = arrivalCheckInMismatches[0];
@@ -3744,7 +3745,15 @@ function AiPackageContent() {
               {packageCost > 0 ? (
                 <div className="mt-3 grid gap-2 text-xs text-[#3A478A]">
                   <div>Flights and stays <span className="font-semibold text-[#010D50]">Included</span></div>
-                  {activityTotal > 0 ? <div>Activities <span className="font-semibold text-[#010D50]">Included · {money(activityTotal, "GBP")}</span></div> : null}
+                  {activityTotal > 0 ? (
+                    <div className="flex items-start justify-between gap-3">
+                      <span>Activities</span>
+                      <span className="flex flex-col items-end leading-tight">
+                        <span>Included</span>
+                        <span className="font-semibold text-[#010D50]">{money(activityTotal, "GBP")}</span>
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
               {packagePricingReady && budgetNotice ? (
@@ -3926,7 +3935,7 @@ function AiPackageContent() {
               <div className="flex items-start gap-3 border border-[#F4B8D9] bg-[#FFF5FB] px-4 py-3 text-sm text-[#6B2151]">
                 <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
                 <span>
-                  Your flight reaches {firstArrivalMismatch?.name} on {formatDate(firstMismatchArrivalDate, firstMismatchArrivalDate)}, after check-in starts on {formatDate(firstArrivalMismatch?.checkIn, firstArrivalMismatch?.checkIn || "")}. Change the flight or trip dates before booking.
+                  Your flight reaches {firstArrivalMismatch?.name} on {formatDate(firstMismatchArrivalDate, firstMismatchArrivalDate)}, after hotel check-in starts on {formatDate(firstArrivalMismatch ? hotelCheckInForSegment(firstArrivalMismatch) : "", "")}. Change the flight or hotel stay dates before booking.
                 </span>
               </div>
             ) : null}
@@ -4114,7 +4123,7 @@ function AiPackageContent() {
           </DialogHeader>
           <div className="space-y-4 text-sm leading-6 text-[#3A478A]">
             <p>
-              Your flight reaches {firstArrivalMismatch?.name} on {formatDate(firstMismatchArrivalDate, firstMismatchArrivalDate)}, after hotel check-in starts on {formatDate(firstArrivalMismatch?.checkIn, firstArrivalMismatch?.checkIn || "")}.
+              Your flight reaches {firstArrivalMismatch?.name} on {formatDate(firstMismatchArrivalDate, firstMismatchArrivalDate)}, after hotel check-in starts on {formatDate(firstArrivalMismatch ? hotelCheckInForSegment(firstArrivalMismatch) : "", "")}.
             </p>
             <p>
               You can continue with this itinerary, but please review the dates before completing your booking.
