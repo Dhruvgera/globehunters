@@ -444,8 +444,6 @@ export const mapAvailability = (availabilityResponse: any, nights: number, rooms
                             : "Room options available",
                 highlights: [
                     ...(r?.AvailabilityStatuses ? [`Availability: ${r.AvailabilityStatuses}`] : []),
-                    ...(SHOW_HYBRID_PROVIDER_IN_RESULTS && isHybridProviderResponse ? [`Provider: ${rowProvider}`] : []),
-                    ...(r?.suppliers?.[0] ? [`Supplier: ${r.suppliers[0]}`] : []),
                     ...(hbCheapest?.refundable === true ? ["Refundable"] : hbCheapest?.refundable === false ? ["Non-refundable"] : []),
                 ].slice(0, 2),
             },

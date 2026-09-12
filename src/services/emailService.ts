@@ -79,7 +79,7 @@ export function generateConfirmationEmailHTML(data: BookingConfirmationEmailData
               <td style="padding: 12px 0; font-family: 'Inter', Arial, sans-serif; vertical-align: top;">
                 <div style="font-weight: 600; font-size: 13px; color: #010D50;">${escapeHtml(activity.title)}</div>
                 <div style="font-size: 12px; color: #555555; margin-top: 4px;">${escapeHtml([activity.destination, activity.date, activity.time, activity.duration].filter(Boolean).join(' | '))}</div>
-                <div style="font-size: 11px; color: #6B7280; margin-top: 4px;">Viator product: ${escapeHtml(activity.productCode)}</div>
+                <div style="font-size: 11px; color: #6B7280; margin-top: 4px;">Activity reference: ${escapeHtml(activity.productCode)}</div>
               </td>
               ${typeof activity.price === 'number' ? `<td style="padding: 12px 0; font-family: 'Inter', Arial, sans-serif; font-weight: 600; font-size: 13px; color: #010D50; text-align: right; vertical-align: top;">${escapeHtml(activity.currency || 'GBP')} ${activity.price.toFixed(2)}</td>` : ''}
             </tr>

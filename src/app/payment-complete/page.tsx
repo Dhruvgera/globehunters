@@ -1549,7 +1549,7 @@ function PaymentCompleteContent() {
                         <div className="text-sm text-[#6B7280] mt-1">
                           {[activity.destination, activity.itineraryDate, activity.duration].filter(Boolean).join(' | ')}
                         </div>
-                        <div className="text-xs text-[#6B7280] mt-1">Viator product: {activity.productCode}</div>
+                        <div className="text-xs text-[#6B7280] mt-1">Activity reference: {activity.productCode}</div>
                       </div>
                       {typeof activity.price === 'number' && (
                         <div className="font-semibold text-[#010D50] whitespace-nowrap">

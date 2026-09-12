@@ -12,6 +12,7 @@ import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
 import { FlightSummaryCard, type FlightLeg } from "@/components/booking/FlightSummaryCard";
 import { HotelFiltersSidebar, type HotelAmenityOption, type HotelFiltersState } from "@/components/hotels/HotelFiltersSidebar";
 import { Button } from "@/components/ui/button";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { activityService } from "@/services/api/activityService";
 import { flightService } from "@/services/api/flightService";
@@ -1351,6 +1352,7 @@ function AiPackageContent() {
   const [newDestination, setNewDestination] = useState<HolidayDestination | null>(null);
   const [newDestinationCheckIn, setNewDestinationCheckIn] = useState(checkOut || checkIn || "");
   const [newDestinationCheckOut, setNewDestinationCheckOut] = useState("");
+  const [newDestinationDatesDone, setNewDestinationDatesDone] = useState(false);
   const [newTripBudget, setNewTripBudget] = useState(budget || 3000);
   const [budgetNotice, setBudgetNotice] = useState<string | null>(null);
   const manuallyEditedActivitiesRef = useRef<Set<string>>(new Set());
@@ -2593,13 +2595,17 @@ function AiPackageContent() {
 
   useEffect(() => {
     if (!addDestinationOpen) return;
-    const minIso = String(formatIsoDate(nextDestinationMinDate) || checkOut || checkIn || "");
+    const minIso = formatIsoDate(nextDestinationMinDate);
     setAddDestinationError(null);
-    const stayLength = Math.max(1, calculateNights(checkIn || "", checkOut || ""));
-    setNewDestinationCheckIn(minIso);
-    setNewDestinationCheckOut(addDaysIso(minIso, stayLength));
-    setNewTripBudget(budget || 3000);
-  }, [addDestinationOpen, budget, checkIn, checkOut, nextDestinationMinDate]);
+    setNewDestinationCheckIn((current) => {
+      if (current && current >= minIso) return current;
+      return minIso;
+    });
+    setNewDestinationCheckOut((current) => {
+      if (current && current >= minIso) return current;
+      return "";
+    });
+  }, [addDestinationOpen, nextDestinationMinDate]);
   const packageTravellerCount = Math.max(1, adults + children);
   const selectedHotelPackageTotal = Number(liveSearch.hotel?.price.total || 0);
   const hotelExtraPerPerson = useCallback(
@@ -3505,7 +3511,11 @@ function AiPackageContent() {
             aiHeaderAction={(
               <Button
                 type="button"
-                onClick={() => setAddDestinationOpen(true)}
+                onClick={() => {
+                  setNewDestinationDatesDone(false);
+                  setNewTripBudget(budget || 3000);
+                  setAddDestinationOpen(true);
+                }}
                 className="h-9 rounded-lg bg-[#3754ED] px-3 text-xs font-semibold text-white hover:bg-[#2942D1]"
               >
                 <Plus className="h-4 w-4" /> Add to Trip
@@ -3699,10 +3709,10 @@ function AiPackageContent() {
                   })}
                 </div>
 
-                {activitiesLoading && <div className="rounded-lg bg-[#F5F7FF] px-3 py-2 text-sm text-[#3A478A]">Loading Viator activities...</div>}
+                {activitiesLoading && <div className="rounded-lg bg-[#F5F7FF] px-3 py-2 text-sm text-[#3A478A]">Loading activities...</div>}
                 {activitiesError && (
-                  <div className="mt-3 max-h-48 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-lg border border-red-200 bg-red-50 px-3 py-2 font-mono text-xs text-red-600">
-                    {activitiesError}
+                  <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+                    Activities are unavailable right now. Please try again.
                   </div>
                 )}
               </div>
@@ -3885,7 +3895,7 @@ function AiPackageContent() {
                 <input
                   value={activityQuery}
                   onChange={(event) => setActivityQuery(event.target.value)}
-                  placeholder="Search Viator activities"
+                  placeholder="Search activities"
                   className="h-10 flex-1 rounded-xl border border-[#DFE0E4] px-3 text-sm text-[#010D50] outline-none focus:border-[#3754ED]"
                 />
                 <Button
@@ -3898,11 +3908,11 @@ function AiPackageContent() {
               </div>
               <div className="grid gap-3">
                 {activitiesLoading && (
-                  <div className="rounded-xl bg-[#F5F7FF] p-4 text-sm text-[#3A478A]">Finding relevant Viator activities...</div>
+                  <div className="rounded-xl bg-[#F5F7FF] p-4 text-sm text-[#3A478A]">Finding relevant activities...</div>
                 )}
                 {!activitiesLoading && activities.length === 0 && (
                   <div className="rounded-xl bg-[#F5F7FF] p-4 text-sm text-[#3A478A]">
-                    No Viator activities returned for this destination yet.
+                    No activities returned for this destination yet.
                   </div>
                 )}
                 {activities.map((activity, index) => (
@@ -4341,7 +4351,7 @@ function AiPackageContent() {
                   {selectedActivityDetails.price && <span>{money(selectedActivityDetails.price, selectedActivityDetails.currency || "GBP")}</span>}
                 </div>
                 <p className="line-clamp-6 text-sm leading-6 text-[#3A478A]">
-                  {selectedActivityDetails.description || "Viator activity details are available from the supplier."}
+                  {selectedActivityDetails.description || "Activity details are currently unavailable."}
                 </p>
                 <div className="mt-5 flex flex-col gap-2 sm:flex-row">
                   <Button
@@ -4372,6 +4382,10 @@ function AiPackageContent() {
         open={addDestinationOpen}
         onOpenChange={(open) => {
           setAddDestinationOpen(open);
+          if (open) {
+            setNewDestinationDatesDone(false);
+            setNewTripBudget(budget || 3000);
+          }
         }}
       >
         <DialogContent className="max-w-[min(100vw-24px,680px)] bg-white">
@@ -4389,11 +4403,39 @@ function AiPackageContent() {
             </label>
             <div className="grid gap-2">
               <span className="text-sm font-medium text-[#010D50]">Stay dates</span>
-              <div className="rounded-xl border border-[#DFE0E4] bg-[#F5F7FF] px-4 py-3 text-sm font-semibold text-[#010D50]">
-                {shortDate(newDestinationCheckIn, "Start date")} - {shortDate(newDestinationCheckOut, "End date")}
-              </div>
+              {newDestinationDatesDone ? (
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-[#DFE0E4] bg-[#F5F7FF] px-4 py-3">
+                  <div className="text-sm font-semibold text-[#010D50]">
+                    {shortDate(newDestinationCheckIn, "Start date")} - {shortDate(newDestinationCheckOut, "End date")}
+                  </div>
+                  <Button type="button" variant="outline" className="h-8 rounded-full px-4 text-xs" onClick={() => setNewDestinationDatesDone(false)}>
+                    Change dates
+                  </Button>
+                </div>
+              ) : (
+                <DatePicker
+                  startDate={parseIsoDate(newDestinationCheckIn)}
+                  endDate={parseIsoDate(newDestinationCheckOut)}
+                  minDate={nextDestinationMinDate}
+                  onStartDateChange={(date) => {
+                    if (!date || isBeforeDateOnly(date, nextDestinationMinDate)) return;
+                    const nextStart = formatIsoDate(date);
+                    setNewDestinationCheckIn(nextStart);
+                    setNewDestinationDatesDone(false);
+                    const currentEnd = parseIsoDate(newDestinationCheckOut);
+                    if (currentEnd && isBeforeDateOnly(currentEnd, date)) setNewDestinationCheckOut("");
+                  }}
+                  onEndDateChange={(date) => {
+                    if (!date || isBeforeDateOnly(date, nextDestinationMinDate)) return;
+                    setNewDestinationCheckOut(formatIsoDate(date));
+                    setNewDestinationDatesDone(false);
+                  }}
+                  onDone={() => setNewDestinationDatesDone(true)}
+                  className="max-w-none border border-[#DFE0E4] shadow-none"
+                />
+              )}
               <p className="text-xs text-[#5E6B8A]">
-                This stop starts when the current stay ends and keeps the same stay length.
+                Next stays start from {shortDate(formatIsoDate(nextDestinationMinDate), "the current trip end date")} or later.
               </p>
             </div>
             <label className="grid gap-2">
