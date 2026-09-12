@@ -51,9 +51,10 @@ interface FlightInfoModalProps {
   onOpenChange: (open: boolean) => void;
   stayOnCurrentPage?: boolean;
   hideFooter?: boolean;
+  allowFareSelection?: boolean;
   isPackageMode?: boolean;
   onPackageSelect?: (flight: Flight) => void;
-  onPackageApply?: (option: TransformedPriceOption, priceCheck: PriceCheckResult | null) => void;
+  onPackageApply?: (flight: Flight, option: TransformedPriceOption, priceCheck: PriceCheckResult | null) => void;
 }
 
 function flightWithSelectedFare(flight: Flight, option: TransformedPriceOption): Flight {
@@ -89,6 +90,7 @@ export default function FlightInfoModal({
   onOpenChange,
   stayOnCurrentPage = false,
   hideFooter = false,
+  allowFareSelection = true,
   isPackageMode = false,
   onPackageSelect,
   onPackageApply,
@@ -832,7 +834,7 @@ export default function FlightInfoModal({
           {((priceCheck && priceCheck.priceOptions.length > 0 && selectedUpgradeOption) || (!isLoading && priceCheck)) && (
             <div className="flex flex-col gap-5 sm:gap-6">
               {/* Only show fare option chips if there are multiple options */}
-              {priceCheck && priceCheck.priceOptions.length > 1 && (
+              {allowFareSelection && priceCheck && priceCheck.priceOptions.length > 1 && (
                 <div className="flex flex-wrap items-center gap-2 py-1">
                   {priceCheck.priceOptions.map((option) => (
                     <Button
@@ -1383,16 +1385,17 @@ export default function FlightInfoModal({
               </div>
               <Button
                 onClick={() => {
+                  const selectedFlightForFlow = flightWithSelectedFare(flight, selectedUpgradeOption);
                   // Save selected upgrade to store
                   setSelectedUpgrade(selectedUpgradeOption);
                   // Update selected flight with new cabin class
-                  setSelectedFlight(flight, selectedUpgradeOption.cabinClassDisplay);
+                  setSelectedFlight(selectedFlightForFlow, selectedUpgradeOption.cabinClassDisplay);
                   // Save price check data
                   if (priceCheck) {
                     setPriceCheckData(priceCheck);
                   }
                   if (isPackageMode) {
-                    onPackageApply?.(selectedUpgradeOption, priceCheck || null);
+                    onPackageApply?.(selectedFlightForFlow, selectedUpgradeOption, priceCheck || null);
                   }
                   // Close the dialog
                   onOpenChange(false);

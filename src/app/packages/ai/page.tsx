@@ -664,6 +664,7 @@ function compactHotelForSession(hotel: Hotel | null): Hotel | null {
     neighborhood: hotel.neighborhood,
     price: hotel.price,
     room: hotel.room,
+    refundable: hotel.refundable,
     reviews: hotel.reviews,
     amenities: hotel.amenities?.slice(0, 8) || [],
     cityName: hotel.cityName,
@@ -1033,33 +1034,6 @@ function destinationAirportCodeFromParams(params: { get(name: string): string | 
   const hiddenIdCode = params.get("hidden_id") || "";
   const candidates = [explicitCode, hiddenKeyCode, hiddenIdCode];
   return candidates.find((candidate) => /^[A-Z]{3}$/i.test(candidate))?.toUpperCase() || explicitCode;
-}
-
-function flightWithUpgrade(flight: Flight, option: TransformedPriceOption): Flight {
-  const cabinClass = option.cabinClassDisplay || option.cabinName || option.cabinClass || "Economy";
-  return {
-    ...flight,
-    price: option.totalPrice || flight.price,
-    pricePerPerson: option.pricePerPerson || flight.pricePerPerson,
-    currency: option.currency || flight.currency,
-    outbound: {
-      ...flight.outbound,
-      cabinClass,
-      segmentBaggage: option.baggage?.description || flight.outbound.segmentBaggage,
-    },
-    inbound: flight.inbound
-      ? {
-          ...flight.inbound,
-          cabinClass,
-          segmentBaggage: option.baggage?.description || flight.inbound.segmentBaggage,
-        }
-      : undefined,
-    segments: flight.segments?.map((segment) => ({
-      ...segment,
-      cabinClass,
-      segmentBaggage: option.baggage?.description || segment.segmentBaggage,
-    })),
-  };
 }
 
 function buildPackageFlightHref(params: URLSearchParams, aiReturnHref?: string, chainedFlightSearch?: SearchParams | null) {
@@ -3601,9 +3575,7 @@ function AiPackageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveSearch.hotel?.id, liveSearch.hotelLoading, liveSearch.hotelError, roomOptionsByHotelId, roomOptionsLoadingByHotelId]);
 
-  const applyFlightUpgrade = (option: TransformedPriceOption, priceCheck: PriceCheckResult | null) => {
-    if (!liveSearch.flight) return;
-    const nextFlight = flightWithUpgrade(liveSearch.flight, option);
+  const applyFlightUpgrade = (nextFlight: Flight, option: TransformedPriceOption, priceCheck: PriceCheckResult | null) => {
     setLiveSearch((current) => ({
       ...current,
       flight: nextFlight,

@@ -1327,6 +1327,7 @@ function AiCheckoutContent() {
           onOpenChange={setFlightInfoOpen}
           stayOnCurrentPage
           hideFooter
+          allowFareSelection={false}
           isPackageMode
         />
       ) : null}
