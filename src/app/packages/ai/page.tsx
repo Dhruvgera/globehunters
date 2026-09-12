@@ -1346,6 +1346,7 @@ function AiPackageContent() {
   const destinationHydrationAttemptedRef = useRef<Set<string>>(new Set());
   const previousStayPreferenceRef = useRef(stayPreference);
   const [flightInfoOpen, setFlightInfoOpen] = useState(false);
+  const [arrivalWarningOpen, setArrivalWarningOpen] = useState(false);
   const [addDestinationOpen, setAddDestinationOpen] = useState(false);
   const [addDestinationLoading, setAddDestinationLoading] = useState(false);
   const [addDestinationError, setAddDestinationError] = useState<string | null>(null);
@@ -3024,6 +3025,14 @@ function AiPackageContent() {
     router.push(`/packages/ai/checkout?${next.toString()}`);
   };
 
+  const requestBooking = () => {
+    if (hasArrivalCheckInMismatch) {
+      setArrivalWarningOpen(true);
+      return;
+    }
+    continueToNextStep();
+  };
+
   const addDestination = async () => {
     const selectedDestination = newDestination;
     const name = selectedDestination?.name.trim() || "";
@@ -3931,8 +3940,8 @@ function AiPackageContent() {
             <div className="flex justify-end">
               <Button
                 type="button"
-                onClick={continueToNextStep}
-                disabled={!packagePricingReady || !liveSearch.hotel || !liveSearch.flight || hasArrivalCheckInMismatch}
+                onClick={requestBooking}
+                disabled={!packagePricingReady || !liveSearch.hotel || !liveSearch.flight}
                 className="h-12 w-full rounded-xl bg-[#3754ED] text-white hover:bg-[#2942D1] sm:w-[360px]"
               >
                 Book this AI trip
@@ -3953,6 +3962,37 @@ function AiPackageContent() {
           onPackageApply={applyFlightUpgrade}
         />
       ) : null}
+
+      <Dialog open={arrivalWarningOpen} onOpenChange={setArrivalWarningOpen}>
+        <DialogContent className="max-w-[min(100vw-32px,520px)] bg-white">
+          <DialogHeader>
+            <DialogTitle className="pr-6 text-[#010D50]">Your stay starts before you arrive</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 text-sm leading-6 text-[#3A478A]">
+            <p>
+              Your flight reaches {firstArrivalMismatch?.name} on {formatDate(firstMismatchArrivalDate, firstMismatchArrivalDate)}, after hotel check-in starts on {formatDate(firstArrivalMismatch?.checkIn, firstArrivalMismatch?.checkIn || "")}.
+            </p>
+            <p>
+              You can continue with this itinerary, but please review the dates before completing your booking.
+            </p>
+            <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+              <Button type="button" variant="outline" onClick={() => setArrivalWarningOpen(false)} className="border-[#DFE0E4] text-[#010D50]">
+                Review itinerary
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  setArrivalWarningOpen(false);
+                  continueToNextStep();
+                }}
+                className="bg-[#3754ED] text-white hover:bg-[#2942D1]"
+              >
+                Continue to booking
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={hotelDetailsOpen} onOpenChange={setHotelDetailsOpen}>
         <DialogContent className="max-h-[min(92vh,860px)] max-w-[min(100vw-24px,1080px)] overflow-y-auto bg-white">
