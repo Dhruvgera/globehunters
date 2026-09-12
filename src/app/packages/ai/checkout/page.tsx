@@ -36,6 +36,8 @@ type AiDestinationDraft = {
   name?: string;
   checkIn?: string;
   checkOut?: string;
+  hotelCheckIn?: string;
+  hotelCheckOut?: string;
   airportCode?: string;
   hotel?: Hotel | null;
   activities?: AiActivityDraft[];
@@ -100,6 +102,14 @@ function longDate(value?: string) {
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" }).format(date);
+}
+
+function hotelCheckInForDestination(destination: AiDestinationDraft | undefined, fallback = "") {
+  return destination?.hotelCheckIn || destination?.checkIn || fallback;
+}
+
+function hotelCheckOutForDestination(destination: AiDestinationDraft | undefined, fallback = "") {
+  return destination?.hotelCheckOut || destination?.checkOut || fallback;
 }
 
 function flightSegmentToSummaryLeg(flight: Flight, segment: Flight["outbound"]): FlightLeg {
@@ -771,8 +781,8 @@ function AiCheckoutContent() {
       location: primaryDestination?.name || draft.search?.destination || "",
       hidden_id: String(raw?.hotel_id || raw?.hotelId || ""),
       hidden_key: String(raw?.searchCriteriaId || ""),
-      checkIn: primaryDestination?.checkIn || draft.search?.checkIn || "",
-      checkOut: primaryDestination?.checkOut || draft.search?.checkOut || "",
+      checkIn: hotelCheckInForDestination(primaryDestination, draft.search?.checkIn || ""),
+      checkOut: hotelCheckOutForDestination(primaryDestination, draft.search?.checkOut || ""),
       rooms: Number(draft.search?.rooms || 1),
       adults: Number(draft.search?.adults || 1),
       children: Number(draft.search?.children || 0),
@@ -971,8 +981,8 @@ function AiCheckoutContent() {
                 hotelName: destination.hotel.name,
               },
               stay: {
-                checkIn: destination.checkIn || draft.search?.checkIn || "",
-                checkOut: destination.checkOut || draft.search?.checkOut || "",
+                checkIn: hotelCheckInForDestination(destination, draft.search?.checkIn || ""),
+                checkOut: hotelCheckOutForDestination(destination, draft.search?.checkOut || ""),
                 rooms: Math.max(1, Number(draft.search?.rooms || 1)),
                 adults: Math.max(1, Number(draft.search?.adults || 1)),
                 children: Math.max(0, Number(draft.search?.children || 0)),
@@ -993,8 +1003,8 @@ function AiCheckoutContent() {
                 `${submitResp?.message || "Failed to submit HotelBeds hotel to folder."} Hotel request: ${JSON.stringify({
                   hotelId: resolveAiHotelId(destination.hotel),
                   hotelName: destination.hotel.name,
-                  checkIn: destination.checkIn || draft.search?.checkIn || "",
-                  checkOut: destination.checkOut || draft.search?.checkOut || "",
+                  checkIn: hotelCheckInForDestination(destination, draft.search?.checkIn || ""),
+                  checkOut: hotelCheckOutForDestination(destination, draft.search?.checkOut || ""),
                 })}`
               );
             }
@@ -1122,7 +1132,7 @@ function AiCheckoutContent() {
                     ) : null}
                     <div>
                       <div className="text-xs font-semibold uppercase text-[#3A478A]">
-                        {destination.name} - {longDate(destination.checkIn)} to {longDate(destination.checkOut)}
+                        {destination.name} - {longDate(hotelCheckInForDestination(destination))} to {longDate(hotelCheckOutForDestination(destination))}
                       </div>
                       <h3 className="mt-1 text-xl font-bold text-[#010D50]">{destination.hotel?.name || "Selected hotel"}</h3>
                       <p className="mt-1 text-sm text-[#3A478A]">{destination.hotel?.distanceLabel}</p>
@@ -1331,11 +1341,11 @@ function AiCheckoutContent() {
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-lg border border-[#DFE0E4] p-3">
                   <div className="text-xs text-[#3A478A]">Check-in</div>
-                  <div className="text-sm font-semibold text-[#010D50]">{longDate(selectedHotelDestination?.checkIn || draft.search?.checkIn)}</div>
+                  <div className="text-sm font-semibold text-[#010D50]">{longDate(hotelCheckInForDestination(selectedHotelDestination, draft.search?.checkIn))}</div>
                 </div>
                 <div className="rounded-lg border border-[#DFE0E4] p-3">
                   <div className="text-xs text-[#3A478A]">Check-out</div>
-                  <div className="text-sm font-semibold text-[#010D50]">{longDate(selectedHotelDestination?.checkOut || draft.search?.checkOut)}</div>
+                  <div className="text-sm font-semibold text-[#010D50]">{longDate(hotelCheckOutForDestination(selectedHotelDestination, draft.search?.checkOut))}</div>
                 </div>
                 <div className="rounded-lg border border-[#DFE0E4] p-3">
                   <div className="text-xs text-[#3A478A]">Travellers</div>
