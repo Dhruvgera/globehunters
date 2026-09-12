@@ -26,6 +26,11 @@ export interface BoxPayOrderItem {
 }
 
 export interface BoxPayOrder {
+  /**
+   * Original order value before any payment-method adjustments. BoxPay requires
+   * this alongside `money.amount` when creating a checkout session.
+   */
+  originalAmount: string;
   items: BoxPayOrderItem[];
 }
 
@@ -179,7 +184,6 @@ export interface PaymentCompletionInfo {
   paymentMethod?: BoxPayPaymentMethod;
   timestamp?: string;
 }
-
 
 
 

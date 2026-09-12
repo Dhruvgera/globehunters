@@ -161,6 +161,7 @@ class BoxPayService {
         currencyCode: params.currency,
       },
       order: {
+        originalAmount: params.amount.toFixed(2),
         items: params.orderItems?.length ? params.orderItems : defaultOrderItems,
       },
       shopper: {
@@ -253,7 +254,6 @@ class BoxPayService {
 
 // Export singleton instance
 export const boxpayService = new BoxPayService();
-
 
 
 
