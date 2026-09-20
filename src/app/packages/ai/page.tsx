@@ -1023,6 +1023,10 @@ function flightMatchesSearch(flight: Flight | null, search: SearchParams) {
   return expected.length === actual.length && expected.every((entry, index) => entry === actual[index]);
 }
 
+function flightSelectionIdentity(value: string | number | null | undefined) {
+  return String(value || "").replace(/^\d+-/, "");
+}
+
 function currencySymbol(value: string | null | undefined) {
   const normalized = String(value || "GBP").trim().toUpperCase();
   if (normalized === "GBP" || normalized === "£") return "£";
@@ -1286,8 +1290,10 @@ function AiPackageContent() {
   const stayPreference = normalizeStayPreference(params.get("stayPreference"));
   const budget = Number(params.get("budget") || "0") || 0;
   const selectionRevision = params.get("_aiSelection") || "";
+  const selectionFlightId = params.get("_aiFlight") || "";
   const canonicalParams = new URLSearchParams(params.toString());
   canonicalParams.delete("_aiSelection");
+  canonicalParams.delete("_aiFlight");
   const paramsKey = canonicalParams.toString();
   const toParam = params.get("to") || "";
   const hiddenIdParam = params.get("hidden_id") || "";
@@ -1392,6 +1398,7 @@ function AiPackageContent() {
   const setStoreSearchParams = useBookingStore((state) => state.setSearchParams);
   const setSearchRequestId = useBookingStore((state) => state.setSearchRequestId);
   const setSelectedFlight = useBookingStore((state) => state.setSelectedFlight);
+  const storeSelectedFlight = useBookingStore((state) => state.selectedFlight);
   const setHotelSearch = useBookingStore((state) => state.setHotelSearch);
   const setHotelResultsMeta = useBookingStore((state) => state.setHotelResultsMeta);
   const storeHotelSearch = useBookingStore((state) => state.hotelSearch);
@@ -1563,7 +1570,21 @@ function AiPackageContent() {
     if (Object.keys(cachedDestinationStates).length > 0) {
       setDestinationStateById((current) => ({ ...cachedDestinationStates, ...current }));
     }
-    const cachedFlightCandidate = patch?.type === "flight" && patch.flight ? patch.flight : cached?.flight || null;
+    const requestedFlightIdentity = flightSelectionIdentity(selectionFlightId);
+    const selectionCandidates = [
+      patch?.type === "flight" ? patch.flight : null,
+      storeSelectedFlight,
+      cached?.flight,
+    ];
+    const cachedFlightCandidate = requestedFlightIdentity
+      ? selectionCandidates.find(
+          (flight) => flight && flightSelectionIdentity(flight.id) === requestedFlightIdentity
+        ) || null
+      : patch?.type === "flight" && patch.flight
+        ? patch.flight
+        : selectionRevision && storeSelectedFlight
+          ? storeSelectedFlight
+          : cached?.flight || null;
     const cachedFlight = flightMatchesSearch(cachedFlightCandidate, flightSearch) ? cachedFlightCandidate : null;
     const primarySegment = destinationSegments[0];
     const existingPrimaryState = primarySegment
@@ -1636,7 +1657,10 @@ function AiPackageContent() {
       try {
         const response = await flightService.searchFlights(flightSearch);
         if (cancelled) return;
-        const firstFlight = selectRecommendedFlight(response.flights, { budget, stayPreference });
+        const requestedFlight = requestedFlightIdentity
+          ? response.flights.find((flight) => flightSelectionIdentity(flight.id) === requestedFlightIdentity) || null
+          : null;
+        const firstFlight = requestedFlight || selectRecommendedFlight(response.flights, { budget, stayPreference });
         setLiveSearch((current) => ({
           ...current,
           flight: firstFlight,
@@ -1726,7 +1750,7 @@ function AiPackageContent() {
             hotelSearch: undefined,
           },
         }));
-        if (primaryIsActive) {
+        if (activeDestinationIdRef.current === primarySegment.id) {
           setHotelOptions(stampedHotels);
           setLiveSearch((current) => ({
             ...current,
@@ -1768,7 +1792,7 @@ function AiPackageContent() {
             hotelSearch: nextHotelSearch,
           },
         }));
-        if (primaryIsActive) setHotelSearch(nextHotelSearch);
+        if (activeDestinationIdRef.current === primarySegment.id) setHotelSearch(nextHotelSearch);
         if (parsed.criteriaId) {
           setSearchRequestId(
             typeof parsed.criteriaId === "string" ? shortWebRefFromToken(parsed.criteriaId) : String(parsed.criteriaId)
@@ -1800,7 +1824,6 @@ function AiPackageContent() {
       cancelled = true;
     };
   }, [
-    activeDestinationId,
     adults,
     checkIn,
     checkOut,
@@ -1818,7 +1841,9 @@ function AiPackageContent() {
     paramsKey,
     rooms,
     selectionRevision,
+    selectionFlightId,
     stayPreference,
+    storeSelectedFlight,
     setHotelResultsMeta,
     setHotelSearch,
     setSearchRequestId,
@@ -2533,15 +2558,15 @@ function AiPackageContent() {
   const packageCost = liveFlightTotal + liveHotelTotal + activityTotal + destinationAddOnTotal;
   const [settledPackageCost, setSettledPackageCost] = useState<number | null>(null);
   useEffect(() => {
-    if (!packagePricingReady) {
-      setSettledPackageCost(null);
-      return;
-    }
+    setSettledPackageCost(null);
+  }, [paramsKey, selectionFlightId, selectionRevision]);
+  useEffect(() => {
+    if (!packagePricingReady) return;
     const timeout = window.setTimeout(() => setSettledPackageCost(packageCost), 600);
     return () => window.clearTimeout(timeout);
   }, [packageCost, packagePricingReady]);
-  const packagePriceDisplayReady =
-    packagePricingReady && settledPackageCost !== null && Math.abs(settledPackageCost - packageCost) < 0.01;
+  const packagePriceDisplayReady = packagePricingReady && settledPackageCost !== null;
+  const displayedPackageCost = settledPackageCost ?? packageCost;
   useEffect(() => {
     if (!packagePricingReady || budget <= 0) return;
 
@@ -3890,7 +3915,7 @@ function AiPackageContent() {
                 </div>
               ) : packageCost > 0 ? (
                 <div className="text-3xl font-bold text-[#010D50]">
-                  {money(packageCost, liveSearch.flight?.currency || liveSearch.hotel?.price.currency || "GBP")}
+                  {money(displayedPackageCost, liveSearch.flight?.currency || liveSearch.hotel?.price.currency || "GBP")}
                 </div>
               ) : (
                 <div className="text-base font-semibold text-[#3A478A]">Price unavailable</div>

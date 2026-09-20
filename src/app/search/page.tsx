@@ -1034,7 +1034,10 @@ function SearchPageContent() {
           })
         );
       }
-      router.push(`${aiReturnHref}${aiReturnHref.includes("?") ? "&" : "?"}_aiSelection=${Date.now()}`);
+      const separator = aiReturnHref.includes("?") ? "&" : "?";
+      router.push(
+        `${aiReturnHref}${separator}_aiSelection=${Date.now()}&_aiFlight=${encodeURIComponent(String(flight.id))}`
+      );
       return;
     }
     // Build URL with all package parameters for review page
