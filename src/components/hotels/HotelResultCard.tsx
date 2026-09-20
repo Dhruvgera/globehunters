@@ -10,6 +10,7 @@ import type { Hotel } from "@/types/hotel";
 import type { HotelViewMode } from "./HotelResultsToolbar";
 import { useBookingStore } from "@/store/bookingStore";
 import { encodeHotelSearchContext } from "@/lib/hotels/searchContextCodec";
+import { setSessionItem } from "@/lib/storage/safeSessionStorage";
 
 function getAmenityIcon(text: string) {
   const lower = text.toLowerCase();
@@ -143,7 +144,7 @@ export function HotelResultCard({
         e.preventDefault();
         onSelect?.();
         if (aiReturnHref?.startsWith("/packages/ai")) {
-          window.sessionStorage.setItem("aiPackageCandidateHotel", JSON.stringify(hotel));
+          setSessionItem("aiPackageCandidateHotel", JSON.stringify(hotel));
         }
         if (openInCurrentTab) {
           window.location.assign(hotelDetailUrl);
@@ -156,7 +157,7 @@ export function HotelResultCard({
           e.preventDefault();
           onSelect?.();
           if (aiReturnHref?.startsWith("/packages/ai")) {
-            window.sessionStorage.setItem("aiPackageCandidateHotel", JSON.stringify(hotel));
+            setSessionItem("aiPackageCandidateHotel", JSON.stringify(hotel));
           }
           if (openInCurrentTab) {
             window.location.assign(hotelDetailUrl);

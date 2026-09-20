@@ -16,6 +16,7 @@ import { FilterState, Flight, SearchParams } from "@/types/flight";
 import { DEFAULT_FILTER_STATE } from "@/config/constants";
 import { useFilterExpansion } from "@/hooks/useFilterExpansion";
 import { useIdleTimer } from "@/hooks/useIdleTimer";
+import { setSessionItem } from "@/lib/storage/safeSessionStorage";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ErrorMessage } from "@/components/ui/error-message";
 import { useAffiliate } from "@/lib/AffiliateContext";
@@ -228,11 +229,11 @@ function SearchPageContent() {
 
     // Store UTM params in sessionStorage for persistence
     if (typeof window !== 'undefined') {
-      if (utmSource) sessionStorage.setItem('utm_source', utmSource);
+      if (utmSource) setSessionItem('utm_source', utmSource);
       const utmMedium = getQueryParamCaseInsensitive(urlParams, 'utm_medium');
       const utmCampaign = getQueryParamCaseInsensitive(urlParams, 'utm_campaign');
-      if (utmMedium) sessionStorage.setItem('utm_medium', utmMedium);
-      if (utmCampaign) sessionStorage.setItem('utm_campaign', utmCampaign);
+      if (utmMedium) setSessionItem('utm_medium', utmMedium);
+      if (utmCampaign) setSessionItem('utm_campaign', utmCampaign);
     }
   }, [urlParams, setAffiliateCode]);
 
@@ -1024,7 +1025,7 @@ function SearchPageContent() {
     setSelectedFlight(flight, normalizeCabinClass(flight.outbound?.cabinClass));
     if (aiReturnHref?.startsWith("/packages/ai")) {
       if (typeof window !== "undefined") {
-        window.sessionStorage.setItem(
+        setSessionItem(
           "aiPackageSelectionPatch",
           JSON.stringify({
             type: "flight",
@@ -1033,7 +1034,7 @@ function SearchPageContent() {
           })
         );
       }
-      router.push(aiReturnHref);
+      router.push(`${aiReturnHref}${aiReturnHref.includes("?") ? "&" : "?"}_aiSelection=${Date.now()}`);
       return;
     }
     // Build URL with all package parameters for review page

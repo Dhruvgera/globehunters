@@ -21,7 +21,8 @@
     "share:vyspa:hotel-repro": "node scripts/share-vyspa-hotel-repro.mjs",
     "test:hotel:vyspa:timing": "node scripts/time-vyspa-hotels-search.mjs",
     "test:hotel:vyspa:timeout-poll": "node scripts/verify-vyspa-timeout-poll.mjs",
-    "test:trustyou": "node scripts/test-trustyou-api.mjs"
+    "test:trustyou": "node scripts/test-trustyou-api.mjs",
+    "capture:flight-report": "node scripts/capture-vyspa-flight-report.mjs"
   },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",

@@ -17,6 +17,7 @@ import { useBookingStore } from "@/store/bookingStore";
 import type { Passenger, PassengerTitle, PassengerType } from "@/types/booking";
 import type { Flight } from "@/types/flight";
 import type { Hotel } from "@/types/hotel";
+import { getSessionItem, removeSessionItem, setSessionItem } from "@/lib/storage/safeSessionStorage";
 import { ArrowLeft, CalendarDays, Clock, Loader2, Users } from "lucide-react";
 
 type AiActivityDraft = {
@@ -620,12 +621,12 @@ function AiCheckoutContent() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
-    const raw = window.sessionStorage.getItem("aiPackageBookingDraft");
+    const raw = getSessionItem("aiPackageBookingDraft");
     if (!raw) return;
     try {
       const parsed = JSON.parse(raw) as AiBookingDraft;
       if (!draftMatchesCheckoutUrl(parsed, new URLSearchParams(paramsKey))) {
-        window.sessionStorage.removeItem("aiPackageBookingDraft");
+        removeSessionItem("aiPackageBookingDraft");
         setDraft(null);
         router.replace(`/packages/ai?${paramsKey}`);
         return;
@@ -964,7 +965,7 @@ function AiCheckoutContent() {
 
       const folderNumber = currentFolderNumber || String(useBookingStore.getState().vyspaFolderNumber || "");
       const hotelAddedKey = folderNumber ? `aiPackageHotelsAdded_${folderNumber}` : "";
-      if (folderNumber && typeof window !== "undefined" && sessionStorage.getItem(hotelAddedKey) !== "1") {
+      if (folderNumber && typeof window !== "undefined" && getSessionItem(hotelAddedKey) !== "1") {
         const roomConfigs = Array.from({ length: Math.max(1, Number(draft.search?.rooms || 1)) }, (_, index) => ({
           adults:
             index === 0
@@ -1060,7 +1061,7 @@ function AiCheckoutContent() {
           }
         }
 
-        sessionStorage.setItem(hotelAddedKey, "1");
+        setSessionItem(hotelAddedKey, "1");
       }
 
       const next = new URLSearchParams(paramsKey);

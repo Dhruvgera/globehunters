@@ -42,6 +42,7 @@ import {
 import { ensureGiataImageUrl, fixStubaImageUrl } from "@/lib/hotels/imageUrl";
 import { syncPdpUrl } from "@/lib/hotels/syncPdpUrl";
 import { decodeHotelSearchContext } from "@/lib/hotels/searchContextCodec";
+import { getSessionItem, setSessionItem } from "@/lib/storage/safeSessionStorage";
 import { convertHotelLocalTaxTotal, formatMoneyFromCode, normalizeCurrencyCode } from "@/lib/currency/localTaxDisplay";
 import { parsePackageHotelContent, type PackageHotelNearbyPlace } from "@/lib/package/hotelContent";
 import { usePackageDeeplink } from "@/hooks/usePackageDeeplink";
@@ -3606,7 +3607,7 @@ export default function HotelRoomsPage() {
     let candidateHotel: Record<string, unknown> | null = null;
     if (typeof window !== "undefined") {
       try {
-        const raw = window.sessionStorage.getItem("aiPackageCandidateHotel");
+        const raw = getSessionItem("aiPackageCandidateHotel");
         const parsed = raw ? JSON.parse(raw) : null;
         if (parsed && typeof parsed === "object") candidateHotel = parsed as Record<string, unknown>;
       } catch {
@@ -3618,7 +3619,7 @@ export default function HotelRoomsPage() {
           ? (candidateHotel.price as Record<string, unknown>)
           : {};
 
-      window.sessionStorage.setItem(
+      setSessionItem(
         "aiPackageSelectionPatch",
         JSON.stringify({
           type: "hotel",
@@ -3649,7 +3650,7 @@ export default function HotelRoomsPage() {
         })
       );
 
-      window.top?.location.assign(aiReturnHref);
+      router.push(`${aiReturnHref}${aiReturnHref.includes("?") ? "&" : "?"}_aiSelection=${Date.now()}`);
     }
   }
 

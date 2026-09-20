@@ -25,7 +25,8 @@ import type { SearchParams } from "@/types/flight";
 import type { HolidayDestination } from "@/types/holidayPackage";
 import type { PriceCheckResult, TransformedPriceOption } from "@/types/priceCheck";
 import { calculateNights } from "@/lib/hotels/nights";
-import { normalizeCabinClass } from "@/lib/utils";
+import { formatFareLabel, normalizeCabinClass } from "@/lib/utils";
+import { getSessionItem, removeSessionItem, setSessionItem } from "@/lib/storage/safeSessionStorage";
 import {
   DEFAULT_FILTERS,
   includesBreakfast,
@@ -44,13 +45,12 @@ import {
   CheckCircle2,
   Clock,
   Coffee,
+  Download,
   Dumbbell,
   Edit3,
   Loader2,
-  Mail,
   MapPin,
   Plus,
-  Share2,
   Sparkles,
   Star,
   Utensils,
@@ -408,6 +408,28 @@ function formatIsoDate(date: Date | undefined): string {
   return `${year}-${month}-${day}`;
 }
 
+function normalizeFlightDate(value: string | null | undefined): string {
+  const text = String(value || "").trim();
+  const iso = text.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso) return iso[1];
+
+  const display = text.toUpperCase().match(/(?:[A-Z]{3},?\s+)?(\d{1,2})\s+([A-Z]{3})\s+(\d{2}|\d{4})/);
+  if (display) {
+    const months: Record<string, string> = {
+      JAN: "01", FEB: "02", MAR: "03", APR: "04", MAY: "05", JUN: "06",
+      JUL: "07", AUG: "08", SEP: "09", OCT: "10", NOV: "11", DEC: "12",
+    };
+    const month = months[display[2]];
+    if (month) {
+      const year = display[3].length === 2 ? `20${display[3]}` : display[3];
+      return `${year}-${month}-${display[1].padStart(2, "0")}`;
+    }
+  }
+
+  const parsed = new Date(text);
+  return Number.isNaN(parsed.getTime()) ? text : formatIsoDate(parsed);
+}
+
 function isBeforeDateOnly(date: Date, minDate: Date) {
   const dateOnly = new Date(date);
   const minOnly = new Date(minDate);
@@ -752,7 +774,7 @@ function compactDestinationStatesForSession(
 function readAiPackageLiveCache(paramsKey: string): AiPackageLiveCache | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.sessionStorage.getItem(AI_PACKAGE_CACHE_KEY);
+    const raw = getSessionItem(AI_PACKAGE_CACHE_KEY);
     const parsed = raw ? (JSON.parse(raw) as AiPackageLiveCache) : null;
     if (!parsed || parsed.version !== AI_PACKAGE_CACHE_VERSION || parsed.paramsKey !== paramsKey || parsed.expiresAt < Date.now()) return null;
     return parsed;
@@ -781,7 +803,7 @@ function writeAiPackageLiveCache(cache: Omit<AiPackageLiveCache, "expiresAt">) {
   };
 
   try {
-    window.sessionStorage.setItem(AI_PACKAGE_CACHE_KEY, JSON.stringify(next));
+    setSessionItem(AI_PACKAGE_CACHE_KEY, JSON.stringify(next));
   } catch (error) {
     if (error instanceof DOMException && (error.name === "QuotaExceededError" || error.name === "NS_ERROR_DOM_QUOTA_REACHED")) {
       const fallback: AiPackageLiveCache = {
@@ -798,7 +820,7 @@ function writeAiPackageLiveCache(cache: Omit<AiPackageLiveCache, "expiresAt">) {
         destinationStates: compactDestinationStatesForSession(next.destinationStates, 8, 6),
       };
       try {
-        window.sessionStorage.setItem(AI_PACKAGE_CACHE_KEY, JSON.stringify(fallback));
+        setSessionItem(AI_PACKAGE_CACHE_KEY, JSON.stringify(fallback));
       } catch {
         // Storage can be disabled by browser privacy settings. The live state
         // remains available in memory for the current page.
@@ -812,9 +834,9 @@ function writeAiPackageLiveCache(cache: Omit<AiPackageLiveCache, "expiresAt">) {
 function consumeAiSelectionPatch() {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.sessionStorage.getItem(AI_PACKAGE_SELECTION_PATCH_KEY);
+    const raw = getSessionItem(AI_PACKAGE_SELECTION_PATCH_KEY);
     if (!raw) return null;
-    window.sessionStorage.removeItem(AI_PACKAGE_SELECTION_PATCH_KEY);
+    removeSessionItem(AI_PACKAGE_SELECTION_PATCH_KEY);
     const parsed = JSON.parse(raw) as { type?: string; flight?: Flight; hotel?: Hotel; createdAt?: number };
     if (!parsed?.createdAt || Date.now() - parsed.createdAt > AI_PACKAGE_CACHE_TTL_MS) return null;
     return parsed;
@@ -996,7 +1018,7 @@ function flightMatchesSearch(flight: Flight | null, search: SearchParams) {
     ? flight.segments
     : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
   const actual = actualSegments.map((segment) =>
-    `${segment.departureAirport.code}-${segment.arrivalAirport.code}-${segment.date || ""}`
+    `${segment.departureAirport.code}-${segment.arrivalAirport.code}-${normalizeFlightDate(segment.date)}`
   );
   return expected.length === actual.length && expected.every((entry, index) => entry === actual[index]);
 }
@@ -1124,7 +1146,7 @@ function flightSegmentToSummaryLeg(flight: Flight, segment: Flight["outbound"]):
       : "Direct",
     airline: segment.carrierName || flight.airline.name || "Selected airline",
     airlineCode: segment.carrierCode || flight.airline.code,
-    cabinClass: normalizeCabinClass(segment.cabinClass || "Economy"),
+    cabinClass: formatFareLabel(segment.cabinClass || "Economy"),
   };
 }
 
@@ -1263,7 +1285,10 @@ function AiPackageContent() {
   const lookingFor = params.get("lookingFor") || "A bit of everything";
   const stayPreference = normalizeStayPreference(params.get("stayPreference"));
   const budget = Number(params.get("budget") || "0") || 0;
-  const paramsKey = params.toString();
+  const selectionRevision = params.get("_aiSelection") || "";
+  const canonicalParams = new URLSearchParams(params.toString());
+  canonicalParams.delete("_aiSelection");
+  const paramsKey = canonicalParams.toString();
   const toParam = params.get("to") || "";
   const hiddenIdParam = params.get("hidden_id") || "";
   const hiddenKeyParam = params.get("hidden_key") || "";
@@ -1293,6 +1318,7 @@ function AiPackageContent() {
   const [destinationStateById, setDestinationStateById] = useState<Record<string, DestinationLiveState>>({});
   const destinationStateByIdRef = useRef<Record<string, DestinationLiveState>>({});
   const [activeDestinationIndex, setActiveDestinationIndex] = useState(0);
+  const activeDestinationIdRef = useRef("");
   const [liveSearch, setLiveSearch] = useState<LiveSearchState>({
     flight: null,
     flightRequestId: null,
@@ -1337,6 +1363,9 @@ function AiPackageContent() {
   const previousStayPreferenceRef = useRef(stayPreference);
   const [flightInfoOpen, setFlightInfoOpen] = useState(false);
   const [arrivalWarningOpen, setArrivalWarningOpen] = useState(false);
+  const [packagePdfOpen, setPackagePdfOpen] = useState(false);
+  const [packagePdfGenerating, setPackagePdfGenerating] = useState(false);
+  const [agentMarkupPercent, setAgentMarkupPercent] = useState("0");
   const [addDestinationOpen, setAddDestinationOpen] = useState(false);
   const [addDestinationLoading, setAddDestinationLoading] = useState(false);
   const [addDestinationError, setAddDestinationError] = useState<string | null>(null);
@@ -1412,6 +1441,7 @@ function AiPackageContent() {
   );
   const activeDestination = destinationSegments[Math.min(activeDestinationIndex, Math.max(0, destinationSegments.length - 1))] || destinationSegments[0];
   const activeDestinationId = activeDestination?.id || primaryDestinationId;
+  activeDestinationIdRef.current = activeDestinationId;
   const activeActivityStartDate = useMemo(
     () => activityStartDateForSegment(activeDestination, liveSearch.flight) || activeDestination?.checkIn || checkIn || "",
     [activeDestination, checkIn, liveSearch.flight]
@@ -1787,6 +1817,7 @@ function AiPackageContent() {
     infants,
     paramsKey,
     rooms,
+    selectionRevision,
     stayPreference,
     setHotelResultsMeta,
     setHotelSearch,
@@ -1942,7 +1973,7 @@ function AiPackageContent() {
           },
         }));
 
-        if (activeDestinationId === segment.id) {
+        if (activeDestinationIdRef.current === segment.id) {
           setHotelOptions(hotelPayload?.hotelOptions || []);
           if (hotelPayload?.hotelSearch) setHotelSearch(hotelPayload.hotelSearch);
           setActivities(activityProducts);
@@ -1972,8 +2003,9 @@ function AiPackageContent() {
 
     return () => {
       cancelled = true;
+      segmentsToHydrate.forEach((segment) => destinationHydrationAttemptedRef.current.delete(segment.id));
     };
-  }, [activeDestinationId, activityQuery, adults, branchesParam, budget, children, destinationSegments, liveSearch.flight, paramsKey, rooms, setHotelSearch, stayPreference]);
+  }, [activityQuery, adults, branchesParam, budget, children, destinationSegments, liveSearch.flight, paramsKey, rooms, setHotelSearch, stayPreference]);
 
   useEffect(() => {
     if (!hotelDetailsOpen || !liveSearch.hotel) return;
@@ -2487,18 +2519,29 @@ function AiPackageContent() {
     const state = effectiveDestinationStateById[segment.id];
     return Boolean(
       state &&
+        state.activitiesLoading !== true &&
         (state.hotel || state.hotelError || (state.hotelLoading !== true && state.hotelOptions.length === 0))
     );
   });
-  const packagePricingReady =
-    Boolean(liveSearch.flight || (!liveSearch.flightLoading && liveSearch.flightError)) &&
-    destinationPricingReady;
+  const packagePricingSettled = !liveSearch.flightLoading && destinationPricingReady;
+  const packagePricingReady = Boolean(liveSearch.flight) && packagePricingSettled;
   const liveHotelTotal = destinationSegments.reduce((sum, segment) => {
     const stateHotel = effectiveDestinationStateById[segment.id]?.hotel;
     const matchedLiveHotel = hotelMatchesSegment(liveSearch.hotel, segment, destinationSegments) ? liveSearch.hotel : null;
     return sum + ((matchedLiveHotel || stateHotel)?.price.total || 0);
   }, 0);
   const packageCost = liveFlightTotal + liveHotelTotal + activityTotal + destinationAddOnTotal;
+  const [settledPackageCost, setSettledPackageCost] = useState<number | null>(null);
+  useEffect(() => {
+    if (!packagePricingReady) {
+      setSettledPackageCost(null);
+      return;
+    }
+    const timeout = window.setTimeout(() => setSettledPackageCost(packageCost), 600);
+    return () => window.clearTimeout(timeout);
+  }, [packageCost, packagePricingReady]);
+  const packagePriceDisplayReady =
+    packagePricingReady && settledPackageCost !== null && Math.abs(settledPackageCost - packageCost) < 0.01;
   useEffect(() => {
     if (!packagePricingReady || budget <= 0) return;
 
@@ -3107,7 +3150,7 @@ function AiPackageContent() {
         destinationStates: effectiveDestinationStateById,
       });
       try {
-        window.sessionStorage.setItem(
+        setSessionItem(
           "aiPackageBookingDraft",
           JSON.stringify({
           search: {
@@ -3608,20 +3651,150 @@ function AiPackageContent() {
       ).map((segment) => flightSegmentToSummaryLeg(liveFlight, segment))
     : [];
   const passengerLabel = `${adults + children} passenger${adults + children === 1 ? "" : "s"}`;
-  const tripShareData = {
-    title: `GlobeHunters trip to ${destinationSegments.map((segment) => segment.name).join(" and ")}`,
-    text: `${tripDates} · ${passengerLabel} · ${packageCost > 0 ? money(packageCost, liveSearch.flight?.currency || "GBP") : "Live pricing"}`,
-    url: typeof window !== "undefined" ? window.location.href : "",
-  };
-  const shareTrip = async () => {
-    if (navigator.share) {
-      await navigator.share(tripShareData).catch(() => undefined);
-      return;
+  const downloadPackagePdf = async () => {
+    if (!liveFlight || packageCost <= 0) return;
+    setPackagePdfGenerating(true);
+    try {
+      const { jsPDF } = await import("jspdf");
+      const pdf = new jsPDF({ unit: "mm", format: "a4" });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 16;
+      const contentWidth = pageWidth - margin * 2;
+      const currency = liveSearch.flight?.currency || liveSearch.hotel?.price.currency || "GBP";
+      const markupPercent = Math.max(0, Number(agentMarkupPercent) || 0);
+      const markupAmount = packageCost * (markupPercent / 100);
+      const customerTotal = packageCost + markupAmount;
+      const pdfMoney = (value: number) =>
+        new Intl.NumberFormat("en-GB", {
+          style: "currency",
+          currency: /^[A-Z]{3}$/.test(currency) ? currency : "GBP",
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }).format(value);
+      let y = 18;
+
+      const ensureRoom = (height = 12) => {
+        if (y + height <= pageHeight - 15) return;
+        pdf.addPage();
+        y = 18;
+      };
+      const heading = (label: string) => {
+        ensureRoom(12);
+        pdf.setFont("helvetica", "bold");
+        pdf.setFontSize(13);
+        pdf.setTextColor(1, 13, 80);
+        pdf.text(label, margin, y);
+        y += 7;
+      };
+      const line = (label: string, value?: string, options?: { bold?: boolean; indent?: number }) => {
+        const indent = options?.indent || 0;
+        const text = value ? `${label}: ${value}` : label;
+        pdf.setFont("helvetica", options?.bold ? "bold" : "normal");
+        pdf.setFontSize(10);
+        pdf.setTextColor(35, 47, 85);
+        const wrapped = pdf.splitTextToSize(text, contentWidth - indent);
+        ensureRoom(wrapped.length * 5 + 2);
+        pdf.text(wrapped, margin + indent, y);
+        y += wrapped.length * 5 + 1;
+      };
+      const divider = () => {
+        ensureRoom(6);
+        pdf.setDrawColor(223, 224, 228);
+        pdf.line(margin, y, pageWidth - margin, y);
+        y += 6;
+      };
+
+      pdf.setFillColor(1, 13, 80);
+      pdf.rect(0, 0, pageWidth, 30, "F");
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(20);
+      pdf.text("GlobeHunters package proposal", margin, 16);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9);
+      pdf.text(`Generated ${new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date())}`, margin, 23);
+      y = 39;
+
+      heading("Trip overview");
+      line("Destinations", destinationSegments.map((segment) => segment.name).join(" · "));
+      line("Travel dates", `${formatDate(destinationSegments[0]?.checkIn || checkIn, "") || "—"} to ${formatDate(destinationSegments.at(-1)?.checkOut || checkOut, "") || "—"}`);
+      line("Travellers", `${adults} adult${adults === 1 ? "" : "s"}${children ? `, ${children} child${children === 1 ? "" : "ren"}` : ""}${infants ? `, ${infants} infant${infants === 1 ? "" : "s"}` : ""}`);
+      if (liveSearch.flightRequestId) line("Search reference", liveSearch.flightRequestId);
+      divider();
+
+      heading("Flights");
+      flightSummaryLegs.forEach((leg, index) => {
+        line(`${index + 1}. ${leg.fromCode} to ${leg.toCode}`, `${leg.date} · ${leg.departureTime}–${leg.arrivalTime} · ${leg.airline} · ${leg.cabinClass || "Economy"}`, { bold: true });
+        line("Journey", `${leg.stops} · ${leg.duration}`, { indent: 5 });
+      });
+      line("Flight total", pdfMoney(liveFlightTotal), { bold: true });
+      divider();
+
+      heading("Stays");
+      destinationSegments.forEach((segment, index) => {
+        const stateHotel = effectiveDestinationStateById[segment.id]?.hotel;
+        const selectedHotel = (hotelMatchesSegment(liveSearch.hotel, segment, destinationSegments) ? liveSearch.hotel : null) || stateHotel;
+        if (!selectedHotel) {
+          line(`${index + 1}. ${segment.name}`, "No hotel selected", { bold: true });
+          return;
+        }
+        line(`${index + 1}. ${segment.name} — ${selectedHotel.name}`, `${formatDate(hotelCheckInForSegment(segment), "")} to ${formatDate(hotelCheckOutForSegment(segment), "")}`, { bold: true });
+        line("Room", formatRoomName(selectedHotel.room?.name) || "Selected room", { indent: 5 });
+        if (typeof selectedHotel.refundable === "boolean") {
+          line("Cancellation", selectedHotel.refundable ? "Refundable" : "Non-refundable", { indent: 5 });
+        }
+        line("Stay total", pdfMoney(selectedHotel.price.total || 0), { indent: 5 });
+      });
+      line("Stays total", pdfMoney(liveHotelTotal), { bold: true });
+      divider();
+
+      heading("Activities");
+      let activityNumber = 0;
+      destinationSegments.forEach((segment) => {
+        const state = effectiveDestinationStateById[segment.id];
+        const selected = (state?.activities || []).filter((activity) => state?.selectedActivityCodes.includes(activity.productCode));
+        const activityStart = activityStartDateForSegment(segment, liveSearch.flight) || segment.checkIn;
+        selected.forEach((activity, index) => {
+          activityNumber += 1;
+          line(`${activityNumber}. ${activity.title}`, `${formatDate(itineraryDateForIndex(activityStart, segment.checkOut, index), "Date to be confirmed")} · ${activity.duration || "Duration unavailable"} · ${pdfMoney(activity.price || 0)}`, { bold: true });
+        });
+      });
+      if (activityNumber === 0) line("No activities selected");
+      line("Activities total", pdfMoney(activityTotal), { bold: true });
+      divider();
+
+      heading("Price breakdown");
+      line("Flights", pdfMoney(liveFlightTotal));
+      line("Stays", pdfMoney(liveHotelTotal));
+      line("Activities", pdfMoney(activityTotal));
+      line("Taxes and provider fees", "Included in prices above");
+      line("Package subtotal", pdfMoney(packageCost), { bold: true });
+      line(`Agent markup (${markupPercent.toFixed(2)}%)`, pdfMoney(markupAmount));
+      line("Customer total", pdfMoney(customerTotal), { bold: true });
+      y += 3;
+      line("Prices and availability are live and can change until booking is completed.");
+
+      const pageCount = pdf.getNumberOfPages();
+      for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+        pdf.setPage(pageNumber);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(8);
+        pdf.setTextColor(100, 116, 139);
+        pdf.text(
+          `Page ${pageNumber} of ${pageCount}`,
+          pageWidth - margin,
+          pdf.internal.pageSize.getHeight() - 8,
+          { align: "right" },
+        );
+      }
+
+      const safeDestinations = destinationSegments.map((segment) => segment.name).join("-").replace(/[^a-z0-9-]+/gi, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").toLowerCase();
+      pdf.save(`globehunters-${safeDestinations || "package"}.pdf`);
+      setPackagePdfOpen(false);
+    } finally {
+      setPackagePdfGenerating(false);
     }
-    await navigator.clipboard.writeText(`${tripShareData.text}\n${tripShareData.url}`);
-  };
-  const emailTrip = () => {
-    window.location.href = `mailto:?subject=${encodeURIComponent(tripShareData.title)}&body=${encodeURIComponent(`${tripShareData.text}\n\n${tripShareData.url}`)}`;
   };
 
   return (
@@ -3653,11 +3826,14 @@ function AiPackageContent() {
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <TripStepper />
           <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" onClick={emailTrip} className="h-9 rounded-lg border-[#DFE0E4] px-3 text-xs font-semibold text-[#010D50]">
-              <Mail className="h-4 w-4" /> Email
-            </Button>
-            <Button type="button" variant="outline" onClick={shareTrip} className="h-9 rounded-lg border-[#DFE0E4] px-3 text-xs font-semibold text-[#010D50]">
-              <Share2 className="h-4 w-4" /> Share
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setPackagePdfOpen(true)}
+              disabled={!packagePriceDisplayReady || !liveFlight || packageCost <= 0}
+              className="h-9 rounded-lg border-[#DFE0E4] px-3 text-xs font-semibold text-[#010D50]"
+            >
+              <Download className="h-4 w-4" /> Download PDF
             </Button>
           </div>
         </div>
@@ -3707,14 +3883,19 @@ function AiPackageContent() {
           <aside className="flex flex-col gap-4 lg:order-2">
             <section className="rounded-xl border border-[#DFE0E4] bg-white p-4">
               <h2 className="mb-4 text-lg font-semibold text-[#010D50]">Trip total</h2>
-              {packageCost > 0 ? (
+              {!packagePricingSettled || (packagePricingReady && !packagePriceDisplayReady) ? (
+                <div className="inline-flex items-center gap-2 text-base font-semibold text-[#3754ED]">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Calculating your trip total...
+                </div>
+              ) : packageCost > 0 ? (
                 <div className="text-3xl font-bold text-[#010D50]">
                   {money(packageCost, liveSearch.flight?.currency || liveSearch.hotel?.price.currency || "GBP")}
                 </div>
               ) : (
                 <div className="text-base font-semibold text-[#3A478A]">Price unavailable</div>
               )}
-              {packageCost > 0 ? (
+              {packagePriceDisplayReady && packageCost > 0 ? (
                 <div className="mt-3 grid gap-2 text-xs text-[#3A478A]">
                   <div className="flex items-center justify-between gap-3">
                     <span>Flights and stays</span>
@@ -3730,7 +3911,7 @@ function AiPackageContent() {
                   ) : null}
                 </div>
               ) : null}
-              {packagePricingReady && budgetNotice ? (
+              {packagePriceDisplayReady && budgetNotice ? (
                 <div className="mt-3 rounded-lg border border-[#F5D9B3] bg-[#FFF8F0] px-3 py-2 text-xs leading-5 text-[#8B5E20]">
                   {budgetNotice}
                 </div>
@@ -4068,7 +4249,7 @@ function AiPackageContent() {
               <Button
                 type="button"
                 onClick={requestBooking}
-                disabled={!packagePricingReady || !liveSearch.hotel || !liveSearch.flight}
+                disabled={!packagePriceDisplayReady || !liveSearch.hotel || !liveSearch.flight}
                 className="h-12 w-full rounded-xl bg-[#3754ED] text-white hover:bg-[#2942D1] sm:w-[360px]"
               >
                 Book this AI trip
@@ -4089,6 +4270,51 @@ function AiPackageContent() {
           onPackageApply={applyFlightUpgrade}
         />
       ) : null}
+
+      <Dialog open={packagePdfOpen} onOpenChange={setPackagePdfOpen}>
+        <DialogContent className="max-w-[min(100vw-32px,460px)] bg-white">
+          <DialogHeader>
+            <DialogTitle className="pr-6 text-[#010D50]">Download package PDF</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm leading-6 text-[#3A478A]">
+              Add optional agent markup. PDF shows itinerary, package subtotal, markup, fees note, and customer total.
+            </p>
+            <label className="block text-sm font-semibold text-[#010D50]">
+              Agent markup (%)
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={agentMarkupPercent}
+                onChange={(event) => setAgentMarkupPercent(event.target.value)}
+                className="mt-2 h-11 w-full rounded-lg border border-[#DFE0E4] bg-white px-3 text-sm font-normal text-[#010D50] outline-none focus:border-[#3754ED] focus:ring-2 focus:ring-[#DCE3FF]"
+              />
+            </label>
+            <div className="rounded-lg border border-[#DFE0E4] px-3 py-3 text-sm text-[#3A478A]">
+              <div className="flex justify-between gap-4">
+                <span>Package subtotal</span>
+                <span className="font-semibold text-[#010D50]">{money(packageCost, liveSearch.flight?.currency || liveSearch.hotel?.price.currency || "GBP")}</span>
+              </div>
+              <div className="mt-2 flex justify-between gap-4 border-t border-[#EEF0F6] pt-2">
+                <span>Customer total</span>
+                <span className="font-semibold text-[#010D50]">
+                  {money(packageCost * (1 + Math.max(0, Number(agentMarkupPercent) || 0) / 100), liveSearch.flight?.currency || liveSearch.hotel?.price.currency || "GBP")}
+                </span>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setPackagePdfOpen(false)} className="h-10 rounded-lg border-[#DFE0E4] px-4">
+                Cancel
+              </Button>
+              <Button type="button" onClick={downloadPackagePdf} disabled={packagePdfGenerating} className="h-10 rounded-lg bg-[#3754ED] px-4 text-white hover:bg-[#2942D1]">
+                {packagePdfGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                {packagePdfGenerating ? "Creating PDF" : "Download PDF"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={arrivalWarningOpen} onOpenChange={setArrivalWarningOpen}>
         <DialogContent className="max-w-[min(100vw-32px,520px)] bg-white">
