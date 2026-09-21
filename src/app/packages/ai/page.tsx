@@ -105,8 +105,9 @@ type LiveSearchState = {
 const AI_PACKAGE_CACHE_KEY = "aiPackageLiveSearchCache";
 const AI_PACKAGE_SELECTION_PATCH_KEY = "aiPackageSelectionPatch";
 const AI_PACKAGE_CACHE_TTL_MS = 5 * 60 * 1000;
-// Version 10 adds per-destination state so checkout -> planner navigation does not rerun searches.
-const AI_PACKAGE_CACHE_VERSION = 10;
+// Version 11 also keeps the last settled total so flight changes can refresh
+// date-sensitive activity availability without blanking an already known price.
+const AI_PACKAGE_CACHE_VERSION = 11;
 const HOTEL_CHANGE_PAGE_SIZE = 20;
 // Changes to the automatic activity policy must invalidate prior two-item selections.
 const ACTIVITY_PLAN_VERSION = 4;
@@ -125,6 +126,8 @@ type AiPackageLiveCache = {
   activities?: ActivityProduct[];
   selectedActivityCodes?: string[];
   destinationStates?: Record<string, DestinationLiveState>;
+  settledPackageCost?: number;
+  settledFlightPrice?: number;
 };
 
 type RichHotelRoom = {
@@ -799,6 +802,8 @@ function writeAiPackageLiveCache(cache: Omit<AiPackageLiveCache, "expiresAt">) {
     activities: compactActivitiesForSession(cache.activities ?? current?.activities),
     selectedActivityCodes: cache.selectedActivityCodes ?? current?.selectedActivityCodes,
     destinationStates: compactDestinationStatesForSession(cache.destinationStates ?? current?.destinationStates),
+    settledPackageCost: cache.settledPackageCost ?? current?.settledPackageCost,
+    settledFlightPrice: cache.settledFlightPrice ?? current?.settledFlightPrice,
     expiresAt: Date.now() + AI_PACKAGE_CACHE_TTL_MS,
   };
 
@@ -1458,14 +1463,14 @@ function AiPackageContent() {
       [
         activeDestinationId,
         activeDestination?.name || destination,
-        activeActivityStartDate,
+        activeDestination?.checkIn || checkIn || "",
         activeDestination?.checkOut || checkOut || "",
         adults,
         children,
         activityQuery,
         ACTIVITY_PLAN_VERSION,
       ].join("|"),
-    [activeActivityStartDate, activeDestination?.checkOut, activeDestination?.name, activeDestinationId, activityQuery, adults, checkOut, children, destination]
+    [activeDestination?.checkIn, activeDestination?.checkOut, activeDestination?.name, activeDestinationId, activityQuery, adults, checkIn, checkOut, children, destination]
   );
 
   useEffect(() => {
@@ -1968,7 +1973,7 @@ function AiPackageContent() {
         const hotelPayload = hotelResult.status === "fulfilled" ? hotelResult.value : null;
         const activityProducts = activityResult.status === "fulfilled" ? activityResult.value.products : [];
         const selectedCodes = defaultActivityCodes(activityProducts, segmentActivityStartDate, segment.checkOut);
-        const activitiesKey = [segment.id, segment.name, segmentActivityStartDate, segment.checkOut, adults, children, activityQuery, ACTIVITY_PLAN_VERSION].join("|");
+        const activitiesKey = [segment.id, segment.name, segment.checkIn, segment.checkOut, adults, children, activityQuery, ACTIVITY_PLAN_VERSION].join("|");
 
         setDestinationStateById((current) => ({
           ...current,
@@ -2237,7 +2242,7 @@ function AiPackageContent() {
     const activityEndDate = activeDestination?.checkOut || checkOut || "";
     const activitiesKey = activeActivitiesKey;
     const savedDestinationState = destinationStateByIdRef.current[activeDestinationId];
-    if (savedDestinationState?.activitiesKey === activitiesKey && savedDestinationState.activities.length) {
+    if (savedDestinationState?.activitiesKey === activitiesKey && savedDestinationState.activitiesLoading !== true) {
       setActivities(savedDestinationState.activities);
       setSelectedActivityCodes(savedDestinationState.selectedActivityCodes);
       setActivitiesError(savedDestinationState.activitiesError || null);
@@ -2248,7 +2253,7 @@ function AiPackageContent() {
     }
     const cached = readAiPackageLiveCache(paramsKey);
     const cachedDestinationState = cached?.destinationStates?.[activeDestinationId];
-    if (cachedDestinationState?.activitiesKey === activitiesKey && cachedDestinationState.activities.length) {
+    if (cachedDestinationState?.activitiesKey === activitiesKey && cachedDestinationState.activitiesLoading !== true) {
       setActivities(cachedDestinationState.activities);
       setSelectedActivityCodes(cachedDestinationState.selectedActivityCodes);
       setActivitiesError(cachedDestinationState.activitiesError || null);
@@ -2556,15 +2561,49 @@ function AiPackageContent() {
     return sum + ((matchedLiveHotel || stateHotel)?.price.total || 0);
   }, 0);
   const packageCost = liveFlightTotal + liveHotelTotal + activityTotal + destinationAddOnTotal;
-  const [settledPackageCost, setSettledPackageCost] = useState<number | null>(null);
+  const [settledPackageCost, setSettledPackageCost] = useState<number | null>(
+    () => readAiPackageLiveCache(paramsKey)?.settledPackageCost ?? null
+  );
+  const settledFlightPriceRef = useRef<number | null>(
+    readAiPackageLiveCache(paramsKey)?.settledFlightPrice ?? readAiPackageLiveCache(paramsKey)?.flight?.price ?? null
+  );
+  const settledPricingParamsKeyRef = useRef(paramsKey);
   useEffect(() => {
+    if (settledPricingParamsKeyRef.current === paramsKey) return;
+    settledPricingParamsKeyRef.current = paramsKey;
     setSettledPackageCost(null);
-  }, [paramsKey, selectionFlightId, selectionRevision]);
+    settledFlightPriceRef.current = null;
+  }, [paramsKey]);
+  useEffect(() => {
+    if (!selectionFlightId || !liveSearch.flight || settledPackageCost === null) return;
+    const previousFlightPrice = settledFlightPriceRef.current;
+    const selectedFlightPrice = Number(liveSearch.flight.price || 0);
+    if (previousFlightPrice === null || Math.abs(previousFlightPrice - selectedFlightPrice) < 0.01) return;
+    setSettledPackageCost((current) =>
+      current === null ? current : Math.max(0, current - previousFlightPrice + selectedFlightPrice)
+    );
+    settledFlightPriceRef.current = selectedFlightPrice;
+  }, [liveSearch.flight, selectionFlightId, settledPackageCost]);
   useEffect(() => {
     if (!packagePricingReady) return;
-    const timeout = window.setTimeout(() => setSettledPackageCost(packageCost), 600);
+    const timeout = window.setTimeout(() => {
+      setSettledPackageCost(packageCost);
+      settledFlightPriceRef.current = liveFlightTotal;
+      const cached = readAiPackageLiveCache(paramsKey);
+      writeAiPackageLiveCache({
+        paramsKey,
+        flight: liveSearch.flight,
+        flightRequestId: liveSearch.flightRequestId,
+        hotel: cached?.hotel || liveSearch.hotel,
+        hotelOptions: cached?.hotelOptions?.length ? cached.hotelOptions : hotelOptions,
+        hotelSearch: cached?.hotelSearch || storeHotelSearch,
+        settledPackageCost: packageCost,
+        settledFlightPrice: liveFlightTotal,
+      });
+    }, 600);
     return () => window.clearTimeout(timeout);
-  }, [packageCost, packagePricingReady]);
+  }, [hotelOptions, liveFlightTotal, liveSearch.flight, liveSearch.flightRequestId, liveSearch.hotel, packageCost, packagePricingReady, paramsKey, storeHotelSearch]);
+  const hasSettledPackageCost = settledPackageCost !== null;
   const packagePriceDisplayReady = packagePricingReady && settledPackageCost !== null;
   const displayedPackageCost = settledPackageCost ?? packageCost;
   useEffect(() => {
@@ -3908,19 +3947,19 @@ function AiPackageContent() {
           <aside className="flex flex-col gap-4 lg:order-2">
             <section className="rounded-xl border border-[#DFE0E4] bg-white p-4">
               <h2 className="mb-4 text-lg font-semibold text-[#010D50]">Trip total</h2>
-              {!packagePricingSettled || (packagePricingReady && !packagePriceDisplayReady) ? (
+              {!hasSettledPackageCost ? (
                 <div className="inline-flex items-center gap-2 text-base font-semibold text-[#3754ED]">
                   <Loader2 className="h-5 w-5 animate-spin" />
                   Calculating your trip total...
                 </div>
-              ) : packageCost > 0 ? (
+              ) : displayedPackageCost > 0 ? (
                 <div className="text-3xl font-bold text-[#010D50]">
                   {money(displayedPackageCost, liveSearch.flight?.currency || liveSearch.hotel?.price.currency || "GBP")}
                 </div>
               ) : (
                 <div className="text-base font-semibold text-[#3A478A]">Price unavailable</div>
               )}
-              {packagePriceDisplayReady && packageCost > 0 ? (
+              {hasSettledPackageCost && displayedPackageCost > 0 ? (
                 <div className="mt-3 grid gap-2 text-xs text-[#3A478A]">
                   <div className="flex items-center justify-between gap-3">
                     <span>Flights and stays</span>
@@ -4066,7 +4105,26 @@ function AiPackageContent() {
             <section className="rounded-xl border border-[#DFE0E4] bg-white p-4">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold text-[#010D50]">Flight Details</h2>
-                <Link href={flightChangeHref} className="inline-flex items-center gap-1 text-xs font-medium text-[#3754ED]">
+                <Link
+                  href={flightChangeHref}
+                  onClick={() => {
+                    writeAiPackageLiveCache({
+                      paramsKey,
+                      flight: liveSearch.flight,
+                      flightRequestId: liveSearch.flightRequestId,
+                      hotel: liveSearch.hotel,
+                      hotelOptions,
+                      hotelSearch: storeHotelSearch,
+                      activitiesKey: activeActivitiesKey,
+                      activities,
+                      selectedActivityCodes,
+                      destinationStates: effectiveDestinationStateById,
+                      settledPackageCost: settledPackageCost ?? undefined,
+                      settledFlightPrice: liveFlightTotal || undefined,
+                    });
+                  }}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-[#3754ED]"
+                >
                   <Edit3 className="h-3.5 w-3.5" />
                   Change selection
                 </Link>
