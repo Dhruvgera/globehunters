@@ -1,12 +1,21 @@
 import { NextResponse } from "next/server";
-import { getViatorProduct } from "@/lib/viator/client";
+import { getViatorAvailabilityDates, getViatorProduct } from "@/lib/viator/client";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ productCode: string }> }
 ) {
   try {
     const { productCode } = await params;
+    const url = new URL(request.url);
+    const startDate = url.searchParams.get("startDate");
+    const endDate = url.searchParams.get("endDate");
+
+    if (startDate && endDate) {
+      const availableDates = await getViatorAvailabilityDates(productCode, startDate, endDate);
+      return NextResponse.json({ productCode, availableDates });
+    }
+
     const product = await getViatorProduct(productCode);
 
     if (!product) {

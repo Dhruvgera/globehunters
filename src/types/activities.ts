@@ -22,6 +22,12 @@ export interface ActivityProduct {
   currency?: string;
   flags: string[];
   webUrl?: string;
+  travelDate?: string;
+}
+
+export interface ActivityAvailabilityResponse {
+  productCode: string;
+  availableDates: string[];
 }
 
 export interface ActivitySearchResponse {

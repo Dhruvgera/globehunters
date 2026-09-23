@@ -750,6 +750,7 @@ function compactActivitiesForSession(activities: ActivityProduct[] | undefined):
     description: activity.description,
     flags: activity.flags || [],
     webUrl: activity.webUrl,
+    travelDate: activity.travelDate,
   }));
 }
 
@@ -1316,7 +1317,6 @@ function AiPackageContent() {
     adults,
     children,
     rooms,
-    budget,
     lookingFor,
     stayPreference,
   ].join("|");
@@ -1341,6 +1341,10 @@ function AiPackageContent() {
   });
   const [activityQuery, setActivityQuery] = useState(lookingFor);
   const [selectedActivityDetails, setSelectedActivityDetails] = useState<ActivityProduct | null>(null);
+  const [activityAvailabilityByCode, setActivityAvailabilityByCode] = useState<
+    Record<string, { loading: boolean; dates: string[]; error: string | null }>
+  >({});
+  const activityAvailabilityRequestedRef = useRef<Set<string>>(new Set());
   const [hotelDetailsOpen, setHotelDetailsOpen] = useState(false);
   const [hotelDetails, setHotelDetails] = useState<RichHotelDetails | null>(null);
   const [hotelDetailsLoading, setHotelDetailsLoading] = useState(false);
@@ -1399,6 +1403,19 @@ function AiPackageContent() {
   });
 
   destinationStateByIdRef.current = destinationStateById;
+  const commitDestinationStates = useCallback(
+    (
+      update:
+        | Record<string, DestinationLiveState>
+        | ((current: Record<string, DestinationLiveState>) => Record<string, DestinationLiveState>)
+    ) => {
+      const next = typeof update === "function" ? update(destinationStateByIdRef.current) : update;
+      destinationStateByIdRef.current = next;
+      setDestinationStateById(next);
+      return next;
+    },
+    []
+  );
   const aiReturnHref = useMemo(() => `/packages/ai?${paramsKey}`, [paramsKey]);
   const setStoreSearchParams = useBookingStore((state) => state.setSearchParams);
   const setSearchRequestId = useBookingStore((state) => state.setSearchRequestId);
@@ -1486,7 +1503,7 @@ function AiPackageContent() {
   const persistVisibleDestinationState = useCallback((destinationId = activeDestinationId) => {
     const segment = destinationSegments.find((item) => item.id === destinationId) || activeDestination;
     const segmentHotel = segment && hotelMatchesSegment(liveSearch.hotel, segment, destinationSegments) ? liveSearch.hotel : null;
-    setDestinationStateById((current) => ({
+    return commitDestinationStates((current) => ({
       ...current,
       [destinationId]: {
         hotel: segmentHotel,
@@ -1501,13 +1518,13 @@ function AiPackageContent() {
         activitiesLoading,
       },
     }));
-  }, [activeActivitiesKey, activeDestination, activeDestinationId, activities, activitiesError, activitiesLoading, destinationSegments, hotelOptions, liveSearch.hotel, liveSearch.hotelError, liveSearch.hotelLoading, selectedActivityCodes, storeHotelSearch]);
+  }, [activeActivitiesKey, activeDestination, activeDestinationId, activities, activitiesError, activitiesLoading, commitDestinationStates, destinationSegments, hotelOptions, liveSearch.hotel, liveSearch.hotelError, liveSearch.hotelLoading, selectedActivityCodes, storeHotelSearch]);
 
   const showDestinationState = useCallback((index: number) => {
     const nextSegment = destinationSegments[index];
     if (!nextSegment) return;
-    persistVisibleDestinationState(activeDestinationId);
-    const nextState = destinationStateByIdRef.current[nextSegment.id];
+    const currentStates = persistVisibleDestinationState(activeDestinationId);
+    const nextState = currentStates[nextSegment.id];
     const nextHotelOptions = hotelOptionsMatchSegment(nextState?.hotelOptions, nextSegment, destinationSegments);
     const nextHotel =
       nextState?.hotel && hotelMatchesSegment(nextState.hotel, nextSegment, destinationSegments)
@@ -1813,11 +1830,26 @@ function AiPackageContent() {
         });
       } catch (error) {
         if (!cancelled) {
+          const hotelError = error instanceof Error ? error.message : "Failed to load live hotels.";
+          commitDestinationStates((current) => ({
+            ...current,
+            [primarySegment.id]: {
+              ...(current[primarySegment.id] || {
+                hotel: null,
+                hotelOptions: [],
+                activities: [],
+                selectedActivityCodes: [],
+              }),
+              hotel: null,
+              hotelLoading: false,
+              hotelError,
+            },
+          }));
           setLiveSearch((current) => ({
             ...current,
-            hotel: null,
-            hotelLoading: false,
-            hotelError: error instanceof Error ? error.message : "Failed to load live hotels.",
+            hotel: activeDestinationIdRef.current === primarySegment.id ? null : current.hotel,
+            hotelLoading: activeDestinationIdRef.current === primarySegment.id ? false : current.hotelLoading,
+            hotelError: activeDestinationIdRef.current === primarySegment.id ? hotelError : current.hotelError,
           }));
         }
       }
@@ -1834,6 +1866,7 @@ function AiPackageContent() {
     checkOut,
     children,
     chainedFlightSearchParams,
+    commitDestinationStates,
     branchesParam,
     budget,
     destination,
@@ -2497,7 +2530,7 @@ function AiPackageContent() {
     () => {
       const datedActivities = selectedActivities.slice(0, totalTripDays).map((activity, index) => ({
         activity,
-        date: addDaysIso(activeItineraryStartDate, index),
+        date: activity.travelDate || addDaysIso(activeItineraryStartDate, index),
       }));
       return Array.from({ length: totalTripDays }, (_, index) => {
         const date = addDaysIso(activeItineraryStartDate, index);
@@ -2536,10 +2569,88 @@ function AiPackageContent() {
     [destinationSegments, effectiveDestinationStateById]
   );
   const itineraryLabelFor = (index: number) => {
-    const date = itineraryDateForIndex(activeItineraryStartDate, activeDestination?.checkOut || checkOut, index);
+    const date = activities[index]?.travelDate || itineraryDateForIndex(activeItineraryStartDate, activeDestination?.checkOut || checkOut, index);
     const dayNumber = (index % totalTripDays) + 1;
     const dayLabel = date ? formatDate(date, `Day ${dayNumber}`) : `Day ${dayNumber}`;
     return dayLabel;
+  };
+
+  const openActivityDetails = (activity: ActivityProduct, index: number) => {
+    const selectedIndex = selectedActivities.findIndex((item) => item.productCode === activity.productCode);
+    const plannedDate =
+      activity.travelDate ||
+      itineraryDateForIndex(
+        activeItineraryStartDate,
+        activeDestination?.checkOut || checkOut,
+        selectedIndex >= 0 ? selectedIndex : index
+      );
+    setSelectedActivityDetails({ ...activity, travelDate: plannedDate || undefined });
+  };
+
+  const selectedActivityAvailabilityKey = selectedActivityDetails
+    ? `${selectedActivityDetails.productCode}|${activeItineraryStartDate}|${activeDestinationCheckOut}`
+    : "";
+  const selectedActivityAvailability = selectedActivityAvailabilityKey
+    ? activityAvailabilityByCode[selectedActivityAvailabilityKey]
+    : undefined;
+
+  useEffect(() => {
+    if (!selectedActivityDetails || !activeItineraryStartDate || !activeDestinationCheckOut) return;
+    const key = `${selectedActivityDetails.productCode}|${activeItineraryStartDate}|${activeDestinationCheckOut}`;
+    if (activityAvailabilityRequestedRef.current.has(key)) return;
+    activityAvailabilityRequestedRef.current.add(key);
+    setActivityAvailabilityByCode((current) => ({
+      ...current,
+      [key]: { loading: true, dates: [], error: null },
+    }));
+    void activityService
+      .getAvailableDates(selectedActivityDetails.productCode, activeItineraryStartDate, activeDestinationCheckOut)
+      .then((result) => {
+        setActivityAvailabilityByCode((current) => ({
+          ...current,
+          [key]: { loading: false, dates: result.availableDates, error: null },
+        }));
+      })
+      .catch((error) => {
+        setActivityAvailabilityByCode((current) => ({
+          ...current,
+          [key]: {
+            loading: false,
+            dates: [],
+            error: error instanceof Error ? error.message : "Activity dates unavailable",
+          },
+        }));
+      });
+  }, [activeDestinationCheckOut, activeItineraryStartDate, selectedActivityDetails]);
+
+  const changeActivityDate = (productCode: string, travelDate: string) => {
+    const selectedForDestination = activities.filter((activity) => selectedActivityCodes.includes(activity.productCode));
+    const currentIndex = selectedForDestination.findIndex((activity) => activity.productCode === productCode);
+    const currentDate =
+      activities.find((activity) => activity.productCode === productCode)?.travelDate ||
+      itineraryDateForIndex(activeItineraryStartDate, activeDestinationCheckOut, Math.max(0, currentIndex));
+    const occupiedActivity = selectedForDestination.find((activity, index) => {
+      const plannedDate = activity.travelDate || itineraryDateForIndex(activeItineraryStartDate, activeDestinationCheckOut, index);
+      return activity.productCode !== productCode && plannedDate === travelDate;
+    });
+    const nextActivities = activities.map((activity) => {
+      if (activity.productCode === productCode) return { ...activity, travelDate };
+      if (occupiedActivity && activity.productCode === occupiedActivity.productCode && currentDate) {
+        return { ...activity, travelDate: currentDate };
+      }
+      return activity;
+    });
+    setActivities(nextActivities);
+    setSelectedActivityDetails((current) =>
+      current?.productCode === productCode ? { ...current, travelDate } : current
+    );
+    commitDestinationStates((current) => ({
+      ...current,
+      [activeDestinationId]: {
+        ...(current[activeDestinationId] || effectiveDestinationStateById[activeDestinationId]),
+        activities: nextActivities,
+      },
+    }));
   };
 
   const activityTotal = allSelectedActivities.reduce((sum, activity) => sum + (activity.price || 0), 0);
@@ -2553,8 +2664,12 @@ function AiPackageContent() {
         (state.hotel || state.hotelError || (state.hotelLoading !== true && state.hotelOptions.length === 0))
     );
   });
+  const packagePricingUnavailable = (!liveSearch.flightLoading && !liveSearch.flight) || destinationSegments.some((segment) => {
+    const state = effectiveDestinationStateById[segment.id];
+    return Boolean(state && !state.hotelLoading && !state.hotel);
+  });
   const packagePricingSettled = !liveSearch.flightLoading && destinationPricingReady;
-  const packagePricingReady = Boolean(liveSearch.flight) && packagePricingSettled;
+  const packagePricingReady = Boolean(liveSearch.flight) && packagePricingSettled && !packagePricingUnavailable;
   const liveHotelTotal = destinationSegments.reduce((sum, segment) => {
     const stateHotel = effectiveDestinationStateById[segment.id]?.hotel;
     const matchedLiveHotel = hotelMatchesSegment(liveSearch.hotel, segment, destinationSegments) ? liveSearch.hotel : null;
@@ -2603,7 +2718,7 @@ function AiPackageContent() {
     }, 600);
     return () => window.clearTimeout(timeout);
   }, [hotelOptions, liveFlightTotal, liveSearch.flight, liveSearch.flightRequestId, liveSearch.hotel, packageCost, packagePricingReady, paramsKey, storeHotelSearch]);
-  const hasSettledPackageCost = settledPackageCost !== null;
+  const hasSettledPackageCost = packagePricingReady && settledPackageCost !== null;
   const packagePriceDisplayReady = packagePricingReady && settledPackageCost !== null;
   const displayedPackageCost = settledPackageCost ?? packageCost;
   useEffect(() => {
@@ -3187,7 +3302,7 @@ function AiPackageContent() {
         selectedRoomIds: segmentHotelRaw?.selectedRoomId ? [String(segmentHotelRaw.selectedRoomId)] : [],
         activities: segmentActivities.map((activity, index) => ({
           ...activity,
-          itineraryDate: itineraryDateForIndex(segmentActivityStartDate, segment.checkOut, index),
+          itineraryDate: activity.travelDate || itineraryDateForIndex(segmentActivityStartDate, segment.checkOut, index),
         })),
         order: segmentIndex + 1,
       };
@@ -3384,22 +3499,71 @@ function AiPackageContent() {
       const nextSelectedActivityCodes = defaultActivityCodes(nextActivities, nextCheckIn, nextCheckOut);
       const nextIndex = destinationSegments.length;
       const nextActivitiesKey = [nextDestination.id, name, nextCheckIn, nextCheckOut, adults, children, activityQuery, ACTIVITY_PLAN_VERSION].join("|");
-      setChainedDestinations(nextDestinations);
-      setDestinationStateById((current) => ({
-        ...current,
+      const addedDestinationState: DestinationLiveState = {
+        hotel: nextHotel,
+        hotelLoading: false,
+        hotelError: hotelResult.status === "rejected" ? hotelResult.reason instanceof Error ? hotelResult.reason.message : "Failed to load live hotels." : nextHotel ? null : "No live hotels returned for this search.",
+        hotelOptions: nextHotelOptions,
+        hotelSearch: nextHotelSearch,
+        activitiesKey: nextActivitiesKey,
+        activities: nextActivities,
+        selectedActivityCodes: nextSelectedActivityCodes,
+        activitiesError: activityResult.status === "rejected" ? activityResult.reason instanceof Error ? activityResult.reason.message : "Failed to load activities" : null,
+        activitiesLoading: false,
+      };
+      const nextDestinationStates = {
+        ...destinationStateByIdRef.current,
         [nextDestination.id]: {
-          hotel: nextHotel,
-          hotelLoading: false,
-          hotelError: hotelResult.status === "rejected" ? hotelResult.reason instanceof Error ? hotelResult.reason.message : "Failed to load live hotels." : nextHotel ? null : "No live hotels returned for this search.",
-          hotelOptions: nextHotelOptions,
-          hotelSearch: nextHotelSearch,
-          activitiesKey: nextActivitiesKey,
-          activities: nextActivities,
-          selectedActivityCodes: nextSelectedActivityCodes,
-          activitiesError: activityResult.status === "rejected" ? activityResult.reason instanceof Error ? activityResult.reason.message : "Failed to load activities" : null,
-          activitiesLoading: false,
+          ...addedDestinationState,
         },
-      }));
+      };
+      const recommendedFlight =
+        flightResult.status === "fulfilled" && flightResult.value?.flights?.[0]
+          ? selectRecommendedFlight(flightResult.value.flights, { budget: newTripBudget, stayPreference })
+          : null;
+      const nextFlightRequestId =
+        flightResult.status === "fulfilled" && flightResult.value?.requestId
+          ? flightResult.value.requestId
+          : null;
+      const nextParams = new URLSearchParams(typeof window !== "undefined" ? window.location.search : paramsKey);
+      nextParams.set("destinations", JSON.stringify(nextDestinations));
+      nextParams.set("budget", String(newTripBudget));
+      nextParams.delete("_aiSelection");
+      nextParams.delete("_aiFlight");
+      const nextParamsKey = nextParams.toString();
+      const allDestinationSearchesSettled = [...destinationSegments, nextSegment].every((segment) => {
+        const state = nextDestinationStates[segment.id];
+        return Boolean(state && !state.activitiesLoading && !state.hotelLoading && state.hotel);
+      });
+      const nextPackageCost = recommendedFlight && allDestinationSearchesSettled ?
+        Number(recommendedFlight.price || 0) +
+        Object.values(nextDestinationStates).reduce(
+          (sum, state) =>
+            sum +
+            Number(state.hotel?.price.total || 0) +
+            state.activities
+              .filter((activity) => state.selectedActivityCodes.includes(activity.productCode))
+              .reduce((activitySum, activity) => activitySum + Number(activity.price || 0), 0),
+          0
+        ) : null;
+      const primaryState = nextDestinationStates[primaryDestinationId];
+
+      commitDestinationStates(nextDestinationStates);
+      writeAiPackageLiveCache({
+        paramsKey: nextParamsKey,
+        flight: recommendedFlight,
+        flightRequestId: nextFlightRequestId,
+        hotel: primaryState?.hotel || null,
+        hotelOptions: primaryState?.hotelOptions || [],
+        hotelSearch: primaryState?.hotelSearch,
+        destinationStates: nextDestinationStates,
+        settledPackageCost: nextPackageCost ?? undefined,
+        settledFlightPrice: recommendedFlight?.price || undefined,
+      });
+      settledPricingParamsKeyRef.current = nextParamsKey;
+      setSettledPackageCost(nextPackageCost);
+      settledFlightPriceRef.current = recommendedFlight?.price || null;
+      setChainedDestinations(nextDestinations);
       setActiveDestinationIndex(nextIndex);
       setHotelOptions(nextHotelOptions);
       setActivities(nextActivities);
@@ -3409,34 +3573,22 @@ function AiPackageContent() {
       if (nextHotelSearch) setHotelSearch(nextHotelSearch);
       setLiveSearch((current) => ({
         ...current,
-        flight:
-          flightResult.status === "fulfilled" && flightResult.value?.flights?.[0]
-            ? selectRecommendedFlight(flightResult.value.flights, { budget: newTripBudget, stayPreference })
-            : current.flight,
-        flightRequestId:
-          flightResult.status === "fulfilled" && flightResult.value?.requestId
-            ? flightResult.value.requestId
-            : current.flightRequestId,
+        flight: recommendedFlight,
+        flightRequestId: nextFlightRequestId,
         flightLoading: false,
         flightError:
           flightResult.status === "rejected"
             ? flightResult.reason instanceof Error ? flightResult.reason.message : "Failed to refresh chained flights."
             : flightResult.status === "fulfilled" && flightResult.value && flightResult.value.flights.length === 0
               ? "No live flights returned for the chained journey."
-              : null,
+              : recommendedFlight ? null : "Could not find flights for the chained journey.",
         hotel: nextHotel,
         hotelLoading: false,
         hotelError: hotelResult.status === "rejected" ? hotelResult.reason instanceof Error ? hotelResult.reason.message : "Failed to load live hotels." : null,
       }));
       if (flightResult.status === "fulfilled" && flightResult.value?.requestId) setSearchRequestId(flightResult.value.requestId);
-      if (flightResult.status === "fulfilled" && flightResult.value?.flights?.[0]) {
-        const recommendedFlight = selectRecommendedFlight(flightResult.value.flights, { budget: newTripBudget, stayPreference });
-        if (recommendedFlight) setSelectedFlight(recommendedFlight, normalizeCabinClass(recommendedFlight.outbound?.cabinClass));
-      }
+      if (recommendedFlight) setSelectedFlight(recommendedFlight, normalizeCabinClass(recommendedFlight.outbound?.cabinClass));
       if (typeof window !== "undefined") {
-        const nextParams = new URLSearchParams(window.location.search);
-        nextParams.set("destinations", JSON.stringify(nextDestinations));
-        nextParams.set("budget", String(newTripBudget));
         window.history.replaceState(null, "", `${window.location.pathname}?${nextParams.toString()}`);
       }
       setNewDestination(null);
@@ -3821,7 +3973,7 @@ function AiPackageContent() {
         const activityStart = activityStartDateForSegment(segment, liveSearch.flight) || segment.checkIn;
         selected.forEach((activity, index) => {
           activityNumber += 1;
-          line(`${activityNumber}. ${activity.title}`, `${formatDate(itineraryDateForIndex(activityStart, segment.checkOut, index), "Date to be confirmed")} · ${activity.duration || "Duration unavailable"} · ${pdfMoney(activity.price || 0)}`, { bold: true });
+          line(`${activityNumber}. ${activity.title}`, `${formatDate(activity.travelDate || itineraryDateForIndex(activityStart, segment.checkOut, index), "Date to be confirmed")} · ${activity.duration || "Duration unavailable"} · ${pdfMoney(activity.price || 0)}`, { bold: true });
         });
       });
       if (activityNumber === 0) line("No activities selected");
@@ -3947,7 +4099,9 @@ function AiPackageContent() {
           <aside className="flex flex-col gap-4 lg:order-2">
             <section className="rounded-xl border border-[#DFE0E4] bg-white p-4">
               <h2 className="mb-4 text-lg font-semibold text-[#010D50]">Trip total</h2>
-              {!hasSettledPackageCost ? (
+              {packagePricingUnavailable ? (
+                <div className="text-base font-semibold text-[#3A478A]">Price unavailable</div>
+              ) : !hasSettledPackageCost ? (
                 <div className="inline-flex items-center gap-2 text-base font-semibold text-[#3754ED]">
                   <Loader2 className="h-5 w-5 animate-spin" />
                   Calculating your trip total...
@@ -4322,7 +4476,7 @@ function AiPackageContent() {
                     selected={selectedActivityCodes.includes(activity.productCode)}
                     itineraryLabel={itineraryLabelFor(index)}
                     onToggle={() => toggleActivity(activity.productCode)}
-                    onDetails={() => setSelectedActivityDetails(activity)}
+                    onDetails={() => openActivityDetails(activity, index)}
                   />
                 ))}
               </div>
@@ -4870,6 +5024,23 @@ function AiPackageContent() {
                 <p className="line-clamp-6 text-sm leading-6 text-[#3A478A]">
                   {selectedActivityDetails.description || "Activity details are currently unavailable."}
                 </p>
+                {selectedActivityAvailability?.dates && selectedActivityAvailability.dates.length > 1 ? (
+                  <label className="mt-4 block text-sm font-medium text-[#010D50]">
+                    Preferred activity date
+                    <select
+                      value={selectedActivityAvailability.dates.includes(selectedActivityDetails.travelDate || "") ? selectedActivityDetails.travelDate : ""}
+                      onChange={(event) => changeActivityDate(selectedActivityDetails.productCode, event.target.value)}
+                      className="mt-2 h-10 w-full rounded-lg border border-[#DFE0E4] bg-white px-3 text-sm text-[#010D50] outline-none focus:border-[#3754ED]"
+                    >
+                      <option value="" disabled>Choose available date</option>
+                      {selectedActivityAvailability.dates.map((date) => (
+                        <option key={date} value={date}>
+                          {formatDate(date, date)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
                 <div className="mt-5 flex flex-col gap-2 sm:flex-row">
                   <Button
                     type="button"
@@ -4878,16 +5049,6 @@ function AiPackageContent() {
                   >
                     {selectedActivityCodes.includes(selectedActivityDetails.productCode) ? "Remove from trip" : "Add to trip"}
                   </Button>
-                  {selectedActivityDetails.webUrl && (
-                    <a
-                      href={selectedActivityDetails.webUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex h-10 flex-1 items-center justify-center rounded-xl border border-[#DFE0E4] px-4 text-sm font-semibold text-[#010D50]"
-                    >
-                      Supplier page
-                    </a>
-                  )}
                 </div>
               </div>
             </div>

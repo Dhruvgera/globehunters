@@ -185,6 +185,61 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 }
 
+const VIATOR_DAY_NAMES = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+
+function isoDatesBeforeEnd(startDate: string, endDate: string): string[] {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return [];
+  const start = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start >= end ||
+    (end.getTime() - start.getTime()) / 86_400_000 > 45) return [];
+
+  const dates: string[] = [];
+  for (const date = new Date(start); date < end; date.setUTCDate(date.getUTCDate() + 1)) {
+    dates.push(date.toISOString().slice(0, 10));
+  }
+  return dates;
+}
+
+function dateIsAvailableInPricingRecord(date: string, recordValue: unknown): boolean {
+  const record = asRecord(recordValue);
+  const dayName = VIATOR_DAY_NAMES[new Date(`${date}T00:00:00Z`).getUTCDay()];
+  const daysOfWeek = Array.isArray(record.daysOfWeek) ? record.daysOfWeek.map((day) => String(day).toUpperCase()) : [];
+  if (daysOfWeek.length > 0 && !daysOfWeek.includes(dayName)) return false;
+
+  const timedEntries = Array.isArray(record.timedEntries) ? record.timedEntries : [];
+  if (timedEntries.length === 0) return true;
+
+  return timedEntries.some((entryValue) => {
+    const entry = asRecord(entryValue);
+    const unavailableDates = Array.isArray(entry.unavailableDates)
+      ? entry.unavailableDates.map((unavailable) => String(unavailable))
+      : [];
+    return !unavailableDates.includes(date);
+  });
+}
+
+export function extractAvailableDatesFromSchedule(scheduleValue: unknown, startDate: string, endDate: string): string[] {
+  const schedule = asRecord(scheduleValue);
+  const candidates = isoDatesBeforeEnd(startDate, endDate);
+  const bookableItems = Array.isArray(schedule.bookableItems) ? schedule.bookableItems : [];
+
+  return candidates.filter((date) =>
+    bookableItems.some((itemValue) => {
+      const item = asRecord(itemValue);
+      const seasons = Array.isArray(item.seasons) ? item.seasons : [];
+      return seasons.some((seasonValue) => {
+        const season = asRecord(seasonValue);
+        const seasonStart = String(season.startDate || "");
+        const seasonEnd = String(season.endDate || "9999-12-31");
+        if (!seasonStart || date < seasonStart || date > seasonEnd) return false;
+        const pricingRecords = Array.isArray(season.pricingRecords) ? season.pricingRecords : [];
+        return pricingRecords.some((record) => dateIsAvailableInPricingRecord(date, record));
+      });
+    })
+  );
+}
+
 function getImageUrl(product: Record<string, unknown>): string | undefined {
   const images = Array.isArray(product.images) ? product.images : [];
   const first = asRecord(images[0]);
@@ -365,4 +420,13 @@ export async function searchViatorActivities(input: ActivitySearchRequest): Prom
 export async function getViatorProduct(productCode: string): Promise<ActivityProduct | null> {
   const product = await viatorFetch<unknown>(`/products/${encodeURIComponent(productCode)}`);
   return mapProduct(product);
+}
+
+export async function getViatorAvailabilityDates(
+  productCode: string,
+  startDate: string,
+  endDate: string
+): Promise<string[]> {
+  const schedule = await viatorFetch<unknown>(`/availability/schedules/${encodeURIComponent(productCode)}`);
+  return extractAvailableDatesFromSchedule(schedule, startDate, endDate);
 }
