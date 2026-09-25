@@ -60,6 +60,30 @@ interface SearchBarProps {
 
 type Product = "flight" | "hotel" | "package" | "ai";
 
+type AiDestinationStop = {
+  id: string;
+  destination: HolidayDestination | null;
+  checkIn?: Date;
+  checkOut?: Date;
+  hotelCheckIn?: string;
+  hotelCheckOut?: string;
+  originalSignature?: string;
+};
+
+function aiStopSignature(name: string, checkIn: string, checkOut: string, airportCode: string): string {
+  return `${name}|${checkIn}|${checkOut}|${airportCode}`;
+}
+
+function parseSearchDate(value: string | undefined): Date | undefined {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const date = new Date(`${value}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? undefined : date;
+}
+
+function toSearchDate(value: Date): string {
+  return format(value, "yyyy-MM-dd");
+}
+
 function normalizeAiStayPreference(value: string | null | undefined) {
   const normalized = String(value || "").trim().toLowerCase();
   if (normalized.includes("luxury") || normalized.includes("only the best")) return "Luxury hotels";
@@ -177,6 +201,8 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
   const [aiLookingFor, setAiLookingFor] = useState("A bit of everything");
   const [aiStayPreference, setAiStayPreference] = useState("Comfort stay");
   const [aiBudget, setAiBudget] = useState(3000);
+  const [aiDestinationStops, setAiDestinationStops] = useState<AiDestinationStop[]>([]);
+  const [openAiStopDateId, setOpenAiStopDateId] = useState<string | null>(null);
 
   const savedHotelLocation = useBookingStore((s) => s.hotelLocationSelection);
   const setHotelLocationSelection = useBookingStore((s) => s.setHotelLocationSelection);
@@ -224,6 +250,7 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
   const hotelLocationItemRef = useRef<VyspaCityHotelLookupItem | null>(hotelLocationItem);
   const packageDestinationItemRef = useRef<HolidayDestination | null>(packageDestinationItem);
   const fromRef = useRef(from);
+  const originalAiPrimarySignatureRef = useRef("");
 
   useEffect(() => {
     hotelLocationItemRef.current = hotelLocationItem;
@@ -319,14 +346,10 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
     const rms = Number(currentUrlParams.get("rooms") || savedHotelSearch?.rooms || "") || undefined;
     const childAgeParam = currentUrlParams.get("child_age");
 
-    if (inStr) {
-      const d = new Date(inStr);
-      if (!Number.isNaN(d.getTime())) setHotelStartDate(d);
-    }
-    if (outStr) {
-      const d = new Date(outStr);
-      if (!Number.isNaN(d.getTime())) setHotelEndDate(d);
-    }
+    const parsedCheckIn = parseSearchDate(inStr);
+    const parsedCheckOut = parseSearchDate(outStr);
+    if (parsedCheckIn) setHotelStartDate(parsedCheckIn);
+    if (parsedCheckOut) setHotelEndDate(parsedCheckOut);
     if (adults) setHotelGuests(adults);
     setHotelChildren(Math.max(0, Number(children) || 0));
     if (rms) setHotelRooms(rms);
@@ -338,12 +361,43 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
       )
     );
     if (isAiPackagePage) {
+      originalAiPrimarySignatureRef.current = aiStopSignature(
+        currentUrlParams.get("location") || "",
+        currentUrlParams.get("checkIn") || "",
+        currentUrlParams.get("checkOut") || "",
+        currentUrlParams.get("hidden_key")?.split(";")[0] || ""
+      );
       const nextLookingFor = currentUrlParams.get("lookingFor");
       const nextStayPreference = currentUrlParams.get("stayPreference");
       const nextBudget = Number(currentUrlParams.get("budget") || "");
       if (nextLookingFor) setAiLookingFor(nextLookingFor);
       if (nextStayPreference) setAiStayPreference(normalizeAiStayPreference(nextStayPreference));
       if (Number.isFinite(nextBudget) && nextBudget > 0) setAiBudget(nextBudget);
+      try {
+        const parsed = JSON.parse(currentUrlParams.get("destinations") || "[]") as Array<{
+          id?: string; name?: string; checkIn?: string; checkOut?: string;
+          airportCode?: string; hiddenId?: string; hiddenKey?: string;
+          hotelCheckIn?: string; hotelCheckOut?: string;
+        }>;
+        setAiDestinationStops(Array.isArray(parsed) ? parsed.filter((stop) => stop.name).map((stop, index) => ({
+          id: stop.id || `existing-${index}`,
+          destination: {
+            id: stop.hiddenId || stop.name || "",
+            name: stop.name || "",
+            country_name: "",
+            airportcode: stop.airportCode || "",
+            featured_image: "",
+            hiddenvalue: stop.hiddenKey || "",
+          },
+          checkIn: parseSearchDate(stop.checkIn),
+          checkOut: parseSearchDate(stop.checkOut),
+          hotelCheckIn: stop.hotelCheckIn,
+          hotelCheckOut: stop.hotelCheckOut,
+          originalSignature: aiStopSignature(stop.name || "", stop.checkIn || "", stop.checkOut || "", stop.airportCode || ""),
+        })) : []);
+      } catch {
+        setAiDestinationStops([]);
+      }
     }
   }, [pathname, savedHotelLocation, savedHotelSearch, savedPackageDestination, savedPackageSearch, setFrom, urlParamsKey]);
 
@@ -379,7 +433,16 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
     );
   }, [from, hotelEndDate, hotelStartDate, packageDestinationItem]);
 
-  const isAiSearchValid = isPackageSearchValid;
+  const isAiSearchValid = useMemo(() => {
+    if (!isPackageSearchValid || !hotelStartDate || !hotelEndDate || hotelEndDate <= hotelStartDate) return false;
+    let previousCheckOut = hotelEndDate;
+    for (const stop of aiDestinationStops) {
+      if (!stop.destination?.airportcode || !stop.checkIn || !stop.checkOut) return false;
+      if (toSearchDate(stop.checkIn) < toSearchDate(previousCheckOut) || toSearchDate(stop.checkOut) <= toSearchDate(stop.checkIn)) return false;
+      previousCheckOut = stop.checkOut;
+    }
+    return true;
+  }, [aiDestinationStops, hotelEndDate, hotelStartDate, isPackageSearchValid]);
 
   const handleSearch = async () => {
     const effectiveProduct: Product =
@@ -408,9 +471,34 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
         params.set("lookingFor", aiLookingFor);
         params.set("stayPreference", aiStayPreference);
         params.set("budget", String(aiBudget));
-        const existingDestinations = urlParams.get("destinations");
-        if (pathname?.startsWith("/packages/ai") && existingDestinations) {
-          params.set("destinations", existingDestinations);
+        if (aiDestinationStops.length > 0) {
+          let previousDestination = packageDestinationItem;
+          const primaryChanged = Boolean(originalAiPrimarySignatureRef.current && originalAiPrimarySignatureRef.current !== aiStopSignature(
+            loc, checkIn, checkOut, packageDestinationItem?.airportcode || ""
+          ));
+          params.set("destinations", JSON.stringify(aiDestinationStops.map((stop) => {
+            const destination = stop.destination!;
+            const stopSignature = aiStopSignature(destination.name, toSearchDate(stop.checkIn!), toSearchDate(stop.checkOut!), destination.airportcode || "");
+            const segment = {
+              id: primaryChanged || (stop.originalSignature && stop.originalSignature !== stopSignature)
+                ? `stop-${stop.id}-${toSearchDate(stop.checkIn!)}-${toSearchDate(stop.checkOut!)}-${destination.airportcode}`
+                : stop.id,
+              name: destination.name,
+              checkIn: toSearchDate(stop.checkIn!),
+              checkOut: toSearchDate(stop.checkOut!),
+              airportCode: destination.airportcode || "",
+              hiddenId: String(destination.id || ""),
+              hiddenKey: destination.hiddenvalue || "",
+              fromCode: previousDestination?.airportcode || "",
+              fromName: previousDestination?.name || "",
+              ...(stop.hotelCheckIn && stop.hotelCheckOut ? {
+                hotelCheckIn: stop.hotelCheckIn,
+                hotelCheckOut: stop.hotelCheckOut,
+              } : {}),
+            };
+            previousDestination = destination;
+            return segment;
+          })));
         }
         if (packageDestinationItem) setPackageDestination(packageDestinationItem);
         router.push(`/packages/ai?${params.toString()}`);
@@ -922,15 +1010,75 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
             </PopoverContent>
           </Popover>
 
-          <Button
-            type="button"
-            onClick={handleSearch}
-            disabled={activeProduct === "package" ? !isPackageSearchValid : activeProduct === "ai" ? !isAiSearchValid : false}
-            className="rounded-xl px-5 py-2.5 h-auto gap-2 text-sm font-medium w-full md:w-auto bg-[#3754ED] hover:bg-[#2A3FB8] text-white"
-          >
-            {activeProduct === "ai" ? "Plan my trip" : "Search"}
-          </Button>
+          {activeProduct !== "ai" && (
+            <Button
+              type="button"
+              onClick={handleSearch}
+              disabled={activeProduct === "package" ? !isPackageSearchValid : false}
+              className="rounded-xl px-5 py-2.5 h-auto gap-2 text-sm font-medium w-full md:w-auto bg-[#3754ED] hover:bg-[#2A3FB8] text-white"
+            >
+              Search
+            </Button>
+          )}
             </div>
+            {activeProduct === "ai" && (
+              <div className="mt-3 space-y-3">
+                {aiDestinationStops.map((stop, index) => {
+                  const previousCheckOut = index === 0 ? hotelEndDate : aiDestinationStops[index - 1]?.checkOut;
+                  const invalidDates = Boolean(previousCheckOut && stop.checkIn && toSearchDate(stop.checkIn) < toSearchDate(previousCheckOut));
+                  return (
+                    <div key={stop.id} className="grid gap-3 border-t border-[#DFE0E4] pt-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
+                      <label className="min-w-0 space-y-1">
+                        <span className="block text-xs font-medium text-[#3A478A]">Destination {index + 2}</span>
+                        <PackageDestinationAutocomplete
+                          value={stop.destination}
+                          onChange={(destination) => setAiDestinationStops((current) => current.map((item) => item.id === stop.id ? { ...item, destination, hotelCheckIn: undefined, hotelCheckOut: undefined } : item))}
+                          placeholder="Where next?"
+                        />
+                      </label>
+                      <div className="min-w-0 space-y-1">
+                        <span className="block text-xs font-medium text-[#3A478A]">Stay dates</span>
+                        <Popover open={openAiStopDateId === stop.id} onOpenChange={(open) => setOpenAiStopDateId(open ? stop.id : null)}>
+                          <PopoverTrigger asChild>
+                            <button type="button" className="flex h-[46px] w-full items-center gap-2 rounded-xl border border-[#D3D3D3] bg-white px-3 text-left text-sm font-medium text-[#010D50] hover:border-[#3754ED]">
+                              <Calendar className="h-4 w-4 shrink-0 text-[#3754ED]" />
+                              <span className="truncate">{stop.checkIn && stop.checkOut ? `${format(stop.checkIn, "dd MMM")} - ${format(stop.checkOut, "dd MMM")}` : "Select dates"}</span>
+                              <ChevronDown className="ml-auto h-4 w-4 shrink-0" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto max-w-[calc(100vw-32px)] overflow-auto border bg-white p-0" align="start" side="bottom" sideOffset={8}>
+                            <DatePicker
+                              startDate={stop.checkIn}
+                              endDate={stop.checkOut}
+                              minDate={previousCheckOut}
+                              onStartDateChange={(date) => setAiDestinationStops((current) => current.map((item) => item.id === stop.id ? { ...item, checkIn: date, checkOut: undefined, hotelCheckIn: undefined, hotelCheckOut: undefined } : item))}
+                              onEndDateChange={(date) => setAiDestinationStops((current) => current.map((item) => item.id === stop.id ? { ...item, checkOut: date, hotelCheckIn: undefined, hotelCheckOut: undefined } : item))}
+                              onDone={() => setOpenAiStopDateId(null)}
+                            />
+                          </PopoverContent>
+                        </Popover>
+                        {invalidDates && <span className="block text-xs text-red-600">Start on or after the previous stay ends.</span>}
+                      </div>
+                      <Button type="button" variant="outline" onClick={() => setAiDestinationStops((current) => current.filter((item) => item.id !== stop.id))} className="h-[46px] rounded-lg border-[#DFE0E4] px-3 text-[#010D50]" aria-label={`Remove destination ${index + 2}`}>
+                        <X className="h-4 w-4" /> <span className="md:sr-only">Remove destination</span>
+                      </Button>
+                    </div>
+                  );
+                })}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setAiDestinationStops((current) => [...current, { id: `stop-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, destination: null, checkIn: current.at(-1)?.checkOut || hotelEndDate }])}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#DFE0E4] bg-white px-3 py-2 text-sm font-medium text-[#010D50] hover:border-[#3754ED]"
+                  >
+                    <Plus className="h-4 w-4" /> Add destination
+                  </button>
+                  <Button type="button" onClick={handleSearch} disabled={!isAiSearchValid} className="h-[46px] rounded-lg bg-[#3754ED] px-5 text-sm font-medium text-white hover:bg-[#2A3FB8]">
+                    Plan my trip
+                  </Button>
+                </div>
+              </div>
+            )}
             {activeProduct === "ai" && (
               <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
                 <label className="flex flex-col gap-1">

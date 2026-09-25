@@ -213,7 +213,7 @@ function dateIsAvailableInPricingRecord(date: string, recordValue: unknown): boo
   return timedEntries.some((entryValue) => {
     const entry = asRecord(entryValue);
     const unavailableDates = Array.isArray(entry.unavailableDates)
-      ? entry.unavailableDates.map((unavailable) => String(unavailable))
+      ? entry.unavailableDates.map((unavailable) => String(asRecord(unavailable).date || unavailable))
       : [];
     return !unavailableDates.includes(date);
   });

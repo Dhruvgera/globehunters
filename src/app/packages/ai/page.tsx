@@ -1341,10 +1341,6 @@ function AiPackageContent() {
   });
   const [activityQuery, setActivityQuery] = useState(lookingFor);
   const [selectedActivityDetails, setSelectedActivityDetails] = useState<ActivityProduct | null>(null);
-  const [activityAvailabilityByCode, setActivityAvailabilityByCode] = useState<
-    Record<string, { loading: boolean; dates: string[]; error: string | null }>
-  >({});
-  const activityAvailabilityRequestedRef = useRef<Set<string>>(new Set());
   const [hotelDetailsOpen, setHotelDetailsOpen] = useState(false);
   const [hotelDetails, setHotelDetails] = useState<RichHotelDetails | null>(null);
   const [hotelDetailsLoading, setHotelDetailsLoading] = useState(false);
@@ -1391,8 +1387,9 @@ function AiPackageContent() {
   const [newTripBudget, setNewTripBudget] = useState(budget || 3000);
   const [budgetNotice, setBudgetNotice] = useState<string | null>(null);
   const manuallyEditedActivitiesRef = useRef<Set<string>>(new Set());
+  const destinationsParam = params.get("destinations") || "";
   const [chainedDestinations, setChainedDestinations] = useState<ChainedDestination[]>(() => {
-    const raw = params.get("destinations");
+    const raw = destinationsParam;
     if (!raw) return [];
     try {
       const parsed = JSON.parse(raw) as ChainedDestination[];
@@ -1401,6 +1398,15 @@ function AiPackageContent() {
       return [];
     }
   });
+
+  useEffect(() => {
+    try {
+      const parsed = JSON.parse(destinationsParam || "[]") as ChainedDestination[];
+      setChainedDestinations(Array.isArray(parsed) ? parsed.filter((item) => item?.name) : []);
+    } catch {
+      setChainedDestinations([]);
+    }
+  }, [destinationsParam]);
 
   destinationStateByIdRef.current = destinationStateById;
   const commitDestinationStates = useCallback(
@@ -2585,72 +2591,6 @@ function AiPackageContent() {
         selectedIndex >= 0 ? selectedIndex : index
       );
     setSelectedActivityDetails({ ...activity, travelDate: plannedDate || undefined });
-  };
-
-  const selectedActivityAvailabilityKey = selectedActivityDetails
-    ? `${selectedActivityDetails.productCode}|${activeItineraryStartDate}|${activeDestinationCheckOut}`
-    : "";
-  const selectedActivityAvailability = selectedActivityAvailabilityKey
-    ? activityAvailabilityByCode[selectedActivityAvailabilityKey]
-    : undefined;
-
-  useEffect(() => {
-    if (!selectedActivityDetails || !activeItineraryStartDate || !activeDestinationCheckOut) return;
-    const key = `${selectedActivityDetails.productCode}|${activeItineraryStartDate}|${activeDestinationCheckOut}`;
-    if (activityAvailabilityRequestedRef.current.has(key)) return;
-    activityAvailabilityRequestedRef.current.add(key);
-    setActivityAvailabilityByCode((current) => ({
-      ...current,
-      [key]: { loading: true, dates: [], error: null },
-    }));
-    void activityService
-      .getAvailableDates(selectedActivityDetails.productCode, activeItineraryStartDate, activeDestinationCheckOut)
-      .then((result) => {
-        setActivityAvailabilityByCode((current) => ({
-          ...current,
-          [key]: { loading: false, dates: result.availableDates, error: null },
-        }));
-      })
-      .catch((error) => {
-        setActivityAvailabilityByCode((current) => ({
-          ...current,
-          [key]: {
-            loading: false,
-            dates: [],
-            error: error instanceof Error ? error.message : "Activity dates unavailable",
-          },
-        }));
-      });
-  }, [activeDestinationCheckOut, activeItineraryStartDate, selectedActivityDetails]);
-
-  const changeActivityDate = (productCode: string, travelDate: string) => {
-    const selectedForDestination = activities.filter((activity) => selectedActivityCodes.includes(activity.productCode));
-    const currentIndex = selectedForDestination.findIndex((activity) => activity.productCode === productCode);
-    const currentDate =
-      activities.find((activity) => activity.productCode === productCode)?.travelDate ||
-      itineraryDateForIndex(activeItineraryStartDate, activeDestinationCheckOut, Math.max(0, currentIndex));
-    const occupiedActivity = selectedForDestination.find((activity, index) => {
-      const plannedDate = activity.travelDate || itineraryDateForIndex(activeItineraryStartDate, activeDestinationCheckOut, index);
-      return activity.productCode !== productCode && plannedDate === travelDate;
-    });
-    const nextActivities = activities.map((activity) => {
-      if (activity.productCode === productCode) return { ...activity, travelDate };
-      if (occupiedActivity && activity.productCode === occupiedActivity.productCode && currentDate) {
-        return { ...activity, travelDate: currentDate };
-      }
-      return activity;
-    });
-    setActivities(nextActivities);
-    setSelectedActivityDetails((current) =>
-      current?.productCode === productCode ? { ...current, travelDate } : current
-    );
-    commitDestinationStates((current) => ({
-      ...current,
-      [activeDestinationId]: {
-        ...(current[activeDestinationId] || effectiveDestinationStateById[activeDestinationId]),
-        activities: nextActivities,
-      },
-    }));
   };
 
   const activityTotal = allSelectedActivities.reduce((sum, activity) => sum + (activity.price || 0), 0);
@@ -4077,7 +4017,12 @@ function AiPackageContent() {
                     aria-label={`Remove ${segment.name}`}
                     onClick={() => {
                       const nextIndex = activeDestinationIndex >= index ? Math.max(0, activeDestinationIndex - 1) : activeDestinationIndex;
-                      setChainedDestinations((current) => current.filter((row) => row.id !== segment.id));
+                      const remainingDestinations = chainedDestinations.filter((row) => row.id !== segment.id);
+                      setChainedDestinations(remainingDestinations);
+                      const nextParams = new URLSearchParams(window.location.search);
+                      if (remainingDestinations.length > 0) nextParams.set("destinations", JSON.stringify(remainingDestinations));
+                      else nextParams.delete("destinations");
+                      window.history.replaceState(null, "", `${window.location.pathname}?${nextParams.toString()}`);
                       setDestinationStateById((current) => {
                         const next = { ...current };
                         delete next[segment.id];
@@ -5024,23 +4969,6 @@ function AiPackageContent() {
                 <p className="line-clamp-6 text-sm leading-6 text-[#3A478A]">
                   {selectedActivityDetails.description || "Activity details are currently unavailable."}
                 </p>
-                {selectedActivityAvailability?.dates && selectedActivityAvailability.dates.length > 1 ? (
-                  <label className="mt-4 block text-sm font-medium text-[#010D50]">
-                    Preferred activity date
-                    <select
-                      value={selectedActivityAvailability.dates.includes(selectedActivityDetails.travelDate || "") ? selectedActivityDetails.travelDate : ""}
-                      onChange={(event) => changeActivityDate(selectedActivityDetails.productCode, event.target.value)}
-                      className="mt-2 h-10 w-full rounded-lg border border-[#DFE0E4] bg-white px-3 text-sm text-[#010D50] outline-none focus:border-[#3754ED]"
-                    >
-                      <option value="" disabled>Choose available date</option>
-                      {selectedActivityAvailability.dates.map((date) => (
-                        <option key={date} value={date}>
-                          {formatDate(date, date)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                ) : null}
                 <div className="mt-5 flex flex-col gap-2 sm:flex-row">
                   <Button
                     type="button"

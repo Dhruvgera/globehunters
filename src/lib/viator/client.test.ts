@@ -56,4 +56,9 @@ describe("extractAvailableDatesFromSchedule", () => {
 
     expect(extractAvailableDatesFromSchedule(schedule, "2026-09-23", "2026-09-24")).toEqual([]);
   });
+
+  it("handles Viator unavailable-date objects", () => {
+    const schedule = { bookableItems: [{ seasons: [{ startDate: "2026-09-01", endDate: "2026-10-31", pricingRecords: [{ daysOfWeek: ["WEDNESDAY"], timedEntries: [{ startTime: "09:00", unavailableDates: [{ date: "2026-09-23", reason: "SOLD_OUT" }] }] }] }] }] };
+    expect(extractAvailableDatesFromSchedule(schedule, "2026-09-23", "2026-09-24")).toEqual([]);
+  });
 });
