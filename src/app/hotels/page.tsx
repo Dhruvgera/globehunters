@@ -181,7 +181,13 @@ function HotelsPageInner() {
       return;
     }
 
-    const saved = parseHotelProvider(window.localStorage.getItem(HOTEL_PROVIDER_OVERRIDE_STORAGE_KEY));
+    let storedProvider: string | null = null;
+    try {
+      storedProvider = window.localStorage.getItem(HOTEL_PROVIDER_OVERRIDE_STORAGE_KEY);
+    } catch {
+      // Storage can be blocked by browser privacy settings; fall back to the default provider.
+    }
+    const saved = parseHotelProvider(storedProvider);
     setProviderOverride(saved);
     if (saved) {
       setProviderMode(saved);
@@ -191,11 +197,15 @@ function HotelsPageInner() {
 
   useEffect(() => {
     if (!HOTEL_PROVIDER_TOGGLE_ENABLED || typeof window === "undefined") return;
-    if (providerOverride) {
-      window.localStorage.setItem(HOTEL_PROVIDER_OVERRIDE_STORAGE_KEY, providerOverride);
-      return;
+    try {
+      if (providerOverride) {
+        window.localStorage.setItem(HOTEL_PROVIDER_OVERRIDE_STORAGE_KEY, providerOverride);
+        return;
+      }
+      window.localStorage.removeItem(HOTEL_PROVIDER_OVERRIDE_STORAGE_KEY);
+    } catch {
+      // Storage can be blocked by browser privacy settings; the override just won't persist.
     }
-    window.localStorage.removeItem(HOTEL_PROVIDER_OVERRIDE_STORAGE_KEY);
   }, [providerOverride]);
 
   useEffect(() => {

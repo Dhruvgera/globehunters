@@ -6,6 +6,7 @@
  */
 
 "use client";
+import { getSessionItem, setSessionItem } from "@/lib/storage/safeSessionStorage";
 
 export interface DeeplinkParams {
   key?: string | null;
@@ -49,7 +50,7 @@ export function storeUtmTracking(params: DeeplinkParams): void {
     timestamp: new Date().toISOString(),
   };
 
-  sessionStorage.setItem("deeplink_tracking", JSON.stringify(trackingData));
+  setSessionItem("deeplink_tracking", JSON.stringify(trackingData));
 }
 
 /**
@@ -58,7 +59,7 @@ export function storeUtmTracking(params: DeeplinkParams): void {
 export function getStoredUtmTracking(): DeeplinkParams & { timestamp?: string } | null {
   if (typeof window === "undefined") return null;
   
-  const stored = sessionStorage.getItem("deeplink_tracking");
+  const stored = getSessionItem("deeplink_tracking");
   if (!stored) return null;
   
   try {

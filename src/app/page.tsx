@@ -14,6 +14,7 @@ import { normalizeCabinClass } from "@/lib/utils";
 import type { SearchParams } from "@/types/flight";
 import type { Airport } from "@/types/airport";
 import { DeeplinkLoader } from "@/components/shared/DeeplinkLoader";
+import { setSessionItem } from "@/lib/storage/safeSessionStorage";
 
 // Airline logos for the "Why Book With Us" section
 const airlineLogos = [
@@ -358,10 +359,10 @@ function HomeContent() {
 
         // Store in sessionStorage for persistence across page loads
         if (typeof window !== "undefined") {
-          sessionStorage.setItem("utm_source", utmSource);
-          if (utmMedium) sessionStorage.setItem("utm_medium", utmMedium);
-          if (utmCampaign) sessionStorage.setItem("utm_campaign", utmCampaign);
-          if (cnc) sessionStorage.setItem("cnc", cnc);
+          setSessionItem("utm_source", utmSource);
+          if (utmMedium) setSessionItem("utm_medium", utmMedium);
+          if (utmCampaign) setSessionItem("utm_campaign", utmCampaign);
+          if (cnc) setSessionItem("cnc", cnc);
         }
       }
 

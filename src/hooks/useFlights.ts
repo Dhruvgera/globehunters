@@ -8,6 +8,7 @@ import { flightService, FlightSearchResponse } from '@/services/api/flightServic
 import { flightCache } from '@/lib/cache/flightCache';
 import { useBookingStore } from '@/store/bookingStore';
 import { getTimestamp } from '@/lib/utils/date';
+import { getSessionItem } from '@/lib/storage/safeSessionStorage';
 
 interface UseFlightsOptions {
   enabled?: boolean; // Whether to automatically fetch on mount
@@ -66,8 +67,8 @@ export function useFlights(
       const affiliateCode =
         affiliateCodeFromStore ||
         (typeof window !== 'undefined'
-          ? (sessionStorage.getItem('affiliate_code') ||
-              sessionStorage.getItem('utm_source') ||
+          ? (getSessionItem('affiliate_code') ||
+              getSessionItem('utm_source') ||
               undefined)
           : undefined);
 

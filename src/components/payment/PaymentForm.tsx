@@ -10,6 +10,7 @@ import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { useBookingStore } from "@/store/bookingStore";
 import { CountrySelector } from "@/components/payment/CountrySelector";
+import { getSessionItem, setSessionItem } from "@/lib/storage/safeSessionStorage";
 
 interface PaymentFormProps {
   onSubmit: (billingAddress: BillingAddress) => void;
@@ -31,7 +32,7 @@ export function PaymentForm({ onSubmit, loading = false, onValidityChange }: Pay
   const [billingAddress, setBillingAddress] = useState<Partial<BillingAddress>>(() => {
     // Try to load from sessionStorage first
     if (typeof window !== 'undefined') {
-      const stored = sessionStorage.getItem(BILLING_ADDRESS_STORAGE_KEY);
+      const stored = getSessionItem(BILLING_ADDRESS_STORAGE_KEY);
       if (stored) {
         try {
           return JSON.parse(stored);
@@ -70,7 +71,7 @@ export function PaymentForm({ onSubmit, loading = false, onValidityChange }: Pay
   // Persist billing address to sessionStorage whenever it changes
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      sessionStorage.setItem(BILLING_ADDRESS_STORAGE_KEY, JSON.stringify(billingAddress));
+      setSessionItem(BILLING_ADDRESS_STORAGE_KEY, JSON.stringify(billingAddress));
     }
   }, [billingAddress]);
 

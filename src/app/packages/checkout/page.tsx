@@ -37,6 +37,7 @@ import { getJourneySegments } from "@/lib/flight/segments";
 import { PRICING_CONFIG, REFUND_SHIELD_PRICING } from "@/config/constants";
 import { CustomerReviewsCard } from "@/components/booking/CustomerReviewsCard";
 import { useReviews } from "@/hooks/useReviews";
+import { getSessionItem, setSessionItem } from "@/lib/storage/safeSessionStorage";
 
 function parseMoneyString(value?: string | null) {
   const raw = String(value || "").trim();
@@ -619,7 +620,7 @@ function PackageTravellerDetailsInner() {
       }
 
       const packageAddedKey = `packageItineraryAdded_${folderNumber}`;
-      if (sessionStorage.getItem(packageAddedKey) !== "1") {
+      if (getSessionItem(packageAddedKey) !== "1") {
         const folderPassengers = passengers.slice(0, required).map((passenger, index) => ({
           pax_no: index + 1,
           title: passenger.title as any,
@@ -665,7 +666,7 @@ function PackageTravellerDetailsInner() {
         if (!addResponse.success) {
           throw new Error(addResponse.message || "Failed to add package itinerary to folder");
         }
-        sessionStorage.setItem(packageAddedKey, "1");
+        setSessionItem(packageAddedKey, "1");
       }
 
       const params = new URLSearchParams(sp.toString());

@@ -7,6 +7,7 @@ import { useBookingStore } from '@/store/bookingStore';
 import { normalizeCabinClass } from '@/lib/utils';
 import Navbar from '@/components/navigation/Navbar';
 import { FlightSearchLoading } from '@/components/flights/FlightSearchLoading';
+import { setSessionItem } from '@/lib/storage/safeSessionStorage';
 
 function FlightSearchContent() {
   const searchParams = useSearchParams();
@@ -61,10 +62,10 @@ function FlightSearchContent() {
 
           // Store in sessionStorage for persistence
           if (typeof window !== 'undefined') {
-            if (utmSource) sessionStorage.setItem('utm_source', utmSource);
-            if (utmMedium) sessionStorage.setItem('utm_medium', utmMedium);
-            if (utmCampaign) sessionStorage.setItem('utm_campaign', utmCampaign);
-            if (cnc) sessionStorage.setItem('cnc', cnc);
+            if (utmSource) setSessionItem('utm_source', utmSource);
+            if (utmMedium) setSessionItem('utm_medium', utmMedium);
+            if (utmCampaign) setSessionItem('utm_campaign', utmCampaign);
+            if (cnc) setSessionItem('cnc', cnc);
           }
         }
 

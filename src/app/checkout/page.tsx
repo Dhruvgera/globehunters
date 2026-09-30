@@ -7,6 +7,7 @@ import { useAffiliate } from '@/lib/AffiliateContext';
 import { normalizeCabinClass } from '@/lib/utils';
 import { Plane, Loader2 } from 'lucide-react';
 import Navbar from '@/components/navigation/Navbar';
+import { setSessionItem } from '@/lib/storage/safeSessionStorage';
 
 /**
  * Checkout page handler for legacy Globehunters deeplinks
@@ -66,10 +67,10 @@ function CheckoutContent() {
 
         // Store in sessionStorage for persistence
         if (typeof window !== 'undefined') {
-          if (utmSource) sessionStorage.setItem('utm_source', utmSource);
-          if (utmMedium) sessionStorage.setItem('utm_medium', utmMedium);
-          if (utmCampaign) sessionStorage.setItem('utm_campaign', utmCampaign);
-          if (cnc) sessionStorage.setItem('cnc', cnc);
+          if (utmSource) setSessionItem('utm_source', utmSource);
+          if (utmMedium) setSessionItem('utm_medium', utmMedium);
+          if (utmCampaign) setSessionItem('utm_campaign', utmCampaign);
+          if (cnc) setSessionItem('cnc', cnc);
         }
       }
 

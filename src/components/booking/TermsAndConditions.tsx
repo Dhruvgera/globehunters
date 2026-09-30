@@ -8,6 +8,7 @@ import { ChevronLeft, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useBookingStore } from "@/store/bookingStore";
 import { TERMS_AND_CONDITIONS_URL } from "@/config/constants";
+import { getSessionItem } from "@/lib/storage/safeSessionStorage";
 
 interface TermsAndConditionsProps {
   onUpgradeClick: () => void;
@@ -254,8 +255,8 @@ export function TermsAndConditions({
       const affiliateCode =
         useBookingStore.getState().affiliateData?.code ||
         (typeof window !== 'undefined'
-          ? (sessionStorage.getItem('affiliate_code') ||
-            sessionStorage.getItem('utm_source') ||
+          ? (getSessionItem('affiliate_code') ||
+            getSessionItem('utm_source') ||
             '')
           : '');
 
