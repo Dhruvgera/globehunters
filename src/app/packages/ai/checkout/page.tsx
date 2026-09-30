@@ -18,7 +18,9 @@ import type { Passenger, PassengerTitle, PassengerType } from "@/types/booking";
 import type { Flight } from "@/types/flight";
 import type { Hotel } from "@/types/hotel";
 import { getSessionItem, removeSessionItem, setSessionItem } from "@/lib/storage/safeSessionStorage";
-import { ArrowLeft, CalendarDays, Clock, Loader2, Users } from "lucide-react";
+import { PackageProposalPdfDialog } from "@/components/packages/PackageProposalPdfDialog";
+import type { PackageProposalInput } from "@/lib/packages/packageProposalPdf";
+import { ArrowLeft, CalendarDays, Clock, Download, Loader2, Users } from "lucide-react";
 
 type AiActivityDraft = {
   productCode: string;
@@ -619,6 +621,7 @@ function AiCheckoutContent() {
   const setContactInfo = useBookingStore((s) => s.setContactInfo);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [packagePdfOpen, setPackagePdfOpen] = useState(false);
 
   useEffect(() => {
     const raw = getSessionItem("aiPackageBookingDraft");
@@ -703,6 +706,50 @@ function AiCheckoutContent() {
     ];
   }, [draft?.search?.adults, draft?.search?.children]);
   const selectedHotelDestination = destinationDrafts[hotelDetailsDestinationIndex] || destinationDrafts[0];
+  const packageCost = Number(draft?.totals?.package || 0);
+  const getPackageProposalInput = (): Omit<PackageProposalInput, "markupPercent"> | null => {
+    if (!draft || packageCost <= 0) return null;
+    return {
+      packageCost,
+      currency,
+      adults: Number(draft.search?.adults || 1),
+      children: Number(draft.search?.children || 0),
+      infants: Number(new URLSearchParams(paramsKey).get("infants") || 0) || 0,
+      flightLegs: flightSummaryLegs,
+      destinations: destinationDrafts.map((destination) => {
+        const hotel = destination.hotel;
+        const raw = hotel?.rawSearchResult && typeof hotel.rawSearchResult === "object" ? (hotel.rawSearchResult as Record<string, unknown>) : null;
+        const address = [raw?.address1, raw?.address2].filter((part): part is string => typeof part === "string" && part.trim().length > 0).join(", ");
+        return {
+          name: destination.name || draft.search?.destination || "Destination",
+          hotelCheckIn: hotelCheckInForDestination(destination, draft.search?.checkIn || ""),
+          hotelCheckOut: hotelCheckOutForDestination(destination, draft.search?.checkOut || ""),
+          hotel: hotel
+            ? {
+                name: hotel.name,
+                imageSrc: hotel.imageSrc,
+                starRating: hotel.starRating,
+                address: address || hotel.distanceLabel || hotel.neighborhood,
+                roomName: formatRoomName(hotel.room?.name),
+                roomHighlights: formatRoomHighlights(hotel.room?.highlights),
+                refundable: hotel.refundable,
+                amenities: hotel.amenities,
+                reviewScore: hotel.reviews?.score,
+                reviewLabel: hotel.reviews?.label,
+                reviewCount: hotel.reviews?.count,
+                rooms: hotel.price?.rooms,
+              }
+            : null,
+          activities: (destination.activities || []).map((activity) => ({
+            title: activity.title,
+            imageUrl: activity.imageUrl,
+            date: activity.itineraryDate,
+            duration: activity.duration,
+          })),
+        };
+      }),
+    };
+  };
 
   const hasCompletePassengerData = (candidatePassengers: Passenger[]) =>
     candidatePassengers.length > 0 &&
@@ -1100,10 +1147,21 @@ function AiCheckoutContent() {
     <div className="min-h-screen bg-white">
       <Navbar />
       <main className="mx-auto max-w-[1240px] px-4 py-6 sm:px-6 lg:px-8">
-        <Link href={plannerHref} className="inline-flex items-center gap-2 text-sm font-medium text-[#3754ED]">
-          <ArrowLeft className="h-4 w-4" />
-          Back to AI planner
-        </Link>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Link href={plannerHref} className="inline-flex items-center gap-2 text-sm font-medium text-[#3754ED]">
+            <ArrowLeft className="h-4 w-4" />
+            Back to AI planner
+          </Link>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setPackagePdfOpen(true)}
+            disabled={packageCost <= 0}
+            className="h-9 rounded-lg border-[#DFE0E4] px-3 text-xs font-semibold text-[#010D50]"
+          >
+            <Download className="h-4 w-4" /> Download PDF
+          </Button>
+        </div>
 
         <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_380px]">
           <div className="flex flex-col gap-5">
@@ -1377,6 +1435,13 @@ function AiCheckoutContent() {
           </div>
         </DialogContent>
       </Dialog>
+      <PackageProposalPdfDialog
+        open={packagePdfOpen}
+        onOpenChange={setPackagePdfOpen}
+        getInput={getPackageProposalInput}
+        packageCost={packageCost}
+        currency={currency}
+      />
       <Footer />
     </div>
   );
