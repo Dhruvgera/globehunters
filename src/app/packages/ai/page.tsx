@@ -10,6 +10,7 @@ import SearchBar from "@/components/search/SearchBar";
 import { PackageDestinationAutocomplete } from "@/components/search/search-bar/PackageDestinationAutocomplete";
 import FlightInfoModal from "@/components/flights/modals/FlightInfoModal";
 import { FlightSummaryCard, type FlightLeg } from "@/components/booking/FlightSummaryCard";
+import { PackageProposalPdfDialog } from "@/components/packages/PackageProposalPdfDialog";
 import { HotelFiltersSidebar, type HotelAmenityOption, type HotelFiltersState } from "@/components/hotels/HotelFiltersSidebar";
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -17,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { activityService } from "@/services/api/activityService";
 import { flightService } from "@/services/api/flightService";
 import { hotelService } from "@/services/api/hotelService";
+import { packageService } from "@/services/api/packageService";
 import { useBookingStore } from "@/store/bookingStore";
 import type { ActivityProduct } from "@/types/activities";
 import type { Flight } from "@/types/flight";
@@ -577,6 +579,38 @@ function hotelMatchesSegment(hotel: Hotel | null | undefined, segment: PackageDe
   return allSegments.length <= 1;
 }
 
+function hotelIdentityKeys(hotel: Hotel | null | undefined) {
+  if (!hotel) return [];
+  const raw = rawRecord(hotel.rawSearchResult);
+  const provider = textValue(raw?.provider)?.toLowerCase() || "";
+  const keys = [
+    textValue(raw?.hotel_id ?? raw?.hotelId) ? `hotel:${provider}:${textValue(raw?.hotel_id ?? raw?.hotelId)}` : "",
+    textValue(raw?.VmapId ?? raw?.vMapId) ? `vmap:${textValue(raw?.VmapId ?? raw?.vMapId)}` : "",
+    hotel.tyId ? `ty:${hotel.tyId}` : "",
+  ].filter((key) => key && !/:0$/.test(key));
+  const name = normalizedPlaceName(hotel.name);
+  if (name) keys.push(`name:${name}:${hotel.starRating || 0}`);
+  return keys;
+}
+
+function isSameHotel(a: Hotel | null | undefined, b: Hotel | null | undefined) {
+  if (!a || !b) return false;
+  if (a.id && a.id === b.id) return true;
+  const bKeys = new Set(hotelIdentityKeys(b));
+  return hotelIdentityKeys(a).some((key) => bKeys.has(key));
+}
+
+type HotelStayOverrides = Record<string, { checkIn: string; checkOut: string }>;
+
+function readHotelStayOverrides(key: string): HotelStayOverrides {
+  try {
+    const saved = JSON.parse(getSessionItem(key) || "{}");
+    return saved && typeof saved === "object" && !Array.isArray(saved) ? saved : {};
+  } catch {
+    return {};
+  }
+}
+
 function hotelOptionsMatchSegment(hotels: Hotel[] | undefined, segment: PackageDestinationSegment, allSegments: PackageDestinationSegment[] = []) {
   return (hotels || []).filter((hotel) => hotelMatchesSegment(hotel, segment, allSegments));
 }
@@ -733,8 +767,12 @@ function compactHotelForSession(hotel: Hotel | null): Hotel | null {
   } as Hotel;
 }
 
-function compactHotelsForSession(hotels: Hotel[] | undefined): Hotel[] {
-  return (hotels || []).slice(0, 24).map((hotel) => compactHotelForSession(hotel)).filter(Boolean) as Hotel[];
+function compactHotelsForSession(hotels: Hotel[] | undefined, selected?: Hotel | null, limit = 24): Hotel[] {
+  // Keep the selected hotel in the trimmed list so "Change selection" can still show it after a reload.
+  const list = hotels || [];
+  const selectedIndex = selected ? list.findIndex((hotel) => isSameHotel(hotel, selected)) : -1;
+  const ordered = selectedIndex > 0 ? [list[selectedIndex], ...list.slice(0, selectedIndex), ...list.slice(selectedIndex + 1)] : list;
+  return ordered.slice(0, limit).map((hotel) => compactHotelForSession(hotel)).filter(Boolean) as Hotel[];
 }
 
 function compactActivitiesForSession(activities: ActivityProduct[] | undefined): ActivityProduct[] {
@@ -767,7 +805,7 @@ function compactDestinationStatesForSession(
         ...state,
         hotel: compactHotelForSession(state.hotel),
         hotelLoading: false,
-        hotelOptions: compactHotelsForSession(state.hotelOptions).slice(0, hotelLimit),
+        hotelOptions: compactHotelsForSession(state.hotelOptions, state.hotel, hotelLimit),
         activities: compactActivitiesForSession(state.activities).slice(0, activityLimit),
         activitiesLoading: false,
       },
@@ -797,7 +835,7 @@ function writeAiPackageLiveCache(cache: Omit<AiPackageLiveCache, "expiresAt">) {
     flight: compactFlightForSession(cache.flight ?? current?.flight ?? null),
     flightRequestId: cache.flightRequestId ?? current?.flightRequestId ?? null,
     hotel: compactHotelForSession(cache.hotel ?? current?.hotel ?? null),
-    hotelOptions: compactHotelsForSession(cache.hotelOptions ?? current?.hotelOptions),
+    hotelOptions: compactHotelsForSession(cache.hotelOptions ?? current?.hotelOptions, cache.hotel ?? current?.hotel),
     hotelSearch: cache.hotelSearch ?? current?.hotelSearch,
     activitiesKey: cache.activitiesKey ?? current?.activitiesKey,
     activities: compactActivitiesForSession(cache.activities ?? current?.activities),
@@ -1346,12 +1384,33 @@ function AiPackageContent() {
   const [hotelDetailsLoading, setHotelDetailsLoading] = useState(false);
   const [hotelDetailsError, setHotelDetailsError] = useState<string | null>(null);
   const [hotelChangeOpen, setHotelChangeOpen] = useState(false);
-  const [hotelStayOverrides, setHotelStayOverrides] = useState<Record<string, { checkIn: string; checkOut: string }>>({});
+  // Stay-date overrides are scoped to the current search and restored from session storage so
+  // returning from checkout keeps the dates the traveller picked.
+  const hotelStayOverridesKey = `aiPackageHotelStayOverrides:${paramsKey}`;
+  const [hotelStayOverridesState, setHotelStayOverridesState] = useState(() => ({
+    key: hotelStayOverridesKey,
+    value: readHotelStayOverrides(hotelStayOverridesKey),
+  }));
+  if (hotelStayOverridesState.key !== hotelStayOverridesKey) {
+    setHotelStayOverridesState({ key: hotelStayOverridesKey, value: readHotelStayOverrides(hotelStayOverridesKey) });
+  }
+  const hotelStayOverrides = hotelStayOverridesState.value;
+  const setHotelStayOverrides = useCallback((update: (current: HotelStayOverrides) => HotelStayOverrides) => {
+    setHotelStayOverridesState((current) => {
+      const value = update(current.value);
+      if (Object.keys(value).length === 0) removeSessionItem(current.key);
+      else setSessionItem(current.key, JSON.stringify(value));
+      return { key: current.key, value };
+    });
+  }, []);
   const [hotelStayDatesOpen, setHotelStayDatesOpen] = useState(false);
   const [hotelStayCheckInDraft, setHotelStayCheckInDraft] = useState("");
   const [hotelStayCheckOutDraft, setHotelStayCheckOutDraft] = useState("");
   const [hotelStayDateError, setHotelStayDateError] = useState<string | null>(null);
   const [hotelStaySearching, setHotelStaySearching] = useState(false);
+  const [hotelStayChangeNotice, setHotelStayChangeNotice] = useState<
+    { kind: "kept" | "replaced"; previousName: string; checkIn: string; checkOut: string } | null
+  >(null);
   const [visibleHotelOptionCount, setVisibleHotelOptionCount] = useState(HOTEL_CHANGE_PAGE_SIZE);
   const [hotelFilters, setHotelFilters] = useState<HotelFiltersState>({ ...DEFAULT_FILTERS, priceMode: "total" });
   const [hotelFiltersExpanded, setHotelFiltersExpanded] = useState<Record<string, boolean>>({
@@ -1375,8 +1434,6 @@ function AiPackageContent() {
   const [flightInfoOpen, setFlightInfoOpen] = useState(false);
   const [arrivalWarningOpen, setArrivalWarningOpen] = useState(false);
   const [packagePdfOpen, setPackagePdfOpen] = useState(false);
-  const [packagePdfGenerating, setPackagePdfGenerating] = useState(false);
-  const [agentMarkupPercent, setAgentMarkupPercent] = useState("0");
   const [addDestinationOpen, setAddDestinationOpen] = useState(false);
   const [addDestinationLoading, setAddDestinationLoading] = useState(false);
   const [addDestinationError, setAddDestinationError] = useState<string | null>(null);
@@ -1426,7 +1483,6 @@ function AiPackageContent() {
   const setStoreSearchParams = useBookingStore((state) => state.setSearchParams);
   const setSearchRequestId = useBookingStore((state) => state.setSearchRequestId);
   const setSelectedFlight = useBookingStore((state) => state.setSelectedFlight);
-  const storeSelectedFlight = useBookingStore((state) => state.selectedFlight);
   const setHotelSearch = useBookingStore((state) => state.setHotelSearch);
   const setHotelResultsMeta = useBookingStore((state) => state.setHotelResultsMeta);
   const storeHotelSearch = useBookingStore((state) => state.hotelSearch);
@@ -1554,8 +1610,44 @@ function AiPackageContent() {
     }));
   }, [activeDestinationId, budget, destinationSegments, persistVisibleDestinationState, setHotelSearch, stayPreference]);
 
+  // Without an airport code the flight search used to guess from the city name ("Dubai" -> DUB, Dublin).
+  // Resolve it from the destination lookup and put it in the URL so the search below can run.
+  const needsDestinationCodeLookup = !chainedFlightSearchParams && !destinationCode && !/^[A-Z]{3}$/i.test(toParam);
+  const searchParamsString = params.toString();
+  useEffect(() => {
+    if (!needsDestinationCodeLookup) return;
+    let cancelled = false;
+    const failLookup = () => {
+      if (cancelled) return;
+      setLiveSearch((current) => ({
+        ...current,
+        flight: null,
+        flightLoading: false,
+        flightError: `We couldn't find an airport for ${destination}. Choose the destination from the list and search again.`,
+        hotelLoading: false,
+      }));
+    };
+    packageService
+      .lookupDestinations(destination)
+      .then((items) => {
+        if (cancelled) return;
+        const target = normalizedPlaceName(destination);
+        const withCode = items.filter((item) => /^[A-Z]{3}$/i.test(String(item.airportcode || "").trim()));
+        const code = (withCode.find((item) => normalizedPlaceName(item.name) === target) || withCode[0])?.airportcode?.trim();
+        if (!code) return failLookup();
+        const next = new URLSearchParams(searchParamsString);
+        next.set("arrival_point_code", code.toUpperCase());
+        router.replace(`/packages/ai?${next.toString()}`);
+      })
+      .catch(failLookup);
+    return () => {
+      cancelled = true;
+    };
+  }, [destination, needsDestinationCodeLookup, router, searchParamsString]);
+
   useEffect(() => {
     let cancelled = false;
+    if (needsDestinationCodeLookup) return;
     if (!checkIn || !checkOut) {
       setLiveSearch({
         flight: null,
@@ -1571,9 +1663,7 @@ function AiPackageContent() {
       };
     }
     const explicitTo = toParam;
-    const flightTo =
-      destinationCode ||
-      (/^[A-Z]{3}$/i.test(explicitTo) ? explicitTo.toUpperCase() : destination.slice(0, 3).toUpperCase());
+    const flightTo = destinationCode || explicitTo.toUpperCase();
     const flightSearch: SearchParams =
       chainedFlightSearchParams || {
         from: fromCode,
@@ -1599,6 +1689,9 @@ function AiPackageContent() {
       setDestinationStateById((current) => ({ ...cachedDestinationStates, ...current }));
     }
     const requestedFlightIdentity = flightSelectionIdentity(selectionFlightId);
+    // Read the store directly: subscribing to selectedFlight here re-ran this effect after every
+    // setSelectedFlight below (cached flights are fresh JSON objects), looping until React bailed out.
+    const storeSelectedFlight = useBookingStore.getState().selectedFlight;
     const selectionCandidates = [
       patch?.type === "flight" ? patch.flight : null,
       storeSelectedFlight,
@@ -1641,7 +1734,13 @@ function AiPackageContent() {
     }
     if (primaryIsActive) setHotelOptions(cachedHotelOptions);
     if (cachedFlightRequestId) setSearchRequestId(cachedFlightRequestId);
-    if (cachedFlight) setSelectedFlight(cachedFlight, normalizeCabinClass(cachedFlight.outbound?.cabinClass));
+    if (
+      cachedFlight &&
+      cachedFlight !== storeSelectedFlight &&
+      (patch?.type === "flight" || flightSelectionIdentity(storeSelectedFlight?.id) !== flightSelectionIdentity(cachedFlight.id))
+    ) {
+      setSelectedFlight(cachedFlight, normalizeCabinClass(cachedFlight.outbound?.cabinClass));
+    }
 
     if (cachedFlight || cachedHotel) {
       setLiveSearch((current) => ({
@@ -1882,12 +1981,12 @@ function AiPackageContent() {
     hiddenIdParam,
     hiddenKeyParam,
     infants,
+    needsDestinationCodeLookup,
     paramsKey,
     rooms,
     selectionRevision,
     selectionFlightId,
     stayPreference,
-    storeSelectedFlight,
     setHotelResultsMeta,
     setHotelSearch,
     setSearchRequestId,
@@ -2940,8 +3039,19 @@ function AiPackageContent() {
         return (a.price.total || 0) - (b.price.total || 0);
       });
     }
+    const selectedIndex = sorted.findIndex((hotel) => isSameHotel(hotel, liveSearch.hotel));
+    if (selectedIndex > 0) sorted.unshift(...sorted.splice(selectedIndex, 1));
+    if (
+      selectedIndex === -1 &&
+      liveSearch.hotel &&
+      activeDestination &&
+      hotelMatchesSegment(liveSearch.hotel, activeDestination, destinationSegments) &&
+      !hotelOptions.some((hotel) => isSameHotel(hotel, liveSearch.hotel))
+    ) {
+      sorted.unshift(liveSearch.hotel);
+    }
     return sorted;
-  }, [activeDestination?.name, budget, destination, destinationSegments.length, hotelExtraPerPerson, hotelFilters, hotelOptions, hotelSortMode, stayPreference]);
+  }, [activeDestination, budget, destination, destinationSegments, hotelExtraPerPerson, hotelFilters, hotelOptions, hotelSortMode, liveSearch.hotel, stayPreference]);
   const displayedHotelOptions = useMemo(
     () => filteredHotelOptions.slice(0, visibleHotelOptionCount),
     [filteredHotelOptions, visibleHotelOptionCount]
@@ -2964,6 +3074,11 @@ function AiPackageContent() {
     if (!hotelChangeOpen) return;
     setVisibleHotelOptionCount(HOTEL_CHANGE_PAGE_SIZE);
   }, [activeDestinationId, hotelChangeOpen, hotelFilters, hotelSortMode]);
+
+  const liveHotelRef = useRef(liveSearch.hotel);
+  useEffect(() => {
+    liveHotelRef.current = liveSearch.hotel;
+  }, [liveSearch.hotel]);
 
   useEffect(() => {
     if (!hotelChangeOpen || hotelOptions.length > 0 || !activeDestination) return;
@@ -3043,13 +3158,18 @@ function AiPackageContent() {
           arrivalPointCode: "arrival_point_code" in resolvedPick ? resolvedPick.arrival_point_code : activeDestination.airportCode,
         } as const;
 
+        // Opening "Change selection" only reloads the list; keep the hotel already chosen for
+        // this stay (refreshed from the results when present) instead of swapping in a new pick.
+        const currentHotel = hotelMatchesSegment(liveHotelRef.current, activeDestination, destinationSegments) ? liveHotelRef.current : null;
+        const keptHotel = (currentHotel && stampedHotels.find((hotel) => isSameHotel(hotel, currentHotel))) || currentHotel;
+        const nextHotel = keptHotel || recommendedHotel;
         setHotelOptions(stampedHotels);
         setHotelSearch(nextHotelSearch);
         setLiveSearch((current) => ({
           ...current,
-          hotel: recommendedHotel,
+          hotel: nextHotel,
           hotelLoading: false,
-          hotelError: recommendedHotel ? null : "No live hotels returned for this search.",
+          hotelError: nextHotel ? null : "No live hotels returned for this search.",
         }));
         setDestinationStateById((current) => ({
           ...current,
@@ -3058,9 +3178,9 @@ function AiPackageContent() {
               activities: [],
               selectedActivityCodes: [],
             }),
-            hotel: recommendedHotel,
+            hotel: nextHotel,
             hotelLoading: false,
-            hotelError: recommendedHotel ? null : "No live hotels returned for this search.",
+            hotelError: nextHotel ? null : "No live hotels returned for this search.",
             hotelOptions: stampedHotels,
             hotelSearch: nextHotelSearch,
           },
@@ -3079,7 +3199,21 @@ function AiPackageContent() {
     return () => {
       cancelled = true;
     };
-  }, [activeDestination, adults, branchesParam, budget, children, destinationSegments.length, hotelChangeOpen, hotelOptions.length, rooms, setHotelSearch, stayPreference]);
+  }, [activeDestination, adults, branchesParam, budget, children, destinationSegments, hotelChangeOpen, hotelOptions.length, rooms, setHotelSearch, stayPreference]);
+
+  const openStayDatesFromArrival = () => {
+    if (!activeDestination) return;
+    const currentCheckIn = hotelCheckInForSegment(activeDestination);
+    const currentCheckOut = hotelCheckOutForSegment(activeDestination);
+    const arrivalDate = flightArrivalDateForSegment(activeDestination, liveSearch.flight);
+    const proposedCheckIn = arrivalDate && arrivalDate > currentCheckIn ? arrivalDate : currentCheckIn;
+    setHotelStayDateError(null);
+    setHotelStayChangeNotice(null);
+    setHotelStayCheckInDraft(proposedCheckIn);
+    setHotelStayCheckOutDraft(currentCheckOut > proposedCheckIn ? currentCheckOut : "");
+    setHotelStayDatesOpen(true);
+    setHotelChangeOpen(true);
+  };
 
   const applyHotelStayDates = async () => {
     if (!activeDestination) return;
@@ -3132,11 +3266,17 @@ function AiPackageContent() {
       const nights = calculateNights(hotelStayCheckInDraft, hotelStayCheckOutDraft) || 1;
       const parsed = mapAvailability(availability, nights, rooms);
       const nextHotelOptions = stampHotelsForSegment(parsed.mapped, staySegment, resolvedPick.label || staySegment.name);
-      const nextHotel = selectRecommendedHotel(nextHotelOptions, {
-        stayPreference,
-        budget,
-        destinationCount: destinationSegments.length,
-      });
+      // Keep the traveller's current hotel when it is still bookable for the new dates,
+      // so changing stay dates doesn't silently swap the property.
+      const previousHotel = liveSearch.hotel;
+      const sameHotel = previousHotel ? nextHotelOptions.find((option) => isSameHotel(option, previousHotel)) || null : null;
+      const nextHotel =
+        sameHotel ||
+        selectRecommendedHotel(nextHotelOptions, {
+          stayPreference,
+          budget,
+          destinationCount: destinationSegments.length,
+        });
       const nextHotelSearch = {
         provider:
           parsed.criteriaProvider === "hotelbeds" || typeof parsed.criteriaId === "string"
@@ -3158,18 +3298,23 @@ function AiPackageContent() {
         arrivalPointCode: "arrival_point_code" in resolvedPick ? resolvedPick.arrival_point_code : staySegment.airportCode,
       } as const;
 
+      // The traveller may have switched destination tabs while this search ran; only touch the
+      // visible hotel state if this destination is still the active one.
+      const stillActive = activeDestinationIdRef.current === staySegment.id;
       setHotelStayOverrides((current) => ({
         ...current,
         [staySegment.id]: { checkIn: hotelStayCheckInDraft, checkOut: hotelStayCheckOutDraft },
       }));
-      setHotelOptions(nextHotelOptions);
-      setHotelSearch(nextHotelSearch);
-      setLiveSearch((current) => ({
-        ...current,
-        hotel: nextHotel,
-        hotelLoading: false,
-        hotelError: nextHotel ? null : "No live hotels returned for these dates.",
-      }));
+      if (stillActive) {
+        setHotelOptions(nextHotelOptions);
+        setHotelSearch(nextHotelSearch);
+        setLiveSearch((current) => ({
+          ...current,
+          hotel: nextHotel,
+          hotelLoading: false,
+          hotelError: nextHotel ? null : "No live hotels returned for these dates.",
+        }));
+      }
       setDestinationStateById((current) => ({
         ...current,
         [staySegment.id]: {
@@ -3181,18 +3326,32 @@ function AiPackageContent() {
           hotelSearch: nextHotelSearch,
         },
       }));
-      const cached = readAiPackageLiveCache(paramsKey);
-      writeAiPackageLiveCache({
-        paramsKey,
-        flight: cached?.flight || liveSearch.flight,
-        flightRequestId: cached?.flightRequestId || liveSearch.flightRequestId,
-        hotel: nextHotel,
-        hotelOptions: nextHotelOptions,
-        hotelSearch: nextHotelSearch,
-        activitiesKey: cached?.activitiesKey,
-        activities: cached?.activities,
-        selectedActivityCodes: cached?.selectedActivityCodes,
-      });
+      if (staySegment.id === destinationSegments[0]?.id) {
+        // The top-level cache hotel belongs to the primary destination only.
+        const cached = readAiPackageLiveCache(paramsKey);
+        writeAiPackageLiveCache({
+          paramsKey,
+          flight: cached?.flight || liveSearch.flight,
+          flightRequestId: cached?.flightRequestId || liveSearch.flightRequestId,
+          hotel: nextHotel,
+          hotelOptions: nextHotelOptions,
+          hotelSearch: nextHotelSearch,
+          activitiesKey: cached?.activitiesKey,
+          activities: cached?.activities,
+          selectedActivityCodes: cached?.selectedActivityCodes,
+        });
+      }
+      if (!stillActive) return;
+      setHotelStayChangeNotice(
+        previousHotel && nextHotel
+          ? {
+              kind: sameHotel ? "kept" : "replaced",
+              previousName: previousHotel.name,
+              checkIn: hotelStayCheckInDraft,
+              checkOut: hotelStayCheckOutDraft,
+            }
+          : null
+      );
       setHotelStayDatesOpen(false);
       setHotelFilters({ ...DEFAULT_FILTERS, priceMode: "total" });
       setVisibleHotelOptionCount(HOTEL_CHANGE_PAGE_SIZE);
@@ -3807,150 +3966,53 @@ function AiPackageContent() {
       ).map((segment) => flightSegmentToSummaryLeg(liveFlight, segment))
     : [];
   const passengerLabel = `${adults + children} passenger${adults + children === 1 ? "" : "s"}`;
-  const downloadPackagePdf = async () => {
-    if (!liveFlight || packageCost <= 0) return;
-    setPackagePdfGenerating(true);
-    try {
-      const { jsPDF } = await import("jspdf");
-      const pdf = new jsPDF({ unit: "mm", format: "a4" });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 16;
-      const contentWidth = pageWidth - margin * 2;
-      const currency = liveSearch.flight?.currency || liveSearch.hotel?.price.currency || "GBP";
-      const markupPercent = Math.max(0, Number(agentMarkupPercent) || 0);
-      const markupAmount = packageCost * (markupPercent / 100);
-      const customerTotal = packageCost + markupAmount;
-      const pdfMoney = (value: number) =>
-        new Intl.NumberFormat("en-GB", {
-          style: "currency",
-          currency: /^[A-Z]{3}$/.test(currency) ? currency : "GBP",
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }).format(value);
-      let y = 18;
-
-      const ensureRoom = (height = 12) => {
-        if (y + height <= pageHeight - 15) return;
-        pdf.addPage();
-        y = 18;
-      };
-      const heading = (label: string) => {
-        ensureRoom(12);
-        pdf.setFont("helvetica", "bold");
-        pdf.setFontSize(13);
-        pdf.setTextColor(1, 13, 80);
-        pdf.text(label, margin, y);
-        y += 7;
-      };
-      const line = (label: string, value?: string, options?: { bold?: boolean; indent?: number }) => {
-        const indent = options?.indent || 0;
-        const text = value ? `${label}: ${value}` : label;
-        pdf.setFont("helvetica", options?.bold ? "bold" : "normal");
-        pdf.setFontSize(10);
-        pdf.setTextColor(35, 47, 85);
-        const wrapped = pdf.splitTextToSize(text, contentWidth - indent);
-        ensureRoom(wrapped.length * 5 + 2);
-        pdf.text(wrapped, margin + indent, y);
-        y += wrapped.length * 5 + 1;
-      };
-      const divider = () => {
-        ensureRoom(6);
-        pdf.setDrawColor(223, 224, 228);
-        pdf.line(margin, y, pageWidth - margin, y);
-        y += 6;
-      };
-
-      pdf.setFillColor(1, 13, 80);
-      pdf.rect(0, 0, pageWidth, 30, "F");
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFont("helvetica", "bold");
-      pdf.setFontSize(20);
-      pdf.text("GlobeHunters package proposal", margin, 16);
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(9);
-      pdf.text(`Generated ${new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date())}`, margin, 23);
-      y = 39;
-
-      heading("Trip overview");
-      line("Destinations", destinationSegments.map((segment) => segment.name).join(" · "));
-      line("Travel dates", `${formatDate(destinationSegments[0]?.checkIn || checkIn, "") || "—"} to ${formatDate(destinationSegments.at(-1)?.checkOut || checkOut, "") || "—"}`);
-      line("Travellers", `${adults} adult${adults === 1 ? "" : "s"}${children ? `, ${children} child${children === 1 ? "" : "ren"}` : ""}${infants ? `, ${infants} infant${infants === 1 ? "" : "s"}` : ""}`);
-      if (liveSearch.flightRequestId) line("Search reference", liveSearch.flightRequestId);
-      divider();
-
-      heading("Flights");
-      flightSummaryLegs.forEach((leg, index) => {
-        line(`${index + 1}. ${leg.fromCode} to ${leg.toCode}`, `${leg.date} · ${leg.departureTime}–${leg.arrivalTime} · ${leg.airline} · ${leg.cabinClass || "Economy"}`, { bold: true });
-        line("Journey", `${leg.stops} · ${leg.duration}`, { indent: 5 });
-      });
-      line("Flight total", pdfMoney(liveFlightTotal), { bold: true });
-      divider();
-
-      heading("Stays");
-      destinationSegments.forEach((segment, index) => {
-        const stateHotel = effectiveDestinationStateById[segment.id]?.hotel;
-        const selectedHotel = (hotelMatchesSegment(liveSearch.hotel, segment, destinationSegments) ? liveSearch.hotel : null) || stateHotel;
-        if (!selectedHotel) {
-          line(`${index + 1}. ${segment.name}`, "No hotel selected", { bold: true });
-          return;
-        }
-        line(`${index + 1}. ${segment.name} — ${selectedHotel.name}`, `${formatDate(hotelCheckInForSegment(segment), "")} to ${formatDate(hotelCheckOutForSegment(segment), "")}`, { bold: true });
-        line("Room", formatRoomName(selectedHotel.room?.name) || "Selected room", { indent: 5 });
-        if (typeof selectedHotel.refundable === "boolean") {
-          line("Cancellation", selectedHotel.refundable ? "Refundable" : "Non-refundable", { indent: 5 });
-        }
-        line("Stay total", pdfMoney(selectedHotel.price.total || 0), { indent: 5 });
-      });
-      line("Stays total", pdfMoney(liveHotelTotal), { bold: true });
-      divider();
-
-      heading("Activities");
-      let activityNumber = 0;
-      destinationSegments.forEach((segment) => {
+  const packageProposalCurrency = liveSearch.flight?.currency || liveSearch.hotel?.price.currency || "GBP";
+  const getPackageProposalInput = () => {
+    if (!liveFlight || packageCost <= 0) return null;
+    return {
+      packageCost,
+      currency: packageProposalCurrency,
+      adults,
+      children,
+      infants,
+      flightLegs: flightSummaryLegs,
+      destinations: destinationSegments.map((segment) => {
         const state = effectiveDestinationStateById[segment.id];
-        const selected = (state?.activities || []).filter((activity) => state?.selectedActivityCodes.includes(activity.productCode));
+        const hotel = (hotelMatchesSegment(liveSearch.hotel, segment, destinationSegments) ? liveSearch.hotel : null) || state?.hotel || null;
         const activityStart = activityStartDateForSegment(segment, liveSearch.flight) || segment.checkIn;
-        selected.forEach((activity, index) => {
-          activityNumber += 1;
-          line(`${activityNumber}. ${activity.title}`, `${formatDate(activity.travelDate || itineraryDateForIndex(activityStart, segment.checkOut, index), "Date to be confirmed")} · ${activity.duration || "Duration unavailable"} · ${pdfMoney(activity.price || 0)}`, { bold: true });
-        });
-      });
-      if (activityNumber === 0) line("No activities selected");
-      line("Activities total", pdfMoney(activityTotal), { bold: true });
-      divider();
-
-      heading("Price breakdown");
-      line("Flights", pdfMoney(liveFlightTotal));
-      line("Stays", pdfMoney(liveHotelTotal));
-      line("Activities", pdfMoney(activityTotal));
-      line("Taxes and provider fees", "Included in prices above");
-      line("Package subtotal", pdfMoney(packageCost), { bold: true });
-      line(`Agent markup (${markupPercent.toFixed(2)}%)`, pdfMoney(markupAmount));
-      line("Customer total", pdfMoney(customerTotal), { bold: true });
-      y += 3;
-      line("Prices and availability are live and can change until booking is completed.");
-
-      const pageCount = pdf.getNumberOfPages();
-      for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
-        pdf.setPage(pageNumber);
-        pdf.setFont("helvetica", "normal");
-        pdf.setFontSize(8);
-        pdf.setTextColor(100, 116, 139);
-        pdf.text(
-          `Page ${pageNumber} of ${pageCount}`,
-          pageWidth - margin,
-          pdf.internal.pageSize.getHeight() - 8,
-          { align: "right" },
-        );
-      }
-
-      const safeDestinations = destinationSegments.map((segment) => segment.name).join("-").replace(/[^a-z0-9-]+/gi, "-").replace(/-+/g, "-").replace(/^-|-$/g, "").toLowerCase();
-      pdf.save(`globehunters-${safeDestinations || "package"}.pdf`);
-      setPackagePdfOpen(false);
-    } finally {
-      setPackagePdfGenerating(false);
-    }
+        const selectedActivities = (state?.activities || []).filter((activity) => state?.selectedActivityCodes.includes(activity.productCode));
+        const hotelImage = hotel
+          ? [hotel.imageSrc, hotelThumbnailById[hotel.id]].find((src) => isRealHotelImageUrl(src) && !hotelImageFailedById[hotel.id])
+          : undefined;
+        return {
+          name: segment.name,
+          hotelCheckIn: hotelCheckInForSegment(segment),
+          hotelCheckOut: hotelCheckOutForSegment(segment),
+          hotel: hotel
+            ? {
+                name: hotel.name,
+                imageSrc: hotelImage,
+                starRating: hotel.starRating,
+                address: collectTextByKeys(hotel.rawSearchResult, ["address", "address1", "addressline1", "address_line_1"], 1)[0] || hotel.distanceLabel || hotel.neighborhood,
+                roomName: formatRoomName(hotel.room?.name),
+                roomHighlights: formatRoomHighlights(hotel.room?.highlights),
+                refundable: hotel.refundable,
+                amenities: hotel.amenities,
+                reviewScore: hotel.reviews?.score,
+                reviewLabel: hotel.reviews?.label,
+                reviewCount: hotel.reviews?.count,
+                rooms: hotel.price?.rooms,
+              }
+            : null,
+          activities: selectedActivities.map((activity, index) => ({
+            title: activity.title,
+            imageUrl: activity.imageUrl,
+            date: activity.travelDate || itineraryDateForIndex(activityStart, segment.checkOut, index) || undefined,
+            duration: activity.duration,
+          })),
+        };
+      }),
+    };
   };
 
   return (
@@ -4274,6 +4336,15 @@ function AiPackageContent() {
                 <span>
                   Your flight reaches {firstArrivalMismatch?.name} on {formatDate(firstMismatchArrivalDate, firstMismatchArrivalDate)}, after hotel check-in starts on {formatDate(firstArrivalMismatch ? hotelCheckInForSegment(firstArrivalMismatch) : "", "")}. Change the flight or hotel stay dates before booking.
                 </span>
+                {firstArrivalMismatch && firstArrivalMismatch.id === activeDestination?.id ? (
+                  <button
+                    type="button"
+                    onClick={openStayDatesFromArrival}
+                    className="ml-auto flex-shrink-0 rounded-lg border border-[#F4B8D9] bg-white px-3 py-1.5 text-xs font-semibold text-[#6B2151] hover:bg-[#FFEAF6]"
+                  >
+                    Change stay dates
+                  </button>
+                ) : null}
               </div>
             ) : null}
 
@@ -4453,50 +4524,13 @@ function AiPackageContent() {
         />
       ) : null}
 
-      <Dialog open={packagePdfOpen} onOpenChange={setPackagePdfOpen}>
-        <DialogContent className="max-w-[min(100vw-32px,460px)] bg-white">
-          <DialogHeader>
-            <DialogTitle className="pr-6 text-[#010D50]">Download package PDF</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm leading-6 text-[#3A478A]">
-              Add optional agent markup. PDF shows itinerary, package subtotal, markup, fees note, and customer total.
-            </p>
-            <label className="block text-sm font-semibold text-[#010D50]">
-              Agent markup (%)
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={agentMarkupPercent}
-                onChange={(event) => setAgentMarkupPercent(event.target.value)}
-                className="mt-2 h-11 w-full rounded-lg border border-[#DFE0E4] bg-white px-3 text-sm font-normal text-[#010D50] outline-none focus:border-[#3754ED] focus:ring-2 focus:ring-[#DCE3FF]"
-              />
-            </label>
-            <div className="rounded-lg border border-[#DFE0E4] px-3 py-3 text-sm text-[#3A478A]">
-              <div className="flex justify-between gap-4">
-                <span>Package subtotal</span>
-                <span className="font-semibold text-[#010D50]">{money(packageCost, liveSearch.flight?.currency || liveSearch.hotel?.price.currency || "GBP")}</span>
-              </div>
-              <div className="mt-2 flex justify-between gap-4 border-t border-[#EEF0F6] pt-2">
-                <span>Customer total</span>
-                <span className="font-semibold text-[#010D50]">
-                  {money(packageCost * (1 + Math.max(0, Number(agentMarkupPercent) || 0) / 100), liveSearch.flight?.currency || liveSearch.hotel?.price.currency || "GBP")}
-                </span>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => setPackagePdfOpen(false)} className="h-10 rounded-lg border-[#DFE0E4] px-4">
-                Cancel
-              </Button>
-              <Button type="button" onClick={downloadPackagePdf} disabled={packagePdfGenerating} className="h-10 rounded-lg bg-[#3754ED] px-4 text-white hover:bg-[#2942D1]">
-                {packagePdfGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                {packagePdfGenerating ? "Creating PDF" : "Download PDF"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <PackageProposalPdfDialog
+        open={packagePdfOpen}
+        onOpenChange={setPackagePdfOpen}
+        getInput={getPackageProposalInput}
+        packageCost={packageCost}
+        currency={packageProposalCurrency}
+      />
 
       <Dialog open={arrivalWarningOpen} onOpenChange={setArrivalWarningOpen}>
         <DialogContent className="max-w-[min(100vw-32px,520px)] bg-white">
@@ -4701,7 +4735,13 @@ function AiPackageContent() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={hotelChangeOpen} onOpenChange={setHotelChangeOpen}>
+      <Dialog
+        open={hotelChangeOpen}
+        onOpenChange={(open) => {
+          setHotelChangeOpen(open);
+          if (!open) setHotelStayChangeNotice(null);
+        }}
+      >
         <DialogContent className="max-h-[min(94vh,900px)] max-w-[min(100vw-24px,1180px)] overflow-hidden bg-white p-0">
           <DialogHeader className="border-b border-[#DFE0E4] px-5 py-4">
             <div className="flex items-center justify-between gap-3 pr-6">
@@ -4796,6 +4836,24 @@ function AiPackageContent() {
                     </select>
                   </div>
 
+                  {hotelStayChangeNotice ? (
+                    <div
+                      className={`mb-4 flex items-start gap-2 rounded-xl px-4 py-3 text-sm ${
+                        hotelStayChangeNotice.kind === "kept" ? "bg-[#EEF1FF] text-[#1E2A78]" : "bg-[#FFF5FB] text-[#6B2151]"
+                      }`}
+                    >
+                      {hotelStayChangeNotice.kind === "kept" ? (
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                      ) : (
+                        <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                      )}
+                      <span>
+                        {hotelStayChangeNotice.kind === "kept"
+                          ? `${hotelStayChangeNotice.previousName} is available from ${formatDate(hotelStayChangeNotice.checkIn, hotelStayChangeNotice.checkIn)} to ${formatDate(hotelStayChangeNotice.checkOut, hotelStayChangeNotice.checkOut)}. We've kept it selected with updated pricing.`
+                          : `${hotelStayChangeNotice.previousName} isn't available for ${formatDate(hotelStayChangeNotice.checkIn, hotelStayChangeNotice.checkIn)} to ${formatDate(hotelStayChangeNotice.checkOut, hotelStayChangeNotice.checkOut)}. We've picked the closest match below — choose another if you prefer.`}
+                      </span>
+                    </div>
+                  ) : null}
                   {filteredHotelOptions.length === 0 ? (
                     <div className="rounded-xl bg-[#F5F7FF] p-4 text-sm text-[#3A478A]">No hotels match the selected filters.</div>
                   ) : (
@@ -4806,8 +4864,18 @@ function AiPackageContent() {
                         const roomLoading = !!roomOptionsLoadingByHotelId[hotel.id];
                         const roomError = roomOptionsErrorByHotelId[hotel.id];
                         const thumbnailSrc = hotelThumbnailById[hotel.id];
+                        const isCurrentHotel = isSameHotel(hotel, liveSearch.hotel);
                         return (
-                          <div key={hotel.id} className="rounded-xl border border-[#DFE0E4] bg-white p-3">
+                          <div
+                            key={hotel.id}
+                            className={`rounded-xl border bg-white p-3 ${isCurrentHotel ? "border-[#3754ED] ring-1 ring-[#3754ED]" : "border-[#DFE0E4]"}`}
+                          >
+                            {isCurrentHotel ? (
+                              <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-[#EEF1FF] px-2.5 py-1 text-[11px] font-semibold text-[#3754ED]">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                {hotelStayChangeNotice?.kind === "kept" ? "Your hotel · available for new dates" : "Selected hotel"}
+                              </div>
+                            ) : null}
                             <div className="grid gap-3 sm:grid-cols-[120px_1fr_auto]">
                               <div className="relative h-[92px] overflow-hidden rounded-lg bg-[#F5F7FF]">
                                 {thumbnailSrc ? (
@@ -4871,7 +4939,7 @@ function AiPackageContent() {
                                     onClick={() => selectHotelOption(hotel)}
                                     className="h-9 rounded-full bg-[#3754ED] px-5 text-xs font-semibold text-white hover:bg-[#2942D1]"
                                   >
-                                    Select hotel
+                                    {isCurrentHotel ? "Keep this hotel" : "Select hotel"}
                                   </Button>
                                 </div>
                               </div>

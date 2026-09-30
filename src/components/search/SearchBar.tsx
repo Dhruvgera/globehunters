@@ -279,7 +279,7 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
         id: String(hid || urlLocation),
         name: urlLocation,
         country_name: "",
-        airportcode: hkey?.split(";")[0] || "",
+        airportcode: hkey?.split(";")[0] || apc || "",
         featured_image: "",
         hiddenvalue: hkey || "",
       } satisfies HolidayDestination;
@@ -466,8 +466,10 @@ export default function SearchBar({ compact = false, embedded = false, defaultPr
         params.set("rooms", String(Math.max(1, hotelRooms)));
         if (from?.code) params.set("fromCode", from.code);
         if (from?.name || from?.city) params.set("from", from?.name || from?.city || "");
-        if (packageDestinationItem?.id) params.set("hidden_id", String(packageDestinationItem.id));
+        // hidden_id is only meaningful alongside hidden_key; URL-hydrated items fall back to the name as id.
+        if (packageDestinationItem?.id && packageDestinationItem.hiddenvalue) params.set("hidden_id", String(packageDestinationItem.id));
         if (packageDestinationItem?.hiddenvalue) params.set("hidden_key", packageDestinationItem.hiddenvalue);
+        if (packageDestinationItem?.airportcode) params.set("arrival_point_code", packageDestinationItem.airportcode);
         params.set("lookingFor", aiLookingFor);
         params.set("stayPreference", aiStayPreference);
         params.set("budget", String(aiBudget));
