@@ -20,6 +20,8 @@ export type PackageProposalActivity = {
   imageUrl?: string;
   date?: string;
   duration?: string;
+  /** Supplier price in the package currency. Shown with the agent markup folded in. */
+  price?: number;
 };
 
 export type PackageProposalDestination = {
@@ -41,6 +43,8 @@ export type PackageProposalInput = {
   infants?: number;
   flightLegs: FlightLeg[];
   destinations: PackageProposalDestination[];
+  /** Local taxes paid to the hotel on arrival, already in the package currency. */
+  payAtProperty?: number | null;
 };
 
 const NAVY: [number, number, number] = [1, 13, 80];
@@ -190,6 +194,7 @@ export async function buildPackageProposalPdf(input: PackageProposalInput): Prom
   const bottomLimit = pageHeight - 18;
   const currency = normalizeCurrency(input.currency);
   const customerTotal = packageCustomerTotal(input.packageCost, input.markupPercent);
+  const payAtProperty = Math.max(0, Math.round((Number(input.payAtProperty) || 0) * 100) / 100);
   const money = (value: number) =>
     new Intl.NumberFormat("en-GB", { style: "currency", currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
   const travellersLabel = [
@@ -274,16 +279,25 @@ export async function buildPackageProposalPdf(input: PackageProposalInput): Prom
   y += 44;
 
   // Trip total, mirroring the website summary
-  const totalBoxHeight = 30 + (allActivities.length > 0 ? 6 : 0);
+  const totalBoxHeight = 30 + (allActivities.length > 0 ? 6 : 0) + (payAtProperty > 0 ? 12 : 0);
   pdf.setFillColor(...SOFT);
   pdf.setDrawColor(...BORDER);
   pdf.roundedRect(margin, y, contentWidth, totalBoxHeight, 3, 3, "FD");
   setText(10, MUTED);
   pdf.text("Trip total", margin + 7, y + 8);
   setText(22, NAVY, "bold");
-  pdf.text(money(customerTotal), margin + 7, y + 18);
+  pdf.text(money(customerTotal + payAtProperty), margin + 7, y + 18);
   setText(9, MUTED);
   pdf.text(`For ${travellersLabel}`, margin + 7, y + 24.5);
+  if (payAtProperty > 0) {
+    const payAtPropertyLabel = `Pay at property: ${money(payAtProperty)}`;
+    setText(9, NAVY);
+    pdf.text(`Pay now: ${money(customerTotal)}`, margin + 7, y + 31);
+    pdf.text(payAtPropertyLabel, margin + 7, y + 36.5);
+    const payAtPropertyLabelWidth = pdf.getTextWidth(payAtPropertyLabel);
+    setText(7.5, MUTED);
+    pdf.text("Local taxes, paid to the hotel", margin + 7 + payAtPropertyLabelWidth + 3, y + 36.5);
+  }
   const includedRows = [
     input.flightLegs.length > 0 && destinations.some((destination) => destination.hotel) ? "Flights and stays" : input.flightLegs.length > 0 ? "Flights" : "Stays",
     ...(allActivities.length > 0 ? [`Activities (${allActivities.length})`] : []),
@@ -412,7 +426,12 @@ export async function buildPackageProposalPdf(input: PackageProposalInput): Prom
           textX,
           y + 4 + titleLines.length * 4.8
         );
-        includedPill(pageWidth - margin, y);
+        if (activity.price && activity.price > 0) {
+          setText(10, NAVY, "bold");
+          pdf.text(money(packageCustomerTotal(activity.price, input.markupPercent)), pageWidth - margin, y + 4, { align: "right" });
+        } else {
+          includedPill(pageWidth - margin, y);
+        }
         y += rowHeight;
         pdf.setDrawColor(238, 240, 246);
         pdf.line(margin, y - 2, pageWidth - margin, y - 2);
@@ -430,7 +449,7 @@ export async function buildPackageProposalPdf(input: PackageProposalInput): Prom
       ? `${totalNights ? `${plural(totalNights, "night")} of ` : ""}hotel accommodation${destinations.length > 1 ? ` across ${plural(destinations.length, "destination")}` : ""}`
       : "",
     allActivities.length > 0 ? `${plural(allActivities.length, "activity", "activities")}` : "",
-    "All taxes and fees",
+    payAtProperty > 0 ? `Taxes and fees, except ${money(payAtProperty)} local taxes paid at the property` : "All taxes and fees",
   ].filter(Boolean);
   inclusions.forEach((item) => {
     ensureRoom(7);

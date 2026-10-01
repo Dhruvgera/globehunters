@@ -46,6 +46,7 @@ import { buildSummaryRows } from "@/lib/utils/buildSummaryRows";
 import { FOLDER_STATUS_CODES } from "@/types/portal";
 import { countryCodes } from "@/lib/utils/countryCodes";
 import { convertHotelLocalTaxRows, convertHotelLocalTaxTotal } from "@/lib/currency/localTaxDisplay";
+import { payAtPropertyTaxesForHotels } from "@/lib/packages/payAtProperty";
 import { getSessionItem, setSessionItem } from "@/lib/storage/safeSessionStorage";
 import { calculateNights } from "@/lib/hotels/nights";
 
@@ -60,7 +61,7 @@ type AiPaymentDestination = {
     distanceLabel?: string;
     room?: { name?: string; highlights?: string[] };
     price?: { total?: number; currency?: string };
-    rawSearchResult?: { address1?: string; address2?: string };
+    rawSearchResult?: { address1?: string; address2?: string; _hotelbeds?: unknown };
   } | null;
   activities?: Array<{
     productCode: string;
@@ -75,6 +76,7 @@ type AiPaymentDestination = {
 
 type AiPaymentDraft = {
   search?: { destination?: string; checkIn?: string; checkOut?: string; rooms?: number };
+  hotel?: AiPaymentDestination["hotel"];
   totals?: { flight?: number; hotel?: number; activities?: number; package?: number; currency?: string };
   destinations?: AiPaymentDestination[];
 };
@@ -441,6 +443,14 @@ function PaymentContent() {
   const tripTotal = subtotal - discountAmount;
   const localPayableTaxesForBilling = convertedLocalTaxRowsForBilling;
   const tripTotalForDisplay = tripTotal + convertedLocalTaxTotalForDisplay;
+  const aiPayAtPropertyTaxes = useMemo(() => {
+    if (!aiPaymentDraft) return null;
+    const hotels = aiPaymentDraft.destinations?.length
+      ? aiPaymentDraft.destinations.map((destination) => destination.hotel)
+      : [aiPaymentDraft.hotel];
+    return payAtPropertyTaxesForHotels(hotels);
+  }, [aiPaymentDraft]);
+  const localTaxSourceRows = aiPayAtPropertyTaxes ?? hotelRoomSummary?.hotelBedsTaxes?.taxes;
 
   useEffect(() => {
     let cancelled = false;
@@ -451,7 +461,7 @@ function PaymentContent() {
       return;
     }
 
-    const rows = hotelRoomSummary?.hotelBedsTaxes?.taxes || [];
+    const rows = localTaxSourceRows || [];
     Promise.all([
       convertHotelLocalTaxRows(rows, currencyForGateway),
       convertHotelLocalTaxTotal(rows, currencyForGateway),
@@ -470,7 +480,7 @@ function PaymentContent() {
     return () => {
       cancelled = true;
     };
-  }, [currencyForGateway, hotelRoomSummary?.hotelBedsTaxes?.taxes, isHotelMode, isPackageMode]);
+  }, [currencyForGateway, localTaxSourceRows, isHotelMode, isPackageMode]);
 
   const protectionPlanName =
     isRefundShieldMode

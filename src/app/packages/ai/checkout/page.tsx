@@ -20,6 +20,8 @@ import type { Hotel } from "@/types/hotel";
 import { getSessionItem, removeSessionItem, setSessionItem } from "@/lib/storage/safeSessionStorage";
 import { PackageProposalPdfDialog } from "@/components/packages/PackageProposalPdfDialog";
 import type { PackageProposalInput } from "@/lib/packages/packageProposalPdf";
+import { payAtPropertyTaxesForHotels } from "@/lib/packages/payAtProperty";
+import { usePayAtPropertyTotal } from "@/hooks/usePayAtPropertyTotal";
 import { ArrowLeft, CalendarDays, Clock, Download, Loader2, Users } from "lucide-react";
 
 type AiActivityDraft = {
@@ -707,7 +709,11 @@ function AiCheckoutContent() {
   }, [draft?.search?.adults, draft?.search?.children]);
   const selectedHotelDestination = destinationDrafts[hotelDetailsDestinationIndex] || destinationDrafts[0];
   const packageCost = Number(draft?.totals?.package || 0);
-  const getPackageProposalInput = (): Omit<PackageProposalInput, "markupPercent"> | null => {
+  const payAtPropertyTotal = usePayAtPropertyTotal(
+    payAtPropertyTaxesForHotels(destinationDrafts.map((destination) => destination.hotel)),
+    currency
+  );
+  const getPackageProposalInput = (): Omit<PackageProposalInput, "markupPercent" | "payAtProperty"> | null => {
     if (!draft || packageCost <= 0) return null;
     return {
       packageCost,
@@ -745,6 +751,7 @@ function AiCheckoutContent() {
             imageUrl: activity.imageUrl,
             date: activity.itineraryDate,
             duration: activity.duration,
+            price: activity.price,
           })),
         };
       }),
@@ -1347,6 +1354,17 @@ function AiCheckoutContent() {
                   </span>
                 </div>
               ) : null}
+              {payAtPropertyTotal ? (
+                <div className="flex items-start justify-between gap-3 border-t border-[#EEF0F6] pt-2">
+                  <span>
+                    Pay at property
+                    <span className="block text-xs text-[#5A6699]">Local taxes paid to the hotel, not included above</span>
+                  </span>
+                  <span className="whitespace-nowrap font-semibold text-[#010D50]">
+                    {money(payAtPropertyTotal.amount, payAtPropertyTotal.currencyCode)}
+                  </span>
+                </div>
+              ) : null}
             </div>
             {!showTravellers ? (
               <Button
@@ -1441,6 +1459,7 @@ function AiCheckoutContent() {
         getInput={getPackageProposalInput}
         packageCost={packageCost}
         currency={currency}
+        payAtProperty={payAtPropertyTotal?.amount}
       />
       <Footer />
     </div>

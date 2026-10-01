@@ -29,6 +29,8 @@ import type { PriceCheckResult, TransformedPriceOption } from "@/types/priceChec
 import { calculateNights } from "@/lib/hotels/nights";
 import { formatFareLabel, normalizeCabinClass } from "@/lib/utils";
 import { getSessionItem, removeSessionItem, setSessionItem } from "@/lib/storage/safeSessionStorage";
+import { payAtPropertyTaxesForHotels } from "@/lib/packages/payAtProperty";
+import { usePayAtPropertyTotal } from "@/hooks/usePayAtPropertyTotal";
 import {
   DEFAULT_FILTERS,
   includesBreakfast,
@@ -141,6 +143,8 @@ type RichHotelRoom = {
   currency?: string;
   refundable?: boolean | null;
   inclusions?: string[];
+  /** Hotelbeds tax breakdown for this rate; undefined when the supplier sent none. */
+  taxes?: Record<string, unknown> | null;
 };
 
 type RichHotelDetails = {
@@ -327,6 +331,7 @@ function collectRooms(value: unknown, limit = 8): RichHotelRoom[] {
     const nonRef = record.nonRef;
     const id = textValue(record.id ?? record.search_result_detail_id ?? record.roomId ?? record.room_id ?? record.roomCode ?? record.room_code);
     const rateKey = textValue(record.rateKey ?? record.rate_key);
+    const taxesNode = record.hotelBedsTaxes !== undefined ? record.hotelBedsTaxes : rawRecord(record._hotelbeds)?.taxes;
     const inclusions = uniqueStrings(
       [
         ...Array.from(name.matchAll(/\b(king(?: size)? bed|queen(?: size)? bed|double bed|twin beds?|single bed|sofa bed)\b/gi)).map((match) => sanitizeInclusion(match[1])),
@@ -361,6 +366,7 @@ function collectRooms(value: unknown, limit = 8): RichHotelRoom[] {
       currency: currency || undefined,
       refundable,
       inclusions: inclusions.length > 0 ? inclusions : undefined,
+      taxes: taxesNode === undefined ? undefined : rawRecord(taxesNode),
     });
   };
   const walk = (node: unknown) => {
@@ -2715,6 +2721,18 @@ function AiPackageContent() {
     return sum + ((matchedLiveHotel || stateHotel)?.price.total || 0);
   }, 0);
   const packageCost = liveFlightTotal + liveHotelTotal + activityTotal + destinationAddOnTotal;
+  const payAtPropertyTaxes = payAtPropertyTaxesForHotels(
+    destinationSegments.map(
+      (segment) =>
+        (hotelMatchesSegment(liveSearch.hotel, segment, destinationSegments) ? liveSearch.hotel : null) ||
+        effectiveDestinationStateById[segment.id]?.hotel ||
+        null
+    )
+  );
+  const payAtPropertyTotal = usePayAtPropertyTotal(
+    payAtPropertyTaxes,
+    liveSearch.flight?.currency || liveSearch.hotel?.price.currency || "GBP"
+  );
   const [settledPackageCost, setSettledPackageCost] = useState<number | null>(
     () => readAiPackageLiveCache(paramsKey)?.settledPackageCost ?? null
   );
@@ -3851,6 +3869,7 @@ function AiPackageContent() {
                             roomName: room.name,
                             boardName: room.board,
                             rateKey: room.rateKey || cheapest.rateKey,
+                            ...(room.taxes !== undefined ? { taxes: room.taxes } : {}),
                           }
                         : hotelbeds.cheapest,
                     }
@@ -4009,6 +4028,7 @@ function AiPackageContent() {
             imageUrl: activity.imageUrl,
             date: activity.travelDate || itineraryDateForIndex(activityStart, segment.checkOut, index) || undefined,
             duration: activity.duration,
+            price: activity.price,
           })),
         };
       }),
@@ -4131,6 +4151,17 @@ function AiPackageContent() {
                       <span>Activities</span>
                       <span className="whitespace-nowrap">
                         Included <span className="font-semibold text-[#010D50]">({money(activityTotal, "GBP")})</span>
+                      </span>
+                    </div>
+                  ) : null}
+                  {payAtPropertyTotal ? (
+                    <div className="flex items-start justify-between gap-3 border-t border-[#EEF0F6] pt-2">
+                      <span>
+                        Pay at property
+                        <span className="block text-[11px] text-[#5A6699]">Local taxes paid to the hotel, not included above</span>
+                      </span>
+                      <span className="whitespace-nowrap font-semibold text-[#010D50]">
+                        {money(payAtPropertyTotal.amount, payAtPropertyTotal.currencyCode)}
                       </span>
                     </div>
                   ) : null}
@@ -4530,6 +4561,7 @@ function AiPackageContent() {
         getInput={getPackageProposalInput}
         packageCost={packageCost}
         currency={packageProposalCurrency}
+        payAtProperty={payAtPropertyTotal?.amount}
       />
 
       <Dialog open={arrivalWarningOpen} onOpenChange={setArrivalWarningOpen}>

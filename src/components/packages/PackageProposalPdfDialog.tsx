@@ -18,9 +18,11 @@ type PackageProposalPdfDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Called when the PDF is generated so the latest selections are used. */
-  getInput: () => Omit<PackageProposalInput, "markupPercent"> | null;
+  getInput: () => Omit<PackageProposalInput, "markupPercent" | "payAtProperty"> | null;
   packageCost: number;
   currency: string;
+  /** Local taxes paid at the hotel, in `currency`. Not marked up. */
+  payAtProperty?: number | null;
 };
 
 function formatMoney(value: number, currency: string) {
@@ -37,7 +39,7 @@ function canShareFiles() {
   }
 }
 
-export function PackageProposalPdfDialog({ open, onOpenChange, getInput, packageCost, currency }: PackageProposalPdfDialogProps) {
+export function PackageProposalPdfDialog({ open, onOpenChange, getInput, packageCost, currency, payAtProperty }: PackageProposalPdfDialogProps) {
   const [markupPercent, setMarkupPercent] = useState(() => getSessionItem(MARKUP_STORAGE_KEY) ?? "0");
   const [busy, setBusy] = useState<"download" | "share" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +64,7 @@ export function PackageProposalPdfDialog({ open, onOpenChange, getInput, package
     setBusy(mode);
     setError(null);
     try {
-      const blob = await buildPackageProposalPdf({ ...input, markupPercent: Math.max(0, Number(markupPercent) || 0) });
+      const blob = await buildPackageProposalPdf({ ...input, markupPercent: Math.max(0, Number(markupPercent) || 0), payAtProperty });
       const fileName = packageProposalFileName(input.destinations);
       if (mode === "share") {
         const file = new File([blob], fileName, { type: "application/pdf" });
@@ -92,6 +94,7 @@ export function PackageProposalPdfDialog({ open, onOpenChange, getInput, package
   };
 
   const customerTotal = packageCustomerTotal(packageCost, Number(markupPercent) || 0);
+  const localTaxes = payAtProperty && payAtProperty > 0 ? payAtProperty : 0;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -101,8 +104,8 @@ export function PackageProposalPdfDialog({ open, onOpenChange, getInput, package
         </DialogHeader>
         <div className="space-y-4">
           <p className="text-sm leading-6 text-[#3A478A]">
-            Creates a customer-ready itinerary with flights, hotels, activities, images and what&apos;s included. Your markup is
-            added to the trip total and is never shown on the PDF.
+            Creates a customer-ready itinerary with flights, hotels, priced activities, images and what&apos;s included. Your markup
+            is added to the trip total and activity prices and is never shown on the PDF.
           </p>
           <label className="block text-sm font-semibold text-[#010D50]">
             Agent markup (%)
@@ -121,9 +124,15 @@ export function PackageProposalPdfDialog({ open, onOpenChange, getInput, package
               <span className="font-semibold text-[#010D50]">{formatMoney(packageCost, currency)}</span>
             </div>
             <div className="mt-2 flex justify-between gap-4 border-t border-[#EEF0F6] pt-2">
-              <span>Trip total on PDF</span>
+              <span>{localTaxes > 0 ? "Pay now on PDF" : "Trip total on PDF"}</span>
               <span className="font-semibold text-[#010D50]">{formatMoney(customerTotal, currency)}</span>
             </div>
+            {localTaxes > 0 ? (
+              <div className="mt-2 flex justify-between gap-4">
+                <span>Pay at property (no markup)</span>
+                <span className="font-semibold text-[#010D50]">{formatMoney(localTaxes, currency)}</span>
+              </div>
+            ) : null}
           </div>
           {error ? <div className="text-sm text-[#B42318]">{error}</div> : null}
           <div className="flex flex-wrap justify-end gap-2">
