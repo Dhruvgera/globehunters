@@ -51,6 +51,8 @@ interface PackageRowsParams extends BaseBuildParams {
   protectionPlanCost?: number;
   hotelNights?: number;
   packageNights?: number;
+  /** Overrides the default "Flights (per booking)" label, e.g. "Return flights". */
+  flightsLabel?: string;
 }
 
 export type BuildSummaryRowsParams =
@@ -162,7 +164,7 @@ function buildHotelRows(params: HotelRowsParams): SummaryRow[] {
 }
 
 function buildPackageRows(params: PackageRowsParams): SummaryRow[] {
-  const { baggageCost, baggageCount, protectionPlanCost, hotelNights, packageNights, currency, t } =
+  const { baggageCost, baggageCount, protectionPlanCost, hotelNights, packageNights, flightsLabel, currency, t } =
     params;
 
   const nights = hotelNights || packageNights || 0;
@@ -172,7 +174,7 @@ function buildPackageRows(params: PackageRowsParams): SummaryRow[] {
       value: t("included"),
     },
     {
-      label: t("flightsPerBooking"),
+      label: flightsLabel || t("flightsPerBooking"),
       value: t("included"),
     },
   ];

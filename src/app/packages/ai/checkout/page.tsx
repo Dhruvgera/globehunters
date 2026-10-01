@@ -718,6 +718,7 @@ function AiCheckoutContent() {
     return {
       packageCost,
       currency,
+      origin: draft.search?.fromName || undefined,
       adults: Number(draft.search?.adults || 1),
       children: Number(draft.search?.children || 0),
       infants: Number(new URLSearchParams(paramsKey).get("infants") || 0) || 0,
@@ -1357,8 +1358,8 @@ function AiCheckoutContent() {
               {payAtPropertyTotal ? (
                 <div className="flex items-start justify-between gap-3 border-t border-[#EEF0F6] pt-2">
                   <span>
-                    Pay at property
-                    <span className="block text-xs text-[#5A6699]">Local taxes paid to the hotel, not included above</span>
+                    Pay at check-in
+                    <span className="block text-xs text-[#5A6699]">Local fees payable at the property, not included above</span>
                   </span>
                   <span className="whitespace-nowrap font-semibold text-[#010D50]">
                     {money(payAtPropertyTotal.amount, payAtPropertyTotal.currencyCode)}

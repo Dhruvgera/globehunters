@@ -602,6 +602,11 @@
     "bagsPlural": "bags",
     "iassureProtectionPlan": "iAssure Protection Plan",
     "fareAdjustment": "Spot Discount",
-    "refundShield": "Refund Shield"
+    "refundShield": "Refund Shield",
+    "payNow": "Pay Now",
+    "payAtCheckIn": "Pay at check-in",
+    "payAtCheckInNote": "Local fees payable at the property.",
+    "total": "Total",
+    "inclTaxesAndFees": "Incl. taxes & fees"
   }
 }

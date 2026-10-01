@@ -13,6 +13,8 @@ interface CostSummaryCardProps {
   currency: string;
   totalSubtext?: string;
   isSticky?: boolean;
+  /** Local fees paid at the hotel. When set, the card splits into Pay Now / Pay at check-in / Total. */
+  payAtProperty?: number;
 }
 
 export function CostSummaryCard({
@@ -21,10 +23,12 @@ export function CostSummaryCard({
   currency,
   totalSubtext,
   isSticky = true,
+  payAtProperty,
 }: CostSummaryCardProps) {
   const t = useTranslations("costSummary");
   const [isExpanded, setIsExpanded] = useState(false);
   const hasRows = rows && rows.length > 0;
+  const localFees = payAtProperty && payAtProperty > 0 ? payAtProperty : 0;
 
   return (
     <div
@@ -77,19 +81,51 @@ export function CostSummaryCard({
         </>
       )}
 
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold text-[#010D50]">
-          {t("tripTotal")}
-        </span>
-        <div className="text-right">
-          <div className="text-sm font-semibold text-[#010D50]">
-            {formatPrice(total, currency)}
+      {localFees > 0 ? (
+        <>
+          <div className="flex items-start justify-between gap-4">
+            <span className="text-sm font-semibold text-[#010D50]">{t("payNow")}</span>
+            <div className="text-right">
+              <div className="text-xl font-bold text-[#3754ED]">
+                {formatPrice(total - localFees, currency)}
+              </div>
+              {totalSubtext ? (
+                <div className="text-xs text-[#3A478A]">{totalSubtext}</div>
+              ) : null}
+              <div className="text-xs text-[#3A478A]">{t("inclTaxesAndFees")}</div>
+            </div>
           </div>
-          {totalSubtext ? (
-            <div className="text-xs text-[#3A478A]">{totalSubtext}</div>
-          ) : null}
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-[#010D50]">{t("payAtCheckIn")}</div>
+              <div className="text-xs text-[#3A478A]">{t("payAtCheckInNote")}</div>
+            </div>
+            <div className="text-sm font-semibold text-[#010D50]">
+              {formatPrice(localFees, currency)}
+            </div>
+          </div>
+          <div className="flex items-center justify-between border-t border-[#DFE0E4] pt-4">
+            <span className="text-sm font-semibold text-[#010D50]">{t("total")}</span>
+            <span className="text-base font-semibold text-[#010D50]">
+              {formatPrice(total, currency)}
+            </span>
+          </div>
+        </>
+      ) : (
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-semibold text-[#010D50]">
+            {t("tripTotal")}
+          </span>
+          <div className="text-right">
+            <div className="text-sm font-semibold text-[#010D50]">
+              {formatPrice(total, currency)}
+            </div>
+            {totalSubtext ? (
+              <div className="text-xs text-[#3A478A]">{totalSubtext}</div>
+            ) : null}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

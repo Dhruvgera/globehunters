@@ -47,6 +47,7 @@ import { FOLDER_STATUS_CODES } from "@/types/portal";
 import { countryCodes } from "@/lib/utils/countryCodes";
 import { convertHotelLocalTaxRows, convertHotelLocalTaxTotal } from "@/lib/currency/localTaxDisplay";
 import { payAtPropertyTaxesForHotels } from "@/lib/packages/payAtProperty";
+import { flightTripLabel } from "@/lib/packages/tripLabels";
 import { getSessionItem, setSessionItem } from "@/lib/storage/safeSessionStorage";
 import { calculateNights } from "@/lib/hotels/nights";
 
@@ -55,6 +56,8 @@ type AiPaymentDestination = {
   name?: string;
   checkIn?: string;
   checkOut?: string;
+  hotelCheckIn?: string;
+  hotelCheckOut?: string;
   hotel?: {
     name?: string;
     imageSrc?: string;
@@ -75,7 +78,7 @@ type AiPaymentDestination = {
 };
 
 type AiPaymentDraft = {
-  search?: { destination?: string; checkIn?: string; checkOut?: string; rooms?: number };
+  search?: { destination?: string; checkIn?: string; checkOut?: string; rooms?: number; adults?: number; children?: number };
   hotel?: AiPaymentDestination["hotel"];
   totals?: { flight?: number; hotel?: number; activities?: number; package?: number; currency?: string };
   destinations?: AiPaymentDestination[];
@@ -525,11 +528,35 @@ function PaymentContent() {
     }
 
     if (aiPaymentDraft?.totals?.package) {
-      return [];
+      const destinations = aiPaymentDraft.destinations || [];
+      const stays = destinations.length
+        ? destinations.map((destination) => ({
+            checkIn: destination.hotelCheckIn || destination.checkIn,
+            checkOut: destination.hotelCheckOut || destination.checkOut,
+          }))
+        : [{ checkIn: aiPaymentDraft.search?.checkIn, checkOut: aiPaymentDraft.search?.checkOut }];
+      const nights = stays.reduce(
+        (sum, stay) => sum + (stay.checkIn && stay.checkOut ? calculateNights(stay.checkIn, stay.checkOut) : 0),
+        0
+      );
+      const activityCount = destinations.reduce((sum, destination) => sum + (destination.activities?.length || 0), 0);
+      const activitiesTotal = Number(aiPaymentDraft.totals.activities || 0);
+      const rows = [
+        { label: `${tCost("hotel")} (${nights} ${tCost("nights")})`, value: tCost("included") },
+        ...(journeySegments.length > 0 ? [{ label: flightTripLabel(journeySegments.length), value: tCost("included") }] : []),
+      ];
+      if (activityCount > 0) {
+        rows.push({
+          label: `Activities (${activityCount})`,
+          value: activitiesTotal > 0 ? formatPrice(activitiesTotal, currency || "GBP") : tCost("included"),
+        });
+      }
+      return rows;
     }
 
     return buildSummaryRows({
       mode: "package",
+      flightsLabel: journeySegments.length > 0 ? flightTripLabel(journeySegments.length) : undefined,
       baggageCost,
       baggageCount: additionalBaggage,
       protectionPlanCost,
@@ -542,7 +569,8 @@ function PaymentContent() {
     });
   }, [
     baseFare,
-    aiPaymentDraft?.totals?.package,
+    aiPaymentDraft,
+    journeySegments.length,
     currency,
     hotelSearch?.adults,
     hotelSearch?.children,
@@ -560,14 +588,7 @@ function PaymentContent() {
     fareAdjustmentDiscount,
     tCost,
   ]);
-  const paymentSummaryRows = useMemo(() => {
-    if (convertedLocalTaxTotalForDisplay <= 0) return basePaymentSummaryRows;
-    return [
-      ...basePaymentSummaryRows,
-      { label: "Pay now", value: formatPrice(tripTotal, currency || "GBP") },
-      { label: "Pay at property", value: formatPrice(convertedLocalTaxTotalForDisplay, currency || "GBP") },
-    ];
-  }, [basePaymentSummaryRows, convertedLocalTaxTotalForDisplay, currency, tripTotal]);
+  const paymentSummaryRows = basePaymentSummaryRows;
   const paymentTotalSubtext = useMemo(() => {
     if (!isPackageMode) {
       const paxLabel = formatPassengerLabel({
@@ -577,9 +598,13 @@ function PaymentContent() {
       }) || `1 ${tCost('adult')}`;
       return `${tCost('traveler')}: ${paxLabel}`;
     }
-    const perPerson = calculatePackagePerPersonPrice(tripTotalForDisplay, packageSearch?.rooms);
+    const aiTravellers = aiPaymentDraft?.totals?.package
+      ? [{ adults: Number(aiPaymentDraft.search?.adults || 0), children: Number(aiPaymentDraft.search?.children || 0), infants: 0 }]
+      : null;
+    // Per-person price covers what is paid now; local fees are shown separately.
+    const perPerson = calculatePackagePerPersonPrice(tripTotal, aiTravellers || packageSearch?.rooms);
     return perPerson != null ? `${formatPrice(perPerson, currency || "GBP")} per person` : undefined;
-  }, [baseFare, currency, isPackageMode, packageSearch?.rooms, selectedUpgrade?.passengerBreakdown, storeSearchParams?.passengers, tCost, tripTotalForDisplay]);
+  }, [aiPaymentDraft, currency, isPackageMode, packageSearch?.rooms, selectedUpgrade?.passengerBreakdown, storeSearchParams?.passengers, tCost, tripTotal]);
 
   const paymentTermsText = isHotelMode
     ? "By checking this box, I acknowledge that guest information matches the passport or official ID for travel, and that name changes are not allowed. I confirm that I have reviewed the hotel details and agree to the Refund & Cancellation Policy. I understand bookings are non-transferable and non-changeable unless stated otherwise. I accept full responsibility for valid travel documentation and understand Globehunters cannot be held responsible for denied boarding due to passport or visa validity."
@@ -1271,6 +1296,8 @@ function PaymentContent() {
                 total={tripTotalForDisplay}
                 currency={currency || 'GBP'}
                 isSticky={false}
+                payAtProperty={convertedLocalTaxTotalForDisplay}
+                totalSubtext={isPackageMode ? paymentTotalSubtext : undefined}
               />
             </div>
           </div>

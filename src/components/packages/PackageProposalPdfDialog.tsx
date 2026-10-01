@@ -129,7 +129,7 @@ export function PackageProposalPdfDialog({ open, onOpenChange, getInput, package
             </div>
             {localTaxes > 0 ? (
               <div className="mt-2 flex justify-between gap-4">
-                <span>Pay at property (no markup)</span>
+                <span>Pay at check-in (no markup)</span>
                 <span className="font-semibold text-[#010D50]">{formatMoney(localTaxes, currency)}</span>
               </div>
             ) : null}

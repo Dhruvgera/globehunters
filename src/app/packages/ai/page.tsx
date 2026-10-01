@@ -3991,6 +3991,7 @@ function AiPackageContent() {
     return {
       packageCost,
       currency: packageProposalCurrency,
+      origin: params.get("from") || undefined,
       adults,
       children,
       infants,
@@ -4157,8 +4158,8 @@ function AiPackageContent() {
                   {payAtPropertyTotal ? (
                     <div className="flex items-start justify-between gap-3 border-t border-[#EEF0F6] pt-2">
                       <span>
-                        Pay at property
-                        <span className="block text-[11px] text-[#5A6699]">Local taxes paid to the hotel, not included above</span>
+                        Pay at check-in
+                        <span className="block text-[11px] text-[#5A6699]">Local fees payable at the property, not included above</span>
                       </span>
                       <span className="whitespace-nowrap font-semibold text-[#010D50]">
                         {money(payAtPropertyTotal.amount, payAtPropertyTotal.currencyCode)}

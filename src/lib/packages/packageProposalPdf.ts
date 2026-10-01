@@ -1,4 +1,5 @@
 import type { FlightLeg } from "@/components/booking/FlightSummaryCard";
+import { flightTripLabel } from "@/lib/packages/tripLabels";
 
 export type PackageProposalHotel = {
   name: string;
@@ -43,6 +44,8 @@ export type PackageProposalInput = {
   infants?: number;
   flightLegs: FlightLeg[];
   destinations: PackageProposalDestination[];
+  /** Departure city, e.g. "London". Falls back to the first flight's origin. */
+  origin?: string;
   /** Local taxes paid to the hotel on arrival, already in the package currency. */
   payAtProperty?: number | null;
 };
@@ -204,6 +207,9 @@ export async function buildPackageProposalPdf(input: PackageProposalInput): Prom
   ].filter(Boolean).join(", ");
   const destinations = input.destinations.filter((destination) => destination.name);
   const allActivities = destinations.flatMap((destination) => destination.activities);
+  const activitiesCost = allActivities.reduce((sum, activity) => sum + (activity.price && activity.price > 0 ? activity.price : 0), 0);
+  const origin = input.origin?.trim() || input.flightLegs[0]?.from || input.flightLegs[0]?.fromCode || "";
+  const destinationNames = destinations.map((destination) => destination.name).join("  ·  ");
   const tripStart = destinations[0]?.hotelCheckIn || input.flightLegs[0]?.date;
   const tripEnd = destinations.at(-1)?.hotelCheckOut || input.flightLegs.at(-1)?.arrivalDate || input.flightLegs.at(-1)?.date;
 
@@ -268,7 +274,8 @@ export async function buildPackageProposalPdf(input: PackageProposalInput): Prom
   setText(9, [200, 208, 255]);
   pdf.text("YOUR HOLIDAY ITINERARY", margin + 7, y + 8);
   setText(18, [255, 255, 255], "bold");
-  const titleLines = wrap(destinations.map((destination) => destination.name).join("  ·  ") || "Your trip", contentWidth - 14).slice(0, 2);
+  const tripTitle = origin && destinationNames ? `${origin} to ${destinationNames}` : destinationNames || "Your trip";
+  const titleLines = wrap(tripTitle, contentWidth - 14).slice(0, 2);
   pdf.text(titleLines, margin + 7, y + 16);
   setText(9.5, [220, 226, 255]);
   pdf.text(
@@ -290,24 +297,31 @@ export async function buildPackageProposalPdf(input: PackageProposalInput): Prom
   setText(9, MUTED);
   pdf.text(`For ${travellersLabel}`, margin + 7, y + 24.5);
   if (payAtProperty > 0) {
-    const payAtPropertyLabel = `Pay at property: ${money(payAtProperty)}`;
+    const payAtPropertyLabel = `Pay at check-in: ${money(payAtProperty)}`;
     setText(9, NAVY);
     pdf.text(`Pay now: ${money(customerTotal)}`, margin + 7, y + 31);
     pdf.text(payAtPropertyLabel, margin + 7, y + 36.5);
     const payAtPropertyLabelWidth = pdf.getTextWidth(payAtPropertyLabel);
     setText(7.5, MUTED);
-    pdf.text("Local taxes, paid to the hotel", margin + 7 + payAtPropertyLabelWidth + 3, y + 36.5);
+    pdf.text("Local fees payable at the property", margin + 7 + payAtPropertyLabelWidth + 3, y + 36.5);
   }
-  const includedRows = [
-    input.flightLegs.length > 0 && destinations.some((destination) => destination.hotel) ? "Flights and stays" : input.flightLegs.length > 0 ? "Flights" : "Stays",
-    ...(allActivities.length > 0 ? [`Activities (${allActivities.length})`] : []),
-    "Taxes and fees",
+  const includedRows: Array<{ label: string; amount?: number }> = [
+    { label: input.flightLegs.length > 0 && destinations.some((destination) => destination.hotel) ? "Flights and stays" : input.flightLegs.length > 0 ? "Flights" : "Stays" },
+    ...(allActivities.length > 0
+      ? [{ label: `Activities (${allActivities.length})`, amount: activitiesCost > 0 ? packageCustomerTotal(activitiesCost, input.markupPercent) : undefined }]
+      : []),
+    { label: "Taxes and fees" },
   ];
-  includedRows.forEach((label, index) => {
+  includedRows.forEach((row, index) => {
     const rowY = y + 8 + index * 6.5;
     setText(9.5, NAVY);
-    pdf.text(label, pageWidth - margin - 44, rowY, { align: "right" });
-    includedPill(pageWidth - margin - 7, rowY - 3.9);
+    pdf.text(row.label, pageWidth - margin - 44, rowY, { align: "right" });
+    if (row.amount) {
+      setText(9.5, NAVY, "bold");
+      pdf.text(money(row.amount), pageWidth - margin - 7, rowY, { align: "right" });
+    } else {
+      includedPill(pageWidth - margin - 7, rowY - 3.9);
+    }
   });
   y += totalBoxHeight + 10;
 
@@ -444,12 +458,14 @@ export async function buildPackageProposalPdf(input: PackageProposalInput): Prom
   sectionTitle("What's included");
   const totalNights = destinations.reduce((sum, destination) => sum + nightsBetween(destination.hotelCheckIn, destination.hotelCheckOut), 0);
   const inclusions = [
-    input.flightLegs.length > 0 ? `${plural(input.flightLegs.length, "flight")} for ${travellersLabel}` : "",
+    input.flightLegs.length > 0 ? `${flightTripLabel(input.flightLegs.length)} for ${travellersLabel}` : "",
     destinations.some((destination) => destination.hotel)
       ? `${totalNights ? `${plural(totalNights, "night")} of ` : ""}hotel accommodation${destinations.length > 1 ? ` across ${plural(destinations.length, "destination")}` : ""}`
       : "",
-    allActivities.length > 0 ? `${plural(allActivities.length, "activity", "activities")}` : "",
-    payAtProperty > 0 ? `Taxes and fees, except ${money(payAtProperty)} local taxes paid at the property` : "All taxes and fees",
+    allActivities.length > 0
+      ? `${plural(allActivities.length, "activity", "activities")}${activitiesCost > 0 ? ` (${money(packageCustomerTotal(activitiesCost, input.markupPercent))})` : ""}`
+      : "",
+    payAtProperty > 0 ? `Taxes and fees, except ${money(payAtProperty)} local fees payable at the property` : "All taxes and fees",
   ].filter(Boolean);
   inclusions.forEach((item) => {
     ensureRoom(7);
