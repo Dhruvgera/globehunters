@@ -428,6 +428,11 @@ function PaymentContent() {
     return getJourneySegments(flight, isPackageMode);
   }, [flight, isPackageMode]);
 
+  const journeyLegCodes = useMemo(
+    () => journeySegments.map((segment) => ({ fromCode: segment.departureAirport.code, toCode: segment.arrivalAirport.code })),
+    [journeySegments]
+  );
+
   const normalizedProtectionPlan = isRefundShieldMode
       ? (protectionPlan ? "basic" : undefined)
       : protectionPlan;
@@ -543,7 +548,7 @@ function PaymentContent() {
       const activitiesTotal = Number(aiPaymentDraft.totals.activities || 0);
       const rows = [
         { label: `${tCost("hotel")} (${nights} ${tCost("nights")})`, value: tCost("included") },
-        ...(journeySegments.length > 0 ? [{ label: flightTripLabel(journeySegments.length), value: tCost("included") }] : []),
+        ...(journeySegments.length > 0 ? [{ label: flightTripLabel(journeyLegCodes), value: tCost("included") }] : []),
       ];
       if (activityCount > 0) {
         rows.push({
@@ -556,7 +561,7 @@ function PaymentContent() {
 
     return buildSummaryRows({
       mode: "package",
-      flightsLabel: journeySegments.length > 0 ? flightTripLabel(journeySegments.length) : undefined,
+      flightsLabel: journeySegments.length > 0 ? flightTripLabel(journeyLegCodes) : undefined,
       baggageCost,
       baggageCount: additionalBaggage,
       protectionPlanCost,
@@ -570,6 +575,7 @@ function PaymentContent() {
   }, [
     baseFare,
     aiPaymentDraft,
+    journeyLegCodes,
     journeySegments.length,
     currency,
     hotelSearch?.adults,

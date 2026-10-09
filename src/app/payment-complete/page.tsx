@@ -794,8 +794,16 @@ function PaymentCompleteContent() {
     }
   }, [storeVyspaFolderNumber]);
 
-  // Get email from store or vyspa - use vyspaEmailAddress as fallback
-  const effectiveContactEmail = storeContactEmail || storeVyspaEmailAddress;
+  // BoxPay echoes the shopper contact back on inquiry. Placeholders sent when no contact was known are ignored.
+  const paymentShopperEmail =
+    paymentInfo?.shopperEmail && paymentInfo.shopperEmail.toLowerCase() !== "customer@globehunters.com"
+      ? paymentInfo.shopperEmail
+      : "";
+  const paymentShopperPhone =
+    paymentInfo?.shopperPhone && !paymentInfo.shopperPhone.replace(/\D/g, "").endsWith("2089444555") ? paymentInfo.shopperPhone : "";
+
+  // Get email from store or vyspa, then from the payment provider if this browser session lost it
+  const effectiveContactEmail = storeContactEmail || storeVyspaEmailAddress || paymentShopperEmail;
 
   const flight = bookingContext?.flight || storeSelectedFlight;
   const passengers = storePassengers;
@@ -1207,7 +1215,7 @@ function PaymentCompleteContent() {
 
   const displayEmail = (ctx?.contactEmail || effectiveContactEmail) || "—";
   const displayPhone =
-    (ctx?.contactPhone || storeContactPhone || passengers?.[0]?.phone) || "—";
+    (ctx?.contactPhone || storeContactPhone || passengers?.[0]?.phone || paymentShopperPhone) || "—";
   const displayPassengers = (ctx?.passengers || passengers) || [];
   const confirmationDestinations = isPackageMode && Array.isArray(ctx?.aiPackageDraft?.destinations)
     ? ctx.aiPackageDraft.destinations as ConfirmedDestination[]

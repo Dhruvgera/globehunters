@@ -183,6 +183,9 @@ export interface PaymentCompletionInfo {
   error?: string; // Added to support error handling in UI
   paymentMethod?: BoxPayPaymentMethod;
   timestamp?: string;
+  /** Contact details BoxPay echoes back from the session, used when the browser session was lost. */
+  shopperEmail?: string;
+  shopperPhone?: string;
 }
 
 

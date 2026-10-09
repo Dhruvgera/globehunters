@@ -1,5 +1,5 @@
 import type { FlightLeg } from "@/components/booking/FlightSummaryCard";
-import { flightTripLabel } from "@/lib/packages/tripLabels";
+import { flightRouteCodes, flightTripLabel } from "@/lib/packages/tripLabels";
 
 export type PackageProposalHotel = {
   name: string;
@@ -458,7 +458,9 @@ export async function buildPackageProposalPdf(input: PackageProposalInput): Prom
   sectionTitle("What's included");
   const totalNights = destinations.reduce((sum, destination) => sum + nightsBetween(destination.hotelCheckIn, destination.hotelCheckOut), 0);
   const inclusions = [
-    input.flightLegs.length > 0 ? `${flightTripLabel(input.flightLegs.length)} for ${travellersLabel}` : "",
+    input.flightLegs.length > 0
+      ? `${flightTripLabel(input.flightLegs)} for ${travellersLabel}${input.flightLegs.length > 2 && flightRouteCodes(input.flightLegs) ? ` (${flightRouteCodes(input.flightLegs)})` : ""}`
+      : "",
     destinations.some((destination) => destination.hotel)
       ? `${totalNights ? `${plural(totalNights, "night")} of ` : ""}hotel accommodation${destinations.length > 1 ? ` across ${plural(destinations.length, "destination")}` : ""}`
       : "",

@@ -248,6 +248,8 @@ class BoxPayService {
       message: inquiry.status.reason,
       paymentMethod: inquiry.paymentMethod,
       timestamp: inquiry.timestamp,
+      shopperEmail: inquiry.shopper?.email || undefined,
+      shopperPhone: inquiry.shopper?.phoneNumber || undefined,
     };
   }
 }
