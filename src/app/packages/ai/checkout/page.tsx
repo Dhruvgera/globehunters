@@ -21,6 +21,7 @@ import { getSessionItem, removeSessionItem, setSessionItem } from "@/lib/storage
 import { PackageProposalPdfDialog } from "@/components/packages/PackageProposalPdfDialog";
 import type { PackageProposalInput } from "@/lib/packages/packageProposalPdf";
 import { payAtPropertyTaxesForHotels } from "@/lib/packages/payAtProperty";
+import { fetchHotelContentImages, isRealHotelImageUrl } from "@/lib/hotels/hotelContentImage";
 import { usePayAtPropertyTotal } from "@/hooks/usePayAtPropertyTotal";
 import { ArrowLeft, CalendarDays, Clock, Download, Loader2, Users } from "lucide-react";
 
@@ -671,7 +672,9 @@ function AiCheckoutContent() {
         : [draft.flight.outbound, ...(draft.flight.inbound ? [draft.flight.inbound] : [])]
       ).map((segment) => flightSegmentToSummaryLeg(draft.flight!, segment))
     : [];
-  const destinationDrafts = useMemo<AiDestinationDraft[]>(() => {
+  // Photos fetched here when the planner handed over a placeholder (e.g. booked before its image lookup finished).
+  const [hotelImageById, setHotelImageById] = useState<Record<string, string>>({});
+  const baseDestinationDrafts = useMemo<AiDestinationDraft[]>(() => {
     if (draft?.destinations?.length) return draft.destinations;
     if (!draft) return [];
     return [
@@ -686,6 +689,34 @@ function AiCheckoutContent() {
       },
     ];
   }, [draft]);
+  const destinationDrafts = useMemo<AiDestinationDraft[]>(
+    () =>
+      baseDestinationDrafts.map((destination) => {
+        const hotel = destination.hotel;
+        const fetchedImage = hotel?.id ? hotelImageById[hotel.id] : undefined;
+        return hotel && fetchedImage && !isRealHotelImageUrl(hotel.imageSrc)
+          ? { ...destination, hotel: { ...hotel, imageSrc: fetchedImage } }
+          : destination;
+      }),
+    [baseDestinationDrafts, hotelImageById]
+  );
+  useEffect(() => {
+    const missing = baseDestinationDrafts
+      .map((destination) => destination.hotel)
+      .filter((hotel): hotel is Hotel => Boolean(hotel?.id) && !isRealHotelImageUrl(hotel?.imageSrc));
+    if (missing.length === 0) return;
+    let cancelled = false;
+    missing.forEach((hotel) => {
+      fetchHotelContentImages(hotel)
+        .then((images) => {
+          if (!cancelled && images[0]) setHotelImageById((current) => ({ ...current, [hotel.id]: images[0] }));
+        })
+        .catch(() => undefined);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [baseDestinationDrafts]);
   const dateMismatch = destinationDrafts.find((destination) => {
     const arrivalDate = arrivalDateForDestination(destination, draft?.flight);
     const hotelCheckIn = hotelCheckInForDestination(destination);

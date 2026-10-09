@@ -30,6 +30,7 @@ import { calculateNights } from "@/lib/hotels/nights";
 import { formatFareLabel, normalizeCabinClass } from "@/lib/utils";
 import { getSessionItem, removeSessionItem, setSessionItem } from "@/lib/storage/safeSessionStorage";
 import { payAtPropertyTaxesForHotels } from "@/lib/packages/payAtProperty";
+import { fetchHotelContentImages, isRealHotelImageUrl } from "@/lib/hotels/hotelContentImage";
 import { usePayAtPropertyTotal } from "@/hooks/usePayAtPropertyTotal";
 import {
   DEFAULT_FILTERS,
@@ -468,14 +469,6 @@ function AmenityIcon({ label }: { label: string }) {
   return <Icon className="h-4 w-4 flex-shrink-0 text-[#3754ED]" />;
 }
 
-function isRealHotelImageUrl(value: string | undefined | null): value is string {
-  const text = String(value || "").trim();
-  if (!text) return false;
-  if (text.includes("/hotel-placeholder")) return false;
-  if (text.includes("/figma/")) return false;
-  return /^https?:\/\//i.test(text) || text.startsWith("/");
-}
-
 function firstRealImage(values: Array<string | undefined | null>): string | undefined {
   return values.find(isRealHotelImageUrl);
 }
@@ -489,16 +482,6 @@ function hotelImageKey(value: string | undefined | null) {
   } catch {
     return src.split("?")[0] || src;
   }
-}
-
-async function fetchPropertyContentImage(hotel: Hotel) {
-  const raw = rawRecord(hotel.rawSearchResult);
-  const code = numberValue(raw?.hotel_id ?? raw?.hotelId ?? hotel.id);
-  if (!code || code <= 0) return null;
-  const response = await fetch(`/api/hotels/content?code=${encodeURIComponent(String(code))}`);
-  const data = await response.json().catch(() => null);
-  if (!response.ok || !data?.ok) return null;
-  return firstRealImage([data.imageUrl, ...(Array.isArray(data.hotelImages) ? data.hotelImages : [])]) || null;
 }
 
 async function fetchSelectedHotelImage(
@@ -520,8 +503,11 @@ async function fetchSelectedHotelImage(
       : vMapId && vMapId > 0
         ? [0, { vMapId }]
         : null;
+  // The content API is fast; only fall back to the slower supplier detail calls when it has nothing usable.
+  const contentImages = await withSearchTimeout(fetchHotelContentImages(hotel), `Hotel image for ${hotel.name}`, 10).catch(() => []);
+  const contentImage = contentImages.find((image) => !excludedImageKeys.has(hotelImageKey(image)));
+  if (contentImage) return contentImage;
   const settled = await Promise.allSettled([
-    withSearchTimeout(fetchPropertyContentImage(hotel), `Hotel image for ${hotel.name}`),
     detailPayload
       ? withSearchTimeout(hotelService.hotelSearchDetails(detailPayload), `Hotel details for ${hotel.name}`)
       : Promise.resolve(null),
@@ -532,9 +518,8 @@ async function fetchSelectedHotelImage(
         )
       : Promise.resolve(null),
   ]);
-  const contentImage = settled[0]?.status === "fulfilled" ? settled[0].value : null;
-  const payloads = settled.slice(1).flatMap((result) => (result.status === "fulfilled" && result.value ? [result.value] : []));
-  const candidates = uniqueStrings([contentImage || undefined, ...collectImageUrls(payloads, 12)], 12);
+  const payloads = settled.flatMap((result) => (result.status === "fulfilled" && result.value ? [result.value] : []));
+  const candidates = uniqueStrings(collectImageUrls(payloads, 12), 12);
   return candidates.find((image) => isRealHotelImageUrl(image) && !excludedImageKeys.has(hotelImageKey(image))) || null;
 }
 
@@ -2346,8 +2331,10 @@ function AiPackageContent() {
     selectedImageEnrichmentAttemptedRef.current.add(attemptKey);
     setHotelImageLoadingById((current) => ({ ...current, [selectedHotel.id]: true }));
 
+    let finished = false;
     async function enrichSelectedHotelImage() {
       const imageSrc = await fetchSelectedHotelImage(selectedHotel, storeHotelSearch, failedImageKeys).catch(() => null);
+      finished = true;
       if (cancelled) return;
       setHotelImageLoadingById((current) => ({ ...current, [selectedHotel.id]: false }));
       if (!imageSrc) return;
@@ -2371,12 +2358,28 @@ function AiPackageContent() {
         };
       });
       setHotelImageFailedById((current) => ({ ...current, [selectedHotel.id]: false }));
+      // Keep the photo across reloads and pass it on to the booking draft.
+      const cached = readAiPackageLiveCache(paramsKey);
+      if (cached?.hotel && isSameHotel(cached.hotel, selectedHotel)) {
+        writeAiPackageLiveCache({
+          paramsKey,
+          flight: cached.flight,
+          flightRequestId: cached.flightRequestId,
+          hotel: { ...cached.hotel, imageSrc },
+          hotelOptions: cached.hotelOptions?.map((hotel) => (isSameHotel(hotel, selectedHotel) ? { ...hotel, imageSrc } : hotel)),
+        });
+      }
     }
 
     void enrichSelectedHotelImage();
     return () => {
       cancelled = true;
+      // The hotel object often changes mid-lookup (prices, room choice). Let the next run retry
+      // instead of leaving the card stuck on "Loading hotel image".
+      if (!finished) selectedImageEnrichmentAttemptedRef.current.delete(attemptKey);
     };
+    // paramsKey only scopes the cache write; the enrichment is keyed to the selected hotel.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDestinationId, hotelImageFailedById, liveSearch.hotel, storeHotelSearch]);
 
   useEffect(() => {

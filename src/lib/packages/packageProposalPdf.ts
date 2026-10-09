@@ -310,7 +310,7 @@ export async function buildPackageProposalPdf(input: PackageProposalInput): Prom
     ...(allActivities.length > 0
       ? [{ label: `Activities (${allActivities.length})`, amount: activitiesCost > 0 ? packageCustomerTotal(activitiesCost, input.markupPercent) : undefined }]
       : []),
-    { label: "Taxes and fees" },
+    { label: payAtProperty > 0 ? "Taxes and fees (excl. local fees)" : "Taxes and fees" },
   ];
   includedRows.forEach((row, index) => {
     const rowY = y + 8 + index * 6.5;
@@ -455,7 +455,6 @@ export async function buildPackageProposalPdf(input: PackageProposalInput): Prom
   });
 
   // What's included
-  sectionTitle("What's included");
   const totalNights = destinations.reduce((sum, destination) => sum + nightsBetween(destination.hotelCheckIn, destination.hotelCheckOut), 0);
   const inclusions = [
     input.flightLegs.length > 0
@@ -469,6 +468,14 @@ export async function buildPackageProposalPdf(input: PackageProposalInput): Prom
       : "",
     payAtProperty > 0 ? `Taxes and fees, except ${money(payAtProperty)} local fees payable at the property` : "All taxes and fees",
   ].filter(Boolean);
+  setText(8, MUTED); // wrap at the size the disclaimer is printed in
+  const disclaimerLines = wrap(
+    "Prices and availability are live and may change until your booking is confirmed. Hotel and activity images are supplied by our partners and are for illustration.",
+    contentWidth
+  );
+  // Keep the list and disclaimer on one page rather than orphaning the last bullets.
+  ensureRoom(16 + inclusions.length * 6 + 4 + disclaimerLines.length * 3.5 + 2);
+  sectionTitle("What's included");
   inclusions.forEach((item) => {
     ensureRoom(7);
     pdf.setFillColor(...GREEN);
@@ -480,11 +487,7 @@ export async function buildPackageProposalPdf(input: PackageProposalInput): Prom
   y += 4;
   ensureRoom(14);
   setText(8, MUTED);
-  pdf.text(
-    wrap("Prices and availability are live and may change until your booking is confirmed. Hotel and activity images are supplied by our partners and are for illustration.", contentWidth),
-    margin,
-    y
-  );
+  pdf.text(disclaimerLines, margin, y);
 
   const pageCount = pdf.getNumberOfPages();
   for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
