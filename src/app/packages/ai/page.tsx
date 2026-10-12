@@ -22,14 +22,14 @@ import { packageService } from "@/services/api/packageService";
 import { useBookingStore } from "@/store/bookingStore";
 import type { ActivityProduct } from "@/types/activities";
 import type { Flight } from "@/types/flight";
-import type { Hotel } from "@/types/hotel";
+import type { Hotel, HotelBedsTaxItem } from "@/types/hotel";
 import type { SearchParams } from "@/types/flight";
 import type { HolidayDestination } from "@/types/holidayPackage";
 import type { PriceCheckResult, TransformedPriceOption } from "@/types/priceCheck";
 import { calculateNights } from "@/lib/hotels/nights";
 import { formatFareLabel, normalizeCabinClass } from "@/lib/utils";
 import { getSessionItem, removeSessionItem, setSessionItem } from "@/lib/storage/safeSessionStorage";
-import { payAtPropertyTaxesForHotels } from "@/lib/packages/payAtProperty";
+import { payAtPropertyTaxesForHotels, vyspaRoomLocalFees } from "@/lib/packages/payAtProperty";
 import { fetchHotelContentImages, isRealHotelImageUrl } from "@/lib/hotels/hotelContentImage";
 import { usePayAtPropertyTotal } from "@/hooks/usePayAtPropertyTotal";
 import {
@@ -146,6 +146,8 @@ type RichHotelRoom = {
   inclusions?: string[];
   /** Hotelbeds tax breakdown for this rate; undefined when the supplier sent none. */
   taxes?: Record<string, unknown> | null;
+  /** Vyspa fees payable at the property for this rate; undefined when the supplier sent none. */
+  localFees?: HotelBedsTaxItem[];
 };
 
 type RichHotelDetails = {
@@ -333,6 +335,7 @@ function collectRooms(value: unknown, limit = 8): RichHotelRoom[] {
     const id = textValue(record.id ?? record.search_result_detail_id ?? record.roomId ?? record.room_id ?? record.roomCode ?? record.room_code);
     const rateKey = textValue(record.rateKey ?? record.rate_key);
     const taxesNode = record.hotelBedsTaxes !== undefined ? record.hotelBedsTaxes : rawRecord(record._hotelbeds)?.taxes;
+    const localFees = vyspaRoomLocalFees(record.locally_payable_fees ?? record.locallyPayableFees);
     const inclusions = uniqueStrings(
       [
         ...Array.from(name.matchAll(/\b(king(?: size)? bed|queen(?: size)? bed|double bed|twin beds?|single bed|sofa bed)\b/gi)).map((match) => sanitizeInclusion(match[1])),
@@ -368,6 +371,7 @@ function collectRooms(value: unknown, limit = 8): RichHotelRoom[] {
       refundable,
       inclusions: inclusions.length > 0 ? inclusions : undefined,
       taxes: taxesNode === undefined ? undefined : rawRecord(taxesNode),
+      localFees,
     });
   };
   const walk = (node: unknown) => {
@@ -745,6 +749,10 @@ function compactHotelForSession(hotel: Hotel | null): Hotel | null {
           suppliers: raw.suppliers,
           selectedRoomId: raw.selectedRoomId,
           selectedRateKey: raw.selectedRateKey,
+          selectedLocalFees: raw.selectedLocalFees,
+          SellCur: raw.SellCur,
+          MinLocallyPayableFeeRO: raw.MinLocallyPayableFeeRO,
+          MinLocallyPayableFeeBB: raw.MinLocallyPayableFeeBB,
           _hotelbeds: rawRecord(raw._hotelbeds)
             ? {
                 cheapest: rawRecord((raw._hotelbeds as Record<string, unknown>).cheapest)
@@ -3863,6 +3871,7 @@ function AiPackageContent() {
                 ...raw,
                 selectedRoomId: room.id,
                 selectedRateKey: room.rateKey,
+                selectedLocalFees: room.localFees,
                 _hotelbeds: hotelbeds
                   ? {
                       ...hotelbeds,

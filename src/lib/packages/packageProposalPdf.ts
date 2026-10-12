@@ -70,11 +70,40 @@ function normalizeCurrency(currency: string) {
   return /^[A-Z]{3}$/.test(raw) ? raw : "GBP";
 }
 
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+/** Accepts ISO dates ("2027-01-13") and flight display dates ("Wed, 13 Jan 27" / "13 Jan 2027"). */
+function parseTripDate(value: string | undefined): Date | null {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  const iso = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) {
+    const date = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  const display = text.match(/(\d{1,2})\s+([A-Za-z]{3})[A-Za-z]*\.?,?\s+(\d{2,4})/);
+  if (!display) return null;
+  const month = MONTHS.indexOf(display[2].toLowerCase());
+  if (month < 0) return null;
+  const year = Number(display[3]) < 100 ? 2000 + Number(display[3]) : Number(display[3]);
+  const date = new Date(year, month, Number(display[1]));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function pdfDate(value: string | undefined, fallback = "Date to be confirmed") {
-  if (!value) return fallback;
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return fallback;
+  const date = parseTripDate(value);
+  if (!date) return value?.trim() || fallback;
   return new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" }).format(date);
+}
+
+/** "London All Airports" / "London (All airports)" -> "London". */
+function cityLabel(value: string) {
+  return value
+    .replace(/\(\s*all airports\s*\)/i, "")
+    .replace(/\ball airports\b/i, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/[\s,–-]+$/, "")
+    .trim();
 }
 
 function nightsBetween(checkIn?: string, checkOut?: string) {
@@ -208,10 +237,16 @@ export async function buildPackageProposalPdf(input: PackageProposalInput): Prom
   const destinations = input.destinations.filter((destination) => destination.name);
   const allActivities = destinations.flatMap((destination) => destination.activities);
   const activitiesCost = allActivities.reduce((sum, activity) => sum + (activity.price && activity.price > 0 ? activity.price : 0), 0);
-  const origin = input.origin?.trim() || input.flightLegs[0]?.from || input.flightLegs[0]?.fromCode || "";
+  const origin = cityLabel(input.origin?.trim() || input.flightLegs[0]?.from || input.flightLegs[0]?.fromCode || "");
   const destinationNames = destinations.map((destination) => destination.name).join("  ·  ");
-  const tripStart = destinations[0]?.hotelCheckIn || input.flightLegs[0]?.date;
-  const tripEnd = destinations.at(-1)?.hotelCheckOut || input.flightLegs.at(-1)?.arrivalDate || input.flightLegs.at(-1)?.date;
+  // The holiday runs from the outbound departure to the final arrival home; hotel dates only fill in when there are no flights.
+  const firstLeg = input.flightLegs[0];
+  const lastLeg = input.flightLegs.at(-1);
+  const tripStart = (parseTripDate(firstLeg?.date) ? firstLeg?.date : undefined) || destinations[0]?.hotelCheckIn;
+  const tripEnd =
+    (parseTripDate(lastLeg?.arrivalDate) ? lastLeg?.arrivalDate : undefined) ||
+    (parseTripDate(lastLeg?.date) ? lastLeg?.date : undefined) ||
+    destinations.at(-1)?.hotelCheckOut;
 
   const HOTEL_ASPECT = 3 / 2;
   const ACTIVITY_ASPECT = 4 / 3;

@@ -21,7 +21,7 @@ import { getSessionItem, removeSessionItem, setSessionItem } from "@/lib/storage
 import { PackageProposalPdfDialog } from "@/components/packages/PackageProposalPdfDialog";
 import type { PackageProposalInput } from "@/lib/packages/packageProposalPdf";
 import { payAtPropertyTaxesForHotels } from "@/lib/packages/payAtProperty";
-import { fetchHotelContentImages, isRealHotelImageUrl } from "@/lib/hotels/hotelContentImage";
+import { fetchHotelContent, isRealHotelImageUrl, type HotelContent } from "@/lib/hotels/hotelContentImage";
 import { usePayAtPropertyTotal } from "@/hooks/usePayAtPropertyTotal";
 import { ArrowLeft, CalendarDays, Clock, Download, Loader2, Users } from "lucide-react";
 
@@ -172,6 +172,11 @@ function normalizeCurrencyCode(value?: string) {
   if (raw === "$") return "USD";
   if (raw === "â‚¬" || raw === "€") return "EUR";
   return /^[A-Z]{3}$/.test(raw) ? raw : "GBP";
+}
+
+function hasHotelAddress(hotel?: Hotel | null) {
+  const raw = rawHotelRecord(hotel);
+  return [raw?.address1, raw?.address2].some((part) => typeof part === "string" && part.trim().length > 0);
 }
 
 function rawHotelRecord(hotel?: Hotel | null) {
@@ -460,6 +465,21 @@ function extractAiHotelbedsRateKey(hotel?: Hotel | null) {
   return String(cheapest?.rateKey || "").trim();
 }
 
+/** Meal plan for the folder note, e.g. "Room only". Refundability is recorded separately. */
+function aiHotelBoardName(hotel: Hotel) {
+  const raw = rawHotelRecord(hotel);
+  const hotelbeds = raw?._hotelbeds && typeof raw._hotelbeds === "object" && !Array.isArray(raw._hotelbeds)
+    ? (raw._hotelbeds as Record<string, unknown>)
+    : null;
+  const cheapest = hotelbeds?.cheapest && typeof hotelbeds.cheapest === "object" && !Array.isArray(hotelbeds.cheapest)
+    ? (hotelbeds.cheapest as Record<string, unknown>)
+    : null;
+  const board = String(cheapest?.boardName || "").trim();
+  if (board) return board;
+  const highlights = (hotel.room?.highlights || []).filter((item) => !/refundable/i.test(item));
+  return highlights.join(" - ") || undefined;
+}
+
 function buildAiPackageNotes(draft: AiBookingDraft, currency: string) {
   const lines: string[] = [];
   const normalizedCurrency = normalizeCurrencyCode(currency);
@@ -672,8 +692,9 @@ function AiCheckoutContent() {
         : [draft.flight.outbound, ...(draft.flight.inbound ? [draft.flight.inbound] : [])]
       ).map((segment) => flightSegmentToSummaryLeg(draft.flight!, segment))
     : [];
-  // Photos fetched here when the planner handed over a placeholder (e.g. booked before its image lookup finished).
-  const [hotelImageById, setHotelImageById] = useState<Record<string, string>>({});
+  // Photo and address fetched here when the planner handed over a placeholder or a hotel without an address
+  // (e.g. booked before its image lookup finished, or a Hotelbeds result outside the search enrichment budget).
+  const [hotelContentById, setHotelContentById] = useState<Record<string, HotelContent>>({});
   const baseDestinationDrafts = useMemo<AiDestinationDraft[]>(() => {
     if (draft?.destinations?.length) return draft.destinations;
     if (!draft) return [];
@@ -693,23 +714,36 @@ function AiCheckoutContent() {
     () =>
       baseDestinationDrafts.map((destination) => {
         const hotel = destination.hotel;
-        const fetchedImage = hotel?.id ? hotelImageById[hotel.id] : undefined;
-        return hotel && fetchedImage && !isRealHotelImageUrl(hotel.imageSrc)
-          ? { ...destination, hotel: { ...hotel, imageSrc: fetchedImage } }
-          : destination;
+        const content = hotel?.id ? hotelContentById[hotel.id] : undefined;
+        if (!hotel || !content) return destination;
+        const raw = rawHotelRecord(hotel);
+        const image = !isRealHotelImageUrl(hotel.imageSrc) ? content.images[0] : undefined;
+        const address = !hasHotelAddress(hotel) ? content.address : undefined;
+        if (!image && !address) return destination;
+        return {
+          ...destination,
+          hotel: {
+            ...hotel,
+            ...(image ? { imageSrc: image } : {}),
+            ...(address ? { rawSearchResult: { ...(raw || {}), address1: address } } : {}),
+          },
+        };
       }),
-    [baseDestinationDrafts, hotelImageById]
+    [baseDestinationDrafts, hotelContentById]
   );
   useEffect(() => {
     const missing = baseDestinationDrafts
       .map((destination) => destination.hotel)
-      .filter((hotel): hotel is Hotel => Boolean(hotel?.id) && !isRealHotelImageUrl(hotel?.imageSrc));
+      .filter(
+        (hotel): hotel is Hotel =>
+          Boolean(hotel?.id) && (!isRealHotelImageUrl(hotel?.imageSrc) || !hasHotelAddress(hotel))
+      );
     if (missing.length === 0) return;
     let cancelled = false;
     missing.forEach((hotel) => {
-      fetchHotelContentImages(hotel)
-        .then((images) => {
-          if (!cancelled && images[0]) setHotelImageById((current) => ({ ...current, [hotel.id]: images[0] }));
+      fetchHotelContent(hotel)
+        .then((content) => {
+          if (!cancelled && content) setHotelContentById((current) => ({ ...current, [hotel.id]: content }));
         })
         .catch(() => undefined);
     });
@@ -717,6 +751,11 @@ function AiCheckoutContent() {
       cancelled = true;
     };
   }, [baseDestinationDrafts]);
+  // Hand the enriched hotels on to the payment page, which reads the same session draft.
+  useEffect(() => {
+    if (!draft?.destinations?.length || Object.keys(hotelContentById).length === 0) return;
+    setSessionItem("aiPackageBookingDraft", JSON.stringify({ ...draft, destinations: destinationDrafts }));
+  }, [destinationDrafts, draft, hotelContentById]);
   const dateMismatch = destinationDrafts.find((destination) => {
     const arrivalDate = arrivalDateForDestination(destination, draft?.flight);
     const hotelCheckIn = hotelCheckInForDestination(destination);
@@ -1085,7 +1124,7 @@ function AiCheckoutContent() {
                 total: Number(destination.hotel.price?.total || 0),
                 nightly: destination.hotel.price?.nightly,
                 rateKey: extractAiHotelbedsRateKey(destination.hotel),
-                boardName: destination.hotel.room?.highlights?.join(" - ") || destination.hotel.room?.name,
+                boardName: aiHotelBoardName(destination.hotel),
                 refundable: destination.hotel.refundable ?? undefined,
                 localPayableTaxes: extractAiHotelbedsTaxes(destination.hotel),
               },
@@ -1239,7 +1278,12 @@ function AiCheckoutContent() {
                         {destination.name} - {longDate(hotelCheckInForDestination(destination))} to {longDate(hotelCheckOutForDestination(destination))}
                       </div>
                       <h3 className="mt-1 text-xl font-bold text-[#010D50]">{destination.hotel?.name || "Selected hotel"}</h3>
-                      <p className="mt-1 text-sm text-[#3A478A]">{destination.hotel?.distanceLabel}</p>
+                      <p className="mt-1 text-sm text-[#3A478A]">
+                        {destination.hotel?.distanceLabel ||
+                          [rawHotelRecord(destination.hotel)?.address1, rawHotelRecord(destination.hotel)?.address2]
+                            .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
+                            .join(", ")}
+                      </p>
                       {destination.hotel?.room?.name ? (
                         <div className="mt-3 rounded-xl border border-[#DFE0E4] bg-[#F5F7FF] p-3">
                           <div className="text-xs font-medium text-[#3A478A]">Selected room</div>
