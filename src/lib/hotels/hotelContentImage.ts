@@ -6,24 +6,31 @@ export function isRealHotelImageUrl(value: string | undefined | null): value is 
   return /^https?:\/\//i.test(text) || text.startsWith("/");
 }
 
+type ContentHotel = { id?: string; imageSrc?: string; rawSearchResult?: unknown };
+
 /**
- * Hotelbeds hotel code, only for hotels that came from the Hotelbeds search. Vyspa ids live in a
- * different number space, so looking them up in the content API would return an unrelated hotel.
+ * Hotelbeds hotel code for the content API. Hotelbeds-direct results carry it as their id. Vyspa ids live in a
+ * different number space (looking them up returns an unrelated hotel), but Vyspa hotels supplied by Hotelbeds use
+ * Hotelbeds photos whose path holds the code, e.g. photos.hotelbeds.com/giata/original/14/141604/141604a_hb_ro_063.jpg.
  */
-function hotelContentCode(hotel: { id?: string; rawSearchResult?: unknown }) {
+function hotelContentCode(hotel: ContentHotel) {
   const raw =
     hotel.rawSearchResult && typeof hotel.rawSearchResult === "object" && !Array.isArray(hotel.rawSearchResult)
       ? (hotel.rawSearchResult as Record<string, unknown>)
       : null;
-  if (String(raw?.provider || "").toLowerCase() !== "hotelbeds") return null;
-  const code = Number(raw?.providerHotelCode ?? raw?.hotel_id ?? raw?.hotelId ?? hotel.id);
+  const fromId =
+    String(raw?.provider || "").toLowerCase() === "hotelbeds"
+      ? Number(raw?.providerHotelCode ?? raw?.hotel_id ?? raw?.hotelId ?? hotel.id)
+      : NaN;
+  const imageCode = String(hotel.imageSrc || "").match(/photos\.hotelbeds\.com\/giata\/(?:[a-z]+\/)?\d{2}\/(\d+)\//i)?.[1];
+  const code = Number.isFinite(fromId) && fromId > 0 ? fromId : Number(imageCode);
   return Number.isFinite(code) && code > 0 ? code : null;
 }
 
 export type HotelContent = { images: string[]; address?: string };
 
 /** Photos (main image first) and street address from the hotel content API (Hotelbeds). Fast compared to supplier detail calls. */
-export async function fetchHotelContent(hotel: { id?: string; rawSearchResult?: unknown }): Promise<HotelContent | null> {
+export async function fetchHotelContent(hotel: ContentHotel): Promise<HotelContent | null> {
   const code = hotelContentCode(hotel);
   if (!code) return null;
   const response = await fetch(`/api/hotels/content?code=${encodeURIComponent(String(code))}`);
@@ -38,6 +45,6 @@ export async function fetchHotelContent(hotel: { id?: string; rawSearchResult?: 
 }
 
 /** Real photos from the hotel content API, main image first. */
-export async function fetchHotelContentImages(hotel: { id?: string; rawSearchResult?: unknown }): Promise<string[]> {
+export async function fetchHotelContentImages(hotel: ContentHotel): Promise<string[]> {
   return (await fetchHotelContent(hotel))?.images || [];
 }

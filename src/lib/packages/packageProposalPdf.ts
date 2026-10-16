@@ -431,7 +431,10 @@ export async function buildPackageProposalPdf(input: PackageProposalInput): Prom
         typeof hotel.refundable === "boolean" ? (hotel.refundable ? "Refundable" : "Non-refundable") : "",
       ].filter((value, index, list) => value && list.indexOf(value) === index);
       if (highlights.length) wrap(highlights.join(" · "), textWidth).slice(0, 2).forEach((text) => details.push({ text, size: 8.5, color: MUTED }));
-      if (hotel.amenities?.length) wrap(`Amenities: ${hotel.amenities.slice(0, 8).join(", ")}`, textWidth).slice(0, 2).forEach((text) => details.push({ text, size: 8.5, color: MUTED }));
+      // Hotel amenities describe the property; a breakfast amenity on a room-only booking reads as included.
+      const roomIncludesMeals = /breakfast|half board|full board|all inclusive/i.test([hotel.roomName, ...(hotel.roomHighlights || [])].join(" "));
+      const amenities = (hotel.amenities || []).filter((amenity) => roomIncludesMeals || !/breakfast/i.test(amenity));
+      if (amenities.length) wrap(`Amenities: ${amenities.slice(0, 8).join(", ")}`, textWidth).slice(0, 2).forEach((text) => details.push({ text, size: 8.5, color: MUTED }));
 
       const textHeight = nameLines.length * 5.5 + details.reduce((sum, detail) => sum + detail.size * 0.5, 0) + 2;
       const blockHeight = Math.max(imageHeight, textHeight) + 8;

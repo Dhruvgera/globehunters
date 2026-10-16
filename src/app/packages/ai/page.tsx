@@ -30,11 +30,13 @@ import { calculateNights } from "@/lib/hotels/nights";
 import { formatFareLabel, normalizeCabinClass } from "@/lib/utils";
 import { getSessionItem, removeSessionItem, setSessionItem } from "@/lib/storage/safeSessionStorage";
 import { payAtPropertyTaxesForHotels, vyspaRoomLocalFees } from "@/lib/packages/payAtProperty";
+import { normalizeFlightDate } from "@/lib/packages/flightDates";
 import { fetchHotelContentImages, isRealHotelImageUrl } from "@/lib/hotels/hotelContentImage";
 import { usePayAtPropertyTotal } from "@/hooks/usePayAtPropertyTotal";
 import {
   DEFAULT_FILTERS,
   includesBreakfast,
+  isVyspaSearchCriteriaId,
   mapAvailability,
   mealPlanKey,
   normalizeNeighborhoodValue,
@@ -328,7 +330,9 @@ function collectRooms(value: unknown, limit = 8): RichHotelRoom[] {
     const board = sanitizeInclusion(
       textValue(record.boardName ?? record.BoardName ?? record.mealPlan ?? record.meal_name ?? record.MealPlan ?? record.board)
     );
-    const price = numberValue(record.total ?? record.Total ?? record.price ?? record.amount ?? record.net ?? record.net_price ?? record.cust_tot_sell_amt);
+    // Vyspa's customer price (`cust_tot_sell_amt`, in the selling currency) comes first, as on the hotel pages.
+    // Its `net_price` is a different figure (e.g. £1,810.78 vs £1,742.76 sell) and must not be shown to customers.
+    const price = numberValue(record.cust_tot_sell_amt ?? record.total ?? record.Total ?? record.price ?? record.amount ?? record.net ?? record.net_price);
     const currency = textValue(record.currency ?? record.Currency ?? record.SellCur ?? record.sell_currency_code ?? record.currency_code);
     const refundableRaw = record.refundable ?? record.isRefundable;
     const nonRef = record.nonRef;
@@ -424,28 +428,6 @@ function formatIsoDate(date: Date | undefined): string {
   return `${year}-${month}-${day}`;
 }
 
-function normalizeFlightDate(value: string | null | undefined): string {
-  const text = String(value || "").trim();
-  const iso = text.match(/^(\d{4}-\d{2}-\d{2})/);
-  if (iso) return iso[1];
-
-  const display = text.toUpperCase().match(/(?:[A-Z]{3},?\s+)?(\d{1,2})\s+([A-Z]{3})\s+(\d{2}|\d{4})/);
-  if (display) {
-    const months: Record<string, string> = {
-      JAN: "01", FEB: "02", MAR: "03", APR: "04", MAY: "05", JUN: "06",
-      JUL: "07", AUG: "08", SEP: "09", OCT: "10", NOV: "11", DEC: "12",
-    };
-    const month = months[display[2]];
-    if (month) {
-      const year = display[3].length === 2 ? `20${display[3]}` : display[3];
-      return `${year}-${month}-${display[1].padStart(2, "0")}`;
-    }
-  }
-
-  const parsed = new Date(text);
-  return Number.isNaN(parsed.getTime()) ? text : formatIsoDate(parsed);
-}
-
 function isBeforeDateOnly(date: Date, minDate: Date) {
   const dateOnly = new Date(date);
   const minOnly = new Date(minDate);
@@ -508,7 +490,9 @@ async function fetchSelectedHotelImage(
         ? [0, { vMapId }]
         : null;
   // The content API is fast; only fall back to the slower supplier detail calls when it has nothing usable.
-  const contentImages = await withSearchTimeout(fetchHotelContentImages(hotel), `Hotel image for ${hotel.name}`, 10).catch(() => []);
+  // A failed photo is cleared from the hotel, but its URL still identifies the Hotelbeds hotel for the content API.
+  const contentLookupHotel = { ...hotel, imageSrc: hotel.imageSrc || Array.from(excludedImageKeys)[0] };
+  const contentImages = await withSearchTimeout(fetchHotelContentImages(contentLookupHotel), `Hotel image for ${hotel.name}`, 10).catch(() => []);
   const contentImage = contentImages.find((image) => !excludedImageKeys.has(hotelImageKey(image)));
   if (contentImage) return contentImage;
   const settled = await Promise.allSettled([
@@ -664,6 +648,41 @@ function selectRecommendedHotel(hotels: Hotel[], context: HotelRecommendationCon
       : hotels.filter((hotel) => hotel.starRating >= 3 && hotel.starRating <= 4);
   const candidates = preferredPool.length > 0 ? preferredPool : hotels;
   return sortHotelsByRecommendation(candidates, context)[0] || candidates[0];
+}
+
+type HotelAvailabilityParams = Parameters<typeof hotelService.searchAvailabilityV3>[0];
+
+const AI_HOTEL_SEARCH_MAX_POLLS = 6;
+const AI_HOTEL_SEARCH_POLL_MS = 3000;
+/** Covers the first Vyspa call plus every poll, each of which the server holds for up to the search timeout. */
+const AI_HOTEL_SEARCH_TIMEOUT_SEC =
+  VYSPA_SEARCH_TIMEOUT_SEC + 10 + AI_HOTEL_SEARCH_MAX_POLLS * (VYSPA_SEARCH_TIMEOUT_SEC + AI_HOTEL_SEARCH_POLL_MS / 1000);
+
+function isSearchComplete(value: unknown) {
+  return value === true || value === 1 || value === "1" || String(value).toLowerCase() === "true";
+}
+
+/**
+ * AI packages are booked through Vyspa, so hotels come from Vyspa only. The hybrid search answers first with
+ * Hotelbeds-direct results, which carry no locally payable fees and can only be saved to the folder as manual
+ * requests. Vyspa results arrive over several calls, so poll until Vyspa reports the search complete.
+ */
+async function searchVyspaHotelAvailability(params: Omit<HotelAvailabilityParams, "providerOverride" | "searchCriteriaId">) {
+  let availability = await hotelService.searchAvailabilityV3({ ...params, providerOverride: "vyspa" });
+  for (let attempt = 0; attempt < AI_HOTEL_SEARCH_MAX_POLLS; attempt += 1) {
+    const criteria = rawRecord((availability as unknown as Record<string, unknown>)?.Criteria);
+    const results = (availability as unknown as Record<string, unknown>)?.Results;
+    const hasResults = Array.isArray(results) && results.length > 0;
+    if (isSearchComplete(criteria?.searchComplete) || (hasResults && criteria?.searchComplete == null)) break;
+    const criteriaId = criteria?.searchCriteriaId;
+    await new Promise((resolve) => window.setTimeout(resolve, isVyspaSearchCriteriaId(criteriaId) ? AI_HOTEL_SEARCH_POLL_MS : 750));
+    availability = await hotelService.searchAvailabilityV3({
+      ...params,
+      providerOverride: "vyspa",
+      ...(isVyspaSearchCriteriaId(criteriaId) ? { searchCriteriaId: criteriaId } : {}),
+    });
+  }
+  return availability;
 }
 
 function withSearchTimeout<T>(promise: Promise<T>, label: string, timeoutSeconds = VYSPA_SEARCH_TIMEOUT_SEC + 10): Promise<T> {
@@ -1094,7 +1113,7 @@ function matchingArrivalSegment(segment: PackageDestinationSegment | null | unde
 function flightArrivalDateForSegment(segment: PackageDestinationSegment | null | undefined, flight: Flight | null | undefined) {
   const arrivalSegment = matchingArrivalSegment(segment, flight);
   const lastFlight = arrivalSegment?.individualFlights?.[arrivalSegment.individualFlights.length - 1];
-  return lastFlight?.arrivalDate || arrivalSegment?.arrivalDate || arrivalSegment?.date || "";
+  return normalizeFlightDate(lastFlight?.arrivalDate || arrivalSegment?.arrivalDate || arrivalSegment?.date || "");
 }
 
 function destinationAirportCodeFromParams(params: { get(name: string): string | null }) {
@@ -1427,6 +1446,9 @@ function AiPackageContent() {
   const [hotelImageFailedById, setHotelImageFailedById] = useState<Record<string, boolean>>({});
   const imageEnrichmentAttemptedRef = useRef<Set<string>>(new Set());
   const selectedImageEnrichmentAttemptedRef = useRef<Set<string>>(new Set());
+  // Photos found by enrichment, by hotel id. Room selection can rebuild the hotel from an older object that still
+  // carries the supplier's dead link; this lets the effect put the working photo back instead of giving up.
+  const enrichedHotelImageRef = useRef<Map<string, string>>(new Map());
   const failedHotelImageKeysRef = useRef<Map<string, Set<string>>>(new Map());
   const destinationHydrationAttemptedRef = useRef<Set<string>>(new Set());
   const previousStayPreferenceRef = useRef(stayPreference);
@@ -1835,7 +1857,7 @@ function AiPackageContent() {
         }
 
         const availability = await withSearchTimeout(
-          hotelService.searchAvailabilityV3({
+          searchVyspaHotelAvailability({
             location: resolvedPick.label,
             hidden_id: String(resolvedPick.id),
             hidden_key: String(resolvedPick.loc),
@@ -1848,7 +1870,8 @@ function AiPackageContent() {
             timeout: VYSPA_SEARCH_TIMEOUT_SEC,
             includeFeesInTotal: true,
           }),
-          `Live hotels for ${resolvedPick.label || destination}`
+          `Live hotels for ${resolvedPick.label || destination}`,
+          AI_HOTEL_SEARCH_TIMEOUT_SEC
         );
         if (cancelled) return;
 
@@ -2042,7 +2065,7 @@ function AiPackageContent() {
                 : lookup.find((item) => String(item.loc).toLowerCase() === "city") || lookup[0];
             if (!resolvedPick?.id || !resolvedPick?.loc) throw new Error(`No matching live hotel destination was found for ${segment.name}.`);
             const availability = await withSearchTimeout(
-              hotelService.searchAvailabilityV3({
+              searchVyspaHotelAvailability({
                 location: resolvedPick.label || segment.name,
                 hidden_id: String(resolvedPick.id),
                 hidden_key: String(resolvedPick.loc),
@@ -2055,7 +2078,8 @@ function AiPackageContent() {
                 timeout: VYSPA_SEARCH_TIMEOUT_SEC,
                 includeFeesInTotal: true,
               }),
-              `Live hotels for ${resolvedPick.label || segment.name}`
+              `Live hotels for ${resolvedPick.label || segment.name}`,
+              AI_HOTEL_SEARCH_TIMEOUT_SEC
             );
             const nights = calculateNights(hotelCheckInForSegment(segment), hotelCheckOutForSegment(segment)) || 1;
             const parsed = mapAvailability(availability, nights, rooms);
@@ -2327,6 +2351,24 @@ function AiPackageContent() {
     );
   }, []);
 
+  // Suppliers sometimes send photo links that return 403. Probe the selected hotel's photo directly so a dead link
+  // is replaced even when the card image never renders (lazy loading), before it reaches the review page and PDF.
+  const selectedHotelId = liveSearch.hotel?.id;
+  const selectedHotelImage = liveSearch.hotel?.imageSrc;
+  useEffect(() => {
+    if (!selectedHotelId || !isRealHotelImageUrl(selectedHotelImage)) return;
+    let cancelled = false;
+    const probe = new window.Image();
+    probe.onerror = () => {
+      if (!cancelled) markHotelImageFailed(selectedHotelId, selectedHotelImage);
+    };
+    probe.src = selectedHotelImage;
+    return () => {
+      cancelled = true;
+      probe.onerror = null;
+    };
+  }, [markHotelImageFailed, selectedHotelId, selectedHotelImage]);
+
   useEffect(() => {
     if (!liveSearch.hotel) return;
     const shouldRetryFailedImage = hotelImageFailedById[liveSearch.hotel.id];
@@ -2335,6 +2377,14 @@ function AiPackageContent() {
     const selectedHotel = liveSearch.hotel;
     const failedImageKeys = failedHotelImageKeysRef.current.get(selectedHotel.id) || new Set<string>();
     const attemptKey = `${selectedHotel.id}:${Array.from(failedImageKeys).sort().join("|")}`;
+    const knownImage = enrichedHotelImageRef.current.get(selectedHotel.id);
+    if (knownImage && knownImage !== selectedHotel.imageSrc && !failedImageKeys.has(hotelImageKey(knownImage))) {
+      setLiveSearch((current) =>
+        current.hotel?.id === selectedHotel.id ? { ...current, hotel: { ...current.hotel, imageSrc: knownImage } } : current
+      );
+      setHotelImageFailedById((current) => ({ ...current, [selectedHotel.id]: false }));
+      return;
+    }
     if (selectedImageEnrichmentAttemptedRef.current.has(attemptKey) || failedImageKeys.size >= 3) return;
     selectedImageEnrichmentAttemptedRef.current.add(attemptKey);
     setHotelImageLoadingById((current) => ({ ...current, [selectedHotel.id]: true }));
@@ -2346,6 +2396,7 @@ function AiPackageContent() {
       if (cancelled) return;
       setHotelImageLoadingById((current) => ({ ...current, [selectedHotel.id]: false }));
       if (!imageSrc) return;
+      enrichedHotelImageRef.current.set(selectedHotel.id, imageSrc);
       setLiveSearch((current) => {
         if (!current.hotel || current.hotel.id !== selectedHotel.id) return current;
         return { ...current, hotel: { ...current.hotel, imageSrc } };
@@ -3141,7 +3192,7 @@ function AiPackageContent() {
         }
 
         const availability = await withSearchTimeout(
-          hotelService.searchAvailabilityV3({
+          searchVyspaHotelAvailability({
             location: resolvedPick.label || activeDestination.name,
             hidden_id: String(resolvedPick.id),
             hidden_key: String(resolvedPick.loc),
@@ -3154,7 +3205,8 @@ function AiPackageContent() {
             timeout: VYSPA_SEARCH_TIMEOUT_SEC,
             includeFeesInTotal: true,
           }),
-          `Live hotels for ${resolvedPick.label || activeDestination.name}`
+          `Live hotels for ${resolvedPick.label || activeDestination.name}`,
+          AI_HOTEL_SEARCH_TIMEOUT_SEC
         );
         if (cancelled) return;
 
@@ -3277,7 +3329,7 @@ function AiPackageContent() {
       if (!resolvedPick?.id || !resolvedPick?.loc) throw new Error("No matching live hotel destination was found.");
 
       const availability = await withSearchTimeout(
-        hotelService.searchAvailabilityV3({
+        searchVyspaHotelAvailability({
           location: resolvedPick.label || staySegment.name,
           hidden_id: String(resolvedPick.id),
           hidden_key: String(resolvedPick.loc),
@@ -3290,7 +3342,8 @@ function AiPackageContent() {
           timeout: VYSPA_SEARCH_TIMEOUT_SEC,
           includeFeesInTotal: true,
         }),
-        `Live hotels for ${resolvedPick.label || staySegment.name}`
+        `Live hotels for ${resolvedPick.label || staySegment.name}`,
+        AI_HOTEL_SEARCH_TIMEOUT_SEC
       );
       const nights = calculateNights(hotelStayCheckInDraft, hotelStayCheckOutDraft) || 1;
       const parsed = mapAvailability(availability, nights, rooms);
@@ -3546,7 +3599,7 @@ function AiPackageContent() {
 
       const [hotelResult, activityResult, flightResult] = await Promise.allSettled([
         withSearchTimeout(
-          hotelService.searchAvailabilityV3({
+          searchVyspaHotelAvailability({
             location: resolvedPick.label || name,
             hidden_id: String(resolvedPick.id),
             hidden_key: String(resolvedPick.loc),
@@ -3559,7 +3612,8 @@ function AiPackageContent() {
             timeout: VYSPA_SEARCH_TIMEOUT_SEC,
             includeFeesInTotal: true,
           }),
-          `Live hotels for ${resolvedPick.label || name}`
+          `Live hotels for ${resolvedPick.label || name}`,
+          AI_HOTEL_SEARCH_TIMEOUT_SEC
         ),
         withSearchTimeout(
           activityService.searchActivities({

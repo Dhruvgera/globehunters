@@ -21,6 +21,7 @@ import { getSessionItem, removeSessionItem, setSessionItem } from "@/lib/storage
 import { PackageProposalPdfDialog } from "@/components/packages/PackageProposalPdfDialog";
 import type { PackageProposalInput } from "@/lib/packages/packageProposalPdf";
 import { payAtPropertyTaxesForHotels } from "@/lib/packages/payAtProperty";
+import { normalizeFlightDate } from "@/lib/packages/flightDates";
 import { fetchHotelContent, isRealHotelImageUrl, type HotelContent } from "@/lib/hotels/hotelContentImage";
 import { usePayAtPropertyTotal } from "@/hooks/usePayAtPropertyTotal";
 import { ArrowLeft, CalendarDays, Clock, Download, Loader2, Users } from "lucide-react";
@@ -145,9 +146,11 @@ function arrivalDateForDestination(destination: AiDestinationDraft, flight?: Fli
     : [flight.outbound, ...(flight.inbound ? [flight.inbound] : [])];
   const airportCode = String(destination.airportCode || "").toUpperCase();
   const segment = segments.find((item) => airportCode && item.arrivalAirport.code.toUpperCase() === airportCode)
-    || segments.find((item) => item.arrivalDate === destination.checkIn || item.date === destination.checkIn);
+    || segments.find(
+      (item) => normalizeFlightDate(item.arrivalDate) === destination.checkIn || normalizeFlightDate(item.date) === destination.checkIn
+    );
   const lastFlight = segment?.individualFlights?.[segment.individualFlights.length - 1];
-  return lastFlight?.arrivalDate || segment?.arrivalDate || segment?.date || "";
+  return normalizeFlightDate(lastFlight?.arrivalDate || segment?.arrivalDate || segment?.date || "");
 }
 
 function parseCheckoutDestinations(raw: string | null): AiDestinationDraft[] {
@@ -695,6 +698,8 @@ function AiCheckoutContent() {
   // Photo and address fetched here when the planner handed over a placeholder or a hotel without an address
   // (e.g. booked before its image lookup finished, or a Hotelbeds result outside the search enrichment budget).
   const [hotelContentById, setHotelContentById] = useState<Record<string, HotelContent>>({});
+  // Supplier photo URLs that failed to load (suppliers sometimes send links that return 403), by hotel id.
+  const [failedHotelImageById, setFailedHotelImageById] = useState<Record<string, string>>({});
   const baseDestinationDrafts = useMemo<AiDestinationDraft[]>(() => {
     if (draft?.destinations?.length) return draft.destinations;
     if (!draft) return [];
@@ -717,7 +722,8 @@ function AiCheckoutContent() {
         const content = hotel?.id ? hotelContentById[hotel.id] : undefined;
         if (!hotel || !content) return destination;
         const raw = rawHotelRecord(hotel);
-        const image = !isRealHotelImageUrl(hotel.imageSrc) ? content.images[0] : undefined;
+        const imageFailed = !isRealHotelImageUrl(hotel.imageSrc) || failedHotelImageById[hotel.id] === hotel.imageSrc;
+        const image = imageFailed ? content.images.find((candidate) => candidate !== failedHotelImageById[hotel.id]) : undefined;
         const address = !hasHotelAddress(hotel) ? content.address : undefined;
         if (!image && !address) return destination;
         return {
@@ -729,14 +735,16 @@ function AiCheckoutContent() {
           },
         };
       }),
-    [baseDestinationDrafts, hotelContentById]
+    [baseDestinationDrafts, failedHotelImageById, hotelContentById]
   );
   useEffect(() => {
     const missing = baseDestinationDrafts
       .map((destination) => destination.hotel)
       .filter(
         (hotel): hotel is Hotel =>
-          Boolean(hotel?.id) && (!isRealHotelImageUrl(hotel?.imageSrc) || !hasHotelAddress(hotel))
+          Boolean(hotel?.id) &&
+          !hotelContentById[hotel!.id] &&
+          (!isRealHotelImageUrl(hotel?.imageSrc) || failedHotelImageById[hotel!.id] === hotel?.imageSrc || !hasHotelAddress(hotel))
       );
     if (missing.length === 0) return;
     let cancelled = false;
@@ -749,6 +757,25 @@ function AiCheckoutContent() {
     });
     return () => {
       cancelled = true;
+    };
+    // `hotelContentById` only skips hotels already fetched; re-running when it fills would cancel in-flight lookups.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseDestinationDrafts, failedHotelImageById]);
+  // Probe supplier photos directly; the visible image may never load (lazy) yet the link still reaches the PDF.
+  useEffect(() => {
+    const probes = baseDestinationDrafts
+      .map((destination) => destination.hotel)
+      .filter((hotel): hotel is Hotel => Boolean(hotel?.id) && isRealHotelImageUrl(hotel?.imageSrc))
+      .map((hotel) => {
+        const probe = new window.Image();
+        probe.onerror = () => setFailedHotelImageById((current) => ({ ...current, [hotel.id]: hotel.imageSrc }));
+        probe.src = hotel.imageSrc;
+        return probe;
+      });
+    return () => {
+      probes.forEach((probe) => {
+        probe.onerror = null;
+      });
     };
   }, [baseDestinationDrafts]);
   // Hand the enriched hotels on to the payment page, which reads the same session draft.
@@ -913,7 +940,7 @@ function AiCheckoutContent() {
     } as never);
 
     setHotelSearch({
-      provider: "hotelbeds",
+      provider: isAiHotelbedsHotel(primaryHotel) ? "hotelbeds" : "vyspa",
       location: primaryDestination?.name || draft.search?.destination || "",
       hidden_id: String(raw?.hotel_id || raw?.hotelId || ""),
       hidden_key: String(raw?.searchCriteriaId || ""),
@@ -1270,7 +1297,16 @@ function AiCheckoutContent() {
                   <div key={destination.id || `${destination.name}-${index}`} className="grid gap-4 rounded-xl border border-[#DFE0E4] p-3 md:grid-cols-[220px_1fr_auto]">
                     {destination.hotel?.imageSrc ? (
                       <div className="relative h-40 overflow-hidden rounded-xl bg-[#F5F7FF]">
-                        <Image src={destination.hotel.imageSrc} alt={destination.hotel.name || "Hotel"} fill className="object-cover" />
+                        <Image
+                          src={destination.hotel.imageSrc}
+                          alt={destination.hotel.name || "Hotel"}
+                          fill
+                          className="object-cover"
+                          onError={() => {
+                            const hotel = destination.hotel;
+                            if (hotel?.id && hotel.imageSrc) setFailedHotelImageById((current) => ({ ...current, [hotel.id]: hotel.imageSrc }));
+                          }}
+                        />
                       </div>
                     ) : null}
                     <div>
