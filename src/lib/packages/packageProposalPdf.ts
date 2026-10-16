@@ -399,6 +399,8 @@ export async function buildPackageProposalPdf(input: PackageProposalInput): Prom
   let activityIndex = 0;
   destinations.forEach((destination, destinationIndex) => {
     const nights = nightsBetween(destination.hotelCheckIn, destination.hotelCheckOut);
+    // Keep the stay heading on the same page as at least the top of its hotel card.
+    ensureRoom(9 + (destination.hotel ? (hotelImages[destinationIndex] ? 66 / HOTEL_ASPECT + 10 : 40) : 10));
     sectionTitle(destinations.length > 1 ? `Stay ${destinationIndex + 1}: ${destination.name}` : `Your stay in ${destination.name}`);
     const hotel = destination.hotel;
     if (!hotel) {

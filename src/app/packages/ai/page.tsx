@@ -402,6 +402,73 @@ function collectRooms(value: unknown, limit = 8): RichHotelRoom[] {
   return rooms;
 }
 
+/** The hotel priced and described by one of its live room options (room, board, fees, rate key). */
+function hotelWithSelectedRoom(hotel: Hotel, room: RichHotelRoom): Hotel {
+  const raw = rawRecord(hotel.rawSearchResult);
+  const hotelbeds = rawRecord(raw?._hotelbeds);
+  const cheapest = rawRecord(hotelbeds?.cheapest);
+  return {
+    ...hotel,
+    room: {
+      name: room.name,
+      highlights: [room.board, ...(room.inclusions || []), room.refundable === true ? "Refundable" : room.refundable === false ? "Non-refundable" : ""].filter(Boolean) as string[],
+    },
+    rawSearchResult: raw
+      ? {
+          ...raw,
+          selectedRoomId: room.id,
+          selectedRateKey: room.rateKey,
+          selectedLocalFees: room.localFees,
+          _hotelbeds: hotelbeds
+            ? {
+                ...hotelbeds,
+                cheapest: cheapest
+                  ? {
+                      ...cheapest,
+                      roomName: room.name,
+                      boardName: room.board,
+                      rateKey: room.rateKey || cheapest.rateKey,
+                      ...(room.taxes !== undefined ? { taxes: room.taxes } : {}),
+                    }
+                  : hotelbeds.cheapest,
+              }
+            : raw._hotelbeds,
+        }
+      : hotel.rawSearchResult,
+    refundable: room.refundable ?? hotel.refundable,
+    price: room.price
+      ? {
+          ...hotel.price,
+          total: room.price,
+          nightly: hotel.price.nights > 0 ? Math.round((room.price / hotel.price.nights) * 100) / 100 : room.price,
+          currency: room.currency || hotel.price.currency,
+        }
+      : hotel.price,
+  };
+}
+
+/** Search results only summarise a hotel ("Meal plans: ..."); a specific room is needed for its price, board and fees. */
+function hotelNeedsSpecificRoom(hotel: Hotel) {
+  const raw = rawRecord(hotel.rawSearchResult);
+  const cheapest = rawRecord(rawRecord(raw?._hotelbeds)?.cheapest);
+  const roomName = String(hotel.room?.name || "");
+  return (
+    !raw?.selectedRoomId &&
+    !cheapest?.rateKey &&
+    (/^meal plans?:/i.test(roomName) || /^room options? available$/i.test(roomName))
+  );
+}
+
+async function fetchHotelRoomOptions(hotel: Hotel) {
+  const raw = rawRecord(hotel.rawSearchResult);
+  const criteriaId = raw?.searchCriteriaId;
+  if (typeof criteriaId !== "string" && typeof criteriaId !== "number") return [];
+  const roomHotelId = textValue(raw?.hotel_id ?? raw?.hotelId ?? hotel.id);
+  const srId = textValue(raw?.id ?? raw?.srId);
+  const response = await hotelService.getRoomsV3(criteriaId, roomHotelId || hotel.id, srId || undefined);
+  return collectRooms(response, 48);
+}
+
 function groupRoomOptions(rooms: RichHotelRoom[]) {
   const groups = new Map<string, { name: string; options: RichHotelRoom[] }>();
   for (const room of rooms) {
@@ -518,6 +585,13 @@ function normalizedPlaceName(value: string | undefined | null) {
     .trim();
 }
 
+/** "Las Vegas, NV" -> ["las vegas nv", "las vegas"]: supplier city names leave out the state or country suffix. */
+function placeNameVariants(name: string | undefined | null) {
+  const full = normalizedPlaceName(name);
+  const city = normalizedPlaceName(String(name || "").split(",")[0]);
+  return [full, city].filter((value, index, list) => value && list.indexOf(value) === index);
+}
+
 function hotelPlaceText(hotel: Hotel | null | undefined) {
   if (!hotel) return "";
   return normalizedPlaceName([hotel.name, hotel.distanceLabel, hotel.neighborhood, hotel.cityName, hotel.countryName].filter(Boolean).join(" "));
@@ -547,12 +621,10 @@ function hotelMatchesSegment(hotel: Hotel | null | undefined, segment: PackageDe
   if (hasHotelDates && (hotel.checkInDate !== hotelCheckInForSegment(segment) || hotel.checkOutDate !== hotelCheckOutForSegment(segment))) return false;
   const text = hotelPlaceText(hotel);
   if (!text) return true;
-  const target = normalizedPlaceName(segment.name);
-  if (target && text.includes(target)) return true;
+  if (placeNameVariants(segment.name).some((target) => text.includes(target))) return true;
   const conflictsWithAnotherDestination = allSegments.some((candidate) => {
     if (candidate.id === segment.id) return false;
-    const candidateName = normalizedPlaceName(candidate.name);
-    return Boolean(candidateName && text.includes(candidateName));
+    return placeNameVariants(candidate.name).some((candidateName) => text.includes(candidateName));
   });
   if (conflictsWithAnotherDestination) return false;
   return allSegments.length <= 1;
@@ -662,12 +734,48 @@ function isSearchComplete(value: unknown) {
   return value === true || value === 1 || value === "1" || String(value).toLowerCase() === "true";
 }
 
+type VyspaHotelSearchParams = Omit<HotelAvailabilityParams, "providerOverride" | "searchCriteriaId">;
+
+// Planner effects restart whenever related state changes (flight results, other destinations). Polling Vyspa takes
+// long enough that a restart could otherwise cancel and re-run the same search again and again, so effects share
+// the in-flight search for identical parameters and pick up its result.
+const VYSPA_HOTEL_SEARCH_REUSE_MS = 5 * 60 * 1000;
+const vyspaHotelSearches = new Map<string, { startedAt: number; promise: ReturnType<typeof pollVyspaHotelAvailability> }>();
+
+/** Vyspa reports "no hotels" as `Results: [true, "No hotels found in this area."]`, so count hotel entries only. */
+function hasAvailabilityResults(availability: unknown) {
+  const results = (availability as Record<string, unknown> | null)?.Results;
+  return Array.isArray(results) && results.some((result) => Boolean(result) && typeof result === "object");
+}
+
+function searchVyspaHotelAvailability(params: VyspaHotelSearchParams) {
+  const key = JSON.stringify(params);
+  const existing = vyspaHotelSearches.get(key);
+  if (existing && Date.now() - existing.startedAt < VYSPA_HOTEL_SEARCH_REUSE_MS) return existing.promise;
+  const promise = pollVyspaHotelAvailability(params).then(async (availability) => {
+    if (hasAvailabilityResults(availability)) return availability;
+    // Vyspa occasionally reports a search complete with no hotels (and caches that answer for a while). Rather than
+    // leave the trip unpriced, fall back to the hybrid search; any Hotelbeds-direct hotel it returns is saved to the
+    // folder as a manual request.
+    console.warn("[AI planner] Vyspa returned no hotels; falling back to the hybrid hotel search", params.location);
+    return hotelService.searchAvailabilityV3(params);
+  });
+  vyspaHotelSearches.set(key, { startedAt: Date.now(), promise });
+  const forget = () => {
+    if (vyspaHotelSearches.get(key)?.promise === promise) vyspaHotelSearches.delete(key);
+  };
+  promise.then((availability) => {
+    if (!hasAvailabilityResults(availability)) forget();
+  }, forget);
+  return promise;
+}
+
 /**
  * AI packages are booked through Vyspa, so hotels come from Vyspa only. The hybrid search answers first with
  * Hotelbeds-direct results, which carry no locally payable fees and can only be saved to the folder as manual
  * requests. Vyspa results arrive over several calls, so poll until Vyspa reports the search complete.
  */
-async function searchVyspaHotelAvailability(params: Omit<HotelAvailabilityParams, "providerOverride" | "searchCriteriaId">) {
+async function pollVyspaHotelAvailability(params: VyspaHotelSearchParams) {
   let availability = await hotelService.searchAvailabilityV3({ ...params, providerOverride: "vyspa" });
   for (let attempt = 0; attempt < AI_HOTEL_SEARCH_MAX_POLLS; attempt += 1) {
     const criteria = rawRecord((availability as unknown as Record<string, unknown>)?.Criteria);
@@ -3910,49 +4018,7 @@ function AiPackageContent() {
   };
 
   const selectHotelOption = (hotel: Hotel, room?: RichHotelRoom) => {
-    const raw = rawRecord(hotel.rawSearchResult);
-    const hotelbeds = rawRecord(raw?._hotelbeds);
-    const cheapest = rawRecord(hotelbeds?.cheapest);
-    const nextHotel: Hotel = room
-      ? {
-          ...hotel,
-          room: {
-            name: room.name,
-            highlights: [room.board, ...(room.inclusions || []), room.refundable === true ? "Refundable" : room.refundable === false ? "Non-refundable" : ""].filter(Boolean) as string[],
-          },
-          rawSearchResult: raw
-            ? {
-                ...raw,
-                selectedRoomId: room.id,
-                selectedRateKey: room.rateKey,
-                selectedLocalFees: room.localFees,
-                _hotelbeds: hotelbeds
-                  ? {
-                      ...hotelbeds,
-                      cheapest: cheapest
-                        ? {
-                            ...cheapest,
-                            roomName: room.name,
-                            boardName: room.board,
-                            rateKey: room.rateKey || cheapest.rateKey,
-                            ...(room.taxes !== undefined ? { taxes: room.taxes } : {}),
-                          }
-                        : hotelbeds.cheapest,
-                    }
-                  : raw._hotelbeds,
-              }
-            : hotel.rawSearchResult,
-          refundable: room.refundable ?? hotel.refundable,
-          price: room.price
-            ? {
-                ...hotel.price,
-                total: room.price,
-                nightly: hotel.price.nights > 0 ? Math.round((room.price / hotel.price.nights) * 100) / 100 : room.price,
-                currency: room.currency || hotel.price.currency,
-              }
-            : hotel.price,
-        }
-      : hotel;
+    const nextHotel: Hotel = room ? hotelWithSelectedRoom(hotel, room) : hotel;
     const compactHotel = compactHotelForSession(nextHotel);
     setLiveSearch((current) => ({
       ...current,
@@ -3998,15 +4064,7 @@ function AiPackageContent() {
   useEffect(() => {
     const hotel = liveSearch.hotel;
     if (!hotel || liveSearch.hotelLoading || liveSearch.hotelError) return;
-    const raw = rawRecord(hotel.rawSearchResult);
-    const hotelbeds = rawRecord(raw?._hotelbeds);
-    const cheapest = rawRecord(hotelbeds?.cheapest);
-    const roomName = String(hotel.room?.name || "");
-    const needsSpecificRoom =
-      !raw?.selectedRoomId &&
-      !cheapest?.rateKey &&
-      (/^meal plans?:/i.test(roomName) || /^room options? available$/i.test(roomName));
-    if (!needsSpecificRoom) return;
+    if (!hotelNeedsSpecificRoom(hotel)) return;
 
     const options = roomOptionsByHotelId[hotel.id] || [];
     if (options.length > 0) {
@@ -4017,6 +4075,33 @@ function AiPackageContent() {
     // Functions intentionally excluded: this effect is keyed to selected hotel and room-load state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveSearch.hotel?.id, liveSearch.hotelLoading, liveSearch.hotelError, roomOptionsByHotelId, roomOptionsLoadingByHotelId]);
+
+  // The effect above prices the destination on screen. Other destinations of a multi-stop trip need a specific room
+  // too, or their price, board and pay-at-property fees stay at the search-result summary.
+  const destinationRoomLookupsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    Object.entries(destinationStateById).forEach(([segmentId, state]) => {
+      const hotel = state?.hotel;
+      if (segmentId === activeDestinationId || !hotel || !hotelNeedsSpecificRoom(hotel)) return;
+      const lookupKey = `${segmentId}:${hotel.id}`;
+      if (destinationRoomLookupsRef.current.has(lookupKey)) return;
+      destinationRoomLookupsRef.current.add(lookupKey);
+      void fetchHotelRoomOptions(hotel)
+        .then((rooms) => {
+          if (rooms.length === 0) return;
+          setDestinationStateById((current) => {
+            const latest = current[segmentId];
+            if (!latest?.hotel || latest.hotel.id !== hotel.id || !hotelNeedsSpecificRoom(latest.hotel)) return current;
+            const pricedHotel = hotelWithSelectedRoom(latest.hotel, rooms[0]);
+            return { ...current, [segmentId]: { ...latest, hotel: compactHotelForSession(pricedHotel) || pricedHotel } };
+          });
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          destinationRoomLookupsRef.current.delete(lookupKey);
+        });
+    });
+  }, [activeDestinationId, destinationStateById]);
 
   const applyFlightUpgrade = (nextFlight: Flight, option: TransformedPriceOption, priceCheck: PriceCheckResult | null) => {
     setLiveSearch((current) => ({
