@@ -684,6 +684,7 @@ export async function POST(req: Request) {
     if (!isVyspaSearchCriteriaId(next.searchCriteriaId)) {
       delete next.searchCriteriaId;
     }
+    delete next.freshSearch;
     return next;
   });
   const firstCriteria = (vyspaPayload[0] as any) || {};
@@ -696,6 +697,15 @@ export async function POST(req: Request) {
     ? normalizeSearchCriteriaId(firstCriteria?.searchCriteriaId)
     : null;
   const hybridRequestFingerprint = buildHybridRequestFingerprint(firstCriteria);
+  const freshSearch = payload[0] && typeof payload[0] === 'object' && !Array.isArray(payload[0])
+    ? (payload[0] as Record<string, unknown>).freshSearch === true
+    : false;
+  if (freshSearch && !requestedSearchCriteriaId) {
+    // Supplier result ids expire (e.g. "Hotel Result is expired" when booking), so drop the cached search
+    // for these criteria and start a new one.
+    hybridVyspaCacheByFingerprint.delete(hybridRequestFingerprint);
+    hybridHbCacheByFingerprint.delete(hybridRequestFingerprint);
+  }
 
   if (provider === 'vyspa') {
     const cachedVyspa = getHybridVyspaFromCache({

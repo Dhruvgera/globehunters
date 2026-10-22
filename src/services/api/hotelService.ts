@@ -26,6 +26,8 @@ interface HotelSearchParams {
   searchCriteriaId?: number | string;
   providerOverride?: HotelProvider;
   includeFeesInTotal?: boolean;
+  /** Skip results the server cached for the same criteria and run a new supplier search. */
+  freshSearch?: boolean;
 }
 
 interface CreateHotelFolderParams {
@@ -113,6 +115,9 @@ export class HotelService {
     }
     if (params.includeFeesInTotal) {
       criteria.includeFeesInTotal = true;
+    }
+    if (params.freshSearch) {
+      criteria.freshSearch = true;
     }
 
     

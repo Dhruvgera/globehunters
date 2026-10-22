@@ -629,8 +629,9 @@ function PaymentContent() {
       arrivalDate: seg.arrivalDate || seg.date,
       duration: seg.totalJourneyTime || seg.duration,
       stops: seg.stopDetails || `${seg.stops} Stop${seg.stops !== 1 ? 's' : ''}`,
-      airline: flight?.airline?.name || "",
-      airlineCode: flight?.airline?.code || "",
+      // Each leg can be flown by a different airline (e.g. multi-city), so prefer the leg's own carrier.
+      airline: seg.carrierName || flight?.airline?.name || "",
+      airlineCode: seg.carrierCode || flight?.airline?.code || "",
     }));
   }, [journeySegments, flight]);
 

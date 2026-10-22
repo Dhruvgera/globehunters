@@ -605,14 +605,26 @@ function hotelCheckOutForSegment(segment: PackageDestinationSegment) {
   return segment.hotelCheckOut || segment.checkOut;
 }
 
-function stampHotelsForSegment(hotels: Hotel[], segment: PackageDestinationSegment, locationLabel?: string) {
+function stampHotelsForSegment(
+  hotels: Hotel[],
+  segment: PackageDestinationSegment,
+  locationLabel?: string,
+  searchPick?: { id?: string | number; loc?: string } | null
+) {
   const cityName = locationLabel || segment.name;
-  return hotels.map((hotel) => ({
-    ...hotel,
-    cityName: hotel.cityName || cityName,
-    checkInDate: hotelCheckInForSegment(segment) || hotel.checkInDate,
-    checkOutDate: hotelCheckOutForSegment(segment) || hotel.checkOutDate,
-  }));
+  // Kept on the hotel so the review page can repeat the search when Vyspa reports the result expired.
+  const searchLocation =
+    searchPick?.id && searchPick?.loc ? { label: cityName, id: String(searchPick.id), key: String(searchPick.loc) } : undefined;
+  return hotels.map((hotel) => {
+    const raw = rawRecord(hotel.rawSearchResult);
+    return {
+      ...hotel,
+      cityName: hotel.cityName || cityName,
+      checkInDate: hotelCheckInForSegment(segment) || hotel.checkInDate,
+      checkOutDate: hotelCheckOutForSegment(segment) || hotel.checkOutDate,
+      ...(raw && searchLocation ? { rawSearchResult: { ...raw, searchLocation } } : {}),
+    };
+  });
 }
 
 function hotelMatchesSegment(hotel: Hotel | null | undefined, segment: PackageDestinationSegment, allSegments: PackageDestinationSegment[] = []) {
@@ -878,6 +890,7 @@ function compactHotelForSession(hotel: Hotel | null): Hotel | null {
           selectedRateKey: raw.selectedRateKey,
           selectedLocalFees: raw.selectedLocalFees,
           SellCur: raw.SellCur,
+          searchLocation: raw.searchLocation,
           MinLocallyPayableFeeRO: raw.MinLocallyPayableFeeRO,
           MinLocallyPayableFeeBB: raw.MinLocallyPayableFeeBB,
           _hotelbeds: rawRecord(raw._hotelbeds)
@@ -1986,7 +1999,7 @@ function AiPackageContent() {
         const nights = calculateNights(primaryHotelCheckIn, primaryHotelCheckOut) || 1;
         const parsed = mapAvailability(availability, nights, rooms);
         const stampedHotels = primarySegment
-          ? stampHotelsForSegment(parsed.mapped, primarySegment, resolvedPick.label || destination)
+          ? stampHotelsForSegment(parsed.mapped, primarySegment, resolvedPick.label || destination, resolvedPick)
           : parsed.mapped;
         const recommendedHotel = selectRecommendedHotel(stampedHotels, {
           stayPreference,
@@ -2191,7 +2204,7 @@ function AiPackageContent() {
             );
             const nights = calculateNights(hotelCheckInForSegment(segment), hotelCheckOutForSegment(segment)) || 1;
             const parsed = mapAvailability(availability, nights, rooms);
-            const stampedHotels = stampHotelsForSegment(parsed.mapped, segment, resolvedPick.label || segment.name);
+            const stampedHotels = stampHotelsForSegment(parsed.mapped, segment, resolvedPick.label || segment.name, resolvedPick);
             const recommendedHotel = selectRecommendedHotel(stampedHotels, {
               stayPreference,
               budget,
@@ -3320,7 +3333,7 @@ function AiPackageContent() {
 
         const nights = calculateNights(hotelCheckInForSegment(activeDestination), hotelCheckOutForSegment(activeDestination)) || 1;
         const parsed = mapAvailability(availability, nights, rooms);
-        const stampedHotels = stampHotelsForSegment(parsed.mapped, activeDestination, resolvedPick.label || activeDestination.name);
+        const stampedHotels = stampHotelsForSegment(parsed.mapped, activeDestination, resolvedPick.label || activeDestination.name, resolvedPick);
         const recommendedHotel = selectRecommendedHotel(stampedHotels, {
           stayPreference,
           budget,
@@ -3455,7 +3468,7 @@ function AiPackageContent() {
       );
       const nights = calculateNights(hotelStayCheckInDraft, hotelStayCheckOutDraft) || 1;
       const parsed = mapAvailability(availability, nights, rooms);
-      const nextHotelOptions = stampHotelsForSegment(parsed.mapped, staySegment, resolvedPick.label || staySegment.name);
+      const nextHotelOptions = stampHotelsForSegment(parsed.mapped, staySegment, resolvedPick.label || staySegment.name, resolvedPick);
       // Keep the traveller's current hotel when it is still bookable for the new dates,
       // so changing stay dates doesn't silently swap the property.
       const previousHotel = liveSearch.hotel;
@@ -3758,7 +3771,7 @@ function AiPackageContent() {
       if (hotelResult.status === "fulfilled") {
         const nights = calculateNights(nextCheckIn, nextCheckOut) || 1;
         const parsed = mapAvailability(hotelResult.value, nights, rooms);
-        nextHotelOptions = stampHotelsForSegment(parsed.mapped, nextSegment, resolvedPick.label || name);
+        nextHotelOptions = stampHotelsForSegment(parsed.mapped, nextSegment, resolvedPick.label || name, resolvedPick);
         nextHotel = selectRecommendedHotel(nextHotelOptions, {
           stayPreference,
           budget: newTripBudget,

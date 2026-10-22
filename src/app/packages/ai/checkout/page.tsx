@@ -299,35 +299,43 @@ function extractRoomOptionRows(payload: unknown) {
   return room1options.filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === "object");
 }
 
-function pickFallbackRoomIds(
-  hotel: Hotel,
-  roomOptions: Record<string, unknown>[],
-  desiredCount: number
-) {
+function roomOptionPrice(option: Record<string, unknown>) {
+  return Number(option.cust_tot_sell_amt ?? option.net_price ?? option.price ?? 0);
+}
+
+function rankRoomOptions(hotel: Hotel, roomOptions: Record<string, unknown>[]) {
   const expectedName = roomNameText(hotel);
   const highlights = roomHighlightsText(hotel);
   const expectedTotal = Number(hotel.price?.total || 0);
+  // "Non-refundable" also contains "refund", so read the refund policy explicitly.
+  const expectsRefundable = /non[- ]?refundable/.test(highlights) ? false : highlights.includes("refund") ? true : null;
 
   const scored = roomOptions.map((option, index) => {
     const optionId = String(option.id ?? "").trim();
     const optionName = String(option.room_name ?? option.roomName ?? "").trim().toLowerCase();
     const optionMeal = String(option.meal_name ?? option.mealName ?? option.MealPlan ?? "").trim().toLowerCase();
     const optionRefundable = Number(option.nonRef ?? 0) === 0;
-    const optionPrice = Number(option.cust_tot_sell_amt ?? option.net_price ?? option.price ?? 0);
+    const optionPrice = roomOptionPrice(option);
     let score = 0;
     if (expectedName && optionName && (expectedName.includes(optionName) || optionName.includes(expectedName))) score += 50;
     if (highlights && optionMeal && highlights.includes(optionMeal)) score += 20;
-    if (highlights.includes("refund") && optionRefundable) score += 10;
+    if (expectsRefundable !== null && optionRefundable === expectsRefundable) score += 10;
     if (Number.isFinite(expectedTotal) && expectedTotal > 0 && Number.isFinite(optionPrice) && optionPrice > 0) {
       score -= Math.abs(optionPrice - expectedTotal);
     }
     score -= index * 0.01;
-    return { optionId, score };
+    return { optionId, option, score };
   });
 
-  return scored
-    .filter((row) => row.optionId)
-    .sort((a, b) => b.score - a.score)
+  return scored.filter((row) => row.optionId).sort((a, b) => b.score - a.score);
+}
+
+function pickFallbackRoomIds(
+  hotel: Hotel,
+  roomOptions: Record<string, unknown>[],
+  desiredCount: number
+) {
+  return rankRoomOptions(hotel, roomOptions)
     .slice(0, Math.max(1, desiredCount))
     .map((row) => row.optionId);
 }
@@ -381,6 +389,133 @@ async function resolveAiDestinationRoomIds(destination: AiDestinationDraft, room
   } catch {
     return candidateIds;
   }
+}
+
+const EXPIRED_HOTEL_RESULT_PATTERN = /expired|couldn'?t found any data|could not find any data/i;
+const FRESH_HOTEL_SEARCH_MAX_POLLS = 6;
+const FRESH_HOTEL_SEARCH_POLL_MS = 3000;
+const FRESH_HOTEL_SEARCH_ATTEMPTS = 3;
+// Allow rounding differences between the price shown and the re-searched room before asking the customer.
+const FRESH_HOTEL_PRICE_TOLERANCE = 1;
+
+class HotelPriceChangedError extends Error {}
+
+function isExpiredHotelResultError(message: string) {
+  return EXPIRED_HOTEL_RESULT_PATTERN.test(message);
+}
+
+/** Customer-facing text for a supplier error; the raw response is logged for support instead. */
+function hotelFolderErrorMessage(hotelName: string) {
+  return `We couldn't confirm ${hotelName} with the hotel supplier. Please try again, or go back to the AI planner to choose another hotel.`;
+}
+
+function addToFolderErrorText(response: { message?: string; errors?: string[]; rawResponse?: unknown }) {
+  const raw = response.rawResponse && typeof response.rawResponse === "object" ? (response.rawResponse as Record<string, unknown>) : null;
+  return [response.message, ...(response.errors || []), typeof raw?.details === "string" ? raw.details : ""]
+    .filter((value): value is string => typeof value === "string" && Boolean(value.trim()))
+    .join(" ");
+}
+
+async function freshVyspaHotelSearchLocation(destination: AiDestinationDraft, hotel: Hotel) {
+  const raw = rawHotelRecord(hotel);
+  const stored =
+    raw?.searchLocation && typeof raw.searchLocation === "object" && !Array.isArray(raw.searchLocation)
+      ? (raw.searchLocation as Record<string, unknown>)
+      : null;
+  if (stored?.id && stored?.key) {
+    return { label: String(stored.label || destination.name || ""), id: String(stored.id), key: String(stored.key) };
+  }
+  const name = destination.name || hotel.cityName || "";
+  if (!name) return null;
+  const lookup = await hotelService.lookupCities(name);
+  const pick = lookup.find((item) => String(item.loc).toLowerCase() === "city") || lookup[0];
+  return pick?.id && pick?.loc ? { label: String(pick.label || name), id: String(pick.id), key: String(pick.loc) } : null;
+}
+
+/**
+ * Vyspa search results expire after a while, and adding the hotel to the folder then fails with
+ * "Hotel Result is expired". Search again for the same hotel and dates and pick the same room.
+ * Throws HotelPriceChangedError when that room now costs a different amount, so the customer is never charged a
+ * price they have not seen.
+ */
+async function refreshExpiredVyspaDestination(
+  destination: AiDestinationDraft,
+  search: AiBookingDraft["search"],
+  roomCount: number,
+  currency: string
+): Promise<AiDestinationDraft | null> {
+  const hotel = destination.hotel;
+  const hotelId = resolveAiHotelId(hotel);
+  if (!hotel || !hotelId) return null;
+  const location = await freshVyspaHotelSearchLocation(destination, hotel);
+  if (!location) return null;
+
+  const params = {
+    location: location.label,
+    hidden_id: location.id,
+    hidden_key: location.key,
+    checkIn: hotelCheckInForDestination(destination, search?.checkIn || ""),
+    checkOut: hotelCheckOutForDestination(destination, search?.checkOut || ""),
+    rooms: Math.max(1, Number(search?.rooms || 1)),
+    adults: Math.max(1, Number(search?.adults || 1)),
+    children: Math.max(0, Number(search?.children || 0)),
+    branches: "UK",
+    timeout: 20,
+    includeFeesInTotal: true,
+    providerOverride: "vyspa" as const,
+  };
+  const searchForHotel = async () => {
+    let availability = await hotelService.searchAvailabilityV3({ ...params, freshSearch: true });
+    for (let attempt = 0; attempt < FRESH_HOTEL_SEARCH_MAX_POLLS; attempt += 1) {
+      const criteria = (availability as unknown as Record<string, unknown>)?.Criteria as Record<string, unknown> | undefined;
+      const complete = criteria?.searchComplete === true || String(criteria?.searchComplete) === "true";
+      if (complete || !criteria?.searchCriteriaId) break;
+      await new Promise((resolve) => window.setTimeout(resolve, FRESH_HOTEL_SEARCH_POLL_MS));
+      availability = await hotelService.searchAvailabilityV3({ ...params, searchCriteriaId: criteria.searchCriteriaId as string });
+    }
+    const results = (availability as unknown as Record<string, unknown>)?.Results;
+    const match = (Array.isArray(results) ? results : []).find(
+      (entry): entry is Record<string, unknown> =>
+        Boolean(entry) && typeof entry === "object" && String((entry as Record<string, unknown>).hotel_id ?? "") === hotelId
+    );
+    const responseCriteria = (availability as unknown as Record<string, unknown>)?.Criteria as Record<string, unknown> | undefined;
+    const searchCriteriaId = match?.searchCriteriaId ?? responseCriteria?.searchCriteriaId;
+    const criteriaId = typeof searchCriteriaId === "string" || typeof searchCriteriaId === "number" ? searchCriteriaId : null;
+    return match?.id && criteriaId !== null ? { match, criteriaId } : null;
+  };
+
+  // Vyspa intermittently answers a new search with "No hotels found in this area.", so try a few times.
+  let found: Awaited<ReturnType<typeof searchForHotel>> = null;
+  for (let attempt = 0; attempt < FRESH_HOTEL_SEARCH_ATTEMPTS && !found; attempt += 1) {
+    if (attempt > 0) await new Promise((resolve) => window.setTimeout(resolve, attempt * FRESH_HOTEL_SEARCH_POLL_MS));
+    found = await searchForHotel();
+  }
+  if (!found) return null;
+  const { match, criteriaId } = found;
+
+  const roomsResponse = await hotelService.getRoomsV3(criteriaId, hotelId, String(match.id));
+  const ranked = rankRoomOptions(hotel, extractRoomOptionRows(roomsResponse)).slice(0, Math.max(1, roomCount));
+  if (ranked.length === 0) return null;
+
+  const previousTotal = Number(hotel.price?.total || 0);
+  const refreshedTotal = ranked.reduce((sum, row) => sum + roomOptionPrice(row.option), 0);
+  if (previousTotal > 0 && refreshedTotal > 0 && Math.abs(refreshedTotal - previousTotal) > FRESH_HOTEL_PRICE_TOLERANCE) {
+    const format = (value: number) =>
+      new Intl.NumberFormat("en-GB", { style: "currency", currency: currency || "GBP" }).format(value);
+    throw new HotelPriceChangedError(
+      `The price for ${hotel.name || "your hotel"} has changed from ${format(previousTotal)} to ${format(refreshedTotal)}. Please go back to the AI planner to see the updated trip before booking.`
+    );
+  }
+
+  const raw = rawHotelRecord(hotel) || {};
+  return {
+    ...destination,
+    selectedRoomIds: ranked.map((row) => row.optionId),
+    hotel: {
+      ...hotel,
+      rawSearchResult: { ...raw, id: match.id, srId: match.id, searchCriteriaId: criteriaId, selectedRoomId: ranked[0].optionId },
+    },
+  };
 }
 
 function mapPassengerTypeToFolder(type?: PassengerType | string) {
@@ -1127,9 +1262,38 @@ function AiCheckoutContent() {
           infants: 0,
         }));
 
-        for (const destination of destinationDrafts) {
+        const addVyspaHotel = async (target: AiDestinationDraft) => {
+          const resolvedRoomIds = await resolveAiDestinationRoomIds(target, roomConfigs.length);
+          if (resolvedRoomIds.length === 0) return { ok: false, error: "No live bookable room found." };
+          const hotelRequestItem = {
+            type: "hotel" as const,
+            search_result_id: resolveAiRoomId(target.hotel) || undefined,
+            roomIds: resolvedRoomIds.join(","),
+            roomCodes: resolvedRoomIds.join(","),
+            passengers: buildAiRoomPassengers(resolvedRoomIds, roomConfigs, effectivePassengers),
+            holiday_package: 1,
+          };
+          const response = await folderService.addToFolder({
+            folderNumber: Number(folderNumber),
+            itineraryNumber: "1",
+            foldcur: normalizeCurrencyCode(currency),
+            travelPurpose: "Holiday",
+            set_as_preferred_itinerary: true,
+            passengers: folderPassengers as never,
+            requestData: [hotelRequestItem] as never,
+          });
+          if (response.success) return { ok: true, error: "" };
+          console.error("[AI checkout] Failed to add hotel to folder", { hotelRequestItem, response });
+          return { ok: false, error: addToFolderErrorText(response) };
+        };
+
+        for (const [destinationIndex, destination] of destinationDrafts.entries()) {
           if (!destination.hotel) continue;
-          const destinationLabel = destination.name || destination.hotel.name || "selected hotel";
+          const destinationLabel = destination.hotel.name || destination.name || "your hotel";
+          // Marked per hotel so a retry after a later hotel fails doesn't add this one to the folder twice.
+          const destinationAddedKey = `${hotelAddedKey}_${destinationIndex}`;
+          if (getSessionItem(destinationAddedKey) === "1") continue;
+
           if (isAiHotelbedsHotel(destination.hotel)) {
             const submitResp = await hotelService.submitHotelbedsToFolder({
               provider: "hotelbeds",
@@ -1158,59 +1322,30 @@ function AiCheckoutContent() {
             });
 
             if (!submitResp?.success) {
-              throw new Error(
-                `${submitResp?.message || "Failed to submit HotelBeds hotel to folder."} Hotel request: ${JSON.stringify({
-                  hotelId: resolveAiHotelId(destination.hotel),
-                  hotelName: destination.hotel.name,
-                  checkIn: hotelCheckInForDestination(destination, draft.search?.checkIn || ""),
-                  checkOut: hotelCheckOutForDestination(destination, draft.search?.checkOut || ""),
-                })}`
-              );
+              console.error("[AI checkout] Failed to submit Hotelbeds hotel to folder", {
+                hotelId: resolveAiHotelId(destination.hotel),
+                hotelName: destination.hotel.name,
+                response: submitResp,
+              });
+              throw new Error(hotelFolderErrorMessage(destinationLabel));
             }
+            setSessionItem(destinationAddedKey, "1");
             continue;
           }
 
-          const resolvedRoomIds = await resolveAiDestinationRoomIds(destination, roomConfigs.length);
-          if (resolvedRoomIds.length === 0) {
-            throw new Error(`Failed to resolve a live bookable room for ${destinationLabel}.`);
-          }
-
-          const hotelRequestItem = {
-            type: "hotel" as const,
-            search_result_id: resolveAiRoomId(destination.hotel) || undefined,
-            roomIds: resolvedRoomIds.join(","),
-            roomCodes: resolvedRoomIds.join(","),
-            passengers: buildAiRoomPassengers(resolvedRoomIds, roomConfigs, effectivePassengers),
-            holiday_package: 1,
-          };
-
-          const addHotelResponse = await folderService.addToFolder({
-            folderNumber: Number(folderNumber),
-            itineraryNumber: "1",
-            foldcur: normalizeCurrencyCode(currency),
-            travelPurpose: "Holiday",
-            set_as_preferred_itinerary: true,
-            passengers: folderPassengers as never,
-            requestData: [hotelRequestItem] as never,
-          });
-
-          if (!addHotelResponse.success) {
-            const details =
-              addHotelResponse.rawResponse &&
-              typeof addHotelResponse.rawResponse === "object" &&
-              "details" in addHotelResponse.rawResponse
-                ? String((addHotelResponse.rawResponse as { details?: unknown }).details || "")
-                : "";
-            throw new Error(
-              [
-                addHotelResponse.message || "Failed to add AI package hotel itinerary to folder.",
-                details,
-                `Hotel request: ${JSON.stringify(hotelRequestItem)}`,
-              ]
-                .filter(Boolean)
-                .join(" ")
+          let added = await addVyspaHotel(destination);
+          if (!added.ok && isExpiredHotelResultError(added.error)) {
+            const refreshed = await refreshExpiredVyspaDestination(destination, draft.search, roomConfigs.length, currency).catch(
+              (error) => {
+                if (error instanceof HotelPriceChangedError) throw error;
+                console.error("[AI checkout] Could not refresh expired hotel result", error);
+                return null;
+              }
             );
+            if (refreshed) added = await addVyspaHotel(refreshed);
           }
+          if (!added.ok) throw new Error(hotelFolderErrorMessage(destinationLabel));
+          setSessionItem(destinationAddedKey, "1");
         }
 
         setSessionItem(hotelAddedKey, "1");
