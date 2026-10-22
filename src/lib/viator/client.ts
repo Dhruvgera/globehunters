@@ -9,7 +9,7 @@ const VIATOR_RATE_LIMIT_RETRIES = 10;
 const VIATOR_RETRY_BASE_DELAY_MS = 300;
 const VIATOR_RATE_LIMIT_BASE_DELAY_MS = 1_000;
 const VIATOR_RETRY_MAX_DELAY_MS = 30_000;
-const VIATOR_DESTINATION_CACHE_TTL_MS = 60 * 60 * 1000;
+const VIATOR_DESTINATION_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const VIATOR_SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
 
 type ViatorEnvironment = "sandbox" | "production";
@@ -320,7 +320,13 @@ async function loadDestinations(): Promise<ViatorDestination[]> {
   if (destinationCache && destinationCache.expiresAt > Date.now()) return destinationCache.destinations;
 
   if (!destinationCachePromise) {
-    destinationCachePromise = viatorFetch<{ destinations?: unknown[] }>("/destinations")
+    // The destination list is large and Viator rate-limits it hard (a second call seconds later gets a 429). Each
+    // serverless instance used to fetch it on its first search, so after a deploy parallel searches queued behind
+    // 429 retries for 30s+ and the planner gave up on activities. Keep it in the shared Next.js data cache instead.
+    destinationCachePromise = viatorFetch<{ destinations?: unknown[] }>("/destinations", {
+      cache: "force-cache",
+      next: { revalidate: VIATOR_DESTINATION_CACHE_TTL_MS / 1000 },
+    })
       .then((response) => {
         const destinations = (Array.isArray(response.destinations) ? response.destinations.map(asRecord) : [])
           .map((destination) => ({
