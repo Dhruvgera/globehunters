@@ -738,9 +738,18 @@ type HotelAvailabilityParams = Parameters<typeof hotelService.searchAvailability
 
 const AI_HOTEL_SEARCH_MAX_POLLS = 6;
 const AI_HOTEL_SEARCH_POLL_MS = 3000;
-/** Covers the first Vyspa call plus every poll, each of which the server holds for up to the search timeout. */
+/** Extra fresh Vyspa searches when one comes back empty, before falling back to Hotelbeds-direct hotels. */
+const AI_HOTEL_SEARCH_EMPTY_RETRIES = 2;
+const AI_HOTEL_SEARCH_RETRY_MS = 3000;
+/**
+ * Covers the first Vyspa call plus every poll, each of which the server holds for up to the search timeout, and the
+ * retries after an empty answer.
+ */
 const AI_HOTEL_SEARCH_TIMEOUT_SEC =
-  VYSPA_SEARCH_TIMEOUT_SEC + 10 + AI_HOTEL_SEARCH_MAX_POLLS * (VYSPA_SEARCH_TIMEOUT_SEC + AI_HOTEL_SEARCH_POLL_MS / 1000);
+  VYSPA_SEARCH_TIMEOUT_SEC +
+  10 +
+  AI_HOTEL_SEARCH_MAX_POLLS * (VYSPA_SEARCH_TIMEOUT_SEC + AI_HOTEL_SEARCH_POLL_MS / 1000) +
+  AI_HOTEL_SEARCH_EMPTY_RETRIES * (VYSPA_SEARCH_TIMEOUT_SEC + 10);
 
 function isSearchComplete(value: unknown) {
   return value === true || value === 1 || value === "1" || String(value).toLowerCase() === "true";
@@ -764,14 +773,20 @@ function searchVyspaHotelAvailability(params: VyspaHotelSearchParams) {
   const key = JSON.stringify(params);
   const existing = vyspaHotelSearches.get(key);
   if (existing && Date.now() - existing.startedAt < VYSPA_HOTEL_SEARCH_REUSE_MS) return existing.promise;
-  const promise = pollVyspaHotelAvailability(params).then(async (availability) => {
+  const promise = (async () => {
+    let availability = await pollVyspaHotelAvailability(params);
+    // Vyspa intermittently reports a search complete with no hotels ("No hotels found in this area."), and the same
+    // search moments later returns them, so search again (bypassing the cached empty answer) before giving up.
+    for (let retry = 1; retry <= AI_HOTEL_SEARCH_EMPTY_RETRIES && !hasAvailabilityResults(availability); retry += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, retry * AI_HOTEL_SEARCH_RETRY_MS));
+      availability = await pollVyspaHotelAvailability(params, { freshSearch: true });
+    }
     if (hasAvailabilityResults(availability)) return availability;
-    // Vyspa occasionally reports a search complete with no hotels (and caches that answer for a while). Rather than
-    // leave the trip unpriced, fall back to the hybrid search; any Hotelbeds-direct hotel it returns is saved to the
-    // folder as a manual request.
+    // Rather than leave the trip unpriced, fall back to the hybrid search; any Hotelbeds-direct hotel it returns is
+    // saved to the folder as a manual request.
     console.warn("[AI planner] Vyspa returned no hotels; falling back to the hybrid hotel search", params.location);
     return hotelService.searchAvailabilityV3(params);
-  });
+  })();
   vyspaHotelSearches.set(key, { startedAt: Date.now(), promise });
   const forget = () => {
     if (vyspaHotelSearches.get(key)?.promise === promise) vyspaHotelSearches.delete(key);
@@ -787,8 +802,12 @@ function searchVyspaHotelAvailability(params: VyspaHotelSearchParams) {
  * Hotelbeds-direct results, which carry no locally payable fees and can only be saved to the folder as manual
  * requests. Vyspa results arrive over several calls, so poll until Vyspa reports the search complete.
  */
-async function pollVyspaHotelAvailability(params: VyspaHotelSearchParams) {
-  let availability = await hotelService.searchAvailabilityV3({ ...params, providerOverride: "vyspa" });
+async function pollVyspaHotelAvailability(params: VyspaHotelSearchParams, options: { freshSearch?: boolean } = {}) {
+  let availability = await hotelService.searchAvailabilityV3({
+    ...params,
+    providerOverride: "vyspa",
+    ...(options.freshSearch ? { freshSearch: true } : {}),
+  });
   for (let attempt = 0; attempt < AI_HOTEL_SEARCH_MAX_POLLS; attempt += 1) {
     const criteria = rawRecord((availability as unknown as Record<string, unknown>)?.Criteria);
     const results = (availability as unknown as Record<string, unknown>)?.Results;
@@ -2239,6 +2258,7 @@ function AiPackageContent() {
           withSearchTimeout(
             activityService.searchActivities({
               destinationName: segment.name,
+              airportCode: segment.airportCode || undefined,
               startDate: segmentActivityStartDate || undefined,
               endDate: segment.checkOut || undefined,
               adults,
@@ -2631,6 +2651,7 @@ function AiPackageContent() {
         const response = await withSearchTimeout(
           activityService.searchActivities({
             destinationName: activityDestinationName,
+            airportCode: activeDestination?.airportCode || destinationCode || undefined,
             startDate: activityStartDate || undefined,
             endDate: activityEndDate || undefined,
             adults,
@@ -2721,7 +2742,7 @@ function AiPackageContent() {
     return () => {
       cancelled = true;
     };
-  }, [activeActivitiesKey, activeActivityStartDate, activeDestination?.checkOut, activeDestination?.name, activeDestinationId, activityQuery, adults, checkOut, children, destination, hotelOptions, liveSearch.flight, liveSearch.flightRequestId, liveSearch.hotel, liveSearch.hotelError, liveSearch.hotelLoading, paramsKey, storeHotelSearch]);
+  }, [activeActivitiesKey, activeActivityStartDate, activeDestination?.airportCode, activeDestination?.checkOut, activeDestination?.name, activeDestinationId, activityQuery, adults, checkOut, children, destination, destinationCode, hotelOptions, liveSearch.flight, liveSearch.flightRequestId, liveSearch.hotel, liveSearch.hotelError, liveSearch.hotelLoading, paramsKey, storeHotelSearch]);
 
   useEffect(() => {
     const activeMatchedHotel =
@@ -3739,6 +3760,7 @@ function AiPackageContent() {
         withSearchTimeout(
           activityService.searchActivities({
             destinationName: name,
+            airportCode: airportCode || undefined,
             startDate: nextCheckIn,
             endDate: nextCheckOut,
             adults,

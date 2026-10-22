@@ -14,9 +14,16 @@ const VIATOR_SEARCH_CACHE_TTL_MS = 5 * 60 * 1000;
 
 type ViatorEnvironment = "sandbox" | "production";
 
+type ViatorDestination = {
+  id: string;
+  name: string;
+  type: string;
+  iataCodes: string[];
+};
+
 type DestinationCacheEntry = {
   expiresAt: number;
-  destinations: Record<string, string>;
+  destinations: ViatorDestination[];
 };
 
 type SearchCacheEntry = {
@@ -25,7 +32,7 @@ type SearchCacheEntry = {
 };
 
 let destinationCache: DestinationCacheEntry | null = null;
-let destinationCachePromise: Promise<Record<string, string>> | null = null;
+let destinationCachePromise: Promise<ViatorDestination[]> | null = null;
 const searchResponseCache = new Map<string, SearchCacheEntry>();
 const inflightSearches = new Map<string, Promise<ActivitySearchResponse>>();
 
@@ -105,6 +112,7 @@ function searchCacheKey(input: ActivitySearchRequest): string {
   return JSON.stringify({
     destinationId: input.destinationId || "",
     destinationName: normalizeDestinationName(input.destinationName || ""),
+    airportCode: String(input.airportCode || "").trim().toUpperCase(),
     startDate: input.startDate || "",
     endDate: input.endDate || "",
     adults: Number(input.adults || 0),
@@ -308,45 +316,78 @@ function mapProduct(product: unknown): ActivityProduct | null {
   };
 }
 
-async function findDestinationId(destinationName: string): Promise<string | undefined> {
-  const normalized = normalizeDestinationName(destinationName);
-  if (!normalized) return undefined;
-
-  if (destinationCache && destinationCache.expiresAt > Date.now()) {
-    const exact = destinationCache.destinations[normalized];
-    if (exact) return exact;
-  }
+async function loadDestinations(): Promise<ViatorDestination[]> {
+  if (destinationCache && destinationCache.expiresAt > Date.now()) return destinationCache.destinations;
 
   if (!destinationCachePromise) {
     destinationCachePromise = viatorFetch<{ destinations?: unknown[] }>("/destinations")
       .then((response) => {
-        const destinations = Array.isArray(response.destinations) ? response.destinations.map(asRecord) : [];
-        const next: Record<string, string> = {};
-
-        for (const destination of destinations) {
-          const name = normalizeDestinationName(String(destination.destinationName || destination.name || ""));
-          const id = String(destination.destinationId || destination.id || "").trim();
-          if (name && id) next[name] = id;
-        }
+        const destinations = (Array.isArray(response.destinations) ? response.destinations.map(asRecord) : [])
+          .map((destination) => ({
+            id: String(destination.destinationId || destination.id || "").trim(),
+            name: normalizeDestinationName(String(destination.destinationName || destination.name || "")),
+            type: String(destination.type || "").toUpperCase(),
+            iataCodes: (Array.isArray(destination.iataCodes) ? destination.iataCodes : []).map((code) =>
+              String(code || "").trim().toUpperCase()
+            ),
+          }))
+          .filter((destination) => destination.id && destination.name);
 
         destinationCache = {
           expiresAt: Date.now() + VIATOR_DESTINATION_CACHE_TTL_MS,
-          destinations: next,
+          destinations,
         };
 
-        return next;
+        return destinations;
       })
       .finally(() => {
         destinationCachePromise = null;
       });
   }
 
-  const destinations = await destinationCachePromise;
-  const exact = destinations[normalized];
-  if (exact) return exact;
+  return destinationCachePromise;
+}
 
-  const fuzzyEntry = Object.entries(destinations).find(([name]) => normalized.includes(name) || name.includes(normalized));
-  return fuzzyEntry?.[1];
+// Prefer cities, then cities served by an airport (the main city of that name), over regions and parks.
+function destinationRank(destination: ViatorDestination) {
+  return (destination.type === "CITY" ? 2 : 0) + (destination.iataCodes.length > 0 ? 1 : 0);
+}
+
+function bestDestination(candidates: ViatorDestination[]) {
+  return [...candidates].sort((a, b) => destinationRank(b) - destinationRank(a))[0];
+}
+
+/**
+ * Resolves a place name such as "New York, NY" to a Viator destination. Matching by the stop's airport code comes
+ * first, then exact names, then Viator names that start with the city name ("New York" -> "New York City"). Names
+ * are never matched by a fragment of the search term, so "New York, NY" can't resolve to York, England.
+ */
+async function findDestinationId(destinationName: string, airportCode?: string): Promise<string | undefined> {
+  const normalized = normalizeDestinationName(destinationName);
+  if (!normalized) return undefined;
+  const destinations = await loadDestinations();
+
+  const cityName = normalized.split(",")[0].trim();
+  const code = String(airportCode || "").trim().toUpperCase();
+  if (code) {
+    const byAirport = destinations.filter((destination) => destination.iataCodes.includes(code));
+    const sameName = byAirport.filter((destination) => destination.name === cityName || destination.name.startsWith(`${cityName} `));
+    const match = bestDestination(sameName.length > 0 ? sameName : byAirport);
+    if (match) return match.id;
+  }
+
+  for (const term of Array.from(new Set([normalized, cityName])).filter(Boolean)) {
+    const exact = destinations.filter((destination) => destination.name === term);
+    const startsWith = destinations.filter((destination) => destination.name.startsWith(`${term} `));
+    const exactMatch = bestDestination(exact);
+    const prefixMatch = bestDestination(startsWith);
+    // "New York" is a REGION in Viator while "New York City" is the city, so a city with the name as prefix beats a
+    // non-city exact match.
+    if (exactMatch && (exactMatch.type === "CITY" || prefixMatch?.type !== "CITY")) return exactMatch.id;
+    if (prefixMatch) return prefixMatch.id;
+  }
+
+  return undefined;
 }
 
 export async function searchViatorActivities(input: ActivitySearchRequest): Promise<ActivitySearchResponse> {
@@ -359,7 +400,7 @@ export async function searchViatorActivities(input: ActivitySearchRequest): Prom
 
   const task = (async () => {
     const currency = (input.currency || DEFAULT_CURRENCY).toUpperCase();
-    const destinationId = input.destinationId || (await findDestinationId(input.destinationName));
+    const destinationId = input.destinationId || (await findDestinationId(input.destinationName, input.airportCode));
     const count = Math.max(1, Math.min(24, Number(input.count || 12)));
 
     const filtering: Record<string, unknown> = {

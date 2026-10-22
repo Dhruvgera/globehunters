@@ -1,6 +1,8 @@
 export interface ActivitySearchRequest {
   destinationName: string;
   destinationId?: string;
+  /** Airport/city code of the stop (e.g. NYC); matched against Viator destination IATA codes. */
+  airportCode?: string;
   startDate?: string;
   endDate?: string;
   currency?: string;
