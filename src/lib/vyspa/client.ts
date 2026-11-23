@@ -188,18 +188,47 @@ export async function searchFlightsVyspa(
 
     clearTimeout(timeoutId);
 
-    console.log('📥 Vyspa API Response Status:', response.status);
+    const contentType = response.headers.get('content-type') || '';
+    console.log('📥 Vyspa API Response Status:', {
+      status: response.status,
+      contentType,
+      endpoint: new URL(flightsUrl).origin,
+    });
 
     if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined);
       throw createVyspaError(
         'API_ERROR' as VyspaErrorType,
         `HTTP ${response.status}: ${response.statusText}`,
         'Flight search service is currently unavailable. Please try again later.',
-        { status: response.status, statusText: response.statusText }
+        { status: response.status, contentType }
       );
     }
 
-    const data: VyspaApiResponse = await response.json();
+    // Some upstream failures are returned as an HTML proxy/login page with a 200
+    // status. Read the body as text first so these do not escape as an opaque
+    // JSON SyntaxError from the Server Action transport.
+    const responseText = await response.text();
+    let data: VyspaApiResponse;
+    try {
+      data = JSON.parse(responseText) as VyspaApiResponse;
+    } catch {
+      throw createVyspaError(
+        'API_ERROR' as VyspaErrorType,
+        `Vyspa returned a non-JSON response (${contentType || 'unknown content type'})`,
+        'Flight search service is currently unavailable. Please try again later.',
+        { status: response.status, contentType }
+      );
+    }
+
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      throw createVyspaError(
+        'API_ERROR' as VyspaErrorType,
+        'Vyspa returned an unexpected JSON response shape',
+        'Flight search service is currently unavailable. Please try again later.',
+        { status: response.status, contentType }
+      );
+    }
     
     console.log('✅ Vyspa API Response:', {
       hasResults: !!data.Results,

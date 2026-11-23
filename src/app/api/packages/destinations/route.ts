@@ -1,99 +1,74 @@
 /**
- * Holiday Package Destinations Autocomplete API Route
- * Endpoint: GET /api/packages/destinations?location={location}
- * 
- * Returns an array of destinations based on the given lookup parameter.
- * Uses Vyspa API: GET /rest/v4/holiday_destinations_autocomplete/{location}/1
+ * GET /api/packages/destinations?location={location}
+ * Proxies Vyspa's holiday destination autocomplete.
  */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { VYSPA_CONFIG } from '@/config/vyspa';
-import type { HolidayDestination } from '@/types/holidayPackage';
 
-function buildBasicAuthHeader(): string {
-  const username = VYSPA_CONFIG.credentials.username;
-  const password = VYSPA_CONFIG.credentials.password;
-  const basicAuth = Buffer.from(`${username}:${password}`).toString('base64');
-  return `Basic ${basicAuth}`;
+function upstreamError(reason: string, diagnostics: object) {
+  console.error('[PackageDestinations] Upstream failure', { reason, ...diagnostics });
+  return NextResponse.json({ error: 'Destination lookup is unavailable' }, { status: 502 });
 }
 
 export async function GET(request: NextRequest) {
+  const location = new URL(request.url).searchParams.get('location')?.trim();
+  if (!location || location.length < 2) {
+    return NextResponse.json(
+      { error: 'Location parameter is required and must be at least 2 characters' },
+      { status: 400 },
+    );
+  }
+
+  const startedAt = Date.now();
+  const region = process.env.VERCEL_REGION;
   try {
-    const { searchParams } = new URL(request.url);
-    const location = searchParams.get('location');
-
-    if (!location || location.trim().length < 2) {
-      return NextResponse.json(
-        { error: 'Location parameter is required and must be at least 2 characters' },
-        { status: 400 }
-      );
-    }
-
-    const encodedLocation = encodeURIComponent(location.trim());
-    const baseUrl = VYSPA_CONFIG.apiUrl.replace(/\/+$/, '');
-    // The second parameter (1) indicates json_format=true
-    const url = `${baseUrl}/rest/v4/holiday_destinations_autocomplete/${encodedLocation}/1`;
-
-    console.log('[PackageDestinations] Fetching destinations:', { location, url });
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), VYSPA_CONFIG.defaults.timeout);
-
+    const baseUrl = (process.env.VYSPA_PACKAGE_DESTINATIONS_API_URL || VYSPA_CONFIG.apiUrl).replace(/\/+$/, '');
+    const url = new URL(`${baseUrl}/rest/v4/holiday_destinations_autocomplete/${encodeURIComponent(location)}/1`);
+    const { username, password } = VYSPA_CONFIG.credentials;
     const response = await fetch(url, {
-      method: 'GET',
       headers: {
+        Accept: 'application/json',
         'Content-Type': 'application/json',
-        'Authorization': buildBasicAuthHeader(),
+        Authorization: `Basic ${Buffer.from(`${username}:${password}`).toString('base64')}`,
         'Api-Version': '1',
       },
-      signal: controller.signal,
+      redirect: 'manual',
+      signal: AbortSignal.timeout(VYSPA_CONFIG.defaults.timeout),
     });
 
-    clearTimeout(timeoutId);
+    const redirect = response.headers.get('location');
+    const redirectUrl = redirect ? URL.parse(redirect, url) : null;
+    const diagnostics = {
+      region,
+      upstreamOrigin: url.origin,
+      upstreamBasePath: new URL(baseUrl).pathname,
+      upstreamStatus: response.status,
+      contentType: response.headers.get('content-type'),
+      redirectOrigin: redirectUrl?.origin,
+      redirectsToSignIn: Boolean(redirectUrl && /(?:auth|login|sign[-_]?in)/i.test(redirectUrl.pathname)),
+      durationMs: Date.now() - startedAt,
+    };
 
     if (!response.ok) {
-      const errorText = await response.text().catch(() => 'Unknown error');
-      console.error('[PackageDestinations] Vyspa API error:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorText,
-      });
-      return NextResponse.json(
-        { error: `Vyspa API error: ${response.status}`, details: errorText },
-        { status: response.status }
-      );
+      await response.body?.cancel().catch(() => undefined);
+      return upstreamError(response.status >= 300 && response.status < 400 ? 'redirect' : 'http', diagnostics);
     }
 
-    const data = await response.json();
-
-    // The API returns an array of destinations
-    const destinations: HolidayDestination[] = Array.isArray(data) ? data : [];
-
-    console.log('[PackageDestinations] Found destinations:', {
-      location,
-      count: destinations.length,
+    const data: unknown = await response.json().catch((error: unknown) => {
+      if (error instanceof SyntaxError) return null;
+      throw error;
     });
+    if (!Array.isArray(data)) return upstreamError('unexpected response format', diagnostics);
 
-    return NextResponse.json(destinations);
+    console.info('[PackageDestinations] Lookup succeeded', { ...diagnostics, count: data.length });
+    return NextResponse.json(data);
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const isTimeout = error instanceof Error && error.name === 'AbortError';
-
-    console.error('[PackageDestinations] Error:', {
-      message: errorMessage,
-      isTimeout,
-    });
-
-    if (isTimeout) {
-      return NextResponse.json(
-        { error: 'Request timeout', message: 'The destination lookup request timed out' },
-        { status: 504 }
-      );
-    }
-
+    const errorName = error instanceof Error ? error.name : 'UnknownError';
+    const timedOut = errorName === 'TimeoutError';
+    console.error('[PackageDestinations] Request failed', { region, errorName, durationMs: Date.now() - startedAt });
     return NextResponse.json(
-      { error: 'Internal server error', message: errorMessage },
-      { status: 500 }
+      { error: timedOut ? 'Destination lookup timed out' : 'Destination lookup is unavailable' },
+      { status: timedOut ? 504 : 502 },
     );
   }
 }

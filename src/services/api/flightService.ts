@@ -32,6 +32,8 @@ export interface AirportFilter {
 
 export interface FlightSearchResponse {
   flights: Flight[];
+  /** Present when the upstream search failed; Server Actions return errors as data. */
+  error?: string;
   filters: {
     airlines: AirlineFilter[];
     departureAirports: AirportFilter[];
@@ -216,6 +218,9 @@ class FlightService {
 
       // Call server action
       const response = await searchFlightsAction(vyspaParams);
+      if (response.error) {
+        throw new Error(response.error);
+      }
 
       // Override tripType on each flight using the original search params.
       // This avoids inferring trip type from the number of segments returned

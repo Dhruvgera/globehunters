@@ -12,6 +12,14 @@ import { applyBusinessRules } from '@/lib/vyspa/rules';
 import type { FlightSearchRequest, VyspaError } from '@/types/vyspa';
 import type { FlightSearchResponse } from '@/services/api/flightService';
 
+function failedSearch(error: string): FlightSearchResponse {
+  return {
+    flights: [],
+    filters: { airlines: [], departureAirports: [], arrivalAirports: [], minPrice: 0, maxPrice: 0 },
+    error,
+  };
+}
+
 /**
  * Search for flights
  * @param params Flight search parameters from frontend
@@ -62,18 +70,24 @@ export async function searchFlights(
 
     return finalData;
   } catch (error: any) {
-    console.error('❌ Server Action: searchFlights error:', error);
+    console.error('❌ Server Action: searchFlights failed:', {
+      errorType: typeof error?.type === 'string' ? error.type : undefined,
+      errorName: error instanceof Error ? error.name : 'UnknownError',
+    });
 
     // Handle VyspaError
     if (error.type) {
       const vyspaError = error as VyspaError;
-      throw new Error(vyspaError.userMessage || vyspaError.message);
+      return failedSearch(vyspaError.userMessage || 'Flight search failed. Please try again.');
     }
 
-    // Re-throw with user-friendly message
-    throw new Error(
-      error.message || 'An error occurred while searching for flights. Please try again.'
-    );
+    if (error instanceof Error && error.message.startsWith('Invalid parameters:')) {
+      return failedSearch(error.message);
+    }
+
+    // Return errors as serializable data. Throwing from a Server Action turns
+    // a supplier outage into a production Server Components error (#441).
+    return failedSearch('Flight search failed. Please try again.');
   }
 }
 
